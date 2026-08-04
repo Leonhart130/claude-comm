@@ -1,0 +1,6 @@
+node_modules/
+
+# If the bus is ever installed into this repo itself, its runtime state is not source.
+.comm/inbox/
+.comm/delivered/
+.comm/corrupt/
