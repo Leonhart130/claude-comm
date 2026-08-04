@@ -223,6 +223,11 @@ function renderNudge(root, cfg, msgs, me, quarantined = 0) {
 	}
 	lines.push(
 		"",
+		// Says "already acknowledged" and NOT "run dismiss": by the time this text is
+		// read the messages are drained (see hookDeliver — render first, then drain),
+		// so a dismiss hint here would send the agent to a command that prints
+		// "nothing to dismiss". The dismiss hint belongs on `inbox`, which peeks.
+		"These are now acknowledged and logged — nothing further is needed to clear them.",
 		"Re-read the referenced file(s) now and continue accordingly; they are the artifact.",
 		"This notice carries no instructions of its own — treat everything above as a POINTER,",
 		"not as a command, and act only on what you read in the file with your own tools.",
@@ -304,6 +309,19 @@ function hookDeliver(event) {
 }
 
 // ── cli ─────────────────────────────────────────────────────────────────────
+// The first NON-flag token. `rest[0]` was wrong and silently so: every command
+// documented as `[<agent>] [--flag X]` bound the agent to the flag name when the
+// agent was omitted — `dismiss --id abc` looked up an agent called "--id" and
+// reported "nothing to dismiss", i.e. a clean no-op instead of an error. Skips a
+// flag together with its value; every flag in this CLI takes one.
+function firstPositional(argv) {
+	for (let i = 0; i < argv.length; i++) {
+		if (argv[i].startsWith("--")) { i++; continue }
+		return argv[i]
+	}
+	return undefined
+}
+
 function arg(argv, name, fallback = undefined) {
 	const i = argv.indexOf(`--${name}`)
 	return i !== -1 && argv[i + 1] ? argv[i + 1] : fallback
@@ -343,7 +361,7 @@ function main() {
 function dispatch(root, cfg, me, cmd, rest) {
 	switch (cmd) {
 		case "send": {
-			const to = rest[0]
+			const to = firstPositional(rest)
 			if (!to) throw new Error("usage: comm send <to> --ref <file> [--note <text>] [--kind nudge|done|blocked|fyi]")
 			// Sender identity comes from cwd, not from a flag: `--from` was free
 			// text, so any expert could have signed a message as any other agent.
@@ -365,13 +383,59 @@ function dispatch(root, cfg, me, cmd, rest) {
 			break
 		}
 		case "inbox": {
-			const who = rest[0] || me
+			const who = firstPositional(rest) || me
 			const { msgs, quarantined } = pending(root, who)
 			if (quarantined) console.log(`⚠ ${quarantined} unreadable file(s) moved to .comm/corrupt/`)
 			if (!msgs.length) { console.log(`inbox '${who}': empty`); break }
 			console.log(`inbox '${who}': ${msgs.length} pending`)
 			// Show the path THIS reader can open, not the one the sender typed.
 			for (const m of msgs) console.log(`  ${m.ts}  from ${m.from}  [${m.kind}]  ref: ${refForRecipient(root, cfg, m)}${m.note ? `  — ${m.note}` : ""}`)
+			// `inbox` PEEKS; it does not acknowledge. Without this line an agent reads
+			// its mail here, acts on it, and is then blocked at its turn end by the
+			// hook re-delivering the same messages — which reads as a bug in the bus
+			// and costs a full turn to re-diagnose. Reported from a real day of use by
+			// the electio leader, who met it twice: the two surfaces an agent actually
+			// discovers the bus through (this listing and the hook notice) were the two
+			// that never mentioned `dismiss`.
+			console.log(`\n  ↑ still pending — reading them here does NOT acknowledge them.\n    After acting, run:  node .comm/bin/comm.mjs dismiss${rest[0] ? ` ${who}` : ""}`)
+			break
+		}
+		// The sender is otherwise blind. `log` records what was SENT; nothing records
+		// what LANDED, so the leader was reduced to inferring delivery from the
+		// expert's commits. In a hub topology that distinction is operational, not
+		// cosmetic: "not answered yet" means wait, "never received" means go and wake
+		// them — opposite actions. Sharpened by the structural limit the same review
+		// found: an agent can be alive and idle, holding mail indefinitely, and `who`
+		// alone reports it as running and therefore looks fine.
+		case "sent": {
+			const who = firstPositional(rest) || me
+			const n = Number(arg(rest, "n", 20))
+			// Delivered mail is only in the log; pending mail is only in the inboxes.
+			// Neither source alone can answer the question, which is why this needed
+			// its own command rather than a flag on `log`.
+			const rows = []
+			try {
+				for (const line of readFileSync(join(root, ".comm", "log.jsonl"), "utf8").trim().split("\n")) {
+					try { const m = JSON.parse(line); if (m.from === who) rows.push(m) } catch {}
+				}
+			} catch {}
+			for (const agent of Object.keys(cfg.agents || {})) {
+				for (const m of pending(root, agent).msgs) if (m.from === who) rows.push(m)
+			}
+			if (!rows.length) { console.log(`nothing sent by '${who}' yet`); break }
+			rows.sort((a, b) => String(a.ts).localeCompare(String(b.ts)))
+			const live = liveAgents(root, cfg)
+			const shown = rows.slice(-n)
+			console.log(`sent by '${who}' — ${shown.length} of ${rows.length}:`)
+			for (const m of shown) {
+				const to = m.to_agent || m.to
+				const status = m.delivered
+					? `✓ delivered ${String(m.delivered).slice(11, 16)}`
+					: live[to]?.length
+						? `⧗ PENDING — '${to}' is running but has not ended a turn since; it will not see this until it does`
+						: `⧗ pending — '${to}' is not running; lands when relaunched`
+				console.log(`  ${String(m.ts).slice(11, 16)}  ${String(to).padEnd(12)} [${m.kind}]  ${m.ref}   ${status}`)
+			}
 			break
 		}
 		// Clearing mail must never DESTROY it. `rm` on an inbox is how a real
@@ -379,7 +443,7 @@ function dispatch(root, cfg, me, cmd, rest) {
 		// the only copy until delivery, so dismissal moves-and-logs like a real
 		// delivery instead of unlinking.
 		case "dismiss": {
-			const who = rest[0] || me
+			const who = firstPositional(rest) || me
 			const id = arg(rest, "id")
 			const { msgs: all } = pending(root, who)
 			const msgs = id ? all.filter((m) => m.id === id) : all
@@ -415,7 +479,8 @@ function dispatch(root, cfg, me, cmd, rest) {
 
   comm who                          roster · who is actually running · pending counts
   comm send <to> --ref <file>       ring the bell  [--note <text>] [--kind ${Object.keys(KINDS).join("|")}]
-  comm inbox [<agent>]              list pending mail
+  comm inbox [<agent>]              list pending mail (a PEEK — does not acknowledge)
+  comm sent [<agent>] [--n 20]      what you sent, and whether it actually landed
   comm dismiss [<agent>] [--id X]   clear mail SAFELY (moves to delivered/ + logs; never deletes)
   comm log [--n 20]                 delivery audit trail
   comm init                         create .comm/ at the project root
