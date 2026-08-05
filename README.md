@@ -146,17 +146,24 @@ too — it is how a check gets disabled wholesale a week later.*
   prevents *accidents and confusion*, not a determined local attacker. There is nothing to defend against
   here that the user could not already do directly.
 
-The test plants a sentinel token that exists **only** inside a file the agent is never told to read, then
-asks one discriminating question: did the token reach the agent's answer?
+`selftest.mjs` stands up a scratch project, installs the real hooks, and runs real `claude -p` sessions. It
+asks **two** questions and gates only one of them:
 
-- **Arm A** (mail sent) → token must appear.
-- **Arm B** (empty inbox) → token must **not** appear.
+| | question | determinism | role |
+| --- | --- | --- | --- |
+| **transport** | did the hook fire at the turn boundary, drain the right mail, and log it `via=hook`? | deterministic | **the gate** |
+| **behaviour** | did the agent then read the file it was pointed at? | not deterministic | reported, never gated |
 
-Both arms are required. *A green arm A alone is indistinguishable from an agent that reads `REVIEW.md` out
-of habit* — that is a probe returning a plausible wrong **result** rather than an error.
+⭐ **Gating the second one is what made this test flaky (~1 run in 6 red for nothing), and the split is not a
+workaround — it follows from the design.** Pointer-not-content exists so the agent stays free to read the
+file or not; *a gate demanding obedience measures precisely what this bus refuses to guarantee.* Measured
+after the rewrite: **6 runs, transport green 6/6, behaviour 3 read / 3 did not** — every one of those three
+would have been a red run before. A gate that reddens at random trains you to re-run it until it agrees
+with you, which is worse than no gate, and it makes a green run weak evidence too.
 
-`--prove-red` strips the hook and leaves the message, the file and the token identical — one variable
-moved. **A self-test that stays green with its own mechanism removed is testing nothing.**
+`--prove-red` strips **only** the hook, leaving the message and the file identical — one variable moved. The
+mail must then survive undelivered. **A self-test that stays green with its own mechanism removed is testing
+nothing.**
 
 ## Porting to another project
 
