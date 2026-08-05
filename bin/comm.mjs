@@ -361,8 +361,20 @@ function renderNudge(root, cfg, msgs, me, quarantined = 0, event = "stop") {
  * exists precisely to answer that, reported a dismissed message as ✓ delivered.
  * The latency table in STATUS is computed from this field, so a dismissal would
  * contribute a fabricated latency and nothing could detect it after the fact.
+ *
+ * `idSrc` is the same lesson one level down, and I was its first victim. I read
+ * `to_agent` as an audit field and reported "0 of 37 rows drained by the wrong
+ * agent" — but `pending()` reads inbox/<agent>/ and drain stamps that SAME
+ * agent, so `to === to_agent` holds for every reachable row. It is the A10
+ * class: an assertion true for every value it can take. Worse than logging
+ * nothing, because it LOOKS like the audit. Measured 2026-08-06 with two arms —
+ * app's own stub, and the leader's stub declaring CLAUDE_COMM_AGENT=app — the
+ * two rows were byte-identical in every logged field. What distinguishes them
+ * is not the NAME but where the name CAME FROM: `stub` means that agent's own
+ * installed hook ran (identity cannot wander, finding 1), `declared` means a
+ * session asserted the name through the environment. Gated by A24.
  */
-function drain(root, agent, msgs, via = "hook") {
+function drain(root, agent, msgs, via = "hook", idSrc = "cli") {
 	const done = join(root, ".comm", "delivered")
 	mkdirSync(done, { recursive: true })
 	for (const m of msgs) {
@@ -371,7 +383,7 @@ function drain(root, agent, msgs, via = "hook") {
 	try {
 		appendFileSync(
 			join(root, ".comm", "log.jsonl"),
-			msgs.map((m) => JSON.stringify({ ...m, _file: undefined, delivered: new Date().toISOString(), via, to_agent: agent })).join("\n") + "\n"
+			msgs.map((m) => JSON.stringify({ ...m, _file: undefined, delivered: new Date().toISOString(), via, to_agent: agent, id_src: idSrc })).join("\n") + "\n"
 		)
 	} catch {}
 }
@@ -480,6 +492,10 @@ function hookDeliver(event) {
 	const cfg = loadConfig(root)
 	const me = whoami(root, cfg, anchor)
 	if (!me) process.exit(0)
+	// Where the name came from, not merely what it is — see drain(). Test the
+	// declaration FIRST: it wins inside whoami, so checking agentRoot first would
+	// stamp `stub` on every impostor row and re-create the field this fixes.
+	const idSrc = declaredAgent() ? "declared" : agentRoot ? "stub" : "cwd"
 
 	const { msgs, quarantined } = pending(root, me)
 	if (!msgs.length && !quarantined) process.exit(0)
@@ -489,7 +505,7 @@ function hookDeliver(event) {
 	// exits 0 — a silently lost round report, with the audit log claiming it was
 	// delivered. Rendering is pure; draining is the irreversible half.
 	const reason = renderNudge(root, cfg, msgs, me, quarantined, event)
-	drain(root, me, msgs, "hook")
+	drain(root, me, msgs, "hook", idSrc)
 
 	if (event === "stop") {
 		process.stdout.write(JSON.stringify({ decision: "block", reason }))
