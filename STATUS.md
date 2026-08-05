@@ -1,4 +1,4 @@
-# STATUS — claude-comm, 2026-08-05 (sessions 4–5)
+# STATUS — claude-comm, 2026-08-05 (sessions 4–6)
 
 Design and gates are in `README.md`; **this file is only what is OPEN.** Keep it short — when it grows,
 fold the settled parts into the README.
@@ -10,7 +10,7 @@ fold the settled parts into the README.
 | toolkit | `bin/comm.mjs`, `install.mjs`, `test/attack.mjs`, `test/selftest.mjs`, `test/latency.mjs` — no dependencies |
 | repo | git initialised, local only, no remote |
 | **electio** | in real daily use — 26 real deliveries, both directions. **Ran a bus 4 commits stale until this session** |
-| gates | `attack` **19/19** deterministic ✓, **every case proved able to go red** (defect restored in the bus, gate byte-identical) · `selftest` **now deterministic too** — 6/6 transport green |
+| gates | `attack` **20/20** deterministic ✓, **every case proved able to go red** (defect restored in the bus, gate byte-identical) · `selftest` **now deterministic too** — 6/6 transport green |
 | reviews | #1 (9 findings) in `REVIEW-adversarial.md` · #2 (10 findings) in `REVIEW-adversarial-2.md` · electio leader's field reviews in `REVIEW-electio-leader.md` and `REPLY-from-electio-leader.md` |
 
 ## ✅ Closed in session 4 — adversarial review #2
@@ -79,6 +79,16 @@ That is the A12 failure class — four diagnostics agreeing on a confident wrong
 fix for A17, by me, the same day. `who` now reports off-bus sessions and `sent` says `⧗ STUCK` with the
 reason. Gated by **A19**.
 
+✅ **Confirmed in the field the next morning, unprompted.** After the reboot the owner relaunched all three
+electio sessions with the declaration set — `leader`, `web-app`, and `none` on an adversarial reviewer
+sharing the leader's directory. `comm who` reports one pid per agent and the shared-inbox warning is gone,
+on the exact layout that produced it. Read from `/proc/<pid>/environ`, not from anyone's report.
+
+⚠️ **One honest limit of that display, unchanged:** the off-bus warning is printed only when the agent has
+*no* live session (`!l && off`). Here the reviewer is off-bus in the leader's directory while the leader
+runs, so `who` says nothing about it. That is correct — an off-bus session drains nothing — but it means
+`who` confirms "the leader is on the bus", never "nothing else is sitting in its tree".
+
 ⭐ **The leader's question was better than a fix would have been:** *is "one agent = one directory" the right
 axiom for a bus whose hub is exactly where you parallelise?* No — and the answer is that the name must be
 declarable, not derived. That is a design change it surfaced by asking rather than by proposing.
@@ -101,6 +111,48 @@ No defect on the path that mattered, which is worth stating as plainly as a defe
 fixed and the whole path is now gated by **A18**. It deserved the attention: it is the only path that serves
 a stopped agent, it fires when the inbox is fullest, and a rejected schema there would drain mail and show
 it to no one.
+
+## ✅ Closed in session 6 — a gate went red on its own
+
+🔴 **A declared identity was matched globally, so it leaked across projects.** `whoami` returned on the
+declaration without ever checking the process lives in *this* project — and **every project in this
+framework has an agent named `leader`.**
+
+I did not go looking for this. `attack` was run as a routine check after the reboot and **A19 failed with
+no code change since it was committed.** The cause: the real electio leader, relaunched that morning with
+`CLAUDE_COMM_AGENT=leader`, was counted as a live `leader` inside A19's own throwaway temp project, which
+made `who` take the "agent is running" branch and skip the off-bus warning A19 exists to assert.
+
+Reproduced with one variable moved — same box, same live sessions, same directory, only the agent's **name**
+changed in an unrelated temp project:
+
+| `.comm/config.json` agent name | `comm who` in `/tmp/comm-leak-BPO8` |
+| --- | --- |
+| `chief` | `○ chief  not running` |
+| `leader` | `● leader  running (pid 388580)` ← **a session in `~/Dev/electio`** |
+
+Everything built on `liveAgents` inherited it: `send` and `sent` would report a recipient as reachable with
+nothing listening, and `who` would print a live pid for a project whose leader was not running at all.
+That is the A12 failure class again — a confident wrong answer, agreed on by several surfaces.
+
+Fix: the declaration still wins over the directory, but only within its own project — `findRoot(process cwd)`
+must resolve to this root. Safe to make stricter because `liveAgents` only ever *reports*; delivery anchors
+on the hook stub's location, so a stricter answer here cannot lose mail. A session's own cwd is stable under
+the Bash tool's `cd` (verified against a live session), so this is not the wandering-cwd surface finding 1
+removed.
+
+**Gated by A20, proved red with the defect restored in the bus and the gate byte-identical** — and it fails
+on the arm that matters: `foreign reported running=true (want false)` while `native` stays `true`. A20 carries
+both arms deliberately: from the foreign arm alone, "scoped correctly" and "declared liveness switched off
+entirely" are indistinguishable.
+
+⚠️ **This is the third consecutive session in which the highest-value finding was in the previous session's
+fix** — A17 (declared identity, session 5) created it, exactly as [[attack-the-recent-fix]] predicts. It was
+caught by a contradiction from outside, never by re-reading the patch.
+
+⚠️ **electio is now running a bus one commit stale** (its `.comm/bin/comm.mjs` was byte-identical to the
+repo before this fix). No live impact there today — it is the only installed project, so no name collides —
+but the moment a second project is installed, or selflo is restored, it collides on `leader`.
 
 ## ⏭️ OPEN
 
@@ -138,9 +190,37 @@ it to no one.
 2. **`--reply-to <id>` (threading).** Requested by the electio leader in review #1 — and **deprioritised by
    it in its follow-up**: with two agents, threading adds identity surface while the substance already lives
    in the file. It ranks the wake mechanism (item 3) above this.
-3. **Phase 2 — kitty wake for the idle agent. CONFIG NOW ENABLED, TRANSPORT NOT BUILT.**
+3. **Phase 2 — kitty wake for the idle agent. RESTART DONE, RESOLVER BUILT AND VERIFIED LIVE, SEND NOT BUILT.**
    Item 1 is its justification: an agent alive but in no turn never receives its mail, and that is the last
    delivery gap.
+
+   **2026-08-05, after the owner's reboot — measured against the four real sessions on his screen**
+   (`node test/kitty-resolve.mjs <pid>...`, read-only, sends nothing):
+
+   | | result |
+   | --- | --- |
+   | remote control survived the restart | ✓ socket `/tmp/kitty-384996`, `KITTY_LISTEN_ON` set in every window |
+   | every live agent resolved to exactly one window | ✓ 4/4, distinct windows, via nearest-ancestor `/proc` walk |
+   | a live process outside kitty is refused | ✓ orphaned stand-in → chain `408083 → 5084 → 1`, unresolved |
+   | pid 1, and kitty's own pid as a window root | ✓ both correctly refused / absent |
+
+   🔴 **The obvious implementation would have been a permanent silent no-op.** `@ ls` reports a window
+   `pid`, and it is the window's **shell** — the agent is in `foreground_processes`. Matching `window.pid`
+   against the pids `comm who` knows resolved **0 of 4** on the real layout. Under constraint 2 (refuse
+   when the match does not resolve) that is a wake that never fires and reads on screen exactly like *"no
+   idle agent needed waking"* — this project's signature failure shape, and it is kept as a live control in
+   the probe rather than as a comment.
+
+   ⚠️ A whole-chain match is *not* equivalent to nearest-ancestor: every chain passes through kitty itself
+   and up to init, so a wider match adds only false hits. Refusing those as "ambiguous" would be safe in
+   the wrong direction — the same silent no-op. The nearest ancestor that is a window's root **is** the
+   window; there is nothing to disambiguate.
+
+   **Constraint 1 is now confirmed by observation rather than argument.** Two of the five windows share
+   `/home/leonh/Dev/electio` (the leader and an off-bus adversarial reviewer), so cwd cannot identify an
+   agent — and the window **title changed between two `@ ls` calls seconds apart**, because the spinner
+   glyph is part of it (`⠐ Consult with leader expert` → `⠂ …`). Titles are not merely fragile; they are
+   not stable across two consecutive reads.
 
    **Done 2026-08-05:** `~/.config/kitty/kitty.conf` now sets `allow_remote_control socket-only` and
    `listen_on unix:/tmp/kitty-{kitty_pid}` (backup in scratchpad). `socket-only` because the windows run

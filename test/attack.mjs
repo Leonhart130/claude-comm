@@ -512,6 +512,59 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 		`stand-in alive=${sawProc}, who says OFF-BUS=${/OFF-BUS/.test(whoOut)}, sent says STUCK=${/STUCK/.test(sentOut)}`)
 }
 
+// A20 — a declared identity must be scoped to ITS OWN project.
+//
+// Found by A19 going red with no code change: the declaration was matched against
+// the inspecting project's config with no check that the process lives there, and
+// EVERY project in this framework has an agent named `leader`. So electio's leader
+// was reported as the live leader of an unrelated project — masking A19's off-bus
+// warning, and telling `send`/`sent` a recipient was reachable when nothing was.
+//
+// Two arms, because "scoped correctly" and "declared liveness switched off" look
+// identical from the FOREIGN arm alone. The NATIVE arm is what makes this a test
+// of the rule rather than of its absence.
+{
+	const rootA = mkdtempSync(join(tmpdir(), "comm-attack-scope-"))
+	const elsewhere = mkdtempSync(join(tmpdir(), "comm-attack-elsewhere-"))
+	mkdirSync(join(rootA, "app", "docs"), { recursive: true })
+	mkdirSync(join(rootA, ".comm"), { recursive: true })
+	writeFileSync(join(rootA, "app", "docs", "REVIEW.md"), "# review\n")
+	writeFileSync(join(rootA, ".comm", "config.json"),
+		JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app" } }))
+	execFileSync("node", [join(PKG, "install.mjs"), rootA], { stdio: "pipe" })
+	const busA = join(rootA, ".comm", "bin", "comm.mjs")
+	const fake = join(elsewhere, "claude")
+	writeFileSync(fake, '#!/bin/sh\nsleep "$1"\n', { mode: 0o755 })
+
+	// One arm: a stand-in declaring `leader` from `cwd`, and what `who` says about it.
+	const arm = (cwd) => {
+		const child = spawn(fake, ["20"], {
+			cwd, detached: true, stdio: "ignore",
+			env: { ...process.env, CLAUDE_COMM_AGENT: "leader" },
+		})
+		let out = "", alive = false
+		try {
+			const deadline = Date.now() + 4000
+			while (Date.now() < deadline) {
+				out = spawnSync("node", [busA, "who"], { cwd: rootA, encoding: "utf8" }).stdout || ""
+				if (/leader\s+running/.test(out)) break
+			}
+			try { process.kill(child.pid, 0); alive = true } catch {}
+		} finally { try { process.kill(-child.pid) } catch {} }
+		return { alive, running: new RegExp(`leader\\s+running \\(pid [\\d,]*${child.pid}`).test(out) }
+	}
+
+	const foreign = arm(elsewhere)   // declared `leader`, but living in another tree
+	const native = arm(rootA)        // declared `leader`, living in this project
+	try { rmSync(rootA, { recursive: true, force: true }) } catch {}
+	try { rmSync(elsewhere, { recursive: true, force: true }) } catch {}
+
+	check("A20 declared identity is scoped to its project",
+		foreign.alive && native.alive && !foreign.running && native.running,
+		`foreign(alive=${foreign.alive}) reported running=${foreign.running} (want false); ` +
+		`native(alive=${native.alive}) reported running=${native.running} (want true)`)
+}
+
 // A14 — a valueless flag must not swallow the positional that follows it.
 // `dismiss --force leader` cleared the OPERATOR'S OWN inbox and reported success,
 // because firstPositional skipped `--force` together with the next token. Reachable

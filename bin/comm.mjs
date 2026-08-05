@@ -137,7 +137,26 @@ const declaredAgent = () => {
 // resolves identity for OTHER processes, and reading our own env there would
 // stamp this session's declaration onto every process it inspects.
 function whoami(root, cfg, cwd = process.cwd(), declared = declaredAgent()) {
-	if (declared) return Object.prototype.hasOwnProperty.call(cfg.agents || {}, declared) ? declared : null
+	// The declaration wins over the directory — but it is still scoped to THIS
+	// project. Without this, a name is matched globally: every project in the
+	// framework has an agent called `leader`, so a session declared `leader` for
+	// one project was reported as the live leader of every other project on the
+	// box. Measured 2026-08-05 with one variable moved — renaming the agent in an
+	// unrelated temp project from `chief` to `leader` was enough to make `comm who`
+	// there print `● leader running (pid 388580)`, a pid belonging to a session in
+	// ~/Dev/electio. It also MASKED the off-bus warning (that is how A19 caught it,
+	// by going red with no code change), and made `send`/`sent` report a recipient
+	// as reachable when nothing was listening. Gated by A20.
+	if (declared) {
+		if (!Object.prototype.hasOwnProperty.call(cfg.agents || {}, declared)) return null
+		// A session's OWN cwd is stable — the Bash tool's `cd` does not move it,
+		// verified against a live session — so this is a reliable project test and
+		// not the wandering-cwd surface that finding 1 removed from delivery. It is
+		// also only ever consulted for REPORTING: delivery anchors on the hook
+		// stub's location, so a stricter answer here cannot lose mail.
+		const home = findRoot(cwd)
+		return home && resolve(home) === resolve(root) ? declared : null
+	}
 	const abs = resolve(cwd)
 	const base = resolve(root)
 	const entries = Object.entries(cfg.agents || {})
