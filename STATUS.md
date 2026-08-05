@@ -10,12 +10,12 @@ fold the settled parts into the README.
 | toolkit | `bin/comm.mjs`, `install.mjs`, `test/attack.mjs`, `test/selftest.mjs`, `test/latency.mjs` — no dependencies |
 | repo | git initialised, local only, no remote |
 | **electio** | in real daily use — 26 real deliveries, both directions. **Ran a bus 4 commits stale until this session** |
-| gates | `attack` **15/15** deterministic ✓ — and **all 15 proved able to go red**, gate untouched, one mutation at a time · `selftest` is FLAKY, open item 1 |
+| gates | `attack` **16/16** deterministic ✓, **every case proved able to go red** (defect restored in the bus, gate byte-identical) · `selftest` **now deterministic too** — 6/6 transport green |
 | reviews | #1 (9 findings) in `REVIEW-adversarial.md` · #2 (10 findings) in `REVIEW-adversarial-2.md` · electio leader's field reviews in `REVIEW-electio-leader.md` and `REPLY-from-electio-leader.md` |
 
 ## ✅ Closed in session 4 — adversarial review #2
 
-All 10 findings reproduced before being fixed, and **every fix is pinned by a gate that was demonstrated
+All 10 findings reproduced before being fixed, plus open item 1 (the flaky `selftest`) closed, and **every fix is pinned by a gate that was demonstrated
 to go red.** The two 🔴 are the ones that matter.
 
 | # | defect | fix |
@@ -30,6 +30,7 @@ to go red.** The two 🔴 are the ones that matter.
 | 8 🟡 | the `inbox` peek hint told you to run a `dismiss` the identity guard refuses | hint matches the guard (`dismiss <agent> --force`) |
 | 9 🟡 | `comm sent` quarantined corrupt files as a side effect and said nothing | reports the count, as `who` already did |
 | 10 🟡 | the installer said hooks "take effect in the NEXT session" — true of `settings.json`, **false of the bus**, the only file an upgrade changes | says both, explicitly |
+| 11 🔴 | **`selftest` reddened ~1 run in 6 with nothing wrong** — ARM A asserted a sentinel reached a real agent's *output*, measuring the transport AND the model's choice to obey | split: **transport** (hook fired, right mail drained, logged `via=hook`) is deterministic and is the gate; **behaviour** (did the agent read?) is reported, never gated |
 
 ⚠️ **A retraction on finding 6, because it was my fix that was wrong.** Importing the constants did *not*
 close it: the budget is derived from them, so raising `MAX_REF` raised the budget too and A2 still could
@@ -43,17 +44,7 @@ proposed fix would have left the mail theft in place. Its *observation* is what 
 
 ## ⏭️ OPEN
 
-1. **🔴 `selftest` is flaky: ~1 run in 6 goes red with nothing wrong.** Measured, pre-existing. ARM A
-   asserts a sentinel appears in a real agent's output, which measures two things — that the transport
-   injected the nudge, and that the model chose to obey.
-
-   ⭐ **The electio leader sharpened the cause and its version is better:** that non-determinism is a
-   **consequence of the design, not an accident.** The pointer-not-content rule leaves the agent free to
-   read or not, so *a gate demanding obedience measures precisely what the security model refuses to
-   guarantee.* Fix: split it — **transport** (did the hook emit the right nudge to the right agent?) is
-   deterministic and is the real gate; **behaviour** (did the agent read?) is observable and must be
-   reported, never gated. Until then a green `selftest` is weak evidence, and `attack.mjs` is the gate.
-2. **🔴 Latency is a mailbox — not an interrupt.** Re-derive with `node test/latency.mjs <log>`; the table
+1. **🔴 Latency is a mailbox — not an interrupt.** Re-derive with `node test/latency.mjs <log>`; the table
    is no longer transcribed. From electio's 26 real deliveries:
 
    | direction | n | median | max |
@@ -66,22 +57,33 @@ proposed fix would have left the mail theft in place. Its *observation* is what 
    session alive and pid visible, because it was in no turn at all. `who` showing "running" does not mean
    reachable. Do not describe the bus as real-time in any doc.
 
-   ⚠️ **Two mechanisms are indistinguishable in this data, and one is new.** Review #2: an agent whose turn
-   ends *while its cwd has wandered into a non-agent directory* also silently receives nothing (`whoami`
-   returns null, hook exits 0). The long tail may be idleness, or this. The log cannot separate them.
+   ⚠️ **A second mechanism contributed to this tail, and it is now FIXED — which means the historical
+   numbers above are worse than what the bus does today.** Review #2 found that a turn ending with cwd in a
+   non-agent directory made `whoami` return null, so the hook exited 0 and the agent's own mail was silently
+   not delivered. Measured on the pre-fix bus, leader's own mail, one variable moved:
+
+   | turn ends in | old bus | new bus |
+   | --- | --- | --- |
+   | `.` (root) | delivered | delivered |
+   | `docs/`, `scripts/` | **silently not delivered** | delivered |
+   | `web-app/` (another agent's dir) | **stolen — drained into the wrong inbox** | delivered |
+
+   So an unknown share of the tail was a turn that simply ended in the wrong directory, not an idle agent.
+   The log cannot say which rows. Going forward only idleness remains, and **that one is still open** — it
+   is the whole justification for item 3. Gated by **A16**.
 
    ⚠️ **All 26 rows predate the `via` field, so delivery, dismissal, and a drain by the wrong agent are
    indistinguishable across the whole history.** The script says so on every run rather than printing a
    clean table. New rows are not exposed to this.
-3. **`--reply-to <id>` (threading).** Requested by the electio leader in review #1 — and **deprioritised by
+2. **`--reply-to <id>` (threading).** Requested by the electio leader in review #1 — and **deprioritised by
    it in its follow-up**: with two agents, threading adds identity surface while the substance already lives
-   in the file. It ranks the wake mechanism (item 4) above this.
-4. **Phase 2, deferred by the owner:** kitty socket for a true mid-turn interrupt. Item 2 is its
+   in the file. It ranks the wake mechanism (item 3) above this.
+3. **Phase 2, deferred by the owner:** kitty socket for a true mid-turn interrupt. Item 1 is its
    justification. ⚠️ Before relying on it, verify `kitten @ ls` resolves splits by title on a scratch split —
    a `--match` that matches nothing sends the nudge into the void and looks exactly like an agent ignoring
    it. Third option surfaced by the owner: an **MCP channel that pushes into the session**
    (`--dangerously-load-development-channels`) — undocumented, dev-flagged, **unverified on 2.1.221**.
-5. **selflo is UNINSTALLED** (owner's call, 2026-08-04). Backup:
+4. **selflo is UNINSTALLED** (owner's call, 2026-08-04). Backup:
    `scratchpad/selflo-comm-backup-2026-08-04.tgz`. ⚠️ Its `COORDINATION.md`, `scripts/sync-agent-files.mjs`
    and 6 `docs/START_HERE.md` **still document the bus** — an agent relaunched there before reinstall will
    follow those docs into a missing file.
@@ -98,7 +100,9 @@ proposed fix would have left the mail theft in place. Its *observation* is what 
 - **`SessionStart` under cwd drift.** It shares `hookDeliver`, so it shares the fix by construction, but
   every case run here fires `Stop`.
 - **Behaviour when an agent is mid-tool-call** rather than mid-turn. Still unexercised.
-- **`selftest` was not run this session** — deliberately, per the review brief. Nothing here leans on it.
+- **`selftest`'s BEHAVIOUR half is not a gate and never will be** — 3 of 6 runs showed the agent not reading
+  the file it was pointed at. That is allowed by design, but it means this bus regularly rings a bell nobody
+  answers, and no gate can tell you that happened in production.
 - **Anything non-Linux**: `comm who` reads `/proc` and degrades to "not running" everywhere else.
 - **A8's two guards under partial mutation.** Each alone is uncaught, both together are caught; the
   in-between cases were not enumerated.

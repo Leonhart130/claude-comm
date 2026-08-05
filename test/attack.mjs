@@ -341,6 +341,38 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 		`expert mail ${expertBefore} -> ${expertAfter}, leaked into leader's nudge=${leaked}`)
 }
 
+// A16 — the SECOND FACE of A13, and the quieter one. Before identity came from
+// the stub, a turn ending with cwd in a NON-AGENT subdirectory (a project has
+// docs/, data/, scripts/) made whoami return null, so the hook exited 0 and the
+// agent's OWN mail was silently not delivered — not stolen, just never handed
+// over, with nothing reporting it. Measured on the pre-fix bus: delivery worked
+// from the root and failed from docs/, scripts/ and the expert's dir alike. It is
+// also a second, indistinguishable explanation for the long latency tail.
+{
+	const root7 = mkdtempSync(join(tmpdir(), "comm-attack-nonagent-"))
+	process.on("exit", () => { try { rmSync(root7, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(root7, "app", "docs"), { recursive: true })
+	mkdirSync(join(root7, "docs"), { recursive: true })
+	mkdirSync(join(root7, ".comm"), { recursive: true })
+	writeFileSync(join(root7, "app", "docs", "REVIEW.md"), "# review\n")
+	writeFileSync(join(root7, ".comm", "config.json"),
+		JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app" } }))
+	execFileSync("node", [join(PKG, "install.mjs"), root7], { stdio: "pipe" })
+	const bus7 = join(root7, ".comm", "bin", "comm.mjs")
+	execFileSync("node", [bus7, "send", "leader", "--ref", "docs/REVIEW.md", "--note", "round report"],
+		{ cwd: join(root7, "app"), stdio: "pipe" })
+	const nl = () => readdirSync(join(root7, ".comm", "inbox", "leader")).filter((f) => f.endsWith(".json")).length
+	const before = nl()
+	// The leader's own stub, but its turn ended in a directory belonging to no agent.
+	const h = spawnSync("node", [join(root7, ".claude", "comm-hook.mjs"), "stop"], {
+		cwd: join(root7, "docs"), encoding: "utf8",
+		input: JSON.stringify({ cwd: join(root7, "docs"), stop_hook_active: false }),
+	})
+	const after = nl()
+	check("A16 non-agent cwd still delivers", before === 1 && after === 0 && (h.stdout || "").includes("claude-comm"),
+		`turn ended in docs/: leader mail ${before} -> ${after}, nudge=${(h.stdout || "").includes("claude-comm") ? "emitted" : "NONE"}`)
+}
+
 // A14 — a valueless flag must not swallow the positional that follows it.
 // `dismiss --force leader` cleared the OPERATOR'S OWN inbox and reported success,
 // because firstPositional skipped `--force` together with the next token. Reachable

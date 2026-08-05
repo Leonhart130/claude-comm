@@ -1,26 +1,38 @@
 #!/usr/bin/env node
 /**
- * claude-comm SELF-TEST — a falsifiable, end-to-end proof that the bus delivers.
+ * claude-comm SELF-TEST — an end-to-end proof that the bus delivers, using real
+ * installed hooks and real `claude -p` sessions.
  *
  *   node test/selftest.mjs              run the gate
  *   node test/selftest.mjs --prove-red  prove the gate CAN fail (negative control)
  *
- * It does NOT inspect code or count exit codes. It stands up a real scratch
- * project, installs the real hooks, runs REAL `claude -p` sessions, and asks one
- * discriminating question: did a unique token that exists ONLY inside a file the
- * agent was never told to read end up in that agent's answer?
+ * ── WHY THIS WAS REWRITTEN, 2026-08-05 ──────────────────────────────────────
+ * The previous version asserted that a sentinel token planted in a file the agent
+ * was never told to read appeared in that agent's ANSWER. It went red about one
+ * run in six with nothing wrong, because it measured two things at once:
  *
- *   ARM A (mail sent)   -> token MUST appear   (delivery worked)
- *   ARM B (no mail)     -> token MUST NOT appear (the probe can distinguish)
+ *   1. did the transport inject the nudge?   — deterministic
+ *   2. did the model then choose to obey it? — NOT deterministic
  *
- * Both arms are required. An arm-A pass alone is indistinguishable from an agent
- * that reads REVIEW.md out of habit -- which is precisely the failure mode where
- * a probe returns a plausible wrong RESULT instead of an error.
+ * ⭐ The electio leader supplied the sharper half of the diagnosis, and it is the
+ * reason the fix is a split rather than a retry loop: that non-determinism is a
+ * CONSEQUENCE OF THE DESIGN, not an accident. The whole point of pointer-not-
+ * content is that the agent stays free to read the file or not — so a gate that
+ * demands obedience measures precisely what this bus refuses to guarantee.
  *
- * --prove-red removes the hook and re-runs arm A. The token must then VANISH.
- * A "self-test" that stays green with its own mechanism removed is testing nothing.
+ * A gate that reddens at random trains you to re-run it until it agrees with you,
+ * which is worse than having no gate, and it also makes a GREEN run weak evidence.
+ *
+ * So the two questions are now separated:
+ *   · TRANSPORT  — did the hook fire at the turn boundary, drain the right mail,
+ *                  and log it? Fully deterministic. THIS is the gate.
+ *   · BEHAVIOUR  — did the agent then read the file? Observed and REPORTED on
+ *                  every run, never gated.
+ *
+ * --prove-red removes ONLY the hook and re-runs arm A. The mail must then survive,
+ * because nothing delivered it. That control is deterministic too.
  */
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from "node:fs"
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync, readdirSync } from "node:fs"
 import { join, dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { spawnSync } from "node:child_process"
@@ -52,31 +64,33 @@ in your reply so the leader knows the correction was received.
 `)
 
 log(`scratch project : ${root}`)
-
-// Clean up on EVERY exit path, not just the happy one: a gate that aborts
-// used to leave its scratch project behind, and they accreted silently in /tmp.
 process.on("exit", () => { try { rmSync(root, { recursive: true, force: true }) } catch {} })
-
 log(`sentinel token  : ${TOKEN}  (exists only inside app/docs/REVIEW.md)\n`)
 
-// ── install the real hooks ──────────────────────────────────────────────────
 const inst = spawnSync(process.execPath, [join(PKG, "install.mjs"), root], { encoding: "utf8" })
 if (inst.status !== 0) fail(`installer failed:\n${inst.stdout}${inst.stderr}`)
 if (!existsSync(join(app, ".claude", "comm-hook.mjs"))) fail("installer did not write the hook stub")
-log(`✓ installed hooks into ${Object.keys({ leader: 1, app: 1 }).length} agents`)
+log(`✓ installed real hooks into 2 agents`)
 
 if (PROVE_RED) {
-	// Remove ONLY the delivery mechanism. Everything else -- the message, the
-	// file, the token -- stays identical. Move one thing, per the framework.
+	// Remove ONLY the delivery mechanism. The message, the file and the token stay
+	// identical — one variable moved, per the framework.
 	writeFileSync(join(app, ".claude", "settings.json"), JSON.stringify({}, null, 2) + "\n")
 	log(`⚑ --prove-red: hooks stripped from app/.claude/settings.json (message + file left intact)`)
 }
 
 const bus = join(root, ".comm", "bin", "comm.mjs")
+const pending = (agent) => {
+	try { return readdirSync(join(root, ".comm", "inbox", agent)).filter((f) => f.endsWith(".json")).length } catch { return 0 }
+}
+const logRows = () => {
+	const p = join(root, ".comm", "log.jsonl")
+	if (!existsSync(p)) return []
+	return readFileSync(p, "utf8").trim().split("\n").filter(Boolean).map((l) => { try { return JSON.parse(l) } catch { return null } }).filter(Boolean)
+}
 // The prompt must NOT constrain the reply ("say exactly X, nothing else"), or it
 // CONTRADICTS the instruction in REVIEW.md and the agent may honour either one.
-// That made this gate flaky -- a false RED, which is as bad as a false green: it
-// teaches you to re-run a gate until it agrees with you.
+// That made the old gate flaky in a second, independent way.
 const runAgent = (label) => {
 	const r = spawnSync("claude", ["-p", `Reply with the word ${label}.`, "--model", MODEL, "--permission-mode", "acceptEdits"],
 		{ cwd: app, encoding: "utf8", timeout: 300000, input: "" })
@@ -85,9 +99,12 @@ const runAgent = (label) => {
 
 // ── ARM B: negative control — no mail ───────────────────────────────────────
 log(`\n── ARM B (no mail) ─────────────────────────────`)
+const rowsB0 = logRows().length
 const outB = runAgent("ARM_B_DONE")
+const drainedB = logRows().length - rowsB0
 const sawB = outB.includes(TOKEN)
-log(`  token present: ${sawB}   ${sawB ? "✗ UNEXPECTED" : "✓ as expected"}`)
+log(`  TRANSPORT  log rows added: ${drainedB}   ${drainedB === 0 ? "✓ nothing delivered, as expected" : "✗ something was delivered from an empty inbox"}`)
+log(`  behaviour  token present: ${sawB}   ${sawB ? "⚠ the agent read REVIEW.md unprompted" : "(absent, as expected)"}`)
 
 // ── ARM A: mail sent by the leader ──────────────────────────────────────────
 log(`\n── ARM A (leader sends a nudge) ────────────────`)
@@ -95,9 +112,18 @@ const snd = spawnSync(process.execPath, [bus, "send", "app", "--from", "leader",
 	{ cwd: root, encoding: "utf8" })
 if (snd.status !== 0) fail(`send failed:\n${snd.stdout}${snd.stderr}`)
 log(`  ${snd.stdout.trim().split("\n")[0]}`)
+
+const beforeA = pending("app")
 const outA = runAgent("ARM_A_DONE")
+const afterA = pending("app")
+const rowA = logRows().find((m) => m.to_agent === "app" || m.to === "app")
 const sawA = outA.includes(TOKEN)
-log(`  token present: ${sawA}   ${sawA ? "✓ delivered" : "✗ NOT delivered"}`)
+
+// THE GATE: the transport, and nothing about what the model chose to do.
+const transportOK = beforeA === 1 && afterA === 0 && !!rowA?.delivered && rowA.via === "hook" && rowA.ref === "docs/REVIEW.md"
+log(`  TRANSPORT  mail ${beforeA} -> ${afterA}, logged ${rowA?.delivered ? `via=${rowA.via}` : "NOT LOGGED"}, ref=${rowA?.ref ?? "-"}`)
+log(`             ${transportOK ? "✓ the hook fired at the turn boundary and delivered" : "✗ delivery did not happen"}`)
+log(`  behaviour  token present: ${sawA}   ${sawA ? "the agent read the file it was pointed at" : "the agent did NOT read the file (allowed — see header)"}`)
 
 // ── hub enforcement (pure logic, no model call) ─────────────────────────────
 log(`\n── hub enforcement ─────────────────────────────`)
@@ -108,23 +134,24 @@ log(`  peer-to-peer send refused: ${refused ? "✓" : "✗"}`)
 
 // ── verdict ─────────────────────────────────────────────────────────────────
 log(`\n────────────────────────────────────────────────`)
-const discriminates = sawA && !sawB
 if (PROVE_RED) {
-	if (discriminates) fail(`--prove-red FAILED: the token still arrived with the hook removed.\n` +
-		`  That means this gate does NOT actually measure hook delivery, and a green run proves nothing.`)
-	log(`✓ --prove-red PASSED: with the hook removed the token vanished (arm A: ${sawA}).`)
+	if (transportOK) fail(`--prove-red FAILED: the mail was still delivered with the hook removed.\n` +
+		`  That means this gate does NOT measure hook delivery, and a green run proves nothing.`)
+	log(`✓ --prove-red PASSED: with the hook removed the mail was never delivered`)
+	log(`    mail ${beforeA} -> ${afterA} (stayed pending), log row: ${rowA ? "present" : "none"}`)
 	log(`  The gate is falsifiable — a green run is therefore meaningful.`)
-	rmSync(root, { recursive: true, force: true })
 	process.exit(0)
 }
 if (!refused) fail(`hub enforcement did not refuse a peer-to-peer send`)
-if (sawB) fail(`ARM B leaked the token with an EMPTY inbox — the probe cannot discriminate,\n` +
-	`  so a green ARM A would be indistinguishable from a pass. Gate is invalid.`)
-if (!sawA) fail(`ARM A did not deliver. Agent output was:\n${outA.slice(0, 800)}`)
+if (drainedB !== 0) fail(`ARM B delivered something from an EMPTY inbox — the fixture is not isolating arms.`)
+if (!transportOK) fail(`ARM A transport FAILED — the hook did not deliver at the turn boundary.\n` +
+	`  mail ${beforeA} -> ${afterA}, log row: ${JSON.stringify(rowA ?? null)}\n  Agent output was:\n${outA.slice(0, 800)}`)
 
-log(`✓ PASS — delivery measured, not assumed:`)
-log(`    ARM A (mail)    token present  → the nudge reached the agent and it read the file`)
-log(`    ARM B (no mail) token absent   → the probe discriminates`)
-log(`    peer send       refused        → hub topology enforced`)
+log(`✓ PASS — transport measured end to end with real sessions and real hooks:`)
+log(`    ARM A   mail drained at the turn boundary, logged via=hook, correct ref`)
+log(`    ARM B   empty inbox delivered nothing`)
+log(`    peer    refused → hub topology enforced`)
+log(`\n  BEHAVIOUR (reported, never gated): the agent ${sawA ? "DID" : "did NOT"} read the file it was pointed at.`)
+log(`  Not a failure either way — the bus sends pointers and the agent stays free to`)
+log(`  act on them. Gating this is what made the old version flaky ~1 run in 6.`)
 log(`\n  Now prove it can go red:  node test/selftest.mjs --prove-red`)
-rmSync(root, { recursive: true, force: true })
