@@ -621,6 +621,70 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 		`comm log forged=${topLevelSystem(logOut)}, comm sent forged=${topLevelSystem(sentOut)}`)
 }
 
+// A23 — `who` must be able to answer "who holds this directory", not only
+// "who receives mail".
+//
+// Reported from the field by the electio leader with the measurement attached: the
+// session holding the write lock on the file it was about to edit was an adversarial
+// reviewer correctly declared `none` — off the bus by construction, and therefore
+// invisible to `who`. Its house rule is one writer per file, so it had already
+// written its own /proc scan in two places rather than trust the bus.
+//
+// The asymmetry is what makes it a trap and not a cosmetic gap: a session declared
+// WRONGLY is loud, a session declared RIGHTLY is silent — and the silent one is the
+// one writing. Arm 1 is deliberately the case the reported sketch would have MISSED.
+{
+	const rootA = mkdtempSync(join(tmpdir(), "comm-attack-holds-"))
+	mkdirSync(join(rootA, "app"), { recursive: true })
+	mkdirSync(join(rootA, "scripts"), { recursive: true })   // belongs to no agent
+	mkdirSync(join(rootA, ".comm"), { recursive: true })
+	writeFileSync(join(rootA, ".comm", "config.json"),
+		JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app" } }))
+	execFileSync("node", [join(PKG, "install.mjs"), rootA], { stdio: "pipe" })
+	const busA = join(rootA, ".comm", "bin", "comm.mjs")
+	const fake = join(rootA, "claude")
+	writeFileSync(fake, '#!/bin/sh\nsleep "$1"\n', { mode: 0o755 })
+	const runWho = (...flags) => spawnSync("node", [busA, "who", ...flags], { cwd: rootA, encoding: "utf8" }).stdout || ""
+
+	// FALSE-POSITIVE CONTROL FIRST, while nothing is running: the warning must be
+	// absent. A gate that only ever sees the warning present cannot tell it apart
+	// from a line that is printed unconditionally.
+	const quiet = runWho()
+
+	const spawnStandin = (cwd, declared) => spawn(fake, ["20"], {
+		cwd, detached: true, stdio: "ignore",
+		env: declared ? { ...process.env, CLAUDE_COMM_AGENT: declared } : { ...process.env, CLAUDE_COMM_AGENT: "" },
+	})
+	const inScripts = spawnStandin(join(rootA, "scripts"), null)   // arm 1: no agent owns this dir
+	const declaredNone = spawnStandin(rootA, "none")               // arm 2: the reported case
+	const realAgent = spawnStandin(rootA, "leader")                // control: a genuine agent
+	let all = "", warn = "", alive = false
+	try {
+		const deadline = Date.now() + 4000
+		while (Date.now() < deadline) {
+			all = runWho("--all")
+			if (new RegExp(`off bus[^\\n]*${inScripts.pid}`).test(all)) break
+		}
+		warn = runWho()
+		alive = [inScripts, declaredNone, realAgent].every((c) => { try { process.kill(c.pid, 0); return true } catch { return false } })
+	} finally {
+		for (const c of [inScripts, declaredNone, realAgent]) { try { process.kill(-c.pid) } catch {} }
+		try { rmSync(rootA, { recursive: true, force: true }) } catch {}
+	}
+	const offBusLine = (pid) => all.split("\n").some((l) => /off bus/.test(l) && l.includes(String(pid)))
+	check("A23 who can answer who holds this directory",
+		alive
+		&& offBusLine(inScripts.pid)                                   // the sketch would have missed this one
+		&& /scripts/.test(all)                                         // and it must say WHERE
+		&& offBusLine(declaredNone.pid)                                // the reported case
+		&& !offBusLine(realAgent.pid)                                  // a real agent is not "off bus"
+		&& /other live session/.test(warn)                             // default output is loud about it
+		&& !/other live session/.test(quiet),                          // ...and silent when there are none
+		`standins alive=${alive}; non-agent dir listed=${offBusLine(inScripts.pid)}; cwd shown=${/scripts/.test(all)}; ` +
+		`declared-none listed=${offBusLine(declaredNone.pid)}; real agent wrongly listed=${offBusLine(realAgent.pid)}; ` +
+		`default warns=${/other live session/.test(warn)}; warns when none=${/other live session/.test(quiet)}`)
+}
+
 // ── A21/A22: the properties that erode by accretion, not by a single bad commit ──
 // Asked for directly by the owner (2026-08-05): "performant, compact and secure by
 // default", with a worry about memory leaks as features are added. The honest

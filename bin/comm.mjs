@@ -385,8 +385,14 @@ function liveAgents(root, cfg) {
 	// directory they occupy. Non-enumerable, so `live[agent]` and the
 	// `Object.entries(live)` shared-inbox scan keep exactly their old meaning.
 	const offBus = {}
+	// EVERY live session inside this project's tree, on the bus or not. "Off the
+	// bus" is a property of the MAIL, not of the PRESENCE — the electio leader's
+	// phrasing, and it is the right one. A session declared `none` receives
+	// nothing, correctly, but it is alive and it is writing somewhere.
+	const tree = []
 	const finish = () => {
 		Object.defineProperty(out, "offBus", { value: offBus, enumerable: false })
+		Object.defineProperty(out, "tree", { value: tree, enumerable: false })
 		return out
 	}
 	let pids = []
@@ -406,6 +412,10 @@ function liveAgents(root, cfg) {
 			if (hit) declared = hit.slice("CLAUDE_COMM_AGENT=".length).trim() || null
 		} catch { /* not readable — fall back to cwd, same as before */ }
 		const who = whoami(root, cfg, cwd, declared)
+		// Scoped by the SAME test as the declaration (A20), so this cannot become a
+		// second, laxer definition of "in this project" that drifts from the first.
+		const home = findRoot(cwd)
+		if (home && resolve(home) === resolve(root)) tree.push({ pid: Number(pid), cwd, declared, agent: who })
 		// A session that DECLARED itself off the bus is not an agent — but it is not
 		// nothing either, and reporting it as "not running" is a confident wrong
 		// answer of exactly the kind this project exists to prevent. Measured on my
@@ -506,7 +516,7 @@ function hookDeliver(event) {
 // ("If you really mean to, pass --force") — appending it worked, prefixing it
 // did not. A list that must be kept in step with the flags is a weak fix; it is
 // the smallest one that is correct, and A14 pins it.
-const VALUELESS_FLAGS = new Set(["--force"])
+const VALUELESS_FLAGS = new Set(["--force", "--all"])
 function firstPositional(argv) {
 	for (let i = 0; i < argv.length; i++) {
 		if (argv[i].startsWith("--")) { if (!VALUELESS_FLAGS.has(argv[i])) i++; continue }
@@ -699,6 +709,34 @@ function dispatch(root, cfg, me, cmd, rest) {
 				const many = l && l.length > 1 ? `  ⚠ ${l.length} SESSIONS SHARE THIS INBOX`
 					: !l && off ? `  ⚠ ${off.length} session(s) here declared OFF-BUS (CLAUDE_COMM_AGENT=${off[0].declared})` : ""
 				console.log(`  ${l ? "●" : "○"} ${id.padEnd(18)} ${(l ? `running (pid ${l.map((x) => x.pid).join(",")})${started}` : "not running").padEnd(40)}${n ? `${n} pending` : ""}${many}`)
+			}
+			// `who` answers "WHO RECEIVES MAIL". A leader about to write a shared file
+			// is asking "WHO HOLDS THIS DIRECTORY", and the two diverge exactly where it
+			// costs: reported from the field by the electio leader, the session holding
+			// the write lock on the file it was about to edit was a reviewer correctly
+			// declared `none` — off the bus by construction, and therefore invisible
+			// here. The asymmetry is the trap: a session declared WRONGLY is loud (it
+			// shows up under a name that is not its own), a session declared RIGHTLY is
+			// silent. It had already written its own /proc scan in two places, which is
+			// the part that mattered — a downstream reimplementation of logic that lives
+			// here will drift from it.
+			//
+			// ⚠️ Deliberately NOT the reported sketch, which keyed off the off-bus map:
+			// that map is keyed by the AGENT DIRECTORY a session sits in, so a session in
+			// a subdirectory belonging to no agent — `scripts/`, `docs/` — would still
+			// have been invisible, and "is anyone in my tree" is precisely when that
+			// matters. This walks every live session under the project root instead.
+			const others = (live.tree || []).filter((s) => !s.agent)
+			if (others.length) {
+				if (rest.includes("--all")) {
+					for (const s of others) {
+						const tag = s.declared ? `off bus (${s.declared})` : "off bus"
+						console.log(`  ○ ${tag.padEnd(18)} ${`running (pid ${s.pid})`.padEnd(40)}${s.cwd}`)
+					}
+				} else {
+					console.log(`\n  ⚠ ${others.length} other live session(s) in this tree receive no mail — but they are`)
+					console.log(`    WRITING somewhere in it. Run 'who --all' to see where.`)
+				}
 			}
 			// The condition that used to be silent, and it is the one that loses mail.
 			// Whichever of those sessions ends a turn first drains the inbox; the others

@@ -10,7 +10,7 @@ fold the settled parts into the README.
 | toolkit | `bin/comm.mjs`, `install.mjs`, `test/attack.mjs`, `test/selftest.mjs`, `test/latency.mjs` — no dependencies |
 | repo | git initialised, local only, no remote |
 | **electio** | in real daily use — 26 real deliveries, both directions. **Ran a bus 4 commits stale until this session** |
-| gates | `attack` **22/22** deterministic ✓, **every case proved able to go red** (defect restored in the bus, gate byte-identical) · `selftest` **now deterministic too** — 6/6 transport green |
+| gates | `attack` **23/23** deterministic ✓, **every case proved able to go red** (defect restored in the bus, gate byte-identical) · `selftest` **now deterministic too** — 6/6 transport green |
 | reviews | #1 (9 findings) in `REVIEW-adversarial.md` · #2 (10 findings) in `REVIEW-adversarial-2.md` · electio leader's field reviews in `REVIEW-electio-leader.md` and `REPLY-from-electio-leader.md` |
 
 ## ✅ Closed in session 4 — adversarial review #2
@@ -153,6 +153,56 @@ caught by a contradiction from outside, never by re-reading the patch.
 ⚠️ **electio is now running a bus one commit stale** (its `.comm/bin/comm.mjs` was byte-identical to the
 repo before this fix). No live impact there today — it is the only installed project, so no name collides —
 but the moment a second project is installed, or selflo is restored, it collides on `leader`.
+
+## ✅ `who` can now answer "who HOLDS this directory" — the electio leader's report #4
+
+🟠 **`who` answered "who receives mail" and was asked "who is writing here".** The leader measured it twice:
+the session holding the write lock on the file it was about to edit was an adversarial reviewer correctly
+declared `none` — off the bus by construction, therefore **invisible**. Its house rule is one writer per
+file, so it had already written its own `/proc` scan **in two places** (opening ritual, and a new
+`pre-commit` hook). That workaround is the signal, not the missing line.
+
+⚠️ **I had written this exact gap into STATUS myself that morning** — "`who` confirms *the leader is on the
+bus*, never *nothing else is sitting in its tree*" — called it an honest limit and moved on. The observation
+was right and **my severity judgement was wrong.** Recorded because the pattern is now three for three:
+their observations outrank my diagnoses.
+
+Their framing is the one in the code: **"off bus" is a property of the MAIL, not of the PRESENCE.** It also
+settles the scope question on its own — `who` already reads `/proc` and already reports presence.
+
+Shipped: `who --all` lists live sessions in the tree that receive no mail, with their cwd; and the default
+output **warns** rather than staying silent, because the unsafe case has to be the loud one. Installed into
+electio (bus byte-identical to the repo, `log.jsonl` unchanged at 33 lines, no temp files left).
+
+⚠️ **Deliberately NOT the reported sketch, and the difference is measured.** Their sketch keyed off the
+off-bus map, which is indexed by the *agent directory* a session occupies — so a session in `scripts/` or
+`docs/`, owned by no agent, would have stayed invisible, and that is exactly when "is anyone in my tree"
+matters. **Gated by A23** (six clauses), **proved red with their sketch restored as the mutation**:
+
+| clause | their sketch | shipped |
+| --- | --- | --- |
+| `none` session in the leader's dir (their case) | ✓ | ✓ |
+| session in `scripts/`, owned by no agent | ✗ **invisible** | ✓ |
+| the cwd is shown | ✗ | ✓ |
+| a real agent is never listed "off bus" | ✓ | ✓ |
+
+Two further mutations redden their own clause, and the **false-positive control is inside the gate**: with no
+off-bus session running, the warning must be *absent* — otherwise A23 would be satisfied by a line printed
+unconditionally.
+
+💰 **It cost 5% of the readability budget (A22: 85% → 90%).** The budget was written hours earlier and its
+rule holds: the next feature this size is paid for in deletions elsewhere, never by raising the ceiling.
+
+### The installer now writes atomically
+
+An upgrade lands on a project whose agents are **live** — that is the normal case here, not an edge one —
+and `.comm/bin/comm.mjs` is executed by a `Stop` hook at every turn boundary. `writeFileSync` truncates
+first, leaving a window where the hook loads a partial file and that turn's delivery is silently missed.
+Now write-to-temp + `rename(2)`, same directory. Exercised ~6× per `attack` run.
+
+⚠️ **Not gated, deliberately.** The property holds by construction (`rename` is atomic within a filesystem);
+a gate would have to race a hook against a write, and a flaky gate is worse than none — the `selftest` lesson.
+Stated here instead of pretended.
 
 ## 🛡️ "Performant, compact and secure by default" — what that is worth, measured
 
