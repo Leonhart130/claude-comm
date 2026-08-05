@@ -40,6 +40,24 @@ announced into the leader's context, moved to `delivered/`, and logged as a norm
 never saw it, `comm sent` said `✓ delivered`, and nothing afterwards could tell it from a real delivery.
 Gated by **A13**.
 
+⚠️ **But a directory is not always an agent, and the hub is where that breaks.** A hub-and-spoke owner
+parallelises *in the hub's own tree* — classifiers, an adversarial reviewer, the leader, all launched in the
+same folder. Identity-from-directory then means **N sessions, one name, one inbox**, and whichever ends a
+turn first drains it. Measured with real sessions: a classifier consumed the expert's round report, the log
+recorded a clean `via=hook` delivery, and the leader would never have learned the round landed.
+
+So a session may **declare** who it is, and the declaration wins:
+
+```bash
+CLAUDE_COMM_AGENT=leader claude    # this session is the leader — mail is for it
+CLAUDE_COMM_AGENT=none   claude    # not on the bus: receives nothing, drains nothing
+claude                             # unset → falls back to the directory
+```
+
+An unknown name means *not on the bus* rather than *guess* — the unsafe case is the one that must be loud.
+`comm who` reports when several live sessions resolve to one agent, because that condition used to be
+invisible right up until mail went missing. Gated by **A17**.
+
 ⚠️ **Known limit, stated plainly:** delivery is at a **turn boundary**, not an interrupt. An agent deep in a
 20-minute turn gets the nudge when that turn ends. This takes you from *"waits for the round"* to *"waits for
 the turn"* — most of the win, no terminal configuration. A true mid-turn interrupt needs a terminal
@@ -105,11 +123,11 @@ never known. *A pointer that silently resolves to the wrong file is worse than o
 ```bash
 node test/selftest.mjs              # stands up a scratch project, installs real hooks, runs real sessions
 node test/selftest.mjs --prove-red  # removes ONLY the hook — the signal must vanish
-node test/attack.mjs                # 15 adversarial checks; aborts on regression
+node test/attack.mjs                # 17 adversarial checks; aborts on regression
 node test/latency.mjs <log.jsonl>   # re-derive the delivery-latency table from a log
 ```
 
-**Every one of the 15 has been demonstrated to go RED** by restoring the defect it guards in the bus with
+**Every one of the 17 has been demonstrated to go RED** by restoring the defect it guards in the bus with
 the gate left byte-identical. That is not decoration: A10 spent a session asserting
 `after === 0 || after === before`, which is true for every reachable value — *a gate that cannot fail is
 worse than no gate, because the method rests on it.*
