@@ -123,11 +123,11 @@ never known. *A pointer that silently resolves to the wrong file is worse than o
 ```bash
 node test/selftest.mjs              # stands up a scratch project, installs real hooks, runs real sessions
 node test/selftest.mjs --prove-red  # removes ONLY the hook — the signal must vanish
-node test/attack.mjs                # 17 adversarial checks; aborts on regression
+node test/attack.mjs                # 18 adversarial checks; aborts on regression
 node test/latency.mjs <log.jsonl>   # re-derive the delivery-latency table from a log
 ```
 
-**Every one of the 17 has been demonstrated to go RED** by restoring the defect it guards in the bus with
+**Every one of the 18 has been demonstrated to go RED** by restoring the defect it guards in the bus with
 the gate left byte-identical. That is not decoration: A10 spent a session asserting
 `after === 0 || after === before`, which is true for every reachable value — *a gate that cannot fail is
 worse than no gate, because the method rests on it.*
