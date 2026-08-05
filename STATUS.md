@@ -1,4 +1,4 @@
-# STATUS — claude-comm, 2026-08-05 (session 4)
+# STATUS — claude-comm, 2026-08-05 (sessions 4–5)
 
 Design and gates are in `README.md`; **this file is only what is OPEN.** Keep it short — when it grows,
 fold the settled parts into the README.
