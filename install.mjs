@@ -13,9 +13,10 @@
  * the STUB's own location (import.meta.url), so nothing breaks if the project is
  * moved, cloned, or a hook is invoked from a subdirectory.
  */
-import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from "node:fs"
+import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, renameSync, unlinkSync } from "node:fs"
 import { join, dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
+import { randomBytes } from "node:crypto"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const CHECK = process.argv.includes("--check")
@@ -94,7 +95,21 @@ function write(path, content, results) {
 	if (cur === content) { results.ok.push(path); return }
 	if (CHECK) { results.drift.push(path); return }
 	mkdirSync(dirname(path), { recursive: true })
-	writeFileSync(path, content)
+	// WRITE THEN RENAME, never truncate-then-write. An upgrade is applied to a
+	// project whose agents are LIVE — that is the normal case, not an edge one —
+	// and `.comm/bin/comm.mjs` is executed by a Stop hook at every turn boundary.
+	// A truncating write leaves a window in which the hook loads a partial file,
+	// fails to parse, and that turn's delivery is silently missed. rename(2) is
+	// atomic within a filesystem, so a reader sees either the whole old file or
+	// the whole new one. Same directory, so it never crosses a filesystem.
+	const tmp = `${path}.tmp-${randomBytes(4).toString("hex")}`
+	try {
+		writeFileSync(tmp, content)
+		renameSync(tmp, path)
+	} catch (e) {
+		try { unlinkSync(tmp) } catch {}
+		throw e
+	}
 	results.wrote.push(path)
 }
 
