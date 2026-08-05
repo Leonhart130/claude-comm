@@ -10,7 +10,7 @@ fold the settled parts into the README.
 | toolkit | `bin/comm.mjs`, `install.mjs`, `test/attack.mjs`, `test/selftest.mjs`, `test/latency.mjs` — no dependencies |
 | repo | git initialised, local only, no remote |
 | **electio** | in real daily use — 26 real deliveries, both directions. **Ran a bus 4 commits stale until this session** |
-| gates | `attack` **18/18** deterministic ✓, **every case proved able to go red** (defect restored in the bus, gate byte-identical) · `selftest` **now deterministic too** — 6/6 transport green |
+| gates | `attack` **19/19** deterministic ✓, **every case proved able to go red** (defect restored in the bus, gate byte-identical) · `selftest` **now deterministic too** — 6/6 transport green |
 | reviews | #1 (9 findings) in `REVIEW-adversarial.md` · #2 (10 findings) in `REVIEW-adversarial-2.md` · electio leader's field reviews in `REVIEW-electio-leader.md` and `REPLY-from-electio-leader.md` |
 
 ## ✅ Closed in session 4 — adversarial review #2
@@ -65,6 +65,19 @@ reports when several live sessions resolve to one agent. Gated by **A17**.
 the directory, so protection requires the operator to declare on the *non-bus* sessions. Inverting it would
 silently cut off every existing install, which is worse. `who` makes the condition visible; it does not
 prevent it.
+
+⚠️ **And I attacked my own fix hours after writing it, which is where the yield was.**
+`CLAUDE_COMM_AGENT` is an environment variable, and the obvious way to silence three classifiers at once is
+to **export** it — at which point the real leader launches off-bus too. Measured with a live control:
+
+| surface | said | truth |
+| --- | --- | --- |
+| `comm who` | `○ leader  not running` | it **is** running |
+| `comm sent` | `⧗ pending — lands when relaunched` | relaunching under the same export changes **nothing** |
+
+That is the A12 failure class — four diagnostics agreeing on a confident wrong answer — reintroduced by the
+fix for A17, by me, the same day. `who` now reports off-bus sessions and `sent` says `⧗ STUCK` with the
+reason. Gated by **A19**.
 
 ⭐ **The leader's question was better than a fix would have been:** *is "one agent = one directory" the right
 axiom for a bus whose hub is exactly where you parallelise?* No — and the answer is that the name must be

@@ -17,7 +17,7 @@
  */
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from "node:fs"
 import { join } from "node:path"
-import { execFileSync, spawnSync } from "node:child_process"
+import { execFileSync, spawnSync, spawn } from "node:child_process"
 import { tmpdir } from "node:os"
 import { MAX_NOTE, MAX_RENDER, MAX_REF } from "../bin/comm.mjs"
 
@@ -459,6 +459,57 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 	check("A18 session-start delivers correctly",
 		before === 1 && afterNone === 1 && afterReal === 0 && schemaOK && wording,
 		`none: ${before}->${afterNone} (kept), real: ->${afterReal} (drained), schema=${schemaOK}, wording=${wording}`)
+}
+
+// A19 — a session that declared itself OFF the bus must not read as "no session".
+//
+// Found by attacking my own fix hours after writing it, which is where the yield
+// is. `CLAUDE_COMM_AGENT` is an environment variable, and the obvious way to
+// silence several classifiers at once is to export it — at which point the REAL
+// agent launches off-bus too. `who` then said "not running" and `sent` said
+// "lands when relaunched", which is FALSE: relaunching under the same export
+// changes nothing and the mail waits forever. Four confident wrong answers, the
+// A12 failure class, reintroduced by the fix for A17.
+{
+	const rootA = mkdtempSync(join(tmpdir(), "comm-attack-offbus-"))
+	mkdirSync(join(rootA, "app", "docs"), { recursive: true })
+	mkdirSync(join(rootA, ".comm"), { recursive: true })
+	writeFileSync(join(rootA, "app", "docs", "REVIEW.md"), "# review\n")
+	writeFileSync(join(rootA, ".comm", "config.json"),
+		JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app" } }))
+	execFileSync("node", [join(PKG, "install.mjs"), rootA], { stdio: "pipe" })
+	const busA = join(rootA, ".comm", "bin", "comm.mjs")
+	// A stand-in session: liveAgents matches /proc/<pid>/cmdline, so a script named
+	// `claude` is indistinguishable from the real thing for this purpose. (A copy of
+	// /bin/sleep is NOT — coreutils is multi-call and refuses to run under a name it
+	// does not know, which silently voided this probe the first time.)
+	const fake = join(rootA, "claude")
+	writeFileSync(fake, '#!/bin/sh\nsleep "$1"\n', { mode: 0o755 })
+	execFileSync("node", [busA, "send", "leader", "--ref", "docs/REVIEW.md", "--note", "ruling needed"],
+		{ cwd: join(rootA, "app"), stdio: "pipe" })
+
+	const child = spawn(fake, ["20"], {
+		cwd: rootA, detached: true, stdio: "ignore",
+		env: { ...process.env, CLAUDE_COMM_AGENT: "none" },
+	})
+	let whoOut = "", sentOut = "", sawProc = false
+	try {
+		const deadline = Date.now() + 4000
+		while (Date.now() < deadline) {
+			whoOut = spawnSync("node", [busA, "who"], { cwd: rootA, encoding: "utf8" }).stdout || ""
+			if (/OFF-BUS|not running/.test(whoOut)) break
+		}
+		// The control: the stand-in must actually be alive, or "reported off-bus"
+		// and "no process at all" are indistinguishable and this proves nothing.
+		try { process.kill(child.pid, 0); sawProc = true } catch {}
+		sentOut = spawnSync("node", [busA, "sent", "app"], { cwd: rootA, encoding: "utf8" }).stdout || ""
+	} finally {
+		try { process.kill(-child.pid) } catch {}
+		try { rmSync(rootA, { recursive: true, force: true }) } catch {}
+	}
+	check("A19 off-bus session is reported",
+		sawProc && /OFF-BUS/.test(whoOut) && /STUCK/.test(sentOut),
+		`stand-in alive=${sawProc}, who says OFF-BUS=${/OFF-BUS/.test(whoOut)}, sent says STUCK=${/STUCK/.test(sentOut)}`)
 }
 
 // A14 — a valueless flag must not swallow the positional that follows it.
