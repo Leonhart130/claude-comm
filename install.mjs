@@ -44,8 +44,28 @@ const r = spawnSync(process.execPath, [bus, "hook", ...process.argv.slice(2)], {
 process.exit(r.status ?? 0)
 `
 
+/**
+ * ABSENT and UNPARSEABLE are not the same thing, and conflating them is data
+ * loss. `readJson(sPath, {})` treated a settings.json it could not parse as an
+ * empty one, so `withHooks` merged into `{}` and the write replaced the user's
+ * file with nothing but comm's two hooks — permissions, env and unrelated hooks
+ * gone, output `✓ installed`, exit 0. A trailing comma does it; so does a merge
+ * conflict, which is unparseable by construction and likeliest in exactly the
+ * multi-repo projects this tool targets. Measured, not theorised, and it had
+ * already run against 7 agents.
+ *
+ * A file we cannot read is a file we must not overwrite.
+ */
 function readJson(p, fallback) {
-	try { return JSON.parse(readFileSync(p, "utf8")) } catch { return fallback }
+	if (!existsSync(p)) return fallback
+	const raw = readFileSync(p, "utf8")
+	try { return JSON.parse(raw) } catch (e) {
+		throw new Error(
+			`${p} exists but is not valid JSON (${e.message}).\n` +
+			`  Refusing to touch it: merging into a fallback would have silently replaced your\n` +
+			`  settings with only claude-comm's hooks. Fix the JSON, then re-run.`
+		)
+	}
 }
 
 /** Merge our two hooks into a settings object without disturbing anything else. */
@@ -81,7 +101,7 @@ if (!existsSync(cfgPath)) {
 	process.exit(1)
 }
 const cfg = readJson(cfgPath)
-const results = { wrote: [], ok: [], drift: [] }
+const results = { wrote: [], ok: [], drift: [], failed: [] }
 
 if (!CHECK) mkdirSync(join(commDir, "bin"), { recursive: true })
 const busSrc = readFileSync(join(HERE, "bin", "comm.mjs"), "utf8")
@@ -94,24 +114,46 @@ for (const [id, relPath] of Object.entries(cfg.agents)) {
 
 	write(join(agentRoot, ".claude", "comm-hook.mjs"), STUB, results)
 
+	// One unreadable agent must not abort the other six, and must not be
+	// reported as installed either.
 	const sPath = join(agentRoot, ".claude", "settings.json")
-	const merged = withHooks(readJson(sPath, {}))
-	write(sPath, JSON.stringify(merged, null, 2) + "\n", results)
+	try {
+		const merged = withHooks(readJson(sPath, {}))
+		write(sPath, JSON.stringify(merged, null, 2) + "\n", results)
+	} catch (e) {
+		console.error(`  ✗ ${id}: ${e.message}`)
+		results.failed.push(sPath)
+		continue
+	}
 
 	if (!CHECK) mkdirSync(join(commDir, "inbox", id), { recursive: true })
 }
 
 // ── 3. keep live state out of git ───────────────────────────────────────────
+// The README promises this unconditionally. Guarding the whole block on
+// `existsSync` meant a project WITHOUT a .gitignore silently got no ignore rule
+// at all, while `--check` still reported everything in sync — so live inboxes
+// and log.jsonl became committable in exactly the fresh projects most likely to
+// be `git init`-ed right after install.
 const giPath = join(ROOT, ".gitignore")
-if (existsSync(giPath)) {
-	const gi = readFileSync(giPath, "utf8")
-	if (!/^\.comm\/?$/m.test(gi)) {
-		if (CHECK) results.drift.push(giPath)
-		else { writeFileSync(giPath, gi.replace(/\n*$/, "\n") + "\n# claude-comm live state (regenerate with install.mjs)\n.comm/\n"); results.wrote.push(giPath) }
-	} else results.ok.push(giPath)
-}
+const gi = existsSync(giPath) ? readFileSync(giPath, "utf8") : ""
+if (!/^\.comm\/?$/m.test(gi)) {
+	if (CHECK) results.drift.push(giPath)
+	else {
+		writeFileSync(giPath, (gi ? gi.replace(/\n*$/, "\n") + "\n" : "") + "# claude-comm live state (regenerate with install.mjs)\n.comm/\n")
+		results.wrote.push(giPath)
+	}
+} else results.ok.push(giPath)
 
 // ── report ──────────────────────────────────────────────────────────────────
+// A partial install must not exit 0. The whole point of the readJson fix is
+// that the operator learns a file was skipped; a green summary would bury it.
+if (results.failed.length) {
+	console.error(`\n✗ claude-comm: ${results.failed.length} agent(s) SKIPPED — their settings.json could not be parsed and were left untouched:`)
+	for (const p of results.failed) console.error(`    ${p.replace(ROOT + "/", "")}`)
+	console.error(`  Every other agent was installed. Fix the JSON above and re-run.`)
+	process.exit(1)
+}
 if (CHECK) {
 	if (results.drift.length) {
 		console.error(`✗ claude-comm: ${results.drift.length} file(s) out of date:`)

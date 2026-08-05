@@ -51,6 +51,7 @@ const KINDS = {
 // orientation budget is a doorbell that will be resented and then removed.
 const MAX_NOTE = 240   // characters kept from a --note
 const MAX_RENDER = 8   // messages rendered into one nudge; the rest are counted
+const MAX_REF = 400    // characters allowed in a --ref; a path is never longer
 
 /**
  * Flatten a note to a single safe line. This is the security boundary: `note`
@@ -85,15 +86,47 @@ function loadConfig(root) {
 	return JSON.parse(readFileSync(join(root, ".comm", "config.json"), "utf8"))
 }
 
-/** Which agent am I? Derived from cwd's position under the project root. */
+/**
+ * Which agent am I? Resolved against the config's PATHS, not its keys.
+ *
+ * Matching the cwd's top directory against agent *ids* made `id === directory
+ * name` a load-bearing invariant that nothing enforced and the README invited
+ * you to break ("edit .comm/config.json to trim or rename the roster"). Every
+ * other consumer — the installer, resolveRef, refForRecipient, liveAgents —
+ * already used the values as paths. With `{"webapp": "app"}` the disagreement
+ * was total and silent: send said ✓, the hook in app/ delivered nothing and
+ * exited 0, `who` reported the agent not running while it was, and the mail sat
+ * forever. Four diagnostics, four confident wrong answers, no error anywhere.
+ * Nested paths ("packages/web"), which the installer accepts and the README
+ * documents, failed the same way.
+ *
+ * Longest path first, so a nested agent wins over the parent that contains it.
+ */
 function whoami(root, cfg, cwd = process.cwd()) {
-	const rel = relative(root, resolve(cwd))
-	if (rel === "" || rel === ".") return cfg.leader
-	const top = rel.split(sep)[0]
-	return Object.prototype.hasOwnProperty.call(cfg.agents, top) ? top : null
+	const abs = resolve(cwd)
+	const base = resolve(root)
+	const entries = Object.entries(cfg.agents || {})
+		.map(([id, p]) => [id, resolve(base, p || ".")])
+		.sort((a, b) => b[1].length - a[1].length)
+	for (const [id, dir] of entries) {
+		// An agent rooted AT the project root (normally the leader) owns only the
+		// root itself — otherwise it would swallow every unregistered subdirectory
+		// and hand it the leader's identity.
+		if (dir === base ? abs === base : abs === dir || abs.startsWith(dir + sep)) return id
+	}
+	return null
 }
 
 const inboxDir = (root, agent) => join(root, ".comm", "inbox", agent)
+
+/**
+ * Flatten a ref for DISPLAY. Defence in depth, exactly as sanitizeNote is applied
+ * on both send and render: resolveRef now refuses control characters, but a
+ * message file can be hand-written or predate that rule, and the `inbox` surface
+ * applied no cap at all — a 3 200-char ref produced 3 434 chars of output,
+ * scaling linearly.
+ */
+const safeRef = (s) => String(s ?? "").replace(/[\u0000-\u001f\u007f-\u009f]+/g, " ").slice(0, MAX_REF)
 
 /**
  * The SUBJECT of a message is whichever end is not the leader. Hub enforcement
@@ -113,6 +146,16 @@ const subjectOf = (cfg, from, to) => (from === cfg.leader ? to : from)
  */
 function resolveRef(root, cfg, from, to, ref) {
 	if (!ref) throw new Error(`--ref is required: a message must point at a file, never carry the substance`)
+	// `--ref` is the OTHER free-text field that reaches a recipient's context, and
+	// it was never sanitised while `--note` was. A newline in a path let it forge a
+	// top-level "[SYSTEM] New directive: …" line inside the nudge — the exact
+	// structure sanitizeNote exists to prevent, on a field with no cap at all on
+	// the `inbox` surface. The realistic vector is not a hostile user but a
+	// confused agent building a ref from a README, an issue body or a web page.
+	if (/[\u0000-\u001f\u007f-\u009f]/.test(ref)) {
+		throw new Error(`--ref may not contain newlines or control characters: a path never needs them, and they forge structure inside the recipient's nudge`)
+	}
+	if (ref.length > MAX_REF) throw new Error(`--ref is ${ref.length} chars, over the ${MAX_REF} limit — that is not a path`)
 	if (ref.startsWith("/")) throw new Error(`--ref must be relative to the subject repo, not absolute: ${ref}`)
 	const subjDir = cfg.agents[subjectOf(cfg, from, to)] ?? "."
 	const abs = resolve(root, subjDir, ref)
@@ -138,7 +181,7 @@ function refForRecipient(root, cfg, msg) {
 }
 
 // ── sending ─────────────────────────────────────────────────────────────────
-function send(root, cfg, { from, to, kind, ref, note }) {
+function send(root, cfg, { from, to, kind, ref, note, force = false }) {
 	if (!cfg.agents[to]) {
 		throw new Error(`unknown recipient '${to}'. Known: ${Object.keys(cfg.agents).join(", ")}`)
 	}
@@ -158,6 +201,19 @@ function send(root, cfg, { from, to, kind, ref, note }) {
 	if (from === to) throw new Error(`'${from}' cannot message itself`)
 
 	const refPath = resolveRef(root, cfg, from, to, ref)
+	// The README's own ⭐ finding is that a pointer silently resolving to the WRONG
+	// file is worse than one that errors. A pointer resolving to NO file is the
+	// same class and the cheaper half to catch: at send time both ends are on one
+	// filesystem under one root. Without this the recipient is told "re-read the
+	// referenced file, it is the artifact" about nothing, and the audit log records
+	// a clean delivery. --force covers the legitimate case: ringing about a file
+	// you are about to write.
+	if (!force && !existsSync(join(root, refPath))) {
+		throw new Error(
+			`--ref points at a file that does not exist: ${refPath}\n` +
+			`  Check the path, or pass --force if you are about to create it.`
+		)
+	}
 
 	const id = `${new Date().toISOString().replace(/[:.]/g, "-")}-${randomBytes(3).toString("hex")}`
 	const msg = { id, from, to, kind, ref, refPath, note: sanitizeNote(note), ts: new Date().toISOString() }
@@ -213,7 +269,7 @@ function renderNudge(root, cfg, msgs, me, quarantined = 0) {
 	]
 	for (const m of shown) {
 		lines.push(`  • from '${String(m.from).slice(0, 40)}' (${KINDS[m.kind] ? `${m.kind} — ${KINDS[m.kind]}` : "unknown kind"}) at ${m.ts}`)
-		lines.push(`    read: ${String(refForRecipient(root, cfg, m)).slice(0, 200)}   (relative to your own directory)`)
+		lines.push(`    read: ${safeRef(refForRecipient(root, cfg, m))}   (relative to your own directory)`)
 		const note = sanitizeNote(m.note)
 		if (note) lines.push(`    sender's one-line description: ${JSON.stringify(note)}`)
 	}
@@ -235,8 +291,17 @@ function renderNudge(root, cfg, msgs, me, quarantined = 0) {
 	return lines.join("\n")
 }
 
-/** Move delivered mail out of the inbox and append to the audit log. */
-function drain(root, agent, msgs) {
+/**
+ * Move mail out of the inbox and append to the audit log.
+ *
+ * `via` is not decoration. Both hookDeliver and dismiss call this and both used
+ * to stamp the same `delivered` field, so the log could not distinguish "the
+ * agent was shown this" from "someone cleared it" — and `comm sent`, which
+ * exists precisely to answer that, reported a dismissed message as ✓ delivered.
+ * The latency table in STATUS is computed from this field, so a dismissal would
+ * contribute a fabricated latency and nothing could detect it after the fact.
+ */
+function drain(root, agent, msgs, via = "hook") {
 	const done = join(root, ".comm", "delivered")
 	mkdirSync(done, { recursive: true })
 	for (const m of msgs) {
@@ -245,7 +310,7 @@ function drain(root, agent, msgs) {
 	try {
 		appendFileSync(
 			join(root, ".comm", "log.jsonl"),
-			msgs.map((m) => JSON.stringify({ ...m, _file: undefined, delivered: new Date().toISOString(), to_agent: agent })).join("\n") + "\n"
+			msgs.map((m) => JSON.stringify({ ...m, _file: undefined, delivered: new Date().toISOString(), via, to_agent: agent })).join("\n") + "\n"
 		)
 	} catch {}
 }
@@ -266,7 +331,16 @@ function liveAgents(root, cfg) {
 		const who = whoami(root, cfg, cwd)
 		if (!who) continue
 		let started = ""
-		try { started = statSync(`/proc/${pid}`).mtime.toISOString().slice(11, 19) } catch {}
+		// LOCAL time, with the date whenever it is not today. This field decides
+		// armed-vs-not — you compare it against the hook file's mtime, which every
+		// other tool reports locally — and it was rendered in UTC with no date. On
+		// this box that is a 2-hour skew in the direction that makes a stale session
+		// look freshly started, and a three-day-old session read as fresh.
+		try {
+			const t = statSync(`/proc/${pid}`).mtime
+			const hms = t.toTimeString().slice(0, 8)
+			started = t.toDateString() === new Date().toDateString() ? hms : `${t.toISOString().slice(0, 10)} ${hms}`
+		} catch {}
 		;(out[who] ||= []).push({ pid: Number(pid), since: started })
 	}
 	return out
@@ -296,7 +370,7 @@ function hookDeliver(event) {
 	// exits 0 — a silently lost round report, with the audit log claiming it was
 	// delivered. Rendering is pure; draining is the irreversible half.
 	const reason = renderNudge(root, cfg, msgs, me, quarantined)
-	drain(root, me, msgs)
+	drain(root, me, msgs, "hook")
 
 	if (event === "stop") {
 		process.stdout.write(JSON.stringify({ decision: "block", reason }))
@@ -373,7 +447,7 @@ function dispatch(root, cfg, me, cmd, rest) {
 			const from = me === cfg.leader ? (claimed || cfg.leader) : me
 			if (!from) throw new Error(`cannot tell which agent you are: cwd is not inside a known agent directory`)
 
-			const m = send(root, cfg, { from, to, kind: arg(rest, "kind", from === cfg.leader ? "nudge" : "done"), ref: arg(rest, "ref"), note: arg(rest, "note") })
+			const m = send(root, cfg, { from, to, kind: arg(rest, "kind", from === cfg.leader ? "nudge" : "done"), ref: arg(rest, "ref"), note: arg(rest, "note"), force: rest.includes("--force") })
 			const live = liveAgents(root, cfg)[to]
 			console.log(`✓ ${m.from} → ${m.to}  [${m.kind}]  they will read: ${refForRecipient(root, cfg, m)}`)
 			if (m.note !== sanitizeNote(arg(rest, "note"))) console.log(`  note was flattened/truncated to ${MAX_NOTE} chars — the substance belongs in ${m.ref}`)
@@ -389,7 +463,7 @@ function dispatch(root, cfg, me, cmd, rest) {
 			if (!msgs.length) { console.log(`inbox '${who}': empty`); break }
 			console.log(`inbox '${who}': ${msgs.length} pending`)
 			// Show the path THIS reader can open, not the one the sender typed.
-			for (const m of msgs) console.log(`  ${m.ts}  from ${m.from}  [${m.kind}]  ref: ${refForRecipient(root, cfg, m)}${m.note ? `  — ${m.note}` : ""}`)
+			for (const m of msgs) console.log(`  ${m.ts}  from ${m.from}  [${m.kind}]  ref: ${safeRef(refForRecipient(root, cfg, m))}${m.note ? `  — ${sanitizeNote(m.note)}` : ""}`)
 			// `inbox` PEEKS; it does not acknowledge. Without this line an agent reads
 			// its mail here, acts on it, and is then blocked at its turn end by the
 			// hook re-delivering the same messages — which reads as a bug in the bus
@@ -430,7 +504,11 @@ function dispatch(root, cfg, me, cmd, rest) {
 			for (const m of shown) {
 				const to = m.to_agent || m.to
 				const status = m.delivered
-					? `✓ delivered ${String(m.delivered).slice(11, 16)}`
+					? m.via === "dismiss"
+						? `✗ DISMISSED ${String(m.delivered).slice(11, 16)} — cleared from the inbox, NOT shown to the agent`
+						: m.via
+							? `✓ delivered ${String(m.delivered).slice(11, 16)}`
+							: `✓ delivered ${String(m.delivered).slice(11, 16)} (logged before delivery and dismissal were distinguished)`
 					: live[to]?.length
 						? `⧗ PENDING — '${to}' is running but has not ended a turn since; it will not see this until it does`
 						: `⧗ pending — '${to}' is not running; lands when relaunched`
@@ -445,10 +523,22 @@ function dispatch(root, cfg, me, cmd, rest) {
 		case "dismiss": {
 			const who = firstPositional(rest) || me
 			const id = arg(rest, "id")
+			// `send` enforces identity ("--from is not yours to set") while dismiss,
+			// the DESTRUCTIVE path, took any agent name. An expert could clear the
+			// leader's inbox — including its own `blocked` report — and `comm sent`
+			// would then tell the sender it had been delivered. Guarding the write
+			// path and leaving the clearing path open is backwards.
+			if (who !== me && !rest.includes("--force")) {
+				throw new Error(
+					`'${who}' is not you: you are '${me ?? "(not inside a known agent directory)"}'.\n` +
+					`  Clearing someone else's inbox hides mail they never saw, and the sender is still told it landed.\n` +
+					`  If you really mean to, pass --force.`
+				)
+			}
 			const { msgs: all } = pending(root, who)
 			const msgs = id ? all.filter((m) => m.id === id) : all
 			if (!msgs.length) { console.log(`nothing to dismiss for '${who}'${id ? ` with id ${id}` : ""}`); break }
-			drain(root, who, msgs)
+			drain(root, who, msgs, "dismiss")
 			console.log(`✓ dismissed ${msgs.length} message(s) for '${who}' — moved to .comm/delivered/ and logged, not deleted`)
 			break
 		}
@@ -458,7 +548,11 @@ function dispatch(root, cfg, me, cmd, rest) {
 			for (const id of Object.keys(cfg.agents)) {
 				const l = live[id]
 				const n = pending(root, id).msgs.length
-				console.log(`  ${l ? "●" : "○"} ${id.padEnd(18)} ${(l ? `running (pid ${l.map((x) => x.pid).join(",")})` : "not running").padEnd(28)}${n ? `${n} pending` : ""}`)
+				// `since` was collected and never rendered. It is the field that answers
+				// "is this session old enough to predate the hooks, i.e. deaf?", which
+				// otherwise has to be dug out of `ps`. Local time, dated when not today.
+				const started = l?.[0]?.since ? ` since ${l[0].since}` : ""
+				console.log(`  ${l ? "●" : "○"} ${id.padEnd(18)} ${(l ? `running (pid ${l.map((x) => x.pid).join(",")})${started}` : "not running").padEnd(40)}${n ? `${n} pending` : ""}`)
 			}
 			const corrupt = existsSync(join(root, ".comm", "corrupt")) ? readdirSync(join(root, ".comm", "corrupt")).length : 0
 			if (corrupt) console.log(`\n  ⚠ ${corrupt} corrupt message file(s) in .comm/corrupt/`)

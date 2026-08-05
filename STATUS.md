@@ -11,7 +11,8 @@ fold the settled parts into the README.
 | repo | **git initialised, local only, no remote** — `f94d96b` on `main` |
 | **electio** | installed and **in real daily use** — 20 delivered messages, both directions |
 | **selflo** | installed across all 7 agents; protocol in `COORDINATION.md` + 6 `START_HERE.md` |
-| gates | `attack` 10/10 deterministic ✓ · **`selftest` is FLAKY — see open item 1** |
+| gates | `attack` **12/12** deterministic ✓ (A11, A12 added from the review) · **`selftest` is FLAKY — open item 1** |
+| review | adversarial review 2026-08-05 in `REVIEW-adversarial.md` — **9 findings, all 9 confirmed by reproduction, all 9 fixed** |
 
 ## ✅ Closed since session 1
 
@@ -37,12 +38,22 @@ fold the settled parts into the README.
    until green, which is worse than having no gate**, and it also means a green `selftest` is weak
    evidence. Fix: split the assertion — check the injected nudge text deterministically (hook output),
    and treat model compliance as a separate, explicitly probabilistic check.
-2. **🔴 Latency is a mailbox — not an interrupt.** Across 18 real deliveries:
+2. **🔴 Latency is a mailbox — not an interrupt.** Across **22 real deliveries** (25 log lines, 24 unique
+   ids after dropping one duplicate, minus the 2 sub-second headless proofs). Median = mean of the two
+   middle values; re-derivable from `~/Dev/electio/.comm/log.jsonl`:
 
    | direction | n | median | max |
    | --- | --- | --- | --- |
-   | leader → web-app | 8 | **1422 s (23.7 min)** | 2372 s (39.5 min) |
-   | web-app → leader | 12 | 639 s (10.6 min) | 2101 s (35 min) |
+   | leader → web-app | 10 | **1462 s (24.4 min)** | 2372 s (39.5 min) |
+   | web-app → leader | 12 | 586 s (9.8 min) | 959 s (16.0 min) |
+
+   ⚠️ **The previous version of this table was wrong**, caught by the adversarial review and confirmed by
+   re-derivation. It said n=8 / n=12 and "18 real deliveries" while the table summed to 20; the n=12
+   silently included the 2 headless proofs the prose claimed to exclude; and the old `web-app → leader` max
+   of 2101 s was the duplicate id `…-restored` counted twice, its second drain inflating the tail. The
+   medians moved because the log kept growing after the first measurement. **A table a reader cannot
+   re-derive from its stated source is the thing this repo exists to prevent** — it is now recomputed by
+   script, not transcribed.
 
    The asymmetry is structural: mail lands at the recipient's *turn boundary*, and the expert's
    implementation turns are long, so nudges **to** the expert wait roughly twice as long. Operational
@@ -74,6 +85,31 @@ fold the settled parts into the README.
    `scratchpad/selflo-comm-backup-2026-08-04.tgz`. ⚠️ Its `COORDINATION.md`, `scripts/sync-agent-files.mjs`
    and 6 `docs/START_HERE.md` **still document the bus** — deliberately left, since reinstalling is one
    command, but an agent relaunched there before reinstall will follow those docs into a missing file.
+
+## ✅ Done in session 3, from the adversarial review
+
+Every finding was **reproduced before being fixed** — none was taken on the reviewer's word — and the two
+🔴 silent-failure ones are now permanent gates (A11, A12) so they cannot come back quietly.
+
+| # | defect | fix |
+| --- | --- | --- |
+| 1 🔴 | `--ref` carried the exact injection A8 exists to stop — a newline in a path forged a top-level `[SYSTEM]` line in the recipient's context, uncapped on the `inbox` surface | refused at send, flattened at render (`safeRef`), capped at `MAX_REF`; gated by **A11** |
+| 2 🔴 | `install.mjs` replaced an unparseable `settings.json` with only its own hooks — permissions, env, unrelated hooks gone, exit 0. Had already run against 7 agents | absent ≠ unparseable; a file we cannot read is one we must not overwrite. Skips that agent, reports it, exits 1 |
+| 3 🔴 | an agent id ≠ its directory name was permanently unreachable while `send`, `who`, `sent` and the hook all reported normal — and the README invites the rename that triggers it | `whoami` resolves cwd against config **values**, longest path first; fixes nesting too; gated by **A12** |
+| 4 🟠 | a ref was never checked for existence — the recipient was told "re-read the artifact" about nothing | `existsSync` at send, `--force` for a file you are about to write |
+| 5 🟠 | A2 graded its own homework: threshold 3000 against 2-char notes, while the documented maxima render ~3784 | corpus driven to `MAX_NOTE`/`MAX_REF`, budget derived from the constants. Also added lower bounds to A2/A3 — with an empty inbox both passed on **zero bytes** |
+| 6 🟠 | the log could not tell a delivery from a dismissal, and `dismiss` had no identity check while `send` did — an expert could clear the leader's `blocked` report and the sender was told it landed | `via: hook\|dismiss` in `drain`; dismissing another agent's inbox needs `--force`; `comm sent` shows `✗ DISMISSED` |
+| 7 🟡 | session start rendered UTC without a date | local time, dated when not today |
+| 8 🟡 | `.gitignore` was only edited if it already existed, so fresh projects never ignored `.comm/` | created when absent |
+| 9 🟡 | STATUS's own latency table did not re-derive from its source | recomputed by script — see open item 2 |
+
+⚠️ **Finding 7 was overstated and I say so rather than quietly banking it:** `since` was computed and
+**never rendered anywhere**, so `comm who` printed no time at all. The concern was sound (that field decides
+armed-vs-not, and STATUS had to reach for `ps` to answer it), so it is now correct *and* displayed.
+
+⚠️ **A consequence of fixing 6 that is worth stating:** no historical log row carries a `via` field, so for
+every delivery before this change, delivery and dismissal remain indistinguishable. The table in open item 2
+is exposed to that, unquantified. New rows are not.
 
 ## ✅ Done in session 2, from the electio leader's field review
 
