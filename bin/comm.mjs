@@ -362,8 +362,16 @@ function drain(root, agent, msgs, via = "hook") {
 // launched, /proc says what is alive. Those differ exactly when it matters.
 function liveAgents(root, cfg) {
 	const out = {}
+	// Sessions that declared themselves OFF the bus, keyed by the agent whose
+	// directory they occupy. Non-enumerable, so `live[agent]` and the
+	// `Object.entries(live)` shared-inbox scan keep exactly their old meaning.
+	const offBus = {}
+	const finish = () => {
+		Object.defineProperty(out, "offBus", { value: offBus, enumerable: false })
+		return out
+	}
 	let pids = []
-	try { pids = readdirSync("/proc").filter((p) => /^\d+$/.test(p)) } catch { return out }
+	try { pids = readdirSync("/proc").filter((p) => /^\d+$/.test(p)) } catch { return finish() }
 	for (const pid of pids) {
 		let cmd = ""
 		try { cmd = readFileSync(`/proc/${pid}/cmdline`, "utf8") } catch { continue }
@@ -379,7 +387,21 @@ function liveAgents(root, cfg) {
 			if (hit) declared = hit.slice("CLAUDE_COMM_AGENT=".length).trim() || null
 		} catch { /* not readable — fall back to cwd, same as before */ }
 		const who = whoami(root, cfg, cwd, declared)
-		if (!who) continue
+		// A session that DECLARED itself off the bus is not an agent — but it is not
+		// nothing either, and reporting it as "not running" is a confident wrong
+		// answer of exactly the kind this project exists to prevent. Measured on my
+		// own fix, hours old: with CLAUDE_COMM_AGENT exported globally (the obvious
+		// way to silence several classifiers at once) the REAL leader launches
+		// off-bus, `who` says "not running", and `sent` says "lands when relaunched"
+		// — which is false, because relaunching under the same export changes
+		// nothing. The mail queues forever behind a diagnosis that sounds fine.
+		if (!who) {
+			if (declared) {
+				const inDir = whoami(root, cfg, cwd, null)
+				if (inDir) (offBus[inDir] ||= []).push({ pid, declared })
+			}
+			continue
+		}
 		let started = ""
 		// LOCAL time, with the date whenever it is not today. This field decides
 		// armed-vs-not — you compare it against the hook file's mtime, which every
@@ -393,7 +415,7 @@ function liveAgents(root, cfg) {
 		} catch {}
 		;(out[who] ||= []).push({ pid: Number(pid), since: started })
 	}
-	return out
+	return finish()
 }
 
 // ── hook handlers ───────────────────────────────────────────────────────────
@@ -604,7 +626,12 @@ function dispatch(root, cfg, me, cmd, rest) {
 							: `✓ delivered ${String(m.delivered).slice(11, 16)} (logged before delivery and dismissal were distinguished)`
 					: live[to]?.length
 						? `⧗ PENDING — '${to}' is running but has not ended a turn since; it will not see this until it does`
-						: `⧗ pending — '${to}' is not running; lands when relaunched`
+						// "lands when relaunched" is FALSE when a session is sitting in that
+						// directory having declared itself off the bus: relaunching under the
+						// same declaration changes nothing, and the mail waits forever.
+						: live.offBus?.[to]?.length
+							? `⧗ STUCK — a session in '${to}' declared CLAUDE_COMM_AGENT=${live.offBus[to][0].declared}; relaunching will NOT help until that changes`
+							: `⧗ pending — '${to}' is not running; lands when relaunched`
 				// safeRef here too, not only on `inbox`/`renderNudge`: a hand-written
 				// message file (the vector safeRef exists for, and the one A11 plants)
 				// carries its raw ref into log.jsonl, and `sent`/`log` are the LEADER'S
@@ -649,7 +676,9 @@ function dispatch(root, cfg, me, cmd, rest) {
 				// "is this session old enough to predate the hooks, i.e. deaf?", which
 				// otherwise has to be dug out of `ps`. Local time, dated when not today.
 				const started = l?.[0]?.since ? ` since ${l[0].since}` : ""
-				const many = l && l.length > 1 ? `  ⚠ ${l.length} SESSIONS SHARE THIS INBOX` : ""
+				const off = live.offBus?.[id]
+				const many = l && l.length > 1 ? `  ⚠ ${l.length} SESSIONS SHARE THIS INBOX`
+					: !l && off ? `  ⚠ ${off.length} session(s) here declared OFF-BUS (CLAUDE_COMM_AGENT=${off[0].declared})` : ""
 				console.log(`  ${l ? "●" : "○"} ${id.padEnd(18)} ${(l ? `running (pid ${l.map((x) => x.pid).join(",")})${started}` : "not running").padEnd(40)}${n ? `${n} pending` : ""}${many}`)
 			}
 			// The condition that used to be silent, and it is the one that loses mail.
