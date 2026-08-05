@@ -1,4 +1,4 @@
-# STATUS — claude-comm, 2026-08-05 (sessions 4–6)
+# STATUS — claude-comm, 2026-08-06 (sessions 4–7)
 
 Design and gates are in `README.md`; **this file is only what is OPEN.** Keep it short — when it grows,
 fold the settled parts into the README.
@@ -10,7 +10,7 @@ fold the settled parts into the README.
 | toolkit | `bin/comm.mjs`, `install.mjs`, `test/attack.mjs`, `test/selftest.mjs`, `test/latency.mjs` — no dependencies |
 | repo | git initialised, local only, no remote |
 | **electio** | in real daily use — 26 real deliveries, both directions. **Ran a bus 4 commits stale until this session** |
-| gates | `attack` **23/23** deterministic ✓, **every case proved able to go red** (defect restored in the bus, gate byte-identical) · `selftest` **now deterministic too** — 6/6 transport green |
+| gates | `attack` **24/24** deterministic ✓, **every case proved able to go red** (defect restored in the bus, gate byte-identical) · `selftest` **now deterministic too** — 6/6 transport green |
 | reviews | #1 (9 findings) in `REVIEW-adversarial.md` · #2 (10 findings) in `REVIEW-adversarial-2.md` · electio leader's field reviews in `REVIEW-electio-leader.md` and `REPLY-from-electio-leader.md` |
 
 ## ✅ Closed in session 4 — adversarial review #2
@@ -204,6 +204,69 @@ Now write-to-temp + `rename(2)`, same directory. Exercised ~6× per `attack` run
 a gate would have to race a hook against a write, and a flaky gate is worse than none — the `selftest` lesson.
 Stated here instead of pretended.
 
+## ✅ Session 7 — the field closed my open question, and my own audit field fooled me
+
+**Their report #5 answered the control I asked for.** My reply #4 ended: *"`who --all` has never been
+exercised on your tree with a real off-bus session alive. The first `none` you launch is the real control,
+and if the line does not appear, I want to know."* It appeared — 3 live `none` sessions, counted correctly,
+loud without `--all`. **I then ran the half they had not**: their three stand-ins were still alive, so
+`comm who --all` on their real tree listed all three with correct pids and cwd, cross-checked against an
+independent `/proc` sweep. 3/3. Their `log.jsonl` unchanged at 37 lines.
+
+Also confirmed by measurement, not by reading their report: **electio's bus is byte-identical to HEAD**
+(`79f545e3…`). Their `COORDINATION.md` had claimed all day that it was stale from session 1; they caught
+that themselves and corrected it.
+
+⚠️ **I guessed one of their caveats was over-cautious and the log corrected me.** They wrote "no mail
+circulated during this configuration". I assumed their earlier rounds 9–11 already covered it. The log says
+the last delivery was 2026-08-05T20:48 and their `none` sessions started 2026-08-06T00:07 — **their caveat
+is exact.** Different configuration, different pids. Their self-assessment beat my inference; that is now
+four for four.
+
+### 🔴 `to_agent` looks like an audit field and cannot fail — and I was its first victim
+
+Auditing their 37 rows with `to !== to_agent` returned **"0 drained by the wrong agent"**, and I was about
+to send that number to the field as evidence. It is unearnable. `pending()` reads `inbox/<agent>/` and
+`drain()` stamps that **same** agent, so `to === to_agent` holds for every reachable row.
+
+**The A10 class — an assertion true for every value it can take — except this time baked into the DATA
+FORMAT**, where it outlives any one reader and reads like evidence to the next person. Logging nothing would
+have been safer than logging this.
+
+Measured with two live arms, both confirmed to actually move mail (`inbox 1 → 0`):
+
+| arm | who physically ran | logged row |
+| --- | --- | --- |
+| honest | `app`'s own installed stub | `to=app to_agent=app via=hook` |
+| impostor | the **leader's** stub with `CLAUDE_COMM_AGENT=app` | `to=app to_agent=app via=hook` |
+
+**Byte-identical**, and no pid or process identity anywhere in the row.
+
+⚠️ **The probe was VOID on its first run and said the opposite.** The send was refused (a ref resolves
+relative to the *recipient's* directory, A9), nothing drained, and the two arms compared *equal* — because
+both were `undefined`. It printed `indistinguishable: true`, the answer I was expecting. Only the
+`both arms actually drained` assertion caught it. [[prove-the-probe]] again: **a fixture that cannot run
+reports "no problem"**, and it does so in the direction of your hypothesis.
+
+Fix: `id_src` on every drained row — `stub` (that agent's own installed hook ran, so identity cannot wander),
+`declared` (a session asserted the name through the environment), `cwd` (legacy fallback), `cli` (dismiss).
+The declaration is tested **first**, because it wins inside `whoami`.
+
+**Gated by A24, proved red twice with the gate byte-identical**, and in both mutations the fixture control
+stayed green — so it reddened on its assertion, not on a broken fixture:
+
+| mutation | result |
+| --- | --- |
+| `id_src` deleted from the row | `honest=undefined, impostor=undefined` → red |
+| test `agentRoot` **before** the declaration | `honest=stub, impostor=stub` → red — the impostor stamped **honest**, worse than no field |
+
+A24 carries a third clause that pins *why*: the naive `to !== to_agent` comparison must **still find nothing**.
+Without it, deleting `id_src` leaves the tautology intact and the gate passes on the very format it rejects.
+
+⚠️ **Only rows written from today carry `id_src`.** The 37 historical rows are unauditable and stay that way.
+💰 A22: 43 041 → **44 246 bytes (90% → 92%)** of 48 000. Two features in two sessions have spent 7% of the
+budget; the next one is paid for in deletions.
+
 ## 🛡️ "Performant, compact and secure by default" — what that is worth, measured
 
 The owner asked (2026-08-05) whether the project should be **ported to Rust**, out of a concern about memory
@@ -354,9 +417,13 @@ does and does not defend against as features are added.
 
 ## ⚠️ What was NOT verified
 
-- **Whether finding 1 ever actually ate mail in electio.** Structurally unanswerable: the log records *that*
-  a message was drained, never *which agent's hook* drained it, and every historical row lacks `via`. The
-  mechanism is proven; the history cannot be audited. This is review #1's finding 6 recurring one level up.
+- **Whether finding 1 ever actually ate mail in electio.** Still unanswerable — but the reason stated here
+  for three sessions was **wrong, and the wrong reason was the more dangerous half.** It said the log "never
+  records which agent's hook drained it". It does: `to_agent`, since the initial commit. What it records is
+  the **resolved name**, and every theft class this project has had works by making the thief resolve to the
+  *victim's* name — so the field is clean by construction in exactly the cases it would need to catch. I
+  proved that the hard way on 2026-08-06 (see session 7). `id_src` now separates the two, but it is only on
+  rows written from today; the 37 historical rows stay unauditable. Review #1's finding 6, one level up.
 - **How long the wandered-cwd window stays open.** Proved within a single `-p` turn. Whether an interactive
   session's Bash cwd resets between turns, or after `/clear`, is unmeasured — it decides the exposure, not
   the existence, of the defect. Now moot for delivery (identity no longer reads cwd) but it still governs

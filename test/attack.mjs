@@ -685,6 +685,69 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 		`default warns=${/other live session/.test(warn)}; warns when none=${/other live session/.test(quiet)}`)
 }
 
+// A24 — the audit log must distinguish "this agent's own hook drained its mail"
+// from "some session ASSERTED this agent's name and drained it".
+//
+// Found by being fooled by my own log, 2026-08-06. Auditing electio's 37 rows with
+// `to !== to_agent` returned "0 drained by the wrong agent" and I was about to report
+// that number to the field. It is unearnable: pending() reads inbox/<agent>/ and drain()
+// stamps that SAME agent, so `to === to_agent` holds for every reachable row. The A10
+// class again — an assertion true for every value it can take — except this time it is
+// baked into the DATA FORMAT, where it outlives any one reader and looks like evidence.
+//
+// So the gate does not assert "no theft". It asserts the log can TELL THE TWO APART,
+// and clause 3 pins the reason by re-running the naive comparison and requiring it to
+// stay blind. Without clause 3 someone deletes id_src, `to === to_agent` still holds,
+// and the gate passes on the very format it exists to reject.
+{
+	const rootB = mkdtempSync(join(tmpdir(), "comm-attack-idsrc-"))
+	mkdirSync(join(rootB, "app", "docs"), { recursive: true })
+	mkdirSync(join(rootB, ".comm", "inbox"), { recursive: true })
+	writeFileSync(join(rootB, "app", "docs", "REVIEW.md"), "# review\n")
+	writeFileSync(join(rootB, ".comm", "config.json"),
+		JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app" } }))
+	execFileSync("node", [join(PKG, "install.mjs"), rootB], { stdio: "pipe" })
+	const busB = join(rootB, ".comm", "bin", "comm.mjs")
+	const logB = join(rootB, ".comm", "log.jsonl")
+
+	// The ref is resolved relative to the RECIPIENT's directory (A9), so "docs/…".
+	// Getting this wrong made the first run of this probe VOID: send refused, nothing
+	// was ever drained, and the two arms compared equal because both were `undefined` —
+	// a fixture that cannot run reports "no problem". Hence sendOk below.
+	const sendB = () => spawnSync("node", [busB, "send", "app", "--kind", "done", "--ref", "docs/REVIEW.md", "--note", "n"],
+		{ cwd: rootB, encoding: "utf8" }).status === 0
+	const fireAs = (stubDir, declared) => spawnSync("node", [join(rootB, stubDir, ".claude", "comm-hook.mjs"), "stop"], {
+		cwd: join(rootB, stubDir), encoding: "utf8",
+		env: { ...process.env, CLAUDE_COMM_AGENT: declared || "" },
+		input: JSON.stringify({ cwd: join(rootB, stubDir), hook_event_name: "Stop", stop_hook_active: false }),
+	})
+	const rowsB = () => { try { return readFileSync(logB, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)) } catch { return [] } }
+	const appMail = () => { try { return readdirSync(join(rootB, ".comm", "inbox", "app")).filter((f) => f.endsWith(".json")).length } catch { return 0 } }
+
+	const okA = sendB(), beforeA = appMail()
+	fireAs("app", null)                     // honest: app's own installed stub
+	const rowA = rowsB().at(-1), afterA = appMail()
+
+	const okB = sendB(), beforeB = appMail()
+	fireAs(".", "app")                      // impostor: the LEADER's stub, declaring `app`
+	const rowB = rowsB().at(-1), afterB = appMail()
+
+	// Only fields an auditor can actually read back out of the log.
+	const seen = (r) => (r ? JSON.stringify({ to: r.to, to_agent: r.to_agent, via: r.via, id_src: r.id_src }) : null)
+	// FIXTURE CONTROL: both arms must have genuinely moved mail. Without this the
+	// gate passes when nothing ran at all.
+	const bothDrained = okA && okB && beforeA === 1 && afterA === 0 && beforeB === 1 && afterB === 0
+	const distinguishable = Boolean(rowA && rowB) && seen(rowA) !== seen(rowB)
+	const naiveStillBlind = rowsB().every((r) => r.to === r.to_agent)
+
+	try { rmSync(rootB, { recursive: true, force: true }) } catch {}
+	check("A24 the log distinguishes an asserted identity",
+		bothDrained && distinguishable && naiveStillBlind,
+		`both arms drained=${bothDrained}; honest=${rowA && rowA.id_src}, impostor=${rowB && rowB.id_src}, ` +
+		`distinguishable=${distinguishable}; naive to!==to_agent still finds nothing=${naiveStillBlind} ` +
+		`(it must — that is WHY id_src exists)`)
+}
+
 // ── A21/A22: the properties that erode by accretion, not by a single bad commit ──
 // Asked for directly by the owner (2026-08-05): "performant, compact and secure by
 // default", with a worry about memory leaks as features are added. The honest
