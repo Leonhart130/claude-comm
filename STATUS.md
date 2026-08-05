@@ -79,10 +79,27 @@ proposed fix would have left the mail theft in place. Its *observation* is what 
    it in its follow-up**: with two agents, threading adds identity surface while the substance already lives
    in the file. It ranks the wake mechanism (item 3) above this.
 3. **Phase 2, deferred by the owner:** kitty socket for a true mid-turn interrupt. Item 1 is its
-   justification. ⚠️ Before relying on it, verify `kitten @ ls` resolves splits by title on a scratch split —
-   a `--match` that matches nothing sends the nudge into the void and looks exactly like an agent ignoring
-   it. Third option surfaced by the owner: an **MCP channel that pushes into the session**
-   (`--dangerously-load-development-channels`) — undocumented, dev-flagged, **unverified on 2.1.221**.
+   justification. **Feasibility now MEASURED** (kitty 0.47.4, headless throwaway instance, owner's terminal
+   untouched — `scratchpad/kitty-probe.sh`):
+
+   | | result |
+   | --- | --- |
+   | `kitten @ ls` exposes window titles | ✓ — splits are addressable by title |
+   | `send-text --match title:<exists>` | ✓ — text arrives in the target window |
+   | `send-text --match <matches nothing>` | 🔴 **exit 0, silent, discarded** |
+
+   The last row was the open warning and it is confirmed, with a control proving the match — not a dead
+   window — is what swallowed it. **So the kitty transport ships with exactly the silent-discard property
+   this bus spent two reviews removing:** the sender is told it worked and the nudge never existed.
+
+   ⇒ **Design constraint, not a caution: Phase 2 must resolve the match through `kitten @ ls` and refuse to
+   send when it does not resolve.** `send-text`'s own exit code may never be treated as delivery evidence.
+
+   ⚠️ **Cost the owner must weigh first:** remote control is currently OFF (`allow_remote_control` and
+   `listen_on` both unset, `KITTY_LISTEN_ON` empty). Turning it on needs a kitty.conf change **and a full
+   restart, which kills every running agent session.** Third option surfaced by the owner: an **MCP channel
+   that pushes into the session** (`--dangerously-load-development-channels`) — undocumented, dev-flagged,
+   **unverified**.
 4. **selflo is UNINSTALLED** (owner's call, 2026-08-04). Backup:
    `scratchpad/selflo-comm-backup-2026-08-04.tgz`. ⚠️ Its `COORDINATION.md`, `scripts/sync-agent-files.mjs`
    and 6 `docs/START_HERE.md` **still document the bus** — an agent relaunched there before reinstall will
