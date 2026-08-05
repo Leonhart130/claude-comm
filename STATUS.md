@@ -10,7 +10,7 @@ fold the settled parts into the README.
 | toolkit | `bin/comm.mjs`, `install.mjs`, `test/attack.mjs`, `test/selftest.mjs`, `test/latency.mjs` — no dependencies |
 | repo | git initialised, local only, no remote |
 | **electio** | in real daily use — 26 real deliveries, both directions. **Ran a bus 4 commits stale until this session** |
-| gates | `attack` **20/20** deterministic ✓, **every case proved able to go red** (defect restored in the bus, gate byte-identical) · `selftest` **now deterministic too** — 6/6 transport green |
+| gates | `attack` **22/22** deterministic ✓, **every case proved able to go red** (defect restored in the bus, gate byte-identical) · `selftest` **now deterministic too** — 6/6 transport green |
 | reviews | #1 (9 findings) in `REVIEW-adversarial.md` · #2 (10 findings) in `REVIEW-adversarial-2.md` · electio leader's field reviews in `REVIEW-electio-leader.md` and `REPLY-from-electio-leader.md` |
 
 ## ✅ Closed in session 4 — adversarial review #2
@@ -154,6 +154,45 @@ caught by a contradiction from outside, never by re-reading the patch.
 repo before this fix). No live impact there today — it is the only installed project, so no name collides —
 but the moment a second project is installed, or selflo is restored, it collides on `leader`.
 
+## 🛡️ "Performant, compact and secure by default" — what that is worth, measured
+
+The owner asked (2026-08-05) whether the project should be **ported to Rust**, out of a concern about memory
+leaks and security as features accrete. Measured rather than argued, and the recommendation was **not to
+port**:
+
+| claim | measurement |
+| --- | --- |
+| npm supply chain | **no `package.json`, no `node_modules`, zero dependencies** — one 40 KB file on `node:fs`/`path`/`crypto`/`url`. There is nothing to compromise |
+| speed | hook path **61 ms**, of which **49 ms is Node starting** — a port saves ~50 ms per turn boundary, against measured delivery latencies of **586 s median / 1462 s** in the slow direction. It would optimise ~0.008% of the number that is actually felt |
+| memory leaks | **structurally impossible**: no `spawn`, no timer, no watcher, no server anywhere in the bus. A process that exits in 61 ms has nothing that lives long enough to leak |
+| would Rust have caught the ~24 findings? | **two.** A `SafeRef` newtype would make rendering an unsanitized ref unrepresentable (#3), and a real arg parser prevents `--force` swallowing a positional (#4 — available in Node too). The other ~22 are semantic: identity derived from the wrong thing, gates that could not go red, a probe whose fixture could not run, a name matched globally. No type system catches a tautological assertion |
+| cost | Node is guaranteed present (Claude Code runs on it) and install is *copy one file*; a binary needs cargo on every machine or committed artefacts into a gitignored `.comm/`. And the 20+ case gate is the actual asset — reimplementing it is where the properties get quietly lost |
+
+**The three properties are protectable by gates, and a port protects none of them.** Rust cannot tell you the
+bus grew past what one person will read, that a nudge started carrying content, or that someone added a
+daemon. So:
+
+- **A21 — the bus stays a short-lived process.** Import allowlist (`node:fs|path|crypto|url`) plus no
+  `setInterval`/`setTimeout`/`watchFile`/`createServer`/`.listen`/`spawn`. **Each clause proved red
+  independently** (foreign import; unreachable `setInterval`), because two guards OR'd together can hide a
+  dead one — the A8 lesson. Comments are stripped first, and the **false-positive control is part of the
+  proof**: the same construct written in a comment must stay green, and does. A naive grep for these words
+  already matched prose once on the day this was written.
+- **A22 — the bus stays readable in one sitting.** 40 654 bytes of a 48 000 budget (85%). Proved red by
+  growth past the ceiling. The property is not disk space: **every defect this project has found came from
+  reading or from measuring**, and a file too large to read end-to-end retires the first half of that method.
+  In the framework's own idiom — **the fix for a red is to split or cut, never to raise the budget.**
+
+⚠️ **Latency is deliberately NOT gated, and that is not an oversight.** A timing threshold reddens for
+reasons foreign to what it claims to verify on a loaded machine — the exact failure that made `selftest`
+flaky 1 run in 6. It is measured and reported, like `selftest`'s behaviour half.
+
+⚠️ **Still open on "secure by default": the threat model is one line in the README** ("identity is not a
+security boundary; every agent runs as the same Unix user"). It is true and it is not enough. The real
+surface is **agent-to-agent prompt injection** — a nudge lands in another agent's context — which is why the
+first rule is *nudge, not content*. A8 and A15 gate parts of it; nothing yet states plainly what the bus
+does and does not defend against as features are added.
+
 ## ⏭️ OPEN
 
 1. **🔴 Latency is a mailbox — not an interrupt.** Re-derive with `node test/latency.mjs <log>`; the table
@@ -248,7 +287,14 @@ but the moment a second project is installed, or selflo is restored, it collides
    3. **The wake text must carry NO substance.** It is a doorbell that makes the idle session take a turn;
       the real nudge is then delivered by the `Stop` hook at that turn's end, through the path that is
       already gated. Anything else is content injection, which the project refuses by its first rule.
-   4. A third option the owner surfaced remains unexplored: an **MCP channel that pushes into the session**
+   4. **NO DAEMON, NO TIMER, NO WATCHER — the wake stays a short-lived process.** The natural way to build
+      a wake is a process that watches inboxes and lives forever. That would be the first long-lived thing
+      in this project, and it is the only way this tool could ever acquire a memory leak: today `comm`
+      starts, does file I/O and exits in 61 ms, so nothing lives long enough to leak. That is an
+      **architectural** property, not a Node-versus-Rust one, and it is now **gated by A21** (import
+      allowlist + no long-lived construct) rather than left to good intentions. The wake must therefore be
+      driven from the existing per-turn hook invocation, not from a resident watcher.
+   5. A third option the owner surfaced remains unexplored: an **MCP channel that pushes into the session**
       (`--dangerously-load-development-channels`) — undocumented, dev-flagged, unverified.
 
 4. **selflo is UNINSTALLED** (owner's call, 2026-08-04). Backup:

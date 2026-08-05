@@ -621,6 +621,52 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 		`comm log forged=${topLevelSystem(logOut)}, comm sent forged=${topLevelSystem(sentOut)}`)
 }
 
+// ── A21/A22: the properties that erode by accretion, not by a single bad commit ──
+// Asked for directly by the owner (2026-08-05): "performant, compact and secure by
+// default", with a worry about memory leaks as features are added. The honest
+// answer is that a memory leak is IMPOSSIBLE in this architecture — a process that
+// starts, does file I/O and exits in 61 ms has nothing that lives long enough to
+// leak — and that this is an ARCHITECTURAL property, not a language one. It stops
+// being true the moment someone adds a daemon, a timer or a watcher, which is
+// exactly how a wake mechanism (Phase 2) would most naturally be built.
+//
+// So the property is gated rather than trusted. Neither of these can be satisfied
+// by being careful; both fail loudly the first time the shape of the tool changes.
+{
+	const busSrc = readFileSync(join(PKG, "bin", "comm.mjs"), "utf8")
+	// Strip comments before matching, so PROSE about a daemon cannot redden a gate
+	// about daemons. (The word "listening" in a comment already matched a naive
+	// grep once today — a false red teaches people to ignore the gate.)
+	const code = busSrc.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
+
+	// The import allowlist is the robust half: a daemon cannot be written without
+	// reaching for one of net/http/child_process/timers, and imports are structural
+	// where a call-site regex is guesswork.
+	const ALLOWED = new Set(["node:fs", "node:path", "node:crypto", "node:url"])
+	const imports = [...code.matchAll(/from\s+"([^"]+)"/g)].map((m) => m[1])
+	const foreign = imports.filter((i) => !ALLOWED.has(i))
+	const LIVE = /\bsetInterval\s*\(|\bsetTimeout\s*\(|\bwatchFile\s*\(|\bcreateServer\s*\(|\.listen\s*\(|\bspawn\s*\(/
+	const liveHit = (code.match(LIVE) || [])[0] || null
+
+	check("A21 the bus stays a short-lived process",
+		foreign.length === 0 && !liveHit,
+		`imports outside {${[...ALLOWED].join(", ")}}: ${foreign.length ? foreign.join(", ") : "none"}; ` +
+		`long-lived construct: ${liveHit || "none"}`)
+
+	// A budget, in the same idiom as the framework's orientation budget: the fix for
+	// a red is to SPLIT OR DELETE, never to raise the ceiling. The property being
+	// protected is not disk space — it is that one person can still read the whole
+	// bus in one sitting. Every defect this project has found was found by reading
+	// or by measuring; a file too large to read end-to-end retires the first half of
+	// that method. Set with ~18% headroom over the size on the day it was written.
+	const BUS_BUDGET = 48_000
+	const size = Buffer.byteLength(busSrc)
+	check("A22 the bus stays readable in one sitting",
+		size <= BUS_BUDGET,
+		`bin/comm.mjs is ${size} bytes of ${BUS_BUDGET} (${Math.round((size / BUS_BUDGET) * 100)}%) — ` +
+		`if this is red, split it or cut it; raising the budget is not a fix`)
+}
+
 console.log(`\n${failed ? `✗ ${failed} adversarial check(s) FAILED` : "✓ all adversarial checks passed"}`)
 rmSync(root, { recursive: true, force: true })
 process.exit(failed ? 1 : 0)
