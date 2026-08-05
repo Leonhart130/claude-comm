@@ -10,7 +10,7 @@ fold the settled parts into the README.
 | toolkit | `bin/comm.mjs`, `install.mjs`, `test/attack.mjs`, `test/selftest.mjs`, `test/latency.mjs` — no dependencies |
 | repo | git initialised, local only, no remote |
 | **electio** | in real daily use — 26 real deliveries, both directions. **Ran a bus 4 commits stale until this session** |
-| gates | `attack` **16/16** deterministic ✓, **every case proved able to go red** (defect restored in the bus, gate byte-identical) · `selftest` **now deterministic too** — 6/6 transport green |
+| gates | `attack` **17/17** deterministic ✓, **every case proved able to go red** (defect restored in the bus, gate byte-identical) · `selftest` **now deterministic too** — 6/6 transport green |
 | reviews | #1 (9 findings) in `REVIEW-adversarial.md` · #2 (10 findings) in `REVIEW-adversarial-2.md` · electio leader's field reviews in `REVIEW-electio-leader.md` and `REPLY-from-electio-leader.md` |
 
 ## ✅ Closed in session 4 — adversarial review #2
@@ -41,6 +41,34 @@ never to raise the ceiling.
 ⚠️ **What the electio leader got right and what it got wrong.** It reported the symptom of finding 1 and
 diagnosed it as an unscoped imperative in the nudge. The imperative concern is real and secondary; its
 proposed fix would have left the mail theft in place. Its *observation* is what made the finding.
+
+## ✅ Closed in session 5 — the electio leader's §3
+
+🔴 **N sessions in ONE tree shared ONE inbox, and the fix for the cross-tree theft made it structural.**
+The leader reported it and explicitly declined to diagnose it ("my diagnoses are worth less than my
+observations") — it left the test arm to me. Measured with real sessions: an expert's `done` addressed to
+the leader was consumed by a **classifier's** turn end, drained, logged `via=hook`, `comm sent` showing
+✓ delivered. The leader would never have learned the round landed.
+
+**This was live on the owner's machine while it was being fixed** — `comm who` against the real project:
+
+```
+● leader   running (pid 335746,341714,341833,341956,342041)  ⚠ 5 SESSIONS SHARE THIS INBOX
+```
+
+Fix: a session may **declare** its identity (`CLAUDE_COMM_AGENT`), and the declaration wins over the
+directory. An unknown name means *not on the bus* — receive nothing, drain nothing — so the unsafe case is
+the loud one. Unset keeps the directory fallback, so every existing install is unchanged. `comm who` now
+reports when several live sessions resolve to one agent. Gated by **A17**.
+
+⚠️ **The honest limit: the default is still the unsafe one.** A session that declares nothing falls back to
+the directory, so protection requires the operator to declare on the *non-bus* sessions. Inverting it would
+silently cut off every existing install, which is worse. `who` makes the condition visible; it does not
+prevent it.
+
+⭐ **The leader's question was better than a fix would have been:** *is "one agent = one directory" the right
+axiom for a bus whose hub is exactly where you parallelise?* No — and the answer is that the name must be
+declarable, not derived. That is a design change it surfaced by asking rather than by proposing.
 
 ## ⏭️ OPEN
 

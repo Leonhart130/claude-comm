@@ -107,7 +107,37 @@ function loadConfig(root) {
  *
  * Longest path first, so a nested agent wins over the parent that contains it.
  */
-function whoami(root, cfg, cwd = process.cwd()) {
+/**
+ * A session may DECLARE which agent it is, overriding the directory.
+ *
+ * "one agent = one directory" is the wrong axiom for a hub-and-spoke bus,
+ * because the hub is exactly where you parallelise. Reported by the electio
+ * leader and then MEASURED here with real sessions: with 3 classifiers + an
+ * adversarial reviewer + the leader all launched in the hub's own tree, five
+ * live sessions resolve to one name and share one inbox. An expert's round
+ * report was consumed by a classifier's turn end — drained, logged `via=hook`,
+ * `comm sent` showing ✓ delivered — and the leader would never have learned the
+ * round landed. Identical to the cross-tree theft A13 closes, one level down.
+ *
+ * Semantics, chosen so the unsafe case is the LOUD one:
+ *   · set to a known agent   → that is who you are, whatever directory you are in
+ *   · set to anything else   → you are NOT ON THE BUS: receive nothing, drain
+ *                              nothing. This is what a classifier wants.
+ *   · unset                  → fall back to the directory (every existing install)
+ *
+ * It is not a security boundary — nothing here is, per the README. It stops
+ * accidents and confusion, which is what actually happens in this topology.
+ */
+const declaredAgent = () => {
+	const d = String(process.env.CLAUDE_COMM_AGENT ?? "").trim()
+	return d || null
+}
+
+// `declared` is a PARAMETER, not read from the environment inside: liveAgents
+// resolves identity for OTHER processes, and reading our own env there would
+// stamp this session's declaration onto every process it inspects.
+function whoami(root, cfg, cwd = process.cwd(), declared = declaredAgent()) {
+	if (declared) return Object.prototype.hasOwnProperty.call(cfg.agents || {}, declared) ? declared : null
 	const abs = resolve(cwd)
 	const base = resolve(root)
 	const entries = Object.entries(cfg.agents || {})
@@ -333,7 +363,15 @@ function liveAgents(root, cfg) {
 		if (!/(^|\/|\0)claude(\0|$)/.test(cmd)) continue
 		let cwd = ""
 		try { cwd = readlinkSync(`/proc/${pid}/cwd`) } catch { continue }
-		const who = whoami(root, cfg, cwd)
+		// Each process's OWN declaration, so `who` reports what the hook will
+		// actually do for that session rather than what our cwd implies.
+		let declared = null
+		try {
+			const env = readFileSync(`/proc/${pid}/environ`, "utf8")
+			const hit = env.split("\0").find((e) => e.startsWith("CLAUDE_COMM_AGENT="))
+			if (hit) declared = hit.slice("CLAUDE_COMM_AGENT=".length).trim() || null
+		} catch { /* not readable — fall back to cwd, same as before */ }
+		const who = whoami(root, cfg, cwd, declared)
 		if (!who) continue
 		let started = ""
 		// LOCAL time, with the date whenever it is not today. This field decides
@@ -604,7 +642,23 @@ function dispatch(root, cfg, me, cmd, rest) {
 				// "is this session old enough to predate the hooks, i.e. deaf?", which
 				// otherwise has to be dug out of `ps`. Local time, dated when not today.
 				const started = l?.[0]?.since ? ` since ${l[0].since}` : ""
-				console.log(`  ${l ? "●" : "○"} ${id.padEnd(18)} ${(l ? `running (pid ${l.map((x) => x.pid).join(",")})${started}` : "not running").padEnd(40)}${n ? `${n} pending` : ""}`)
+				const many = l && l.length > 1 ? `  ⚠ ${l.length} SESSIONS SHARE THIS INBOX` : ""
+				console.log(`  ${l ? "●" : "○"} ${id.padEnd(18)} ${(l ? `running (pid ${l.map((x) => x.pid).join(",")})${started}` : "not running").padEnd(40)}${n ? `${n} pending` : ""}${many}`)
+			}
+			// The condition that used to be silent, and it is the one that loses mail.
+			// Whichever of those sessions ends a turn first drains the inbox; the others
+			// — including the agent the mail was actually for — never see it, and the
+			// sender is told ✓ delivered. Measured with real sessions: a classifier
+			// launched in the hub's own tree consumed the expert's round report.
+			const shared = Object.entries(live).filter(([, v]) => v.length > 1)
+			if (shared.length) {
+				console.log(`\n  ⚠ ${shared.map(([id, v]) => `'${id}' has ${v.length} live sessions`).join("; ")}.`)
+				console.log(`    Mail is drained by whichever ends a turn FIRST — the others never see it,`)
+				console.log(`    and the sender is still told it was delivered.`)
+				console.log(`    Fix: launch each session with an explicit identity, e.g.`)
+				const pad = Math.max(cfg.leader.length, 4)
+				console.log(`      CLAUDE_COMM_AGENT=${String(cfg.leader).padEnd(pad)} claude   # the one that should get the mail`)
+				console.log(`      CLAUDE_COMM_AGENT=${"none".padEnd(pad)} claude   # a session that is not on the bus`)
 			}
 			const corrupt = existsSync(join(root, ".comm", "corrupt")) ? readdirSync(join(root, ".comm", "corrupt")).length : 0
 			if (corrupt) console.log(`\n  ⚠ ${corrupt} corrupt message file(s) in .comm/corrupt/`)

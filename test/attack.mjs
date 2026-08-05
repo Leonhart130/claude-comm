@@ -373,6 +373,49 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 		`turn ended in docs/: leader mail ${before} -> ${after}, nudge=${(h.stdout || "").includes("claude-comm") ? "emitted" : "NONE"}`)
 }
 
+// A17 — INTRA-TREE theft: several sessions in ONE directory must not share one
+// inbox by accident. A13 closed theft BETWEEN trees; this is the same defect one
+// level down, and identity-from-directory made it structural. Reported by the
+// electio leader (5 sessions — 3 classifiers, a reviewer, the leader — all
+// launched in the hub's own tree) and then measured here with real sessions: a
+// classifier's turn end consumed the expert's round report, logged `via=hook`,
+// `comm sent` showing ✓ delivered, and the leader would never have known.
+//
+// A session that is not on the bus declares so and must then drain nothing.
+{
+	const root8 = mkdtempSync(join(tmpdir(), "comm-attack-declare-"))
+	process.on("exit", () => { try { rmSync(root8, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(root8, "app", "docs"), { recursive: true })
+	mkdirSync(join(root8, ".comm"), { recursive: true })
+	writeFileSync(join(root8, "app", "docs", "REVIEW.md"), "# review\n")
+	writeFileSync(join(root8, ".comm", "config.json"),
+		JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app" } }))
+	execFileSync("node", [join(PKG, "install.mjs"), root8], { stdio: "pipe" })
+	const bus8 = join(root8, ".comm", "bin", "comm.mjs")
+	const nl = () => readdirSync(join(root8, ".comm", "inbox", "leader")).filter((f) => f.endsWith(".json")).length
+	const fireAs = (declared) => spawnSync("node", [join(root8, ".claude", "comm-hook.mjs"), "stop"], {
+		cwd: root8, encoding: "utf8",
+		input: JSON.stringify({ cwd: root8, stop_hook_active: false }),
+		env: declared === null ? process.env : { ...process.env, CLAUDE_COMM_AGENT: declared },
+	})
+
+	execFileSync("node", [bus8, "send", "leader", "--ref", "docs/REVIEW.md", "--note", "round report"],
+		{ cwd: join(root8, "app"), stdio: "pipe" })
+	// ARM 1: a session in the same tree that is NOT on the bus.
+	const beforeNone = nl()
+	const hNone = fireAs("none")
+	const afterNone = nl()
+	// ARM 2 (control): the real leader, declaring itself, must still receive. Without
+	// this arm "nothing was drained" is also what a completely dead hook looks like.
+	const hLeader = fireAs("leader")
+	const afterLeader = nl()
+
+	check("A17 undeclared sessions cannot share an inbox",
+		beforeNone === 1 && afterNone === 1 && !(hNone.stdout || "").includes("claude-comm") &&
+		afterLeader === 0 && (hLeader.stdout || "").includes("claude-comm"),
+		`CLAUDE_COMM_AGENT=none: mail ${beforeNone} -> ${afterNone} (want unchanged); =leader: -> ${afterLeader} (want 0, delivered)`)
+}
+
 // A14 — a valueless flag must not swallow the positional that follows it.
 // `dismiss --force leader` cleared the OPERATOR'S OWN inbox and reported success,
 // because firstPositional skipped `--force` together with the next token. Reachable
