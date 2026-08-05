@@ -39,6 +39,7 @@ import {
 } from "node:fs"
 import { join, dirname, resolve, relative, sep } from "node:path"
 import { randomBytes } from "node:crypto"
+import { fileURLToPath } from "node:url"
 
 const KINDS = {
 	nudge: "a correction or brief landed",
@@ -49,9 +50,13 @@ const KINDS = {
 
 // Budget guards. These are deliberately small: a doorbell that costs real
 // orientation budget is a doorbell that will be resented and then removed.
-const MAX_NOTE = 240   // characters kept from a --note
-const MAX_RENDER = 8   // messages rendered into one nudge; the rest are counted
-const MAX_REF = 400    // characters allowed in a --ref; a path is never longer
+// EXPORTED so the gate derives its budget from the bus rather than from its own
+// copy. attack.mjs re-declared these three; both its corpus and its budget were
+// built from the copies, so raising a constant HERE moved nothing there — and
+// MAX_REF, the constant added to fix review-#1 finding 1, had no gate at all.
+export const MAX_NOTE = 240   // characters kept from a --note
+export const MAX_RENDER = 8   // messages rendered into one nudge; the rest are counted
+export const MAX_REF = 400    // characters allowed in a --ref; a path is never longer
 
 /**
  * Flatten a note to a single safe line. This is the security boundary: `note`
@@ -355,11 +360,29 @@ function hookDeliver(event) {
 	// Loop guard: we already blocked once for this stop; let the agent finish.
 	if (event === "stop" && p.stop_hook_active) process.exit(0)
 
-	const cwd = p.cwd || process.cwd()
-	const root = findRoot(cwd)
+	// IDENTITY MUST NOT COME FROM THE SESSION'S CWD. Measured 2026-08-05, end to
+	// end, with a control arm: the Stop payload's `cwd` follows the Bash tool's
+	// working directory, which persists across calls inside a turn. A leader that
+	// runs `cd web-app && git log` — the most ordinary thing a reviewing leader
+	// does — ends that turn identified as the EXPERT. Its hook then DRAINED the
+	// expert's inbox: the brief was announced into the leader's context, moved to
+	// delivered/, and logged `via=hook`. The expert never saw it; `comm sent` said
+	// ✓ delivered; no surface anywhere could tell it from a real delivery, and the
+	// log cannot distinguish it after the fact. Symmetric — an expert that cds to
+	// the project root eats the leader's mail the same way.
+	//
+	// The stub is installed ONE PER AGENT at <agentRoot>/.claude/comm-hook.mjs, so
+	// its own location IS the identity and cannot wander. `cwd` remains correct for
+	// the CLI, where "who is typing this" genuinely is the question.
+	//
+	// Fall back to cwd when the flag is absent, so a stub installed before this
+	// change keeps delivering instead of going silent. Gated by A13.
+	const agentRoot = arg(process.argv.slice(2), "agent-root")
+	const anchor = agentRoot || p.cwd || process.cwd()
+	const root = findRoot(anchor)
 	if (!root) process.exit(0)
 	const cfg = loadConfig(root)
-	const me = whoami(root, cfg, cwd)
+	const me = whoami(root, cfg, anchor)
 	if (!me) process.exit(0)
 
 	const { msgs, quarantined } = pending(root, me)
@@ -387,10 +410,20 @@ function hookDeliver(event) {
 // documented as `[<agent>] [--flag X]` bound the agent to the flag name when the
 // agent was omitted — `dismiss --id abc` looked up an agent called "--id" and
 // reported "nothing to dismiss", i.e. a clean no-op instead of an error. Skips a
-// flag together with its value; every flag in this CLI takes one.
+// flag together with its value — except the ones that take none.
+//
+// "every flag in this CLI takes one" stopped being true the moment `--force` was
+// added, and the same session that wrote this fix reopened the bug it closed:
+// `dismiss --force leader` swallowed `leader` as --force's value, returned
+// undefined, fell back to `me`, and cleared THE OPERATOR'S OWN inbox while
+// printing success. Reachable by following this tool's own remediation text
+// ("If you really mean to, pass --force") — appending it worked, prefixing it
+// did not. A list that must be kept in step with the flags is a weak fix; it is
+// the smallest one that is correct, and A14 pins it.
+const VALUELESS_FLAGS = new Set(["--force"])
 function firstPositional(argv) {
 	for (let i = 0; i < argv.length; i++) {
-		if (argv[i].startsWith("--")) { i++; continue }
+		if (argv[i].startsWith("--")) { if (!VALUELESS_FLAGS.has(argv[i])) i++; continue }
 		return argv[i]
 	}
 	return undefined
@@ -471,7 +504,14 @@ function dispatch(root, cfg, me, cmd, rest) {
 			// the electio leader, who met it twice: the two surfaces an agent actually
 			// discovers the bus through (this listing and the hook notice) were the two
 			// that never mentioned `dismiss`.
-			console.log(`\n  ↑ still pending — reading them here does NOT acknowledge them.\n    After acting, run:  node .comm/bin/comm.mjs dismiss${rest[0] ? ` ${who}` : ""}`)
+			// The hint must name a command that actually works. Session 2 added it,
+			// session 3 added the identity guard, and nobody updated the hint: reading
+			// another agent's inbox told you to run `dismiss <them>`, which the guard
+			// then refuses. That is the A7 lesson in miniature — a check that refuses a
+			// path the tool itself documents. `rest[0]` here was also the last survivor
+			// of the positional-argument fix.
+			const clear = who === me ? `dismiss ${who}` : `dismiss ${who} --force`
+			console.log(`\n  ↑ still pending — reading them here does NOT acknowledge them.\n    After acting, run:  node .comm/bin/comm.mjs ${clear}`)
 			break
 		}
 		// The sender is otherwise blind. `log` records what was SENT; nothing records
@@ -493,9 +533,17 @@ function dispatch(root, cfg, me, cmd, rest) {
 					try { const m = JSON.parse(line); if (m.from === who) rows.push(m) } catch {}
 				}
 			} catch {}
+			// `pending()` QUARANTINES unreadable files as a side effect, so this query
+			// command moves files into .comm/corrupt/. It said nothing about it, so a
+			// corrupt message could be quarantined by the sender's own status check and
+			// never surface anywhere. `who` already reports a corrupt count; this did not.
+			let quarantined = 0
 			for (const agent of Object.keys(cfg.agents || {})) {
-				for (const m of pending(root, agent).msgs) if (m.from === who) rows.push(m)
+				const r = pending(root, agent)
+				quarantined += r.quarantined
+				for (const m of r.msgs) if (m.from === who) rows.push(m)
 			}
+			if (quarantined) console.log(`⚠ ${quarantined} unreadable file(s) moved to .comm/corrupt/ — tell the leader.`)
 			if (!rows.length) { console.log(`nothing sent by '${who}' yet`); break }
 			rows.sort((a, b) => String(a.ts).localeCompare(String(b.ts)))
 			const live = liveAgents(root, cfg)
@@ -512,7 +560,11 @@ function dispatch(root, cfg, me, cmd, rest) {
 					: live[to]?.length
 						? `⧗ PENDING — '${to}' is running but has not ended a turn since; it will not see this until it does`
 						: `⧗ pending — '${to}' is not running; lands when relaunched`
-				console.log(`  ${String(m.ts).slice(11, 16)}  ${String(to).padEnd(12)} [${m.kind}]  ${m.ref}   ${status}`)
+				// safeRef here too, not only on `inbox`/`renderNudge`: a hand-written
+				// message file (the vector safeRef exists for, and the one A11 plants)
+				// carries its raw ref into log.jsonl, and `sent`/`log` are the LEADER'S
+				// audit surfaces — text landing in the leader's context. Gated by A15.
+				console.log(`  ${String(m.ts).slice(11, 16)}  ${String(to).padEnd(12)} [${m.kind}]  ${safeRef(m.ref)}   ${status}`)
 			}
 			break
 		}
@@ -564,7 +616,7 @@ function dispatch(root, cfg, me, cmd, rest) {
 			if (!existsSync(f)) { console.log("(no deliveries yet)"); break }
 			const n = Number(arg(rest, "n", "20"))
 			for (const r of readFileSync(f, "utf8").trim().split("\n").filter(Boolean).slice(-n)) {
-				try { const m = JSON.parse(r); console.log(`${m.delivered}  ${m.from} → ${m.to_agent}  [${m.kind}]  ${m.ref}`) } catch {}
+				try { const m = JSON.parse(r); console.log(`${m.delivered}  ${m.from} → ${m.to_agent}  [${m.kind}]  ${safeRef(m.ref)}`) } catch {}
 			}
 			break
 		}
@@ -597,4 +649,7 @@ function cmdInit() {
 	console.log(`✓ .comm/ created at ${root}\n  agents: ${Object.keys(agents).join(", ")}\n\nEdit .comm/config.json to adjust the roster, then run the installer to add hooks.`)
 }
 
-main()
+// Run only when invoked as the entry point. The gate imports this module for its
+// constants (MAX_NOTE/MAX_RENDER/MAX_REF) so it cannot drift from the bus; without
+// this guard that import would execute the CLI and print help text mid-test.
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main()

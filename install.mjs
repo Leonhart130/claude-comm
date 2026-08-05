@@ -30,6 +30,11 @@ import { fileURLToPath } from "node:url"
 import { spawnSync } from "node:child_process"
 
 let dir = resolve(dirname(fileURLToPath(import.meta.url)))
+// This stub lives at <agentRoot>/.claude/comm-hook.mjs, one per agent, so its own
+// location IS this agent's identity. The hook payload's cwd is NOT: it follows the
+// Bash tool's working directory, so a leader that cds into an expert's repo during
+// a turn would otherwise be identified as that expert and drain its inbox.
+const agentRoot = dirname(dir)
 let bus = null
 for (;;) {
 \tconst c = join(dir, ".comm", "bin", "comm.mjs")
@@ -40,7 +45,7 @@ for (;;) {
 }
 // A missing bus must never break the session.
 if (!bus) process.exit(0)
-const r = spawnSync(process.execPath, [bus, "hook", ...process.argv.slice(2)], { stdio: "inherit" })
+const r = spawnSync(process.execPath, [bus, "hook", ...process.argv.slice(2), "--agent-root", agentRoot], { stdio: "inherit" })
 process.exit(r.status ?? 0)
 `
 
@@ -101,7 +106,7 @@ if (!existsSync(cfgPath)) {
 	process.exit(1)
 }
 const cfg = readJson(cfgPath)
-const results = { wrote: [], ok: [], drift: [], failed: [] }
+const results = { wrote: [], ok: [], drift: [], failed: [], missing: [] }
 
 if (!CHECK) mkdirSync(join(commDir, "bin"), { recursive: true })
 const busSrc = readFileSync(join(HERE, "bin", "comm.mjs"), "utf8")
@@ -110,7 +115,13 @@ write(join(commDir, "bin", "comm.mjs"), busSrc, results)
 // ── 2. per-agent stub + hooks ───────────────────────────────────────────────
 for (const [id, relPath] of Object.entries(cfg.agents)) {
 	const agentRoot = resolve(ROOT, relPath)
-	if (!existsSync(agentRoot)) { console.error(`  ⚠ ${id}: ${agentRoot} does not exist — skipped`); continue }
+	// A roster entry with no directory used to `continue` with a stderr warning and
+	// contribute nothing to `results`, so `--check` printed "✓ N file(s) in sync
+	// across 3 agents" and exited 0 while an agent was entirely uninstalled. That
+	// count was of the ROSTER, not of what was installed. This is the pre-flight the
+	// operator trusts before a swap; a green line that overstates its own coverage is
+	// the exact failure this project exists to catch.
+	if (!existsSync(agentRoot)) { results.missing.push(`${id} → ${agentRoot}`); continue }
 
 	write(join(agentRoot, ".claude", "comm-hook.mjs"), STUB, results)
 
@@ -148,6 +159,12 @@ if (!/^\.comm\/?$/m.test(gi)) {
 // ── report ──────────────────────────────────────────────────────────────────
 // A partial install must not exit 0. The whole point of the readJson fix is
 // that the operator learns a file was skipped; a green summary would bury it.
+if (results.missing.length) {
+	console.error(`\n✗ claude-comm: ${results.missing.length} roster agent(s) have NO directory — nothing was installed for them:`)
+	for (const m of results.missing) console.error(`    ${m}`)
+	console.error(`  Fix .comm/config.json (or create the directory) and re-run. Mail addressed to them would queue forever.`)
+	process.exit(1)
+}
 if (results.failed.length) {
 	console.error(`\n✗ claude-comm: ${results.failed.length} agent(s) SKIPPED — their settings.json could not be parsed and were left untouched:`)
 	for (const p of results.failed) console.error(`    ${p.replace(ROOT + "/", "")}`)
@@ -166,5 +183,14 @@ if (CHECK) {
 	console.log(`✓ claude-comm installed at ${ROOT}`)
 	console.log(`  agents:  ${Object.keys(cfg.agents).join(", ")}`)
 	console.log(`  wrote:   ${results.wrote.length} file(s)${results.ok.length ? `  (${results.ok.length} already current)` : ""}`)
-	console.log(`\n  Hooks take effect in each agent's NEXT session — a running one has already loaded its settings.`)
+	// This line used to stop at "NEXT session", which is true of settings.json and
+	// FALSE of the bus — the file an upgrade actually changes. The stub spawns
+	// `node <bus> hook …` fresh on every fire, so a replaced bus is live at the
+	// running agent's very next turn end, with no restart. Measured on a scratch
+	// bus. An operator who believed the swap was deferred would be wrong about the
+	// one part of it that is not.
+	console.log(`\n  settings.json + hook stubs take effect in each agent's NEXT session —`)
+	console.log(`  a running one has already loaded its settings.`)
+	console.log(`  .comm/bin/comm.mjs is NOT deferred: the stub re-executes it on every hook`)
+	console.log(`  fire, so a running agent picks up this bus at its next turn end.`)
 }

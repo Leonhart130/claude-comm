@@ -31,6 +31,15 @@ expert* verified, not something text injected into their session blurred.
 `stop_hook_active` guards the block-loop. **Every hook path exits 0 on any internal error** — a broken bus
 must never break a session.
 
+⭐ **An agent's identity comes from its hook stub's location, never from the session's cwd.** The stub is
+installed one per agent at `<agentRoot>/.claude/comm-hook.mjs` and passes that path to the bus. This was a
+measured defect, and the worst one found so far: the Stop payload's `cwd` follows the **Bash tool's**
+working directory, so a leader running `cd web-app && git log` — the most ordinary thing a reviewing leader
+does — ended that turn identified as the *expert*, and its hook drained the expert's inbox. The brief was
+announced into the leader's context, moved to `delivered/`, and logged as a normal delivery. The expert
+never saw it, `comm sent` said `✓ delivered`, and nothing afterwards could tell it from a real delivery.
+Gated by **A13**.
+
 ⚠️ **Known limit, stated plainly:** delivery is at a **turn boundary**, not an interrupt. An agent deep in a
 20-minute turn gets the nudge when that turn ends. This takes you from *"waits for the round"* to *"waits for
 the turn"* — most of the win, no terminal configuration. A true mid-turn interrupt needs a terminal
@@ -96,8 +105,14 @@ never known. *A pointer that silently resolves to the wrong file is worse than o
 ```bash
 node test/selftest.mjs              # stands up a scratch project, installs real hooks, runs real sessions
 node test/selftest.mjs --prove-red  # removes ONLY the hook — the signal must vanish
-node test/attack.mjs                # 10 adversarial checks; aborts on regression
+node test/attack.mjs                # 15 adversarial checks; aborts on regression
+node test/latency.mjs <log.jsonl>   # re-derive the delivery-latency table from a log
 ```
+
+**Every one of the 15 has been demonstrated to go RED** by restoring the defect it guards in the bus with
+the gate left byte-identical. That is not decoration: A10 spent a session asserting
+`after === 0 || after === before`, which is true for every reachable value — *a gate that cannot fail is
+worse than no gate, because the method rests on it.*
 
 `attack.mjs` exists because what a nudge injects is attacker-influenced text landing in another agent's
 context. **Every one of its cases found a real defect on first run:**
@@ -111,6 +126,9 @@ context. **Every one of its cases found a real defect on first run:**
 | sender identity | `--from` was free text — any expert could sign as any agent. It is now derived from cwd |
 | ref confinement | `--ref ../../../../etc/shadow` was accepted |
 | render-before-drain | mail was deleted *before* the nudge was built, so a render failure lost it while the audit log claimed delivery |
+| cwd identity | a leader that `cd`s into an expert's repo drained that expert's inbox — four diagnostics reported success |
+| valueless flags | `dismiss --force leader` cleared the operator's **own** inbox, by following the tool's own advice |
+| audit surfaces | `comm log` and `comm sent` rendered a forged ref raw — the two commands the *leader* reads |
 
 ⚠️ **The cautionary one is A8.** Its first version asserted *"the hostile string must not appear"* and
 reported HIGH forever — but that property is **wrong**: the recipient legitimately needs to see what a
