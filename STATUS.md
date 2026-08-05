@@ -138,28 +138,39 @@ it to no one.
 2. **`--reply-to <id>` (threading).** Requested by the electio leader in review #1 — and **deprioritised by
    it in its follow-up**: with two agents, threading adds identity surface while the substance already lives
    in the file. It ranks the wake mechanism (item 3) above this.
-3. **Phase 2, deferred by the owner:** kitty socket for a true mid-turn interrupt. Item 1 is its
-   justification. **Feasibility now MEASURED** (kitty 0.47.4, headless throwaway instance, owner's terminal
-   untouched — `scratchpad/kitty-probe.sh`):
+3. **Phase 2 — kitty wake for the idle agent. CONFIG NOW ENABLED, TRANSPORT NOT BUILT.**
+   Item 1 is its justification: an agent alive but in no turn never receives its mail, and that is the last
+   delivery gap.
+
+   **Done 2026-08-05:** `~/.config/kitty/kitty.conf` now sets `allow_remote_control socket-only` and
+   `listen_on unix:/tmp/kitty-{kitty_pid}` (backup in scratchpad). `socket-only` because the windows run
+   coding agents — it means the socket is the only control path, not in-band escape codes from inside a
+   window. ⚠️ *That refusal is kitty's documented behaviour; I verified the socket path works and did NOT
+   verify the refusal.* **Takes effect on the next kitty restart.**
+
+   **Verified BEFORE committing to that restart**, with a scratch headless instance launched against the
+   real edited config:
 
    | | result |
    | --- | --- |
-   | `kitten @ ls` exposes window titles | ✓ — splits are addressable by title |
-   | `send-text --match title:<exists>` | ✓ — text arrives in the target window |
-   | `send-text --match <matches nothing>` | 🔴 **exit 0, silent, discarded** |
+   | socket created at the configured path | ✓ `/tmp/kitty-<pid>` |
+   | reachable via `kitten @ --to` | ✓ |
+   | `KITTY_LISTEN_ON` set inside each window | ✓ — the bus can discover the socket with nothing hardcoded |
+   | `@ ls` exposes per-window `pid`, `title`, foreground `cwd` | ✓ |
 
-   The last row was the open warning and it is confirmed, with a control proving the match — not a dead
-   window — is what swallowed it. **So the kitty transport ships with exactly the silent-discard property
-   this bus spent two reviews removing:** the sender is told it worked and the nudge never existed.
+   **Design constraints the probes settled — do not re-litigate these by reasoning:**
+   1. **Match agent → window by PID, not title and not cwd.** `liveAgents` already knows each agent's pid
+      from `/proc`; `@ ls` reports each window's pid and its foreground processes. Titles are fragile, and
+      cwd is now ambiguous by design — several agents may share one directory (A17).
+   2. **Resolve the match FIRST and refuse to send when it does not resolve.** Measured: `send-text --match`
+      hitting nothing **exits 0 silently**. `send-text`'s exit code may never be treated as delivery
+      evidence — that is the property this whole bus exists to deny.
+   3. **The wake text must carry NO substance.** It is a doorbell that makes the idle session take a turn;
+      the real nudge is then delivered by the `Stop` hook at that turn's end, through the path that is
+      already gated. Anything else is content injection, which the project refuses by its first rule.
+   4. A third option the owner surfaced remains unexplored: an **MCP channel that pushes into the session**
+      (`--dangerously-load-development-channels`) — undocumented, dev-flagged, unverified.
 
-   ⇒ **Design constraint, not a caution: Phase 2 must resolve the match through `kitten @ ls` and refuse to
-   send when it does not resolve.** `send-text`'s own exit code may never be treated as delivery evidence.
-
-   ⚠️ **Cost the owner must weigh first:** remote control is currently OFF (`allow_remote_control` and
-   `listen_on` both unset, `KITTY_LISTEN_ON` empty). Turning it on needs a kitty.conf change **and a full
-   restart, which kills every running agent session.** Third option surfaced by the owner: an **MCP channel
-   that pushes into the session** (`--dangerously-load-development-channels`) — undocumented, dev-flagged,
-   **unverified**.
 4. **selflo is UNINSTALLED** (owner's call, 2026-08-04). Backup:
    `scratchpad/selflo-comm-backup-2026-08-04.tgz`. ⚠️ Its `COORDINATION.md`, `scripts/sync-agent-files.mjs`
    and 6 `docs/START_HERE.md` **still document the bus** — an agent relaunched there before reinstall will
