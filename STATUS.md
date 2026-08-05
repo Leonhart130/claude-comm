@@ -10,7 +10,7 @@ fold the settled parts into the README.
 | toolkit | `bin/comm.mjs`, `install.mjs`, `test/attack.mjs`, `test/selftest.mjs`, `test/latency.mjs` — no dependencies |
 | repo | git initialised, local only, no remote |
 | **electio** | in real daily use — 26 real deliveries, both directions. **Ran a bus 4 commits stale until this session** |
-| gates | `attack` **17/17** deterministic ✓, **every case proved able to go red** (defect restored in the bus, gate byte-identical) · `selftest` **now deterministic too** — 6/6 transport green |
+| gates | `attack` **18/18** deterministic ✓, **every case proved able to go red** (defect restored in the bus, gate byte-identical) · `selftest` **now deterministic too** — 6/6 transport green |
 | reviews | #1 (9 findings) in `REVIEW-adversarial.md` · #2 (10 findings) in `REVIEW-adversarial-2.md` · electio leader's field reviews in `REVIEW-electio-leader.md` and `REPLY-from-electio-leader.md` |
 
 ## ✅ Closed in session 4 — adversarial review #2
@@ -69,6 +69,25 @@ prevent it.
 ⭐ **The leader's question was better than a fix would have been:** *is "one agent = one directory" the right
 axiom for a bus whose hub is exactly where you parallelise?* No — and the answer is that the name must be
 declarable, not derived. That is a design change it surfaced by asking rather than by proposing.
+
+### SessionStart — the debt, paid
+
+Twice I wrote that `SessionStart` was covered "by construction" because it shares `hookDeliver`. That is
+reasoning, and this session already showed what reasoning is worth here. Exercised properly, including one
+real launch:
+
+| | result |
+| --- | --- |
+| output schema (`hookSpecificOutput` / `additionalContext`) | ✓ correct |
+| **a real session actually receives it** | ✓ the agent quoted the injected notice back verbatim |
+| mail drained at launch | ✓ |
+| declared identity honoured on this path | ✓ `none` does not drain, the real agent does |
+| wording | 🟡 **wrong** — announced mail as arriving *"while you were working"* to a session that had just launched and never worked |
+
+No defect on the path that mattered, which is worth stating as plainly as a defect would be. The wording is
+fixed and the whole path is now gated by **A18**. It deserved the attention: it is the only path that serves
+a stopped agent, it fires when the inbox is fullest, and a rejected schema there would drain mail and show
+it to no one.
 
 ## ⏭️ OPEN
 
@@ -142,8 +161,6 @@ declarable, not derived. That is a design change it surfaced by asking rather th
   session's Bash cwd resets between turns, or after `/clear`, is unmeasured — it decides the exposure, not
   the existence, of the defect. Now moot for delivery (identity no longer reads cwd) but it still governs
   the `whoami`-returns-null case in open item 2.
-- **`SessionStart` under cwd drift.** It shares `hookDeliver`, so it shares the fix by construction, but
-  every case run here fires `Stop`.
 - **Behaviour when an agent is mid-tool-call** rather than mid-turn. Still unexercised.
 - **`selftest`'s BEHAVIOUR half is not a gate and never will be** — 3 of 6 runs showed the agent not reading
   the file it was pointed at. That is allowed by design, but it means this bus regularly rings a bell nobody

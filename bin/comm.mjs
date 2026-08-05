@@ -295,11 +295,18 @@ function pending(root, agent) {
  * instruction. Notes are re-sanitised here (defence in depth) and the batch is
  * capped so a flood cannot consume the recipient's orientation budget.
  */
-function renderNudge(root, cfg, msgs, me, quarantined = 0) {
+function renderNudge(root, cfg, msgs, me, quarantined = 0, event = "stop") {
 	const shown = msgs.slice(0, MAX_RENDER)
 	const hidden = msgs.length - shown.length
 	const lines = [
-		`[claude-comm] ${msgs.length} message${msgs.length > 1 ? "s" : ""} arrived for '${me}' while you were working.`,
+		// The two paths are NOT the same situation and must not claim to be. Found by
+		// finally exercising SessionStart with a real session: it announced mail as
+		// having arrived "while you were working" to a session that had just launched
+		// and had never worked. Small, but it invites an agent to believe it missed
+		// something during a turn it never had.
+		event === "session-start"
+			? `[claude-comm] ${msgs.length} message${msgs.length > 1 ? "s" : ""} arrived for '${me}' while this session was not running.`
+			: `[claude-comm] ${msgs.length} message${msgs.length > 1 ? "s" : ""} arrived for '${me}' while you were working.`,
 		"",
 	]
 	for (const m of shown) {
@@ -430,7 +437,7 @@ function hookDeliver(event) {
 	// means any exception in rendering destroys the message while the hook still
 	// exits 0 — a silently lost round report, with the audit log claiming it was
 	// delivered. Rendering is pure; draining is the irreversible half.
-	const reason = renderNudge(root, cfg, msgs, me, quarantined)
+	const reason = renderNudge(root, cfg, msgs, me, quarantined, event)
 	drain(root, me, msgs, "hook")
 
 	if (event === "stop") {

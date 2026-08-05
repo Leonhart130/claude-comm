@@ -285,7 +285,7 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 		JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app" } }))
 
 	const src = readFileSync(join(PKG, "bin", "comm.mjs"), "utf8")
-	const marker = "function renderNudge(root, cfg, msgs, me, quarantined = 0) {"
+	const marker = "function renderNudge(root, cfg, msgs, me, quarantined = 0, event = \"stop\") {"
 	if (!src.includes(marker)) {
 		check("A10 render failure keeps mail", false, "FIXTURE BROKEN: renderNudge signature changed — this gate is not testing anything")
 	} else {
@@ -414,6 +414,51 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 		beforeNone === 1 && afterNone === 1 && !(hNone.stdout || "").includes("claude-comm") &&
 		afterLeader === 0 && (hLeader.stdout || "").includes("claude-comm"),
 		`CLAUDE_COMM_AGENT=none: mail ${beforeNone} -> ${afterNone} (want unchanged); =leader: -> ${afterLeader} (want 0, delivered)`)
+}
+
+// A18 — SESSIONSTART, the path that was called "covered by construction" twice
+// before anyone ran it. It matters more than Stop, not less: it is the ONLY path
+// that serves a stopped agent, it fires AT LAUNCH when the inbox is at maximum
+// stock, and it uses a DIFFERENT output schema. If Claude Code rejects that
+// schema the mail is drained and never shown — silent loss on the highest-stock
+// path. Verified against a real session once (the agent quoted the injected
+// notice back); this case pins the parts that can be checked deterministically.
+{
+	const root9 = mkdtempSync(join(tmpdir(), "comm-attack-sessionstart-"))
+	process.on("exit", () => { try { rmSync(root9, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(root9, "app", "docs"), { recursive: true })
+	mkdirSync(join(root9, ".comm"), { recursive: true })
+	writeFileSync(join(root9, "app", "docs", "REVIEW.md"), "# review\n")
+	writeFileSync(join(root9, ".comm", "config.json"),
+		JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app" } }))
+	execFileSync("node", [join(PKG, "install.mjs"), root9], { stdio: "pipe" })
+	const bus9 = join(root9, ".comm", "bin", "comm.mjs")
+	const na = () => readdirSync(join(root9, ".comm", "inbox", "app")).filter((f) => f.endsWith(".json")).length
+	const startAs = (declared) => spawnSync("node", [join(root9, "app", ".claude", "comm-hook.mjs"), "session-start"], {
+		cwd: join(root9, "app"), encoding: "utf8",
+		input: JSON.stringify({ cwd: join(root9, "app"), source: "startup" }),
+		env: declared === null ? process.env : { ...process.env, CLAUDE_COMM_AGENT: declared },
+	})
+
+	execFileSync("node", [bus9, "send", "app", "--ref", "docs/REVIEW.md", "--note", "brief"], { cwd: root9, stdio: "pipe" })
+	// ARM 1: a session in the same tree that is not on the bus must not drain at
+	// LAUNCH — otherwise every relaunch of a classifier empties someone's inbox.
+	const before = na()
+	startAs("none")
+	const afterNone = na()
+	// ARM 2: the real agent, and the schema must be the one SessionStart expects.
+	const h = startAs(null)
+	const afterReal = na()
+	let p = null
+	try { p = JSON.parse(h.stdout) } catch {}
+	const schemaOK = p?.hookSpecificOutput?.hookEventName === "SessionStart" &&
+		String(p.hookSpecificOutput.additionalContext || "").includes("claude-comm")
+	// The wording must match the situation: at launch the agent was NOT working.
+	const wording = String(p?.hookSpecificOutput?.additionalContext || "").includes("while this session was not running")
+
+	check("A18 session-start delivers correctly",
+		before === 1 && afterNone === 1 && afterReal === 0 && schemaOK && wording,
+		`none: ${before}->${afterNone} (kept), real: ->${afterReal} (drained), schema=${schemaOK}, wording=${wording}`)
 }
 
 // A14 — a valueless flag must not swallow the positional that follows it.
