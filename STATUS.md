@@ -321,11 +321,54 @@ half the time, *in the reassuring direction*. Their existing proxy — the exper
 is proof by work produced, and is the right one. Not building it.
 
 **Field state:** their log 37 → 43 rows, the pending nudge delivered (01:08 → 01:28, 20 min). Their exact
-binary passed the full gate 23/23 in a fresh tree. Nothing installed there yet.
+binary passed the full gate 23/23 in a fresh tree.
+
+### ✅ electio reinstalled — 2026-08-06 04:50, with every session closed
+
+The owner closed all electio sessions, which made this the safest possible moment: no hook could fire
+mid-write, and **both inboxes were empty, so no mail was ever at risk.** Verified before and after:
+
+| | before | after |
+| --- | --- | --- |
+| bus md5 | `79f545e3…` | `92a5742c…` = repo HEAD |
+| `log.jsonl` | 43 lines | **43 lines** |
+| inboxes (leader / web-app) | 0 / 0 | **0 / 0** |
+| `delivered/` · `corrupt/` | 42 · 0 | **42 · 0** |
+| hook stubs + `settings.json` (4 files) | — | **md5 unchanged, untouched** |
+
+`install.mjs` wrote **1 file** (5 already current); `--check` reports `✓ 6 file(s) in sync across 2 agents`,
+exit 0. Confirmed on their real data afterwards: `sent` now renders local time with dates
+(`01:08`, `2026-08-05 02:05`), `who` is clean and silent with nothing running.
+
+⚠️ **Deliberately NOT smoke-tested by sending a message.** A test nudge would sit in an inbox and land in a
+real agent's context when they relaunch. The delivery path is covered by the 26-case gate against a
+byte-identical binary; injecting into a live project to reassure myself is not a trade I will make.
+
+⚠️ **A zone convention, now that two surfaces were inconsistent:** bare clock times (`who`, `sent`) are
+**local**; full ISO timestamps (`comm log`) are **UTC and marked `Z`**. `log` was deliberately left in ISO —
+it is the audit trail, and the `Z` makes it unambiguous, which is exactly what `sent` lacked.
+
+### 🕰️ Kitty needs no restart — verified, not assumed
+
+`allow_remote_control socket-only` and `listen_on unix:/tmp/kitty-{kitty_pid}` are live in the **running**
+instance: socket `/tmp/kitty-617118` exists, `KITTY_LISTEN_ON` is set inside the window, and `kitten @ ls`
+answers with real JSON. The restart that armed this already happened. **Nothing about Phase 2 requires
+another one** — and a restart would still kill every live agent session, so it stays off the table
+mid-round.
 
 💰 **A22 is at 95%** (45 646 / 48 000) — ~2 350 bytes left. Three sessions of features have spent 10% of the
 readability budget. The next feature of this size must be paid for in deletions; that is the rule and it is
 about to be tested.
+
+⚠️ **And the measurement that makes that decision harder than it looks: 55% of the bus is comments**
+(25 041 bytes of comment against 20 605 of code, 842 lines against 492). So "pay in deletions" means
+deleting either dense code or **the findings written at the point they apply** — and that practice is the
+reason those rules have not been simplified away. Cutting the narratives to fit the budget would trade the
+project's memory for its size limit. **This is a values decision, not a technical one; it is the owner's,
+and it should be made calmly now rather than under pressure when a gate goes red.** Options as I see them:
+(a) hold, and let the next feature force it; (b) keep the one-line *"what breaks if you remove this"* at each
+site and move the long measured narratives — dates, pids, tables — into a `FINDINGS.md` keyed by gate id;
+(c) raise the ceiling, which the rule forbids in its own terms.
 
 ## 🛡️ "Performant, compact and secure by default" — what that is worth, measured
 
