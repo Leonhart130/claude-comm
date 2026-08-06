@@ -5,6 +5,11 @@ round to end; an expert that finishes or blocks is invisible until you look at t
 
 **The one rule everything follows from:** *the file is the artifact, the message is only a doorbell.*
 
+**Where the reasoning lives:** this file is the design. **[`FINDINGS.md`](FINDINGS.md) is why** — every guard
+in `bin/comm.mjs` that replaced a measured defect carries a one-line *"what breaks if you remove this"* and a
+`FINDINGS.md#anchor`. Read it before simplifying anything in the bus. Those pointers are gated (**A27**): a
+dangling one is worse than none, because it reads as *"the reasoning is recorded elsewhere"* when it is gone.
+
 ---
 
 ## Why a message may only ever carry a POINTER
