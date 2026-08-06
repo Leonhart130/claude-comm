@@ -174,6 +174,26 @@ function whoami(root, cfg, cwd = process.cwd(), declared = declaredAgent()) {
 const inboxDir = (root, agent) => join(root, ".comm", "inbox", agent)
 
 /**
+ * LOCAL time, plus the date whenever it is not today. Both audit surfaces must
+ * agree and they did not: `who` was moved to local the session before, and its
+ * sibling `sent` was missed — it printed a bare UTC `HH:MM` with no zone marker,
+ * which on this box is a 2-hour skew that READS as local, on the one surface an
+ * operator holds up against `who`. Measured 2026-08-06 against electio's log:
+ * `sent` showed 23:08 for a message sent at 01:08 local.
+ *
+ * The date must be local too. Deriving it from toISOString() pairs a local time
+ * with the previous day's UTC date for anything after 22:00 here — the bug the
+ * `who` fix left behind in its own date branch. Gated by A26.
+ */
+const clock = (v, secs) => {
+	const t = new Date(v)
+	if (isNaN(t.getTime())) return String(v).slice(11, 16)
+	const hm = t.toTimeString().slice(0, secs ? 8 : 5)
+	if (t.toDateString() === new Date().toDateString()) return hm
+	return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")} ${hm}`
+}
+
+/**
  * Flatten a ref for DISPLAY. Defence in depth, exactly as sanitizeNote is applied
  * on both send and render: resolveRef now refuses control characters, but a
  * message file can be hand-written or predate that rule, and the `inbox` surface
@@ -449,11 +469,7 @@ function liveAgents(root, cfg) {
 		// other tool reports locally — and it was rendered in UTC with no date. On
 		// this box that is a 2-hour skew in the direction that makes a stale session
 		// look freshly started, and a three-day-old session read as fresh.
-		try {
-			const t = statSync(`/proc/${pid}`).mtime
-			const hms = t.toTimeString().slice(0, 8)
-			started = t.toDateString() === new Date().toDateString() ? hms : `${t.toISOString().slice(0, 10)} ${hms}`
-		} catch {}
+		try { started = clock(statSync(`/proc/${pid}`).mtime, true) } catch {}
 		;(out[who] ||= []).push({ pid: Number(pid), since: started })
 	}
 	return finish()
@@ -665,10 +681,10 @@ function dispatch(root, cfg, me, cmd, rest) {
 				const to = m.to_agent || m.to
 				const status = m.delivered
 					? m.via === "dismiss"
-						? `✗ DISMISSED ${String(m.delivered).slice(11, 16)} — cleared from the inbox, NOT shown to the agent`
+						? `✗ DISMISSED ${clock(m.delivered)} — cleared from the inbox, NOT shown to the agent`
 						: m.via
-							? `✓ delivered ${String(m.delivered).slice(11, 16)}`
-							: `✓ delivered ${String(m.delivered).slice(11, 16)} (logged before delivery and dismissal were distinguished)`
+							? `✓ delivered ${clock(m.delivered)}`
+							: `✓ delivered ${clock(m.delivered)} (logged before delivery and dismissal were distinguished)`
 					: live[to]?.length
 						? `⧗ PENDING — '${to}' is running but has not ended a turn since; it will not see this until it does`
 						// "lands when relaunched" is FALSE when a session is sitting in that
@@ -681,7 +697,7 @@ function dispatch(root, cfg, me, cmd, rest) {
 				// message file (the vector safeRef exists for, and the one A11 plants)
 				// carries its raw ref into log.jsonl, and `sent`/`log` are the LEADER'S
 				// audit surfaces — text landing in the leader's context. Gated by A15.
-				console.log(`  ${String(m.ts).slice(11, 16)}  ${String(to).padEnd(12)} [${m.kind}]  ${safeRef(m.ref)}   ${status}`)
+				console.log(`  ${clock(m.ts)}  ${String(to).padEnd(12)} [${m.kind}]  ${safeRef(m.ref)}   ${status}`)
 			}
 			break
 		}
@@ -722,8 +738,15 @@ function dispatch(root, cfg, me, cmd, rest) {
 				// otherwise has to be dug out of `ps`. Local time, dated when not today.
 				const started = l?.[0]?.since ? ` since ${l[0].since}` : ""
 				const off = live.offBus?.[id]
+				// Name the declared value only when they AGREE. This printed
+				// `CLAUDE_COMM_AGENT=none` off `off[0]` alone, so three sessions declaring
+				// `none`, `curator` and `classifier` were reported under a value two of them
+				// did not have — a confident wrong answer, the A12 class, in the feature
+				// added the session before. Surfaced 2026-08-06 by the electio leader's
+				// question about roles, not by re-reading the patch. Gated by A25.
+				const names = off ? [...new Set(off.map((s) => s.declared))] : []
 				const many = l && l.length > 1 ? `  ⚠ ${l.length} SESSIONS SHARE THIS INBOX`
-					: !l && off ? `  ⚠ ${off.length} session(s) here declared OFF-BUS (CLAUDE_COMM_AGENT=${off[0].declared})` : ""
+					: !l && off ? `  ⚠ ${off.length} session(s) here declared OFF-BUS (CLAUDE_COMM_AGENT=${names.length === 1 ? names[0] : names.join(", ")})` : ""
 				console.log(`  ${l ? "●" : "○"} ${id.padEnd(18)} ${(l ? `running (pid ${l.map((x) => x.pid).join(",")})${started}` : "not running").padEnd(40)}${n ? `${n} pending` : ""}${many}`)
 			}
 			// `who` answers "WHO RECEIVES MAIL". A leader about to write a shared file

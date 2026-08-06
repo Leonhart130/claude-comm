@@ -10,7 +10,7 @@ fold the settled parts into the README.
 | toolkit | `bin/comm.mjs`, `install.mjs`, `test/attack.mjs`, `test/selftest.mjs`, `test/latency.mjs` — no dependencies |
 | repo | git initialised, local only, no remote |
 | **electio** | in real daily use — 26 real deliveries, both directions. **Ran a bus 4 commits stale until this session** |
-| gates | `attack` **24/24** deterministic ✓, **every case proved able to go red** (defect restored in the bus, gate byte-identical) · `selftest` **now deterministic too** — 6/6 transport green |
+| gates | `attack` **26/26** deterministic ✓, **every case proved able to go red** (defect restored in the bus, gate byte-identical) · `selftest` **now deterministic too** — 6/6 transport green |
 | reviews | #1 (9 findings) in `REVIEW-adversarial.md` · #2 (10 findings) in `REVIEW-adversarial-2.md` · electio leader's field reviews in `REVIEW-electio-leader.md` and `REPLY-from-electio-leader.md` |
 
 ## ✅ Closed in session 4 — adversarial review #2
@@ -266,6 +266,66 @@ Without it, deleting `id_src` leaves the tautology intact and the gate passes on
 ⚠️ **Only rows written from today carry `id_src`.** The 37 historical rows are unauditable and stay that way.
 💰 A22: 43 041 → **44 246 bytes (90% → 92%)** of 48 000. Two features in two sessions have spent 7% of the
 budget; the next one is paid for in deletions.
+
+## ✅ Session 8 — their question about ROLE found two defects in my own surfaces
+
+Their report #6 asked one design question — **does "role" belong in the bus?** — and answering it properly
+cost them nothing and me two findings. Both were in code I had written in the two previous sessions.
+
+**The answer: no, and keep the separate variable.** Measured before replying, because my first instinct was
+to tell them they never needed `ELECTIO_ROLE` — and that instinct was dangerous:
+
+| measured | result |
+| --- | --- |
+| does the bus already distinguish distinct off-bus names? | **yes** — `off bus (curator)`, `off bus (classifier)` shown separately, no role concept required |
+| does a role-named session drain anything? | **no** — `app` inbox 1 → 1 after a `curator` turn ended |
+| what if a role name collides with an agent name? | 🔴 **`app` inbox 1 → 0** — it silently goes ON the bus and eats that agent's mail |
+
+So the visibility they built `ELECTIO_ROLE` for was already available — **but recommending they use
+`CLAUDE_COMM_AGENT` for roles would have handed them a namespace where a typo becomes mail theft.** `none` is
+safe only by accident. Their separate variable is the correct design, not a workaround. Written into the
+README as **three questions, never one variable** (receives mail? / as whom? / what does it do — the last one
+never the bus's business). Their formulation, extending their own item 39: *"off bus" is a property of the
+MAIL — not of the PRESENCE, and not of the ROLE.*
+
+⚠️ **Their `--no-verify` five times in 36 commits, each justified in the message, is the same erosion as my
+UTC-in-two-places.** Worth recording as a shape: a guard that is *defensible each time it is bypassed* is
+already failing.
+
+### 🔴 A25 — the off-bus warning named a value most sessions did not have
+
+`⚠ 3 session(s) here declared OFF-BUS (CLAUDE_COMM_AGENT=none)` — read off `off[0].declared` and presented
+for all N, while two of the three had declared `curator` and `classifier`. **The A12 class, inside the
+`who --all` feature shipped the session before**, and it would have hit them precisely because they run four
+roles. Fixed to name distinct values and keep the single value when they agree. **Gated by A25, proved red
+twice**; the original defect reddens arm 1 while arm 2 stays green, so the arms are independent.
+
+### 🔴 A26 — `comm sent` rendered UTC while `who` rendered local
+
+They had never run `comm sent` and asked what it asserts. Running it against their real log showed `23:08`
+for a message sent at **01:08 local** — a bare UTC `HH:MM`, no zone marker, on the one surface an operator
+holds up against `who`. No dates either, so rows spanning three days looked alike.
+
+⚠️ **I had already found and fixed this exact defect in `who` the session before, and left the sibling
+surface in the same file.** The comment I wrote there even asserts *"which every other tool reports
+locally"* — which `sent` made false. One helper now serves both. **Gated by A26**, machine-independent by
+construction (a known UTC instant under `Asia/Tokyo` and under `UTC`, in January to dodge DST), **proved red
+twice** — once for the zone, once for deriving the date from `toISOString()`, which pairs a local time with
+the previous day's UTC date after 22:00 here.
+
+### On `comm sent` and "was it READ" — answered: not assertable
+
+They asked for it and pre-empted the answer themselves. The number they did not have: **3 of `selftest`'s 6
+behaviour runs showed the agent not reading the file it was pointed at.** A "read" field would be wrong about
+half the time, *in the reassuring direction*. Their existing proxy — the expert's commit citing the brief —
+is proof by work produced, and is the right one. Not building it.
+
+**Field state:** their log 37 → 43 rows, the pending nudge delivered (01:08 → 01:28, 20 min). Their exact
+binary passed the full gate 23/23 in a fresh tree. Nothing installed there yet.
+
+💰 **A22 is at 95%** (45 646 / 48 000) — ~2 350 bytes left. Three sessions of features have spent 10% of the
+readability budget. The next feature of this size must be paid for in deletions; that is the rule and it is
+about to be tested.
 
 ## 🛡️ "Performant, compact and secure by default" — what that is worth, measured
 

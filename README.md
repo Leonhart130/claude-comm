@@ -58,6 +58,29 @@ An unknown name means *not on the bus* rather than *guess* — the unsafe case i
 `comm who` reports when several live sessions resolve to one agent, because that condition used to be
 invisible right up until mail went missing. Gated by **A17**.
 
+### Three questions, never one variable
+
+`CLAUDE_COMM_AGENT` is a **postal address**, not a job title. Keep these apart:
+
+1. *Does this session receive mail?* → the bus
+2. *As whom?* → the bus (`CLAUDE_COMM_AGENT`)
+3. *What does it do, and may it write here?* → **the project. Never the bus.**
+
+Overloading (2) to answer (3) is tempting because the variable is already there. The price is measured: a
+declared name that **collides with a real agent name silently puts that session ON the bus**, where it drains
+that agent's mail — `curator` leaves the inbox at 1, `app` takes it to 0. `none` is safe only by accident,
+because the word resembles no agent; `leader` would not be.
+
+This arrived from the field. The electio leader's staging hook refuses to commit an agent's output while that
+agent is running, and read `CLAUDE_COMM_AGENT` to decide — but four of its roles all declare `none`, so the
+hook could count off-bus sessions and never tell them apart. It blocked correct commits until `--no-verify`
+had been typed five times in 36 commits, *each time justified in the message* — which is the shape a guard
+wears while it erodes. The fix was a separate `ELECTIO_ROLE`, and that separation is the recommendation here:
+a variable that structurally cannot become an address.
+
+In their words, extending the rule that `who --all` came from: **"off bus" is a property of the MAIL — not of
+the PRESENCE, and not of the ROLE.**
+
 ⚠️ **Known limit, stated plainly:** delivery is at a **turn boundary**, not an interrupt. An agent deep in a
 20-minute turn gets the nudge when that turn ends. This takes you from *"waits for the round"* to *"waits for
 the turn"* — most of the win, no terminal configuration. A true mid-turn interrupt needs a terminal

@@ -748,6 +748,114 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 		`(it must — that is WHY id_src exists)`)
 }
 
+// A25 — the off-bus warning must not name a declared value that most of the
+// sessions it is counting do not have.
+//
+// It read `off[0].declared` and printed that one value for all N. Surfaced 2026-08-06
+// by the electio leader asking whether ROLE belongs in the bus: four of its roles all
+// declare `none`, so its own staging hook could count off-bus sessions but never tell
+// them apart. Probing that question showed the bus already distinguishes distinct
+// declared names in `who --all` — and that this warning line flattened them anyway,
+// reporting three sessions as `CLAUDE_COMM_AGENT=none` when two declared otherwise.
+//
+// Arm 2 is the one that keeps the fix honest: when the names DO agree, the single
+// value must still be named. Without it, "always print the list" passes arm 1 while
+// making the common case worse.
+{
+	const rootC = mkdtempSync(join(tmpdir(), "comm-attack-offbusname-"))
+	mkdirSync(join(rootC, "app"), { recursive: true })
+	mkdirSync(join(rootC, ".comm"), { recursive: true })
+	writeFileSync(join(rootC, ".comm", "config.json"),
+		JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app" } }))
+	execFileSync("node", [join(PKG, "install.mjs"), rootC], { stdio: "pipe" })
+	const busC = join(rootC, ".comm", "bin", "comm.mjs")
+	const fakeC = join(rootC, "claude")
+	writeFileSync(fakeC, '#!/bin/sh\nsleep "$1"\n', { mode: 0o755 })
+
+	const spawnC = (declared) => spawn(fakeC, ["25"], {
+		cwd: rootC, detached: true, stdio: "ignore",
+		env: { ...process.env, CLAUDE_COMM_AGENT: declared },
+	})
+	const whoC = () => spawnSync("node", [busC, "who"], { cwd: rootC, encoding: "utf8" }).stdout || ""
+	const settle = (needle) => {
+		const deadline = Date.now() + 5000
+		let o = ""
+		while (Date.now() < deadline) { o = whoC(); if (o.includes(needle)) break }
+		return o
+	}
+
+	// ARM 1 — names DIFFER: the warning must not pick one and present it as the value.
+	const differ = [spawnC("none"), spawnC("curator"), spawnC("classifier")]
+	let out1 = "", alive1 = false
+	try {
+		out1 = settle("curator")
+		alive1 = differ.every((c) => { try { process.kill(c.pid, 0); return true } catch { return false } })
+	} finally { for (const c of differ) { try { process.kill(-c.pid) } catch {} } }
+	const warnLine = out1.split("\n").find((l) => /declared OFF-BUS/.test(l)) || ""
+	const namesAll = /none/.test(warnLine) && /curator/.test(warnLine) && /classifier/.test(warnLine)
+
+	// ARM 2 — names AGREE: the single value must still be named, not a list.
+	const same = [spawnC("none"), spawnC("none")]
+	let out2 = "", alive2 = false
+	try {
+		out2 = settle("declared OFF-BUS")
+		alive2 = same.every((c) => { try { process.kill(c.pid, 0); return true } catch { return false } })
+	} finally { for (const c of same) { try { process.kill(-c.pid) } catch {} } }
+	const warnLine2 = out2.split("\n").find((l) => /declared OFF-BUS/.test(l)) || ""
+	const namesOne = /CLAUDE_COMM_AGENT=none\)/.test(warnLine2)
+
+	try { rmSync(rootC, { recursive: true, force: true }) } catch {}
+	check("A25 off-bus warning names what was declared",
+		alive1 && alive2 && namesAll && namesOne,
+		`standins alive=${alive1 && alive2}; differing names all reported=${namesAll}; ` +
+		`agreeing names still named singly=${namesOne}`)
+}
+
+// A26 — `sent` must render time in the operator's LOCAL zone, like `who`.
+//
+// Found 2026-08-06 while answering the electio leader's "what does `comm sent` even
+// assert?" — it had never been run there. Against their real log it printed `23:08`
+// for a message sent at 01:08 local: a bare UTC HH:MM, no zone marker, on the one
+// surface an operator holds up against `who`. The identical defect had been found and
+// fixed in `who` the session before, with the reasoning written into the code — and
+// its sibling surface was missed. [[attack-the-recent-fix]], one file apart.
+//
+// Machine-independent by construction: it pins a known UTC instant under two fixed
+// zones rather than trusting the box's own. January, to dodge DST entirely.
+{
+	const rootD = mkdtempSync(join(tmpdir(), "comm-attack-clock-"))
+	mkdirSync(join(rootD, "app", "docs"), { recursive: true })
+	mkdirSync(join(rootD, ".comm", "inbox"), { recursive: true })
+	writeFileSync(join(rootD, "app", "docs", "REVIEW.md"), "# r\n")
+	writeFileSync(join(rootD, ".comm", "config.json"),
+		JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app" } }))
+	execFileSync("node", [join(PKG, "install.mjs"), rootD], { stdio: "pipe" })
+	const busD = join(rootD, ".comm", "bin", "comm.mjs")
+
+	const TS = "2026-01-15T23:30:00.000Z"   // Tokyo: 08:30 on the 16th. UTC: 23:30 on the 15th.
+	writeFileSync(join(rootD, ".comm", "log.jsonl"), JSON.stringify({
+		id: "clock-1", from: "leader", to: "app", kind: "done", ref: "docs/REVIEW.md",
+		ts: TS, delivered: TS, via: "hook", to_agent: "app", id_src: "stub",
+	}) + "\n")
+
+	const runTZ = (tz) => spawnSync("node", [busD, "sent"], {
+		cwd: rootD, encoding: "utf8", env: { ...process.env, TZ: tz },
+	}).stdout || ""
+	const tokyo = runTZ("Asia/Tokyo")
+	const utc = runTZ("UTC")
+	try { rmSync(rootD, { recursive: true, force: true }) } catch {}
+
+	// The UTC arm is the control: without it, hardcoding "08:30" would pass. It also
+	// proves the renderer is zone-SENSITIVE rather than merely offset by nine hours.
+	const converted = /08:30/.test(tokyo) && !/23:30/.test(tokyo)
+	const localDate = /2026-01-16/.test(tokyo)   // the UTC date is the 15th — catches toISOString()
+	const controlUTC = /23:30/.test(utc) && /2026-01-15/.test(utc)
+	check("A26 sent renders local time, like who",
+		converted && localDate && controlUTC,
+		`TZ=Asia/Tokyo shows 08:30 not 23:30=${converted}; local date 2026-01-16=${localDate}; ` +
+		`TZ=UTC control shows 23:30 on 2026-01-15=${controlUTC}`)
+}
+
 // ── A21/A22: the properties that erode by accretion, not by a single bad commit ──
 // Asked for directly by the owner (2026-08-05): "performant, compact and secure by
 // default", with a worry about memory leaks as features are added. The honest
