@@ -360,15 +360,35 @@ mid-round.
 readability budget. The next feature of this size must be paid for in deletions; that is the rule and it is
 about to be tested.
 
-⚠️ **And the measurement that makes that decision harder than it looks: 55% of the bus is comments**
-(25 041 bytes of comment against 20 605 of code, 842 lines against 492). So "pay in deletions" means
-deleting either dense code or **the findings written at the point they apply** — and that practice is the
-reason those rules have not been simplified away. Cutting the narratives to fit the budget would trade the
-project's memory for its size limit. **This is a values decision, not a technical one; it is the owner's,
-and it should be made calmly now rather than under pressure when a gate goes red.** Options as I see them:
-(a) hold, and let the next feature force it; (b) keep the one-line *"what breaks if you remove this"* at each
-site and move the long measured narratives — dates, pids, tables — into a `FINDINGS.md` keyed by gate id;
-(c) raise the ceiling, which the rule forbids in its own terms.
+⚠️ **The measurement that made the decision: 55% of the bus was comments** (25 041 bytes against 20 605 of
+code). "Pay in deletions" therefore meant deleting either dense code or **the findings written at the point
+they apply** — the practice that keeps those rules from being simplified away.
+
+### ✅ RESOLVED — the narratives were split out, not deleted (owner's call, 2026-08-06)
+
+Each site keeps a one-line *"what breaks if you remove this"* plus a `FINDINGS.md#anchor`; the long measured
+narratives — dates, pids, tables, the retractions — moved to **`FINDINGS.md`**.
+
+| | before | after |
+| --- | --- | --- |
+| bus | 45 646 bytes (**95%**) | **36 626 (76%)** |
+| comments | 25 041 (55%) | 16 027 (44%) |
+| **code** | 20 605 | **20 599** |
+| lines | 842 | 708 |
+
+**Verified that this was a comment-only change:** stripping comments from HEAD and from the new file gives
+**byte-identical code** — no executable line moved. The 6-byte delta above is the comment-stripper counting
+`/** */` blocks differently from `//` runs, not a code edit.
+
+⚠️ **The split introduces exactly one new failure mode, and it is gated.** A pointer to a section someone
+renamed or deleted is **worse than no pointer** — it reads as "the reasoning is recorded elsewhere" while the
+reasoning is gone, which is how a rule gets simplified away with confidence. **A27** checks every anchor
+resolves; proved red three ways (a bad anchor, a renamed section, `FINDINGS.md` deleted).
+
+⚠️ **A27 was red on a correct tree first.** It required end-of-line after the closing backtick, but every
+heading carries a title — so all 21 anchors reported dangling. A gate failing for a reason foreign to what it
+claims to verify, caught only by running it. The shell check I had run by hand minutes earlier did not anchor
+the end, which is exactly why the two disagreed.
 
 ## 🛡️ "Performant, compact and secure by default" — what that is worth, measured
 

@@ -856,6 +856,36 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 		`TZ=UTC control shows 23:30 on 2026-01-15=${controlUTC}`)
 }
 
+// A27 — every FINDINGS.md pointer in the bus must resolve.
+//
+// This gate exists because of the 2026-08-06 split. A22 hit 95% and 55% of the bus
+// was comment, so the long measured narratives moved to FINDINGS.md and each site
+// kept a one-line "what breaks if you remove this" plus an anchor. That trade buys
+// room and introduces exactly one new failure mode: a pointer to a section someone
+// renamed or deleted. A dangling pointer is WORSE than no pointer — it reads as
+// "the reasoning is recorded elsewhere" while the reasoning is gone, which is how a
+// rule gets simplified away with confidence.
+//
+// The reverse direction is deliberately NOT checked: a finding with no pointer is
+// fine (several are general), so requiring one would only invite dead references.
+{
+	const busSrcA = readFileSync(join(PKG, "bin", "comm.mjs"), "utf8")
+	let findings = ""
+	try { findings = readFileSync(join(PKG, "FINDINGS.md"), "utf8") } catch {}
+	const refs = [...new Set([...busSrcA.matchAll(/FINDINGS\.md#([A-Za-z0-9-]+)/g)].map((m) => m[1]))]
+	// Match the heading PREFIX only. Requiring end-of-line after the closing
+	// backtick reddened every anchor on a correct tree, because each heading
+	// carries a title after it — a gate failing for a reason foreign to what it
+	// claims to verify. The closing backtick still keeps `#A2` from matching `#A20`.
+	const missing = refs.filter((a) => !new RegExp(`^## \`#${a}\``, "m").test(findings))
+	// A fixture control: if the bus somehow carries NO pointers, `missing` is empty
+	// and this passes while asserting nothing — the void-probe shape.
+	check("A27 every FINDINGS pointer resolves",
+		findings.length > 0 && refs.length >= 15 && missing.length === 0,
+		`FINDINGS.md read=${findings.length > 0}; pointers found=${refs.length} (want >=15); ` +
+		`dangling=${missing.length ? missing.join(", ") : "none"}`)
+}
+
 // ── A21/A22: the properties that erode by accretion, not by a single bad commit ──
 // Asked for directly by the owner (2026-08-05): "performant, compact and secure by
 // default", with a worry about memory leaks as features are added. The honest

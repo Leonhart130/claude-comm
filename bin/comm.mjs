@@ -20,18 +20,13 @@
  * RELIABILITY RULE: a hook that throws must never break the user's session.
  * Every hook path is wrapped and exits 0 on any internal error.
  *
- * ── HARDENING, each line of which replaced a MEASURED defect ────────────────
- * An adversarial probe (test/attack.mjs) found six. What a nudge injects is
- * attacker-influenced text landing in another agent's context, so:
- *   · a note is capped and flattened   — a 50 000-char note injected 12 614
- *     tokens, most of a leader's entire orientation budget, from one message.
- *   · a note is stripped of control chars and newlines — it could otherwise
- *     forge "[SYSTEM]"-style framing INSIDE the nudge and escape its quoting.
- *   · the rendered batch is capped      — 40 pending messages injected at once.
- *   · corrupt messages are QUARANTINED  — they were silently skipped and stayed
- *     in the inbox forever with nothing reporting them.
- *   · the sender is derived from cwd    — `--from` was free-text and unverified.
- *   · a ref may not escape the project root.
+ * ── READ THIS BEFORE SIMPLIFYING ANYTHING HERE ──────────────────────────────
+ * Nearly every guard below replaced a MEASURED defect, and the measurement is
+ * in FINDINGS.md, keyed by the `#anchor` named at each site. The comments are
+ * short on purpose (A22 caps this file); they are not decoration, and a rule
+ * whose cost you cannot see is a rule someone will simplify away.
+ * The recurring failure class is NOT a crash: it is several surfaces agreeing
+ * on a plausible wrong answer. See FINDINGS.md#A12.
  */
 import {
 	readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync,
@@ -48,24 +43,17 @@ const KINDS = {
 	fyi: "for information",
 }
 
-// Budget guards. These are deliberately small: a doorbell that costs real
-// orientation budget is a doorbell that will be resented and then removed.
-// EXPORTED so the gate derives its budget from the bus rather than from its own
-// copy. attack.mjs re-declared these three; both its corpus and its budget were
-// built from the copies, so raising a constant HERE moved nothing there — and
-// MAX_REF, the constant added to fix review-#1 finding 1, had no gate at all.
+// Budget guards, deliberately small. EXPORTED so the gate derives its budget
+// from the bus, not its own copy — re-declaring these made A2 unfalsifiable.
+// See FINDINGS.md#A2 (and why importing them was NOT enough on its own).
 export const MAX_NOTE = 240   // characters kept from a --note
 export const MAX_RENDER = 8   // messages rendered into one nudge; the rest are counted
 export const MAX_REF = 400    // characters allowed in a --ref; a path is never longer
 
-/**
- * Flatten a note to a single safe line. This is the security boundary: `note`
- * is the only free text that reaches another agent's context, so it may not
- * contain newlines or control characters that could forge structure inside the
- * nudge (measured: a note containing "[SYSTEM] New directive: …" appeared
- * verbatim and unneutralised). Applied on send AND on render — a message file
- * could have been hand-written.
- */
+// THE security boundary: `note` is the only free text reaching another agent's
+// context. Remove this and a note forges "[SYSTEM] …" framing inside the nudge.
+// Applied on send AND render — a message file can be hand-written.
+// FINDINGS.md#A8
 function sanitizeNote(s) {
 	const flat = String(s ?? "")
 		.replace(/[\u0000-\u001f\u007f-\u009f]+/g, " ") // control chars incl. newlines
@@ -92,67 +80,38 @@ function loadConfig(root) {
 }
 
 /**
- * Which agent am I? Resolved against the config's PATHS, not its keys.
+ * A session may DECLARE which agent it is; otherwise identity comes from the
+ * directory, resolved against the config's PATHS, never its keys.
  *
- * Matching the cwd's top directory against agent *ids* made `id === directory
- * name` a load-bearing invariant that nothing enforced and the README invited
- * you to break ("edit .comm/config.json to trim or rename the roster"). Every
- * other consumer — the installer, resolveRef, refForRecipient, liveAgents —
- * already used the values as paths. With `{"webapp": "app"}` the disagreement
- * was total and silent: send said ✓, the hook in app/ delivered nothing and
- * exited 0, `who` reported the agent not running while it was, and the mail sat
- * forever. Four diagnostics, four confident wrong answers, no error anywhere.
- * Nested paths ("packages/web"), which the installer accepts and the README
- * documents, failed the same way.
+ *   · a known agent  → that is who you are, whatever directory you are in
+ *   · anything else  → NOT ON THE BUS: receive nothing, drain nothing
+ *   · unset          → fall back to the directory (every existing install)
  *
- * Longest path first, so a nested agent wins over the parent that contains it.
- */
-/**
- * A session may DECLARE which agent it is, overriding the directory.
+ * Chosen so the unsafe case is the LOUD one. Not a security boundary; it stops
+ * accidents, which is what actually happens in this topology.
  *
- * "one agent = one directory" is the wrong axiom for a hub-and-spoke bus,
- * because the hub is exactly where you parallelise. Reported by the electio
- * leader and then MEASURED here with real sessions: with 3 classifiers + an
- * adversarial reviewer + the leader all launched in the hub's own tree, five
- * live sessions resolve to one name and share one inbox. An expert's round
- * report was consumed by a classifier's turn end — drained, logged `via=hook`,
- * `comm sent` showing ✓ delivered — and the leader would never have learned the
- * round landed. Identical to the cross-tree theft A13 closes, one level down.
- *
- * Semantics, chosen so the unsafe case is the LOUD one:
- *   · set to a known agent   → that is who you are, whatever directory you are in
- *   · set to anything else   → you are NOT ON THE BUS: receive nothing, drain
- *                              nothing. This is what a classifier wants.
- *   · unset                  → fall back to the directory (every existing install)
- *
- * It is not a security boundary — nothing here is, per the README. It stops
- * accidents and confusion, which is what actually happens in this topology.
+ * Matching ids instead of paths made `id === directory name` a load-bearing
+ * invariant nothing enforced — four surfaces then gave four confident wrong
+ * answers (FINDINGS.md#A12). Declaring exists because "one agent = one
+ * directory" is wrong for a hub, which is exactly where you parallelise, and
+ * five sessions silently shared one inbox (FINDINGS.md#A17).
  */
 const declaredAgent = () => {
 	const d = String(process.env.CLAUDE_COMM_AGENT ?? "").trim()
 	return d || null
 }
 
-// `declared` is a PARAMETER, not read from the environment inside: liveAgents
-// resolves identity for OTHER processes, and reading our own env there would
+// `declared` is a PARAMETER, never read from the environment inside: liveAgents
+// resolves identity for OTHER processes, and reading our own env here would
 // stamp this session's declaration onto every process it inspects.
 function whoami(root, cfg, cwd = process.cwd(), declared = declaredAgent()) {
-	// The declaration wins over the directory — but it is still scoped to THIS
-	// project. Without this, a name is matched globally: every project in the
-	// framework has an agent called `leader`, so a session declared `leader` for
-	// one project was reported as the live leader of every other project on the
-	// box. Measured 2026-08-05 with one variable moved — renaming the agent in an
-	// unrelated temp project from `chief` to `leader` was enough to make `comm who`
-	// there print `● leader running (pid 388580)`, a pid belonging to a session in
-	// ~/Dev/electio. It also MASKED the off-bus warning (that is how A19 caught it,
-	// by going red with no code change), and made `send`/`sent` report a recipient
-	// as reachable when nothing was listening. Gated by A20.
+	// The declaration wins over the directory, but ONLY inside its own project.
+	// Drop the findRoot test and a name matches globally — every project in this
+	// framework has a `leader`, so one project's session is reported as another's
+	// live leader. FINDINGS.md#A20 (found by a gate reddening with no code change).
 	if (declared) {
 		if (!Object.prototype.hasOwnProperty.call(cfg.agents || {}, declared)) return null
-		// A session's OWN cwd is stable — the Bash tool's `cd` does not move it,
-		// verified against a live session — so this is a reliable project test and
-		// not the wandering-cwd surface that finding 1 removed from delivery. It is
-		// also only ever consulted for REPORTING: delivery anchors on the hook
+		// Safe to be strict: this only ever REPORTS. Delivery anchors on the hook
 		// stub's location, so a stricter answer here cannot lose mail.
 		const home = findRoot(cwd)
 		return home && resolve(home) === resolve(root) ? declared : null
@@ -173,18 +132,11 @@ function whoami(root, cfg, cwd = process.cwd(), declared = declaredAgent()) {
 
 const inboxDir = (root, agent) => join(root, ".comm", "inbox", agent)
 
-/**
- * LOCAL time, plus the date whenever it is not today. Both audit surfaces must
- * agree and they did not: `who` was moved to local the session before, and its
- * sibling `sent` was missed — it printed a bare UTC `HH:MM` with no zone marker,
- * which on this box is a 2-hour skew that READS as local, on the one surface an
- * operator holds up against `who`. Measured 2026-08-06 against electio's log:
- * `sent` showed 23:08 for a message sent at 01:08 local.
- *
- * The date must be local too. Deriving it from toISOString() pairs a local time
- * with the previous day's UTC date for anything after 22:00 here — the bug the
- * `who` fix left behind in its own date branch. Gated by A26.
- */
+// LOCAL time, plus the date when not today. Every bare clock time in this tool
+// is local; only `comm log`'s full ISO is UTC, and it is marked `Z`. Revert this
+// to a raw slice and `sent` reads 2 hours off, looking local. The date must be
+// local too — toISOString() pairs a local time with yesterday's UTC date after
+// 22:00 here. FINDINGS.md#A26
 const clock = (v, secs) => {
 	const t = new Date(v)
 	if (isNaN(t.getTime())) return String(v).slice(11, 16)
@@ -193,23 +145,13 @@ const clock = (v, secs) => {
 	return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")} ${hm}`
 }
 
-/**
- * Flatten a ref for DISPLAY. Defence in depth, exactly as sanitizeNote is applied
- * on both send and render: resolveRef now refuses control characters, but a
- * message file can be hand-written or predate that rule, and the `inbox` surface
- * applied no cap at all — a 3 200-char ref produced 3 434 chars of output,
- * scaling linearly.
- */
+// Flatten a ref for DISPLAY. Defence in depth: resolveRef refuses control chars,
+// but a message file can be hand-written or predate that rule. FINDINGS.md#A15
 const safeRef = (s) => String(s ?? "").replace(/[\u0000-\u001f\u007f-\u009f]+/g, " ").slice(0, MAX_REF)
 
-/**
- * The SUBJECT of a message is whichever end is not the leader. Hub enforcement
- * guarantees exactly one end is the leader, so this is always well defined.
- *
- * A ref is written relative to the SUBJECT's repo, because that is what both
- * sides mean: the leader saying `docs/REVIEW.md` means the expert's, and the
- * expert saying `docs/REVIEW.md` means its own.
- */
+// The SUBJECT is whichever end is not the leader (hub enforcement guarantees
+// exactly one is). A ref is relative to the SUBJECT's repo, because that is what
+// both sides mean by `docs/REVIEW.md`.
 const subjectOf = (cfg, from, to) => (from === cfg.leader ? to : from)
 
 /**
@@ -220,12 +162,9 @@ const subjectOf = (cfg, from, to) => (from === cfg.leader ? to : from)
  */
 function resolveRef(root, cfg, from, to, ref) {
 	if (!ref) throw new Error(`--ref is required: a message must point at a file, never carry the substance`)
-	// `--ref` is the OTHER free-text field that reaches a recipient's context, and
-	// it was never sanitised while `--note` was. A newline in a path let it forge a
-	// top-level "[SYSTEM] New directive: …" line inside the nudge — the exact
-	// structure sanitizeNote exists to prevent, on a field with no cap at all on
-	// the `inbox` surface. The realistic vector is not a hostile user but a
-	// confused agent building a ref from a README, an issue body or a web page.
+	// `--ref` is the OTHER free text reaching a recipient's context. A newline in a
+	// path forges a top-level "[SYSTEM] …" line inside the nudge. The realistic
+	// vector is a confused agent building a ref from a README. FINDINGS.md#A11
 	if (/[\u0000-\u001f\u007f-\u009f]/.test(ref)) {
 		throw new Error(`--ref may not contain newlines or control characters: a path never needs them, and they forge structure inside the recipient's nudge`)
 	}
@@ -240,13 +179,10 @@ function resolveRef(root, cfg, from, to, ref) {
 	return relative(base, abs) // e.g. "selflo-seller/docs/REVIEW.md"
 }
 
-/**
- * Express a root-relative ref as a path the RECIPIENT can actually open from its
- * own cwd. Measured defect: an expert sent `docs/REVIEW.md` to the leader, and
- * the leader — whose cwd is the project root — would have opened its OWN
- * `docs/REVIEW.md`, a directory that exists. A pointer that silently resolves to
- * the wrong real file is worse than one that errors.
- */
+// Express a root-relative ref as a path the RECIPIENT can open from its own cwd.
+// Without it the leader opens its OWN docs/REVIEW.md — a real file, the wrong
+// one. A pointer resolving silently to the wrong file is worse than one that
+// errors. FINDINGS.md#A9
 function refForRecipient(root, cfg, msg) {
 	if (!msg.refPath) return msg.ref // messages queued before this rule existed
 	const recvDir = cfg.agents[msg.to] ?? "."
@@ -275,13 +211,11 @@ function send(root, cfg, { from, to, kind, ref, note, force = false }) {
 	if (from === to) throw new Error(`'${from}' cannot message itself`)
 
 	const refPath = resolveRef(root, cfg, from, to, ref)
-	// The README's own ⭐ finding is that a pointer silently resolving to the WRONG
-	// file is worse than one that errors. A pointer resolving to NO file is the
-	// same class and the cheaper half to catch: at send time both ends are on one
-	// filesystem under one root. Without this the recipient is told "re-read the
-	// referenced file, it is the artifact" about nothing, and the audit log records
-	// a clean delivery. --force covers the legitimate case: ringing about a file
-	// you are about to write.
+	// A pointer to NO file is the same class as A9 and cheaper to catch: at send
+	// time both ends are on one filesystem. Without this the recipient is told to
+	// re-read "the artifact" about nothing and the log records a clean delivery.
+	// --force is for ringing about a file you are about to write.
+	// FINDINGS.md#ref-must-exist
 	if (!force && !existsSync(join(root, refPath))) {
 		throw new Error(
 			`--ref points at a file that does not exist: ${refPath}\n` +
@@ -375,24 +309,12 @@ function renderNudge(root, cfg, msgs, me, quarantined = 0, event = "stop") {
 /**
  * Move mail out of the inbox and append to the audit log.
  *
- * `via` is not decoration. Both hookDeliver and dismiss call this and both used
- * to stamp the same `delivered` field, so the log could not distinguish "the
- * agent was shown this" from "someone cleared it" — and `comm sent`, which
- * exists precisely to answer that, reported a dismissed message as ✓ delivered.
- * The latency table in STATUS is computed from this field, so a dismissal would
- * contribute a fabricated latency and nothing could detect it after the fact.
- *
- * `idSrc` is the same lesson one level down, and I was its first victim. I read
- * `to_agent` as an audit field and reported "0 of 37 rows drained by the wrong
- * agent" — but `pending()` reads inbox/<agent>/ and drain stamps that SAME
- * agent, so `to === to_agent` holds for every reachable row. It is the A10
- * class: an assertion true for every value it can take. Worse than logging
- * nothing, because it LOOKS like the audit. Measured 2026-08-06 with two arms —
- * app's own stub, and the leader's stub declaring CLAUDE_COMM_AGENT=app — the
- * two rows were byte-identical in every logged field. What distinguishes them
- * is not the NAME but where the name CAME FROM: `stub` means that agent's own
- * installed hook ran (identity cannot wander, finding 1), `declared` means a
- * session asserted the name through the environment. Gated by A24.
+ * Neither extra field is decoration; drop either and the log starts lying.
+ *   · `via`    — without it a DISMISSAL is logged as a delivery, and the latency
+ *                table silently averages in fabricated numbers. FINDINGS.md#via
+ *   · `idSrc`  — WHERE the name came from. `to_agent` alone is clean by
+ *                construction (it is stamped from the inbox that was drained),
+ *                so it looks like an audit field and cannot fail. FINDINGS.md#A24
  */
 function drain(root, agent, msgs, via = "hook", idSrc = "cli") {
 	const done = join(root, ".comm", "delivered")
@@ -409,18 +331,17 @@ function drain(root, agent, msgs, via = "hook", idSrc = "cli") {
 }
 
 // ── liveness: which experts are actually running right now? ─────────────────
-// Reads /proc rather than trusting a registry file: a registry says what was
-// launched, /proc says what is alive. Those differ exactly when it matters.
+// Reads /proc, never a registry: a registry says what was LAUNCHED, /proc says
+// what is ALIVE, and those differ exactly when it matters. FINDINGS.md#liveness
 function liveAgents(root, cfg) {
 	const out = {}
-	// Sessions that declared themselves OFF the bus, keyed by the agent whose
-	// directory they occupy. Non-enumerable, so `live[agent]` and the
-	// `Object.entries(live)` shared-inbox scan keep exactly their old meaning.
+	// Off-bus sessions, keyed by the agent whose directory they occupy.
+	// Non-enumerable, so `live[agent]` and the shared-inbox scan over
+	// Object.entries(live) keep exactly their old meaning.
 	const offBus = {}
-	// EVERY live session inside this project's tree, on the bus or not. "Off the
-	// bus" is a property of the MAIL, not of the PRESENCE — the electio leader's
-	// phrasing, and it is the right one. A session declared `none` receives
-	// nothing, correctly, but it is alive and it is writing somewhere.
+	// EVERY live session in the tree, on the bus or not: "off bus" is a property
+	// of the MAIL, not of the PRESENCE. A `none` session receives nothing, but it
+	// is alive and writing somewhere. FINDINGS.md#A23
 	const tree = []
 	const finish = () => {
 		Object.defineProperty(out, "offBus", { value: offBus, enumerable: false })
@@ -448,14 +369,10 @@ function liveAgents(root, cfg) {
 		// second, laxer definition of "in this project" that drifts from the first.
 		const home = findRoot(cwd)
 		if (home && resolve(home) === resolve(root)) tree.push({ pid: Number(pid), cwd, declared, agent: who })
-		// A session that DECLARED itself off the bus is not an agent — but it is not
-		// nothing either, and reporting it as "not running" is a confident wrong
-		// answer of exactly the kind this project exists to prevent. Measured on my
-		// own fix, hours old: with CLAUDE_COMM_AGENT exported globally (the obvious
-		// way to silence several classifiers at once) the REAL leader launches
-		// off-bus, `who` says "not running", and `sent` says "lands when relaunched"
-		// — which is false, because relaunching under the same export changes
-		// nothing. The mail queues forever behind a diagnosis that sounds fine.
+		// An off-bus session is not an agent, but it is not nothing either: report it
+		// as "not running" and an EXPORTED CLAUDE_COMM_AGENT takes the real agent off
+		// the bus while `who` says "not running" and `sent` says "lands when
+		// relaunched" — both false, mail queued forever. FINDINGS.md#A19
 		if (!who) {
 			if (declared) {
 				const inDir = whoami(root, cfg, cwd, null)
@@ -464,11 +381,8 @@ function liveAgents(root, cfg) {
 			continue
 		}
 		let started = ""
-		// LOCAL time, with the date whenever it is not today. This field decides
-		// armed-vs-not — you compare it against the hook file's mtime, which every
-		// other tool reports locally — and it was rendered in UTC with no date. On
-		// this box that is a 2-hour skew in the direction that makes a stale session
-		// look freshly started, and a three-day-old session read as fresh.
+		// Local, via clock(): this decides armed-vs-not against the hook file's
+		// mtime. In UTC a stale session reads as freshly started. FINDINGS.md#A26
 		try { started = clock(statSync(`/proc/${pid}`).mtime, true) } catch {}
 		;(out[who] ||= []).push({ pid: Number(pid), since: started })
 	}
@@ -484,23 +398,12 @@ function hookDeliver(event) {
 	// Loop guard: we already blocked once for this stop; let the agent finish.
 	if (event === "stop" && p.stop_hook_active) process.exit(0)
 
-	// IDENTITY MUST NOT COME FROM THE SESSION'S CWD. Measured 2026-08-05, end to
-	// end, with a control arm: the Stop payload's `cwd` follows the Bash tool's
-	// working directory, which persists across calls inside a turn. A leader that
-	// runs `cd web-app && git log` — the most ordinary thing a reviewing leader
-	// does — ends that turn identified as the EXPERT. Its hook then DRAINED the
-	// expert's inbox: the brief was announced into the leader's context, moved to
-	// delivered/, and logged `via=hook`. The expert never saw it; `comm sent` said
-	// ✓ delivered; no surface anywhere could tell it from a real delivery, and the
-	// log cannot distinguish it after the fact. Symmetric — an expert that cds to
-	// the project root eats the leader's mail the same way.
-	//
-	// The stub is installed ONE PER AGENT at <agentRoot>/.claude/comm-hook.mjs, so
-	// its own location IS the identity and cannot wander. `cwd` remains correct for
-	// the CLI, where "who is typing this" genuinely is the question.
-	//
-	// Fall back to cwd when the flag is absent, so a stub installed before this
-	// change keeps delivering instead of going silent. Gated by A13.
+	// IDENTITY MUST NOT COME FROM THE SESSION'S CWD. The Stop payload's `cwd`
+	// follows the BASH TOOL's directory, so `cd web-app && git log` ends the turn
+	// identified as the expert and DRAINS its inbox — invisibly, logged as a clean
+	// delivery. The stub is installed one per agent, so its own location IS the
+	// identity and cannot wander. The cwd fallback keeps pre-flag stubs delivering
+	// rather than going silent. FINDINGS.md#A13
 	const agentRoot = arg(process.argv.slice(2), "agent-root")
 	const anchor = agentRoot || p.cwd || process.cwd()
 	const root = findRoot(anchor)
@@ -516,10 +419,9 @@ function hookDeliver(event) {
 	const { msgs, quarantined } = pending(root, me)
 	if (!msgs.length && !quarantined) process.exit(0)
 
-	// ORDER MATTERS: render FIRST, drain only once a nudge exists. Draining first
-	// means any exception in rendering destroys the message while the hook still
-	// exits 0 — a silently lost round report, with the audit log claiming it was
-	// delivered. Rendering is pure; draining is the irreversible half.
+	// ORDER MATTERS: render FIRST, drain only once a nudge exists. Swap these and
+	// a render exception destroys the message while the hook still exits 0 — a
+	// lost round report the log calls delivered. FINDINGS.md#A10
 	const reason = renderNudge(root, cfg, msgs, me, quarantined, event)
 	drain(root, me, msgs, "hook", idSrc)
 
@@ -534,20 +436,11 @@ function hookDeliver(event) {
 }
 
 // ── cli ─────────────────────────────────────────────────────────────────────
-// The first NON-flag token. `rest[0]` was wrong and silently so: every command
-// documented as `[<agent>] [--flag X]` bound the agent to the flag name when the
-// agent was omitted — `dismiss --id abc` looked up an agent called "--id" and
-// reported "nothing to dismiss", i.e. a clean no-op instead of an error. Skips a
-// flag together with its value — except the ones that take none.
-//
-// "every flag in this CLI takes one" stopped being true the moment `--force` was
-// added, and the same session that wrote this fix reopened the bug it closed:
-// `dismiss --force leader` swallowed `leader` as --force's value, returned
-// undefined, fell back to `me`, and cleared THE OPERATOR'S OWN inbox while
-// printing success. Reachable by following this tool's own remediation text
-// ("If you really mean to, pass --force") — appending it worked, prefixing it
-// did not. A list that must be kept in step with the flags is a weak fix; it is
-// the smallest one that is correct, and A14 pins it.
+// The first NON-flag token, skipping each flag WITH its value — except those
+// that take none. `rest[0]` made `dismiss --id abc` look up an agent named
+// "--id" and report a clean no-op. Forgetting VALUELESS_FLAGS is worse:
+// `dismiss --force leader` then clears THE OPERATOR'S OWN inbox and prints
+// success. Keep this set in step with the flags. FINDINGS.md#A14
 const VALUELESS_FLAGS = new Set(["--force", "--all"])
 function firstPositional(argv) {
 	for (let i = 0; i < argv.length; i++) {
@@ -625,30 +518,19 @@ function dispatch(root, cfg, me, cmd, rest) {
 			console.log(`inbox '${who}': ${msgs.length} pending`)
 			// Show the path THIS reader can open, not the one the sender typed.
 			for (const m of msgs) console.log(`  ${m.ts}  from ${m.from}  [${m.kind}]  ref: ${safeRef(refForRecipient(root, cfg, m))}${m.note ? `  — ${sanitizeNote(m.note)}` : ""}`)
-			// `inbox` PEEKS; it does not acknowledge. Without this line an agent reads
-			// its mail here, acts on it, and is then blocked at its turn end by the
-			// hook re-delivering the same messages — which reads as a bug in the bus
-			// and costs a full turn to re-diagnose. Reported from a real day of use by
-			// the electio leader, who met it twice: the two surfaces an agent actually
-			// discovers the bus through (this listing and the hook notice) were the two
-			// that never mentioned `dismiss`.
-			// The hint must name a command that actually works. Session 2 added it,
-			// session 3 added the identity guard, and nobody updated the hint: reading
-			// another agent's inbox told you to run `dismiss <them>`, which the guard
-			// then refuses. That is the A7 lesson in miniature — a check that refuses a
-			// path the tool itself documents. `rest[0]` here was also the last survivor
-			// of the positional-argument fix.
+			// `inbox` PEEKS, it does not acknowledge. Drop this hint and an agent acts
+			// on its mail, gets re-blocked at its turn end by the same messages, and
+			// reads that as a bug in the bus. The hint must name a command the identity
+			// guard actually ALLOWS — it once documented one the guard refuses.
+			// FINDINGS.md#inbox-hint
 			const clear = who === me ? `dismiss ${who}` : `dismiss ${who} --force`
 			console.log(`\n  ↑ still pending — reading them here does NOT acknowledge them.\n    After acting, run:  node .comm/bin/comm.mjs ${clear}`)
 			break
 		}
-		// The sender is otherwise blind. `log` records what was SENT; nothing records
-		// what LANDED, so the leader was reduced to inferring delivery from the
-		// expert's commits. In a hub topology that distinction is operational, not
-		// cosmetic: "not answered yet" means wait, "never received" means go and wake
-		// them — opposite actions. Sharpened by the structural limit the same review
-		// found: an agent can be alive and idle, holding mail indefinitely, and `who`
-		// alone reports it as running and therefore looks fine.
+		// The sender is otherwise blind: `log` records what was SENT, nothing recorded
+		// what LANDED. "Not answered yet" means wait; "never received" means go and
+		// wake them — opposite actions. An agent can be alive and idle holding mail,
+		// which `who` alone reports as running and fine. FINDINGS.md#sent
 		case "sent": {
 			const who = firstPositional(rest) || me
 			const n = Number(arg(rest, "n", 20))
@@ -661,10 +543,9 @@ function dispatch(root, cfg, me, cmd, rest) {
 					try { const m = JSON.parse(line); if (m.from === who) rows.push(m) } catch {}
 				}
 			} catch {}
-			// `pending()` QUARANTINES unreadable files as a side effect, so this query
-			// command moves files into .comm/corrupt/. It said nothing about it, so a
-			// corrupt message could be quarantined by the sender's own status check and
-			// never surface anywhere. `who` already reports a corrupt count; this did not.
+			// `pending()` QUARANTINES as a side effect, so this query command moves
+			// files. Report the count or a message is quarantined by the sender's own
+			// status check and surfaces nowhere. FINDINGS.md#sent
 			let quarantined = 0
 			for (const agent of Object.keys(cfg.agents || {})) {
 				const r = pending(root, agent)
@@ -738,33 +619,20 @@ function dispatch(root, cfg, me, cmd, rest) {
 				// otherwise has to be dug out of `ps`. Local time, dated when not today.
 				const started = l?.[0]?.since ? ` since ${l[0].since}` : ""
 				const off = live.offBus?.[id]
-				// Name the declared value only when they AGREE. This printed
-				// `CLAUDE_COMM_AGENT=none` off `off[0]` alone, so three sessions declaring
-				// `none`, `curator` and `classifier` were reported under a value two of them
-				// did not have — a confident wrong answer, the A12 class, in the feature
-				// added the session before. Surfaced 2026-08-06 by the electio leader's
-				// question about roles, not by re-reading the patch. Gated by A25.
+				// Name the declared value only when they AGREE. Reading `off[0]` alone
+				// reports N sessions under a value most of them do not have.
+				// FINDINGS.md#A25 Gated by A25.
 				const names = off ? [...new Set(off.map((s) => s.declared))] : []
 				const many = l && l.length > 1 ? `  ⚠ ${l.length} SESSIONS SHARE THIS INBOX`
 					: !l && off ? `  ⚠ ${off.length} session(s) here declared OFF-BUS (CLAUDE_COMM_AGENT=${names.length === 1 ? names[0] : names.join(", ")})` : ""
 				console.log(`  ${l ? "●" : "○"} ${id.padEnd(18)} ${(l ? `running (pid ${l.map((x) => x.pid).join(",")})${started}` : "not running").padEnd(40)}${n ? `${n} pending` : ""}${many}`)
 			}
-			// `who` answers "WHO RECEIVES MAIL". A leader about to write a shared file
-			// is asking "WHO HOLDS THIS DIRECTORY", and the two diverge exactly where it
-			// costs: reported from the field by the electio leader, the session holding
-			// the write lock on the file it was about to edit was a reviewer correctly
-			// declared `none` — off the bus by construction, and therefore invisible
-			// here. The asymmetry is the trap: a session declared WRONGLY is loud (it
-			// shows up under a name that is not its own), a session declared RIGHTLY is
-			// silent. It had already written its own /proc scan in two places, which is
-			// the part that mattered — a downstream reimplementation of logic that lives
-			// here will drift from it.
-			//
-			// ⚠️ Deliberately NOT the reported sketch, which keyed off the off-bus map:
-			// that map is keyed by the AGENT DIRECTORY a session sits in, so a session in
-			// a subdirectory belonging to no agent — `scripts/`, `docs/` — would still
-			// have been invisible, and "is anyone in my tree" is precisely when that
-			// matters. This walks every live session under the project root instead.
+			// `who` answers WHO RECEIVES MAIL; a leader about to write a shared file is
+			// asking WHO HOLDS THIS DIRECTORY. A correctly-declared `none` reviewer is
+			// invisible to the first question and is the one holding the write lock.
+			// ⚠️ Walk live.tree, NOT the off-bus map: that map is keyed by AGENT
+			// DIRECTORY, so a session in `scripts/` — owned by no agent — stays
+			// invisible, which is exactly when the question is asked. FINDINGS.md#A23
 			const others = (live.tree || []).filter((s) => !s.agent)
 			if (others.length) {
 				if (rest.includes("--all")) {
@@ -777,11 +645,9 @@ function dispatch(root, cfg, me, cmd, rest) {
 					console.log(`    WRITING somewhere in it. Run 'who --all' to see where.`)
 				}
 			}
-			// The condition that used to be silent, and it is the one that loses mail.
-			// Whichever of those sessions ends a turn first drains the inbox; the others
-			// — including the agent the mail was actually for — never see it, and the
-			// sender is told ✓ delivered. Measured with real sessions: a classifier
-			// launched in the hub's own tree consumed the expert's round report.
+			// The condition that used to be silent, and the one that loses mail:
+			// whichever session ends a turn first drains the inbox, the rest never see
+			// it, and the sender is told ✓ delivered. FINDINGS.md#A17
 			const shared = Object.entries(live).filter(([, v]) => v.length > 1)
 			if (shared.length) {
 				console.log(`\n  ⚠ ${shared.map(([id, v]) => `'${id}' has ${v.length} live sessions`).join("; ")}.`)
