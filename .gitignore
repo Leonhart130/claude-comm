@@ -6,9 +6,5 @@ node_modules/
 .comm/corrupt/
 
 # Chats
-REPLY-*.md
-REPORT-*.md
-REVIEW-*.md
-STATUS.md
-BRIEF-*.md
-FINDINGS.md
+*.md
+!README.md
