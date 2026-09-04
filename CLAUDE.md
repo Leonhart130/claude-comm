@@ -29,6 +29,20 @@ raising the cap is not a fix. The cost of a boot is paid on every session, forev
 a leader agent in the owner's live project pays ~100 k tokens per boot and up to 170 k. That is what
 made the tiering above non-negotiable here.
 
+## Close — `node bin/boot.mjs --close`
+
+**The close has no criteria of its own: a session is closed when a full boot reports nothing that is not
+either fixed or NAMED.** Giving it its own checklist would give it its own criteria, and they would drift
+from what the boot measures. It refuses unless `STATUS.md` carries a `## ▶ NEXT` section — written by you,
+never by the tool — saying what the next session must do first, in enough detail that a session with no
+memory of this one can act without re-deriving anything.
+
+A non-green row is resolved or acknowledged by name: `--ack <row>="why"`. There is no flag that waves
+everything through, and **acknowledgements are counted** — a row waved past three times prints an
+instruction to amend the protocol, because a guard defensible every time it is bypassed is already failing
+and the rate is the signal. **That count is how both protocols improve: an amendment needs evidence, not an
+opinion, and it lands as a gated change with an arm, never as prose.**
+
 Before changing delivery: `node test/selftest.mjs` and `node test/selftest.mjs --prove-red` — minutes, real
 sessions. Boot deliberately does not run them.
 
