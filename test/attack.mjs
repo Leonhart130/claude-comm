@@ -876,7 +876,16 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 // The reverse direction is deliberately NOT checked: a finding with no pointer is
 // fine (several are general), so requiring one would only invite dead references.
 {
-	const busSrcA = readFileSync(join(PKG, "bin", "comm.mjs"), "utf8")
+	// Review #4 R7: A28 was widened to `bin/ledger.mjs` and A27 was not, so that file's
+	// FINDINGS anchors were checked by nothing - and it cited `FINDINGS.md#A1` four times as
+	// fixture data, an anchor this repo does not have. The trap is real: widening the scan
+	// without fixing the fixtures would have reddened the gate on synthetic refs. The
+	// fixtures now cite a real finding, and the scan covers every tool that carries
+	// reasoning pointers rather than the bus alone.
+	let busSrcA = ""
+	for (const f of ["bin/comm.mjs", "bin/boot.mjs", "bin/context.mjs", "bin/ledger.mjs", "install.mjs"]) {
+		try { busSrcA += readFileSync(join(PKG, f), "utf8") } catch {}
+	}
 	let findings = ""
 	try { findings = readFileSync(join(PKG, "FINDINGS.md"), "utf8") } catch {}
 	const refs = [...new Set([...busSrcA.matchAll(/FINDINGS\.md#([A-Za-z0-9-]+)/g)].map((m) => m[1]))]

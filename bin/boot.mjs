@@ -215,7 +215,18 @@ if (has("--hook")) {
 		catch { return null }
 	}
 	let wrote = null
-	if (has("--hook") && payload && payload.source && sessionAgent) {
+	// R3(a), review #4: this used to require `payload.source` before recording, so a payload
+	// that was empty, unparseable, or simply carried no `source` recorded NOTHING and left
+	// `wrote` null - and the WARN branch was guarded by `wrote && !wrote.ok`, so the row
+	// rendered a plain ✓ with the words "this start recorded" merely absent. Measured: three
+	// payloads through the real --hook path gave identical ticks, 1 record and 0 records.
+	// A suffix is not a mark. On a --hook run, failing to record is now a WARN, and the
+	// reason travels with it.
+	if (has("--hook") && !payload) {
+		wrote = { ok: false, sid: null, why: "the hook payload was empty or unparseable" }
+	} else if (has("--hook") && !(payload.source && sessionAgent)) {
+		wrote = { ok: false, sid: null, why: !payload.source ? "the hook payload carried no `source`" : "no agent could be resolved for this session" }
+	} else if (has("--hook") && payload && payload.source && sessionAgent) {
 		// The session id comes from the transcript path, not from a payload field: `Stop`
 		// is documented to carry `session_id` and SessionStart was only ever OBSERVED to
 		// carry `transcript_path` and `source`. Deriving it from the path uses what was
@@ -231,11 +242,32 @@ if (has("--hook")) {
 	try { a = JSON.parse((q && q.stdout) || "") } catch {}
 	if (!a) row("ledger", UNKNOWN, "bin/ledger.mjs did not answer - the reboot instrument is NOT reporting")
 	else {
+		// R3(b): this block's contract said the write "is VERIFIED by re-reading through the
+		// same tool", and it was not - `wrote.ok` was the child's exit code and the query
+		// was a separate call nobody compared it against. With the handoff directory
+		// writable but not readable, boot printed "0 cold + 0 reboot start(s)" and "this
+		// start recorded" in ONE SENTENCE, green. The re-read now actually happens: the
+		// ledger reports the last start it can see, and it must be the one just written.
+		const seen = a.lastStart && wrote && wrote.sid
+			? (a.lastStart.session === wrote.sid ? "confirmed" : `the ledger's newest start is ${a.lastStart.session}, not the one just written`)
+			: (a.lastStart ? "confirmed" : "the ledger reports no start at all")
 		const bits = [`${a.starts.cold} cold + ${a.starts.reboot} reboot start(s)`,
+			`${a.trials.cold}+${a.trials.reboot} completed trial(s)`,
 			`${a.defects.total} defect(s)`, `verdict ${a.verdict}`]
+		// R6: `mislabelled` and `exposureSkew` were computed, exported, rendered by the
+		// ledger's own report - and dropped by the one rendering anybody reads at session
+		// start. A counter written because "a mismatch is either tampering or a writer bug
+		// and both need to be visible" was visible only in the tool nobody runs daily.
 		if (a.unreadable) bits.push(`⚠ ${a.unreadable} unreadable line(s)`)
+		if (a.unreadableFiles && a.unreadableFiles.length) bits.push(`⚠ ${a.unreadableFiles.length} UNREADABLE LOG FILE(S)`)
+		if (a.dirUnreadable) bits.push(`⚠ the ledger directory could not be read`)
+		if (a.mislabelled) bits.push(`⚠ ${a.mislabelled} line(s) naming another agent`)
+		if (a.exposureSkew) bits.push(`⚠ the arms' exposure is skewed`)
+		const bad = a.unreadable || (a.unreadableFiles && a.unreadableFiles.length) || a.dirUnreadable
+			|| a.mislabelled || a.exposureSkew
 		if (wrote && !wrote.ok) row("ledger", WARN, `THIS START WAS NOT RECORDED (${wrote.why || "no reason given"}) - ${bits.join(" - ")}`)
-		else row("ledger", a.unreadable ? WARN : OK, bits.join(" - ") + (wrote ? " - this start recorded" : ""))
+		else if (wrote && seen !== "confirmed") row("ledger", WARN, `THE WRITE WAS NOT SEEN BY THE RE-READ (${seen}) - ${bits.join(" - ")}`)
+		else row("ledger", bad ? WARN : OK, bits.join(" - ") + (wrote ? " - this start recorded and re-read" : ""))
 	}
 }
 
@@ -893,6 +925,47 @@ function proveRed() {
 		const lr = hookRows.find((r) => r.label === "ledger")
 		assert("ledger: the row states the write happened", !!lr && /this start recorded/.test(lr.text),
 			`row: ${lr ? lr.text.slice(0, 60) : "absent"}`)
+
+		// ---- review #4 R3: the FAILING direction of this row, which was never armed ----
+		const hookLevel = (input) => {
+			const r = spawnSync(process.execPath, [SELFFILE, "--json", "--fast", "--hook", "--root", pkg, "--field", tmp],
+				{ encoding: "utf8", input })
+			try {
+				const rows = JSON.parse(r.stdout).rows
+				const x = rows.find((y) => y.label === "ledger")
+				return { level: x ? x.level : -1, text: x ? x.text : "" }
+			} catch { return { level: -1, text: "" } }
+		}
+		// R3(a). A payload with no `source` recorded nothing and rendered a plain tick; the
+		// only difference a reader got was a missing suffix. Measured as three identical ✓
+		// over 1 record and 0 records.
+		const noSource = hookLevel(JSON.stringify({ transcript_path: "/x/22222222-2222-2222-2222-222222222222.jsonl" }))
+		const unparseable = hookLevel("not json at all")
+		assert("R3a a --hook boot that records nothing WARNS",
+			noSource.level === WARN && unparseable.level === WARN,
+			`no source -> ${LV[noSource.level]}; unparseable -> ${LV[unparseable.level]}`)
+
+		// R3(b). The block's contract claimed the write "is VERIFIED by re-reading through
+		// the same tool". It was not: with the handoff directory writable but not readable,
+		// the append succeeded, the query returned nothing, and the row printed "0 starts"
+		// and "this start recorded" in one sentence, green.
+		const hd = join(pkg, ".comm", "handoff")
+		mkdirSync(hd, { recursive: true })
+		spawnSync("chmod", ["300", hd])
+		const blind = hookLevel(JSON.stringify({ source: "startup", transcript_path: "/x/33333333-3333-3333-3333-333333333333.jsonl" }))
+		spawnSync("chmod", ["755", hd])
+		assert("R3b a write the re-read cannot see WARNS", blind.level === WARN && !/ - this start recorded/.test(blind.text),
+			`dir writable-not-readable -> ${LV[blind.level]}: ${blind.text.slice(0, 52)}`)
+
+		// R6. `mislabelled` and `exposureSkew` were computed, exported, rendered by the
+		// ledger and dropped by the row everyone actually reads at session start.
+		writeFileSync(join(hd, "leader.log"), Array.from({ length: 12 }, (_, k) =>
+			JSON.stringify({ v: 1, at: new Date(Date.UTC(2026, 0, k + 1)).toISOString(), event: "start",
+				agent: "SOMEONE-ELSE", session: `s${k}`, source: "startup" })).join("\n") + "\n")
+		const tampered = hookLevel(JSON.stringify({ source: "startup", transcript_path: "/x/44444444-4444-4444-4444-444444444444.jsonl" }))
+		assert("R6 the row carries the ledger's own caveats",
+			tampered.level === WARN && /naming another agent/.test(tampered.text),
+			`12 rows naming another agent -> ${LV[tampered.level]}: ${/naming another agent/.test(tampered.text) ? "reported" : "DROPPED"}`)
 		try { rmSync(join(pkg, ".comm", "handoff"), { recursive: true, force: true }) } catch {}
 	}
 

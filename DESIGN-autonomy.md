@@ -242,9 +242,13 @@ theirs · **guards already run WITH THEIR OUTPUT, never "passed"** · the read m
 - **Ship the instrument with the feature.** The first ten reboots must leave a marker, so *"did the reboots
   cost us defects"* is a query and not a debate. Their charter: *a feature with no ledger is a hobby.*
 
-## The ledger — built 2026-09-04, BEFORE the mechanism
+## The ledger
 
-`node bin/ledger.mjs` · negative control `--prove-red` (18 arms) · findings `FINDINGS.md#ledger-control`,
+**Built 2026-09-04, before the mechanism.** (The heading is bare on purpose: review #4 R7 found
+`DESIGN-autonomy.md#the-ledger` cited in three places and resolving under no anchor rule, because the date
+and the emphasis were in the heading. A pointer one hop short of its target reads exactly like a pointer.)
+
+`node bin/ledger.mjs` · negative control `--prove-red` (28 arms) · findings `FINDINGS.md#ledger-control`,
 `FINDINGS.md#ledger-blame`, `FINDINGS.md#ledger-unknown`.
 
 The consumer's charter, and the reason this exists first: *"nobody can answer whether a rebooted session is
@@ -293,6 +297,30 @@ asserted to leave a record carrying the right session id.
 
 Cost measured: `--fast` went **0.20 s → 0.30 s** (two extra `node` spawns on the SessionStart path, one to
 write and one to read back). Paid once per session.
+
+### Review #4 — nine findings, all nine dispositioned
+
+`REVIEW-adversarial-4.md`, 2026-09-04. Three severe, and all three were the shape the brief named. Every one
+is fixed with an arm that goes red on the old behaviour; the arm count went 18 → 28.
+
+| | finding | disposition |
+| --- | --- | --- |
+| **R1** | a directional verdict from arms with unequal exposure — **manufactured by the feature under test**, since a reboot IS a start followed by another start. 20 v 20 at identical density published `BETTER (p=0.0000), exit 0`; 100 % of it was exposure. Already at **93 %** on this repo's own first four records | **fixed structurally.** A truncated or unfinished window is not a weaker trial, it is not a trial. Only completed windows enter an arm, so exposure is equal by construction; excluded starts and any defects inside them are counted, reported and pooled. `--window` is the operator's lever when restarts really are minutes apart |
+| **R2** | an unreadable FILE counted as one unreadable LINE, so the tool grew **more confident the more it failed to read**; an unreadable DIRECTORY was byte-identical to an empty one | **fixed.** An unreadable file has unknown magnitude and cannot be priced into a pool at all — it withdraws the verdict. An unreadable directory is now a distinct, stated fact |
+| **R3** | the boot row printed `✓` over a start that was never recorded, and the documented "the write is VERIFIED by re-reading" **did not exist** — in one variant `0 cold + 0 reboot` and `this start recorded` in the same green sentence | **fixed.** Failing to record on a `--hook` run is a WARN with its reason; the re-read now really happens — the ledger reports its newest start and it must be the one just written |
+| **R4** | `2026-09-04T12:05:00` is valid ISO, parsed as LOCAL, stored as UTC — a silent 120-minute shift, eight windows, moving a defect into the other arm's numerator where the pool could not see it | **fixed.** A stamp carrying a time and no zone is refused at the door |
+| **R5** | (a) a defect reached another **agent's** arm through a session id, a field no guard covered; (b) a repeated session id resolved first-wins toward the earliest start, draining the reboot arm toward "clean" | **fixed.** The session index is keyed by agent **and** id, and a repeated id is unusable for attribution rather than silently resolved |
+| **R6** | the boot row dropped `mislabelled` and `exposureSkew` — a tampering counter visible only in the tool nobody runs daily | **fixed.** The row carries every caveat the ledger computed |
+| **R7** | `DESIGN-autonomy.md#the-ledger` resolved to nothing; A28 was widened to `bin/ledger.mjs` and **A27 was not** | **fixed.** The heading is bare so the anchor resolves; the fixture refs cite a real finding; A27 now scans every lifecycle tool, proved red on a dangling pointer in `ledger.mjs` alone |
+| **R8** | an I/O failure bypassed `die()` with a Node stack trace and exit 1; `exit 2` meant both UNKNOWN and "you called me wrong" | **fixed.** Guarded, and usage/environment failures exit **64** (`EX_USAGE`) while 2 stays UNKNOWN |
+| **R9** | the currently-running session was credited a full window, in **every** boot report | **fixed with R1** — it is the same property: a window that has not elapsed is not a trial |
+
+**What the review could not break, and said so:** Fisher is exact to 2.28e-13 over 7 529 tables including
+183 ties with **zero α=0.05 decision flips**; concurrent appends are 6 400/6 400 on ext4 and tmpfs; the
+pool's cap saturates correctly and never re-issues a safer verdict as an answer; `classify()` fails into
+`other` rather than into a wrong arm. Its own uncovered list is in the file and is worth reading before the
+next change — DST and NTP steps, network filesystems, scale past ~6 400 records, and the fact that **the
+ledger has still never scored a real defect.**
 
 ### ⚠️ What is NOT recorded yet, and it is the half that matters
 

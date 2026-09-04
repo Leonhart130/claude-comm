@@ -403,6 +403,44 @@ the unknown pool, where it can withdraw a verdict rather than quietly tilt one. 
 each carrying one defect authored at +5 min and *found* ten days later still score 20/20 cold and 0/20
 reboot.
 
+## `#ledger-trial` — a window that did not elapse is not a shorter trial, it is not a trial
+
+Adversarial review #4's headline, 2026-09-04, and the one it said to fix if only one thing were done.
+
+The ledger compared *the fraction of starts carrying a first-window defect*. A start's window was truncated
+by the next start of the same agent — right on its own terms, since work after a restart belongs to the new
+session. But truncation changes how much window each start had, and **a reboot IS a start followed by
+another start**, so the arm the mechanism defines is the arm whose windows the mechanism truncates.
+
+Measured, 20 starts per arm, every one authoring a defect at exactly +5 minutes — identical density, the
+only difference being that each reboot session was followed 2 minutes later by another start:
+
+```
+cold     20 of 20  100.0%   mean exposure 15.0 min
+reboot    0 of 20    0.0%   mean exposure  2.0 min
+verdict: BETTER — reboot starts carry fewer first-window defects (p=0.0000)      exit 0
+```
+
+**100 % of that was exposure.** The control — the same file with the truncating starts removed — puts both
+arms at 20/20. The tool computed the confound (`exposureSkew`), exported it, printed it as a one-line `⚠`,
+and issued the verdict anyway with exit 0. Property 3 could not see it because nothing was unknown.
+
+It needed no contrivance and no second agent: **it was already at a 93 % gap on this repo's own first four
+records**, and a leader that compacts within fifteen minutes of a restart produces it alone.
+
+**The fix is structural, not a warning.** Fifteen minutes that did not happen cannot be asked whether they
+cost a defect, so only a **completed** window is a trial: not cut short by the next start, and not still
+running (which folded in R9 — every `--hook` boot writes a start and queries immediately, so a session
+credited with a full window it had not lived was in *every* boot report). Excluded starts are counted and
+reported, defects inside them join the unknown pool, and `--window` is the lever: if restarts really are five
+minutes apart, measure five minutes and the cohort fills. `exposureSkew` survives as an invariant — every
+counted start now has the same exposure, so if it ever fires the filter is broken and the verdict is
+withheld rather than footnoted.
+
+⚠️ **The cost, stated:** the arms fill more slowly, and a reboot cadence faster than the window makes the
+answer permanently UNKNOWN at that window. That is the true state of the world, not a defect — but it means
+`MIN_ARM` will take longer to reach than the raw start count suggests.
+
 ## `#ledger-unknown` — the verdict has to survive the worst reading of what could not be read
 
 Three refusals, each of which is a way this file could otherwise print a confident number:
@@ -410,6 +448,12 @@ Three refusals, each of which is a way this file could otherwise print a confide
 - **Below the promised sample there is no verdict.** Ten starts per arm, and ten is not invented — it is the
   consumer's own *"the first ten reboots should each leave a marker"*. Proved red: 0/3 cold against 3/3
   reboot, an effect that could not be more lopsided, still reports UNKNOWN.
+- **An unreadable FILE withdraws the verdict outright** (review #4 R2). It used to increment the same
+  counter as one torn line, so a 100 000-record log contributed **1** to the pool and the tool grew *more
+  confident the more completely it failed to read its own history* — measured as the same tree answering
+  WORSE at mode 000 and UNKNOWN at mode 644. An unreadable file has unknown magnitude; no pool can bound it.
+  An unreadable *directory* is likewise no longer byte-identical to an empty one: explaining an I/O failure
+  as a sampling shortfall is the same confusion one level down.
 - **Unreadable lines and unplaceable defects are a POOL, not a rounding error.** The verdict is recomputed
   with the whole pool loaded into each arm in turn; if the answer moves, the answer is UNKNOWN. An
   append-only log can end in a torn write, and a ledger that silently shrinks its own sample and prints a
