@@ -70,6 +70,8 @@ sessions. Boot deliberately does not run them.
 - A message carries a **pointer**, never content: `--ref` is required, there is no `--body`. The same rule
   governs process control — an agent name comes from `.comm/config.json`, never from message text.
 - An agent's identity comes from its hook stub's location, never the session's cwd.
-- A session resolves its own transcript through `/proc`, never by newest-mtime: several agents share one
-  directory here, and that guess was wrong by 68 % the first time it met the field.
+- A session resolves its own transcript through the registry the `SessionStart` hook writes
+  (`bin/session-registry.mjs`, keyed on pid + start time), and **a miss REFUSES**. Not newest-mtime — wrong
+  by 68 % the first time it met the field. Not the process's scratch directory — it names the session the
+  process was *launched* as, so after a `/clear` it answers for a dead one (`FINDINGS.md#clear-blind`).
 - Every hook path exits 0 on internal error: a broken bus must never break a session.

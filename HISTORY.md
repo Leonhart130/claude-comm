@@ -636,3 +636,29 @@ evidence* — a deleted paragraph shows up as a diff, a deleted list entry shows
 looks complete. Every surface in this project that renders a list (`comm inbox`, `comm who`, the boot's OPEN
 section) has this property, and none of them counts. Worth remembering before trusting any of them to tell
 you that nothing is missing.
+
+## The port collision — 2026-09-04, and why it landed on this project's design
+
+Reported from the field by the `~/Dev/work` leader. Two agents inside **one** project root collided over a
+port: an adversarial reviewer took the project's default preview port, re-ran a browser suite against it, and
+twice killed processes listening there — one of which may have belonged to the app developer working in the
+same repo, who discovered his own runner could photograph another session's server and moved his port.
+Everything else the reviewer did was clean.
+
+It landed here rather than on the reporter, because both agents had a hub available and still could not see
+each other. **Nothing in this tool has ever had a concept of a thing an agent is holding**, and no amount of
+messaging fixes a thing nobody thinks to say. Reaching for transport would have produced a bigger bus that
+still could not have prevented it.
+
+The peer's reply is worth keeping for one sentence in it. On the second property of a claim file — that it
+advises rather than enforces — he wrote that he had been thinking "lock", and that on a machine where every
+agent runs as the same user, *"a file that pretends to be a mutex is a promise the filesystem does not
+make."* He also declined to argue his own finding up the queue, citing his own rule back at himself: a
+feature with no ledger is a hobby, and his had a ledger entry of exactly one incident.
+
+A near-miss followed within two hours — his own probe holding port 54322 in a project whose next agent would
+need it, stopped because the newly written rule made him look. **He filed it himself as evidence the fix is
+cheap, not that it is needed**, which is the correct reading: a rule its author wrote and then obeyed proves
+discipline, not a gap. The gap was proven by the first incident and by nothing since.
+
+Correspondence: `exchange/work-leader/` (gitignored — it is correspondence, not source).
