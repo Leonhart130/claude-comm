@@ -49,8 +49,19 @@ const ROOT = resolve(opt("--root", SELF))
 // framework's shape is "one project per directory", and a list would go stale in the
 // one direction that matters — a project installed and then forgotten.
 const FIELD = resolve(opt("--field", dirname(ROOT)))
-const FAST = has("--fast")
+const CLOSE = has("--close")
+// A close runs the gate: it is the moment the tree is handed to the next session, and
+// "not measured" is not a state to hand anyone.
+const FAST = has("--fast") && !CLOSE
 const JSONOUT = has("--json")
+// --ack <row>=<reason>, repeatable. A close may not pass over a row silently; it may
+// only pass over one it NAMES. The reason is recorded, and so is the count.
+const ACKS = new Map()
+for (let i = 0; i < ARGV.length; i++) {
+	if (ARGV[i] !== "--ack" || !ARGV[i + 1]) continue
+	const eq = ARGV[i + 1].indexOf("=")
+	if (eq > 0) ACKS.set(ARGV[i + 1].slice(0, eq), ARGV[i + 1].slice(eq + 1))
+}
 
 // Four levels, because three forced "not measured" to borrow OK's tick - and OK is a
 // verdict about now while UNKNOWN is the absence of one. Review #3 R1/R5: --fast could
@@ -424,6 +435,27 @@ if (has("--hook")) {
 	}
 }
 
+// -- 5c. did the previous session close? ------------------------------------
+/**
+ * The boot and the close are one loop, and this row is where they touch. A close writes
+ * a marker; every session start writes another. If a start is newer than the last close,
+ * the session before this one ended without one - so whatever it knew and did not write
+ * down is gone, and this boot should not assume otherwise.
+ *
+ * It reports rather than blocks: a session may legitimately be killed, and a boot that
+ * refuses to run because the last one crashed is a boot that gets bypassed.
+ */
+{
+	let st = {}
+	try { st = JSON.parse(readFileSync(join(ROOT, ".boot-state.json"), "utf8")) } catch {}
+	const closedAt = st.lastClose && Date.parse(st.lastClose.at)
+	const startedAt = st.lastStart && Date.parse(st.lastStart)
+	if (!closedAt) row("close", WARN, "no session has ever closed here - the protocol is new or unused")
+	else if (startedAt && startedAt > closedAt)
+		row("close", WARN, `the previous session did NOT close (started ${age(Date.now() - startedAt)} ago, last close ${age(Date.now() - closedAt)} ago) - anything it held and did not write down is gone`)
+	else row("close", OK, `last close ${age(Date.now() - closedAt)} ago at ${st.lastClose.head || "?"}`)
+}
+
 // -- 6. the gate - run it; never infer it from a fingerprint -----------------
 {
 	// The fingerprint covers every input the gate READS, not only the code it lives in.
@@ -478,6 +510,78 @@ if (has("--hook")) {
 	}
 }
 
+// -- the close ---------------------------------------------------------------
+/**
+ * The close protocol, and it is deliberately not a checklist.
+ *
+ * A checklist is satisfied by feeling satisfied. This one is satisfied by the BOOT: a
+ * session is closed when a full boot - gate included - reports nothing that is not
+ * either fixed or NAMED. That makes the two protocols one loop with a single source of
+ * truth, and it means the close cannot drift away from what the boot measures, because
+ * it has no criteria of its own.
+ *
+ * Three rules follow:
+ *
+ * 1. NO SILENT PASS. A non-green row is either resolved or acknowledged by name with a
+ *    reason (`--ack <row>=<why>`). There is no flag that waves everything through.
+ *
+ * 2. ACKNOWLEDGEMENTS ARE COUNTED, NOT JUST RECORDED. From the owner's own standard: "a
+ *    guard that is defensible every time it is bypassed is already failing - count the
+ *    bypasses, not their justifications; the RATE is the signal." A row waved past
+ *    repeatedly is a row that is not doing its job, and this is where a protocol
+ *    amendment gets its evidence instead of its opinion.
+ *
+ * 3. THE CLOSE WRITES A MARKER AND EVERY SESSION START WRITES ANOTHER, so the next boot
+ *    can say whether the last session ended properly. That is the only state the two
+ *    protocols share, and it is one timestamp each.
+ */
+let closeReport = ""
+let closeFailed = false
+if (CLOSE) {
+	const EROSION = 3
+	let st = {}
+	try { st = JSON.parse(readFileSync(join(ROOT, ".boot-state.json"), "utf8")) } catch {}
+	const counts = st.ackCounts || {}
+
+	// The `close` row describes the state BEFORE this run, and this run is what changes
+	// it - so it reports, it does not block. Blocking on it would make every first close
+	// require an acknowledgement for the condition it exists to remove, and would inflate
+	// the erosion count of a row that was never the problem.
+	const open = rows.filter((r) => r.label && r.label !== "close" && r.level !== OK)
+	const unacked = open.filter((r) => !ACKS.has(r.label))
+	const lines = []
+
+	if (unacked.length) {
+		closeFailed = true
+		lines.push("  ✗ NOT CLOSED - these rows are neither fixed nor named:")
+		for (const r of unacked) lines.push(`      ${r.label}  ${r.text.slice(0, 96)}`)
+		lines.push("")
+		lines.push("    Fix them, or name each one:  node bin/boot.mjs --close \\")
+		lines.push(`      ${unacked.map((r) => `--ack ${r.label}="why this is acceptable"`).join(" \\\n      ")}`)
+	} else {
+		for (const r of open) {
+			counts[r.label] = (counts[r.label] || 0) + 1
+			lines.push(`  · acknowledged  ${r.label}: ${ACKS.get(r.label)}`)
+		}
+		// Amendment evidence. Not a suggestion to think about it - a count.
+		const eroding = Object.entries(counts).filter(([, n]) => n >= EROSION)
+		if (eroding.length) {
+			lines.push("")
+			lines.push("  🔴 AMEND THE PROTOCOL - these rows are being waved past, not acted on:")
+			for (const [label, n] of eroding) {
+				lines.push(`      ${label} acknowledged ${n}x. A row that is defensible every time it is bypassed is`)
+				lines.push(`      already failing. Change what it measures, or delete it. Raising nothing is not a fix.`)
+			}
+		}
+		st.ackCounts = counts
+		st.lastClose = { at: new Date().toISOString(), head: git("rev-parse", "--short", "HEAD"), acked: [...ACKS.keys()] }
+		writeState(st)
+		lines.push("")
+		lines.push(`  ✓ CLOSED at ${st.lastClose.head} - the next boot inherits a tree whose every row is green or named.`)
+	}
+	closeReport = "\n" + lines.join("\n") + "\n"
+}
+
 // -- render -----------------------------------------------------------------
 if (JSONOUT) {
 	console.log(JSON.stringify({ worst, rows }, null, 2))
@@ -499,7 +603,7 @@ const report =
 			  .map((m) => `    ${m[1]}. ${m[2].replace(/`/g, "").slice(0, 96)}`).join("\n") + "\n"
 		: "") +
 	"\n  not run here: test/selftest.mjs - it spawns real `claude -p` sessions (minutes), and its" +
-	"\n  BEHAVIOUR half is reported, never gated. Run it before changing delivery.\n"
+	"\n  BEHAVIOUR half is reported, never gated. Run it before changing delivery.\n" + closeReport
 
 process.stdout.write(report)
 
@@ -510,7 +614,7 @@ if (FAST) {
 	st.reportBytes = Buffer.byteLength(report)
 	writeState(st)
 }
-process.exit(worst === RED ? 1 : 0)
+process.exit(closeFailed || worst === RED ? 1 : 0)
 
 // -- the negative control ---------------------------------------------------
 /**
