@@ -856,6 +856,13 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 		`TZ=UTC control shows 23:30 on 2026-01-15=${controlUTC}`)
 }
 
+// Documents this suite READS. Declared, not inferred: bin/boot.mjs's archive row used to
+// derive this by matching the `join(PKG, "X.md")` idiom in this file, and review #3 R4
+// showed a gate written with the filename in a const is invisible to that match - boot
+// then reports a RED as a WARN and exits 0 while a clone crashes all 28 checks. Add a
+// document here the moment a gate reads it.
+// gate-docs: FINDINGS.md
+//
 // A27 — every FINDINGS.md pointer in the bus must resolve.
 //
 // This gate exists because of the 2026-08-06 split. A22 hit 95% and 55% of the bus
@@ -884,6 +891,32 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 		findings.length > 0 && refs.length >= 15 && missing.length === 0,
 		`FINDINGS.md read=${findings.length > 0}; pointers found=${refs.length} (want >=15); ` +
 		`dangling=${missing.length ? missing.join(", ") : "none"}`)
+}
+
+// A28 — every DOCUMENT the bus points at must exist.
+//
+// A27 enforces "a dangling pointer is worse than none" for FINDINGS.md anchors only, and
+// review #3 R11 found the rule true and its enforcement one filename wide: `bin/comm.mjs`
+// cited `FRAMEWORK.md §1`, a file that does not exist in this repo and is not tracked, and
+// A27 could not see it. A pointer reads as "the reasoning is recorded elsewhere" while the
+// reasoning is not there at all.
+//
+// Only POINTERS count - `X.md#anchor` or `X.md §n`. A bare `docs/REVIEW.md` in an example
+// is an illustration of a user's path, not a claim about this repo, and matching those
+// would redden the gate for a reason foreign to what it verifies.
+{
+	let refs = []
+	for (const f of ["bin/comm.mjs", "install.mjs", "bin/boot.mjs", "bin/context.mjs"]) {
+		let src = ""
+		try { src = readFileSync(join(PKG, f), "utf8") } catch { continue }
+		for (const m of src.matchAll(/([A-Za-z][A-Za-z0-9_-]*\.md)(?:#[A-Za-z0-9-]+|\s+§\s*[0-9]+)/g)) {
+			refs.push({ doc: m[1], in: f })
+		}
+	}
+	const dangling = [...new Set(refs.filter((r) => !existsSync(join(PKG, r.doc))).map((r) => `${r.doc} (${r.in})`))]
+	check("A28 every document pointed at exists",
+		refs.length >= 15 && dangling.length === 0,
+		`pointers found=${refs.length} (want >=15); dangling=${dangling.length ? dangling.join(", ") : "none"}`)
 }
 
 // ── A21/A22: the properties that erode by accretion, not by a single bad commit ──

@@ -198,7 +198,7 @@ function send(root, cfg, { from, to, kind, ref, note, force = false }) {
 	if (!KINDS[kind]) {
 		throw new Error(`unknown kind '${kind}'. Known: ${Object.keys(KINDS).join(", ")}`)
 	}
-	// HUB ENFORCEMENT (FRAMEWORK.md §1: exactly one leader).
+	// HUB ENFORCEMENT (README.md "Topology is enforced, not documented": exactly one leader).
 	// Every message has the leader at one end. A peer send is refused loudly
 	// rather than silently rerouted -- a silent reroute would let two experts
 	// coordinate off-board, which is the divergence the hub exists to prevent.

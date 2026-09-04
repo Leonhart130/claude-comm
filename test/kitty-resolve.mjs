@@ -20,8 +20,10 @@
  */
 import { readFileSync, readlinkSync, readdirSync, statSync } from "node:fs"
 import { execFileSync } from "node:child_process"
+import { join } from "node:path"
+import { homedir } from "node:os"
 
-const KITTEN = process.env.COMM_KITTEN || "/home/leonh/.local/kitty.app/bin/kitten"
+const KITTEN = process.env.COMM_KITTEN || join(homedir(), ".local/kitty.app/bin/kitten")
 
 // ── socket discovery ────────────────────────────────────────────────────────
 // NOT just $KITTY_LISTEN_ON: that names the kitty instance WE are in. `listen_on

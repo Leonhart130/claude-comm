@@ -7,8 +7,8 @@
 # non-matching send exits 0, the transport is unfalsifiable at the point of use —
 # which is the failure mode this whole project exists to prevent.
 set -u
-K=/home/leonh/.local/kitty.app/bin/kitty
-KT=/home/leonh/.local/kitty.app/bin/kitten
+K="$HOME/.local/kitty.app/bin/kitty"
+KT="$HOME/.local/kitty.app/bin/kitten"
 SOCK=unix:/tmp/kitty-probe-$$.sock
 OUT=/tmp/kitty-probe-received-$$.txt
 rm -f "$OUT"

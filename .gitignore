@@ -5,6 +5,25 @@ node_modules/
 .comm/delivered/
 .comm/corrupt/
 
-# Chats
-*.md
-!README.md
+# Boot state: when the gate was last green, on which fingerprint. Live state, not source.
+.boot-state.json
+
+# Agent-to-agent correspondence: rounds, briefs and reviews are conversation, not source.
+#
+# This list NAMES what it excludes, and that is the whole point. It used to be `*.md`
+# with a `!README.md` exception - an ignore-by-DEFAULT rule - and it quietly took
+# FINDINGS.md and STATUS.md out of the repo along with the chats. Measured cost: a fresh
+# clone of this repo fails A27 with 21 dangling pointers, because the gate whose entire
+# purpose is "a dangling pointer is worse than none" reads a file git no longer carries.
+# CLAUDE.md would have been the next one swallowed. A rule that excludes by default
+# excludes whatever you add later, silently, and the loss is invisible until a clone.
+BRIEF-*.md
+REPLY-*.md
+REPORT-*.md
+REVIEW-*.md
+
+# Leader-to-leader correspondence with other projects' agents. Same reason as the
+# BRIEF/REPLY/REPORT/REVIEW prefixes above: it is conversation, not source. Named
+# explicitly rather than swept up by a wildcard - see the note above for what an
+# ignore-by-default rule cost this repo once already.
+exchange/
