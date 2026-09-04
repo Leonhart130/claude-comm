@@ -28,7 +28,7 @@
  * 4. THE BUDGET IS NOT INVENTED. `BUDGET` below is a stated assumption with its
  *    evidence attached, not a fact the tool discovered. Override it with --budget.
  */
-import { readFileSync, existsSync, readdirSync, statSync, readlinkSync, openSync, readSync, closeSync, mkdtempSync, writeFileSync, rmSync } from "node:fs"
+import { readFileSync, existsSync, readdirSync, statSync, readlinkSync, openSync, readSync, closeSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs"
 import { join, basename } from "node:path"
 import { homedir, tmpdir } from "node:os"
 import { fileURLToPath } from "node:url"
@@ -159,6 +159,12 @@ function rate(r, scope) {
 }
 
 const slugOf = (dir) => dir.replace(/[/.]/g, "-")
+// Where Claude Code keeps transcripts. Overridable ONLY so the negative control can
+// build its own two-session directory: the R7 arm previously depended on whatever
+// transcripts happened to exist for the caller's cwd, so it passed on the author's
+// machine and failed on a fresh clone - a control that is not hermetic is a control
+// that tests the machine. Read-only, and never consulted when a path is given outright.
+const PROJECTS = () => process.env.CLAUDE_COMM_PROJECTS || join(homedir(), ".claude", "projects")
 
 /**
  * Resolve a session PID to the transcript that PID is writing - exactly, not by guess.
@@ -188,7 +194,7 @@ function transcriptOfPid(pid) {
 	if (!uuid) return null
 	try {
 		const cwd = readlinkSync(`/proc/${pid}/cwd`)
-		const p = join(homedir(), ".claude", "projects", slugOf(cwd), `${uuid}.jsonl`)
+		const p = join(PROJECTS(), slugOf(cwd), `${uuid}.jsonl`)
 		return existsSync(p) ? p : null
 	} catch { return null }
 }
@@ -247,7 +253,7 @@ function resolveTranscript() {
 		const p = transcriptOfPid(own)
 		if (p) return { path: p, how: `resolved from /proc/${own} (own session)` }
 	}
-	const dir = join(homedir(), ".claude", "projects", slugOf(process.cwd()))
+	const dir = join(PROJECTS(), slugOf(process.cwd()))
 	if (!existsSync(dir)) return { path: null, how: `no transcripts for ${process.cwd()}` }
 	const files = readdirSync(dir).filter((f) => f.endsWith(".jsonl"))
 		.map((f) => ({ f: join(dir, f), m: statSync(join(dir, f)).mtimeMs }))
@@ -399,10 +405,18 @@ function proveRed() {
 	// R7. A guessed reading must be visible to a MACHINE. Reached only by a caller with no
 	// claude ancestor, so the arm detaches with setsid --fork, exactly as the reviewer did.
 	{
+		// Hermetic: the arm builds the ambiguity it tests - two transcripts for one
+		// directory - instead of hoping the caller's machine has some.
 		const out = join(dir, "guess.out")
+		const work = join(dir, "amb"); mkdirSync(work, { recursive: true })
+		const proj = join(dir, "projects", work.replace(/[/.]/g, "-"))
+		mkdirSync(proj, { recursive: true })
+		for (const n of ["one", "two"]) {
+			writeFileSync(join(proj, `${n}.jsonl`), JSON.stringify(asst(120_000)) + "\n")
+		}
 		spawnSync("setsid", ["--fork", "sh", "-c",
-			`${process.execPath} ${fileURLToPath(import.meta.url)} --json > ${out} 2>&1; echo "exit=$?" >> ${out}`],
-			{ cwd: process.cwd(), encoding: "utf8" })
+			`cd ${work} && CLAUDE_COMM_PROJECTS=${join(dir, "projects")} ${process.execPath} ${fileURLToPath(import.meta.url)} --json > ${out} 2>&1; echo "exit=$?" >> ${out}`],
+			{ encoding: "utf8" })
 		let txt = ""
 		for (let i = 0; i < 40 && !/exit=/.test(txt); i++) {
 			try { txt = readFileSync(out, "utf8") } catch {}
