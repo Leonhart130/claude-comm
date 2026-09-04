@@ -504,7 +504,7 @@ any session that has been cleared, which after this feature ships is most sessio
 **The `Stop` hook path is unaffected.** Its payload carries `transcript_path` outright and `--hook` outranks
 `--pid`, so the trigger itself reads the right file. The blindness is in every out-of-band reading.
 
-### ⚠️ Deliberately NOT patched in the same breath
+### ✅ FIXED 2026-09-04 — and this section is kept because the two candidates were not equal
 
 Two fixes are candidates and neither was shipped, because a detector whose false positive is already
 demonstrable is worse than a defect that is written down:
@@ -523,4 +523,29 @@ demonstrable is worse than a defect that is written down:
   transcript sits still, which is this very repo's own session for minutes at a time. It would flag a
   working session as cleared.
 
-Until one lands, **nothing may be built that reads a context by pid and acts on it.**
+**The registry landed 2026-09-04 as `bin/session-registry.mjs`**, with one deviation from the decision above,
+recorded here because the reason it gave still holds: it is a **directory of per-pid files** under
+`$XDG_RUNTIME_DIR/claude-comm/sessions/`, not a single `sessions.json`. The location and its reasoning are
+unchanged; the layout changed because one shared file is read-modify-write, and "two interleaved writers lose
+one update" is an open, unmeasured risk on this repo's own `.boot-state.json`. Here a lost update means a
+session that cannot be resolved at all. A per-pid file has no merge to lose. The key is `(pid, start time,
+boot id)` — start time alone is ticks since boot, so a reboot could hand the same pair to a different process
+honestly.
+
+`bin/context.mjs` now resolves pid → transcript through it and **refuses on a miss**, including the
+own-session path that used to fall through to newest-mtime. Four arms in `bin/context.mjs --prove-red` and
+three in `bin/boot.mjs --prove-red` demonstrate it: a registered pid resolves to *its* transcript, a recycled
+pid is a miss, an unregistered pid refuses, and an unregistered *session* refuses rather than guessing.
+
+**Two defects were found inside that fix, both by reading output rather than by a test**, and both are the
+shapes this repo already had names for:
+
+- The boot control ran the real boot with `--hook`, whose ancestor walk reached the **operator's live
+  session**, so the negative control wrote its own fixture transcript into the machine's real registry. The
+  next boot then reported `pid <me> → 44444444-….jsonl` under a green tick. *A control that writes into the
+  world it measures is not a control.* Every child of `proveRed` now runs with `CLAUDE_COMM_RUNTIME` inside
+  the fixture.
+- The boot row said *"bin/context.mjs can resolve this session"* on the strength of a registry hit alone,
+  having never checked the transcript existed. With a stale entry, context refused while the row stayed
+  green — a **green row over a dead sensor**. The row now reads what the reader reads, and that direction is
+  armed.

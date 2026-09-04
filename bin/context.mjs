@@ -27,12 +27,20 @@
  *
  * 4. THE BUDGET IS NOT INVENTED. `BUDGET` below is a stated assumption with its
  *    evidence attached, not a fact the tool discovered. Override it with --budget.
+ *
+ * 5. IT DOES NOT INFER A SESSION FROM THE PROCESS'S SCRATCH DIRECTORY. That directory
+ *    names the session the process was LAUNCHED as, permanently, so after a `/clear`
+ *    this tool answered with a DEAD session's final context - a plausible number, in a
+ *    plausible range, exit 0 (`FINDINGS.md#clear-blind`). pid -> transcript now comes
+ *    from the registry the SessionStart hook writes (`bin/session-registry.mjs`), and a
+ *    miss REFUSES rather than falling back to the answer that was wrong.
  */
-import { readFileSync, existsSync, readdirSync, statSync, readlinkSync, openSync, readSync, closeSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs"
+import { readFileSync, existsSync, readdirSync, statSync, readlinkSync, openSync, readSync, closeSync, mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, unlinkSync } from "node:fs"
 import { join, basename } from "node:path"
 import { homedir, tmpdir } from "node:os"
 import { fileURLToPath } from "node:url"
 import { spawnSync } from "node:child_process"
+import { lookup as registryLookup, record as registryRecord, registryDir, startTimeOf } from "./session-registry.mjs"
 
 const ARGV = process.argv.slice(2)
 const has = (f) => ARGV.includes(f)
@@ -167,36 +175,61 @@ const slugOf = (dir) => dir.replace(/[/.]/g, "-")
 const PROJECTS = () => process.env.CLAUDE_COMM_PROJECTS || join(homedir(), ".claude", "projects")
 
 /**
- * Resolve a session PID to the transcript that PID is writing - exactly, not by guess.
+ * The uuid in the scratch directory a process holds open. EVIDENCE, NEVER AUTHORITY.
  *
- * A session holds an open descriptor on its own per-session scratch directory, whose
- * path carries its session UUID: /tmp/claude-<uid>/<project-slug>/<uuid>/... The
- * transcript is then <uuid>.jsonl under that session's own cwd slug. The transcript
- * itself is NOT held open (it is appended and closed), so the descriptor list is the
- * only place a running process names its own session.
+ * This used to BE the resolution, and it was built that way for a good reason -
+ * newest-mtime was wrong by 68% the first time it met the field, because several agents
+ * share one project directory here and that is the hub topology (A17), not an edge case.
  *
- * This replaced newest-mtime, which was wrong in the field the first time it was
- * pointed at reality: two live sessions shared one project root, so both were reported as
- * carrying 313 395 tokens when one of them was at 186 919 - an error of 68% on the
- * number a session would use to decide whether to close itself. Several agents sharing
- * one directory is not an edge case in this framework, it is the hub topology (A17).
+ * It is wrong for a different reason, found 2026-09-04: `/tmp/claude-<uid>/<slug>/<uuid>/`
+ * names the session the process was LAUNCHED as and never changes, while a `/clear` mints
+ * a new session and a new transcript. The two then disagree forever, and the tool answered
+ * from the dead one.
+ *
+ * Kept because that disagreement is exactly how a cleared session announces itself, and
+ * saying so out loud is worth more than the four lines it costs.
  */
-function transcriptOfPid(pid) {
-	let uuid = null
+/** argv[0]'s basename - the same test boot and ownSessionPid use to recognise a session. */
+function argv0Of(pid) {
+	try { return basename(readFileSync(`/proc/${pid}/cmdline`, "utf8").split("\0")[0] || "") } catch { return "" }
+}
+
+function scratchUuidOfPid(pid) {
 	try {
 		for (const fd of readdirSync(`/proc/${pid}/fd`)) {
 			let target
 			try { target = readlinkSync(`/proc/${pid}/fd/${fd}`) } catch { continue }
 			const m = target.match(/^\/tmp\/claude-\d+\/[^/]+\/([0-9a-f-]{36})\//)
-			if (m) { uuid = m[1]; break }
+			if (m) return m[1]
 		}
-	} catch { return null }
-	if (!uuid) return null
-	try {
-		const cwd = readlinkSync(`/proc/${pid}/cwd`)
-		const p = join(PROJECTS(), slugOf(cwd), `${uuid}.jsonl`)
-		return existsSync(p) ? p : null
-	} catch { return null }
+	} catch {}
+	return null
+}
+
+/**
+ * Resolve a session pid to the transcript it is writing NOW - from the registry the
+ * SessionStart hook writes, and from nothing else.
+ *
+ * A MISS REFUSES. It must never fall through to the scratch directory: that answer is
+ * plausible, in range, and wrong for every cleared session - which, once a leader can
+ * reboot itself, is most sessions most of the time. A refusal is the only outcome a loop
+ * can tell apart from a good reading.
+ */
+function transcriptOfPid(pid) {
+	const r = registryLookup(pid)
+	if (!r.ok) return { path: null, why: r.hint ? `${r.why} (${r.hint})` : r.why }
+	if (!existsSync(r.transcript)) {
+		return { path: null, why: `the registry names ${basename(r.transcript)} for pid ${pid} and that file is gone` }
+	}
+	// ONLY for a pid that is itself a session. A child inherits its parent's open
+	// descriptors, so any descendant of a session holds that session's scratch directory
+	// and would be labelled "cleared" on the strength of its parent's uuid. Found by
+	// reading this control's own output: the arm below printed CLEARED for the test
+	// harness. Evidence that is wrong is not weaker evidence, it is a wrong claim.
+	const launched = argv0Of(pid) === "claude" ? scratchUuidOfPid(pid) : null
+	const live = basename(r.transcript).replace(/\.jsonl$/, "")
+	const note = launched && launched !== live ? ` - session CLEARED (launched as ${launched.slice(0, 8)})` : ""
+	return { path: r.transcript, why: null, note }
 }
 
 /** The nearest ancestor that is the session itself, by argv[0] - same test boot uses. */
@@ -244,14 +277,19 @@ function resolveTranscript() {
 	}
 	const askedPid = Number(opt("--pid", 0))
 	if (askedPid) {
-		const p = transcriptOfPid(askedPid)
-		return p ? { path: p, how: `resolved from /proc/${askedPid}` }
-			: { path: null, how: `pid ${askedPid} names no session transcript` }
+		const r = transcriptOfPid(askedPid)
+		return r.path ? { path: r.path, how: `registry: pid ${askedPid}${r.note}` }
+			: { path: null, how: r.why }
 	}
 	const own = ownSessionPid()
 	if (own) {
-		const p = transcriptOfPid(own)
-		if (p) return { path: p, how: `resolved from /proc/${own} (own session)` }
+		const r = transcriptOfPid(own)
+		if (r.path) return { path: r.path, how: `registry: pid ${own} (own session)${r.note}` }
+		// REFUSE. The newest transcript in this directory is below, and reaching it from
+		// here is precisely the fall-through `FINDINGS.md#clear-blind` forbids: this
+		// process IS a session, we simply cannot say which one, and the guess would be
+		// right often enough to be trusted and wrong exactly when a reboot is at stake.
+		return { path: null, how: `${r.why}; pass --transcript <path> if you know which file is live` }
 	}
 	const dir = join(PROJECTS(), slugOf(process.cwd()))
 	if (!existsSync(dir)) return { path: null, how: `no transcripts for ${process.cwd()}` }
@@ -314,6 +352,11 @@ function report() {
 function proveRed() {
 	const dir = mkdtempSync(join(tmpdir(), "comm-ctx-prove-"))
 	process.on("exit", () => { try { rmSync(dir, { recursive: true, force: true }) } catch {} })
+	// The registry arms must build their own registry, never touch the machine's. Set
+	// before any child is spawned, because every child inherits it - the same reason
+	// CLAUDE_COMM_PROJECTS exists. A control that writes into the real world is not a
+	// control, and this one would write into the sensor every live session depends on.
+	process.env.CLAUDE_COMM_RUNTIME = join(dir, "runtime")
 	let n = 0, failed = 0
 	const check = (name, pass, detail) => {
 		console.log(`  ${pass ? "✓" : "✗"} ${name.padEnd(46)} ${detail}`)
@@ -330,7 +373,7 @@ function proveRed() {
 	})
 	const user = () => ({ type: "user", message: { content: "hello" } })
 	const read = (p, extra = []) => {
-		const r = spawnSelf(["--transcript", p, "--json", ...extra])
+		const r = spawnSelf([...(p ? ["--transcript", p] : []), "--json", ...extra])
 		try { return { ...JSON.parse(r.stdout), exit: r.status } } catch { return { state: "parse-failed", exit: r.status, raw: r.stdout } }
 	}
 
@@ -426,6 +469,69 @@ function proveRed() {
 		const guessed = /"guessed":true/.test(txt)
 		check("R7 an ambiguous session refuses a verdict", code === "3" && guessed,
 			`detached call -> exit ${code}, guessed=${guessed}`)
+	}
+
+	// ---- the registry: pid -> the transcript that pid is writing NOW ----------
+	// FINDINGS.md#clear-blind. The scratch directory names the session a process was
+	// LAUNCHED as, so after a /clear this tool answered from a DEAD session with exit 0 -
+	// and a self-rebooting leader is a cleared session by construction, so the trigger
+	// would have re-fired forever and looked like the feature working. These four arms
+	// are the ones that would have caught it.
+	{
+		const live = write([user(), asst(321_000)])
+		const me = process.pid
+		const entry = join(registryDir(), `${me}.json`)
+
+		// The registry is the AUTHORITY. This process has no claude scratch directory at
+		// all, so nothing but the registry can resolve it - and it must.
+		const wrote = registryRecord({ pid: me, transcript: live, agent: "control", source: "startup" })
+		const hit = read(null, ["--pid", String(me)])
+		check("a registered pid resolves to ITS transcript", wrote.ok && hit.tokens === 321_000,
+			`write ok=${wrote.ok} -> ${hit.tokens} tokens via ${hit.how}`)
+
+		// ONE VARIABLE: the same pid, the same file, a start time that no longer matches.
+		// That is a recycled pid, and it is the exact shape of the failure this replaced -
+		// a confident answer about a process that is not the one recorded. It must MISS.
+		const good = readFileSync(entry, "utf8")
+		writeFileSync(entry, JSON.stringify({ ...JSON.parse(good), start: (startTimeOf(me) || 0) + 1 }) + "\n")
+		const recycled = read(null, ["--pid", String(me)])
+		writeFileSync(entry, good)
+		check("a RECYCLED pid is a miss, not an answer", recycled.exit === 2 && recycled.tokens === null,
+			`start moved by one tick -> exit ${recycled.exit}, tokens=${JSON.stringify(recycled.tokens)}`)
+
+		// An unregistered pid must refuse rather than fall back to the resolution this
+		// replaced. There is no --allow-guess for this: the old answer was plausible and
+		// in range, which is worse than no answer, because a loop cannot tell it apart.
+		unlinkSync(entry)
+		const missing = read(null, ["--pid", String(me)])
+		check("an unregistered pid REFUSES", missing.exit === 2 && missing.tokens === null,
+			`exit ${missing.exit} - ${String(missing.why).slice(0, 60)}`)
+
+		// REGRESSION GUARD, and the one that matters most. A real session - a process with
+		// a `claude` ancestor - that is not in the registry used to fall through to the
+		// newest transcript in its directory. Here the directory is deliberately ambiguous,
+		// so the fall-through would answer (exit 3, "guessed"). It must refuse instead:
+		// exit 2, no number at all. The arm builds a fake `claude` parent because the
+		// property is about having an ancestor, not about who is running the test.
+		{
+			const out = join(dir, "unregistered.out")
+			const work = join(dir, "unreg"); mkdirSync(work, { recursive: true })
+			const proj = join(dir, "projects2", work.replace(/[/.]/g, "-"))
+			mkdirSync(proj, { recursive: true })
+			for (const nm of ["one", "two"]) writeFileSync(join(proj, `${nm}.jsonl`), JSON.stringify(asst(120_000)) + "\n")
+			const fake = join(dir, "claude")
+			try { symlinkSync("/bin/sh", fake) } catch {}
+			// Two commands, so the shell cannot exec-optimise itself away and lose the
+			// argv[0] this arm depends on.
+			spawnSync(fake, ["-c",
+				`cd ${work} && CLAUDE_COMM_PROJECTS=${join(dir, "projects2")} ${process.execPath} ${fileURLToPath(import.meta.url)} --json > ${out} 2>&1; echo "exit=$?" >> ${out}`],
+				{ encoding: "utf8" })
+			let txt = ""
+			try { txt = readFileSync(out, "utf8") } catch {}
+			const code = (txt.match(/exit=(\d+)/) || [])[1]
+			check("an unregistered SESSION refuses, never guesses", code === "2" && !/"tokens":\s*\d/.test(txt),
+				`claude-parented, 2 transcripts in reach -> exit ${code} (a guess would be 3)`)
+		}
 	}
 
 	console.log(`\n${failed ? `✗ ${failed} sensor propert(y/ies) NOT demonstrated` : "✓ every sensor property demonstrated by a moved variable"}\n`)

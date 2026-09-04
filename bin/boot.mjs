@@ -32,12 +32,13 @@
  * A21's import allowlist by design — and stays a short-lived process for exactly the
  * reason the bus does: nothing here lives long enough to leak.
  */
-import { readFileSync, writeFileSync, renameSync, existsSync, readdirSync, statSync, utimesSync, mkdtempSync, mkdirSync, cpSync, rmSync } from "node:fs"
+import { readFileSync, writeFileSync, renameSync, existsSync, readdirSync, statSync, utimesSync, mkdtempSync, mkdirSync, cpSync, rmSync, symlinkSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, dirname, resolve, basename } from "node:path"
 import { fileURLToPath } from "node:url"
 import { execFileSync, spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
+import { record as registryRecord, lookup as registryLookup, registryDir } from "./session-registry.mjs"
 
 const ARGV = process.argv.slice(2)
 const has = (f) => ARGV.includes(f)
@@ -109,6 +110,7 @@ function writeState(obj) {
 
 let statusText = ""
 let sessionAgent = ""   // who this session is, for the ledger; resolved in row 1
+let sessionPid = 0      // the pid of this session, for the registry; resolved in row 1
 let gateDocs = []   // documents the gate suite declares it reads; feeds the fingerprint (R1)
 let nextText = ""   // what the previous close said this session must do first
 
@@ -178,6 +180,7 @@ if (has("--hook")) {
 			}
 		} catch { env = null }
 	}
+	sessionPid = session
 	const declared = env ? (env.get("CLAUDE_COMM_AGENT") || "").trim() : ""
 	// The ledger needs a subject and this is the only place that resolves one. An off-bus
 	// session is still a session that can author a defect in its first fifteen minutes, so
@@ -268,6 +271,66 @@ if (has("--hook")) {
 		if (wrote && !wrote.ok) row("ledger", WARN, `THIS START WAS NOT RECORDED (${wrote.why || "no reason given"}) - ${bits.join(" - ")}`)
 		else if (wrote && seen !== "confirmed") row("ledger", WARN, `THE WRITE WAS NOT SEEN BY THE RE-READ (${seen}) - ${bits.join(" - ")}`)
 		else row("ledger", bad ? WARN : OK, bits.join(" - ") + (wrote ? " - this start recorded and re-read" : ""))
+	}
+}
+
+// -- 1c. the session registry: which transcript is THIS pid writing NOW? -----
+/**
+ * `bin/context.mjs` used to answer that from the scratch directory a process holds
+ * open, and that names the session the process was LAUNCHED as - forever. After a
+ * `/clear` it reports a DEAD session's final context with exit 0
+ * (`FINDINGS.md#clear-blind`), which would have made a self-rebooting leader reboot
+ * forever while looking like a working feature.
+ *
+ * The SessionStart hook is the only vantage point on this machine that is HANDED the
+ * live session's transcript, so it is the only thing entitled to write this down.
+ * Recording it is therefore a hook-path job, and every other caller only reads.
+ *
+ * Two rules this row inherits from the ledger row directly above it, both paid for:
+ *
+ *   · A HOOK MUST NOT BREAK A SESSION - `record` returns reasons, never throws.
+ *   · THE WRITE IS VERIFIED BY RE-READING IT (R3(b)). A write whose success is the
+ *     child's own opinion of itself is not a measurement; this one is read back through
+ *     `lookup`, the same function `bin/context.mjs` will use, and must come back with
+ *     the same transcript.
+ */
+{
+	let wrote = null
+	if (has("--hook")) {
+		const tp = payload && typeof payload.transcript_path === "string" ? payload.transcript_path : ""
+		wrote = registryRecord({ pid: sessionPid, transcript: tp, agent: sessionAgent, source: payload && payload.source })
+	}
+	const back = registryLookup(sessionPid)
+	const where = registryDir()
+	if (has("--hook")) {
+		if (!wrote.ok) {
+			row("registry", WARN, `THIS SESSION WAS NOT RECORDED (${wrote.why}) - bin/context.mjs will REFUSE for it`)
+		} else if (!back.ok || back.transcript !== wrote.transcript) {
+			// The re-read is the whole point: a write nobody read back is a claim.
+			row("registry", WARN, `THE WRITE WAS NOT SEEN BY THE RE-READ (${back.ok ? `it names ${basename(back.transcript)}` : back.why})`)
+		} else if (!existsSync(back.transcript)) {
+			row("registry", WARN, `recorded ${basename(back.transcript)} for pid ${sessionPid}, and that file does not exist`)
+		} else {
+			row("registry", OK, `pid ${sessionPid} -> ${basename(back.transcript)} (${back.source || "no source"}) - written and re-read - ${where}`)
+		}
+	} else if (!sessionPid) {
+		// Not a session at all: a script, a cron shell, a fixture run. There is nothing
+		// to register, and inventing a warning here would train people to ignore the row.
+		row("registry", OK, "no claude ancestor - not a session, nothing to register")
+	} else if (back.ok && !existsSync(back.transcript)) {
+		// The row used to say "bin/context.mjs can resolve this session" on the strength of
+		// a lookup alone - a claim about ANOTHER tool that this one had not checked. When
+		// a stale entry named a file that did not exist, context refused and the row stayed
+		// green: a green row over a dead sensor, which is the one shape this project keeps
+		// paying for. If the row is going to speak for the reader, it reads what the reader
+		// reads.
+		row("registry", WARN, `pid ${sessionPid} -> ${basename(back.transcript)}, and that file is GONE - bin/context.mjs will REFUSE`)
+	} else if (back.ok) {
+		row("registry", OK, `pid ${sessionPid} -> ${basename(back.transcript)} (${back.source || "no source"}) - bin/context.mjs can resolve this session`)
+	} else {
+		// Truthful and self-healing: the next SessionStart in this process records it.
+		// Until then `bin/context.mjs` refuses for this session, which is the point.
+		row("registry", WARN, `${back.why} - bin/context.mjs will REFUSE for this session (--transcript still answers)`)
 	}
 }
 
@@ -757,6 +820,15 @@ function proveRed() {
 	const tmp = mkdtempSync(join(tmpdir(), "comm-boot-prove-"))
 	process.on("exit", () => { try { rmSync(tmp, { recursive: true, force: true }) } catch {} })
 	const pkg = join(tmp, "pkg"), proj = join(tmp, "proj")
+	// EVERY child inherits this, and it must be set before the first one is spawned.
+	// Found by reading a real boot report minutes after the registry shipped: the ledger
+	// arms run the real boot with --hook, that child's ancestor walk reaches the REAL
+	// session running the control, and so the control wrote its own fixture transcript
+	// into the machine's live registry under the operator's own pid. The next boot then
+	// reported `pid <me> -> 44444444-....jsonl` with a green tick. A control that writes
+	// into the world it measures is not a control - this repo has the same lesson written
+	// down twice already (STATUS.md, the two measurement traps).
+	process.env.CLAUDE_COMM_RUNTIME = join(tmp, "runtime")
 
 	mkdirSync(pkg)
 	for (const e of ["bin", "install.mjs", "test", "CLAUDE.md", "README.md", "FINDINGS.md", "STATUS.md", "HISTORY.md", "DESIGN-autonomy.md"]) {
@@ -969,6 +1041,73 @@ function proveRed() {
 		try { rmSync(join(pkg, ".comm", "handoff"), { recursive: true, force: true }) } catch {}
 	}
 
+	// -- the session registry: the row, and the direction it must fail in -------
+	// Only a --hook run writes it, so no `arm` can reach this either. The registry is the
+	// answer to FINDINGS.md#clear-blind: without it, bin/context.mjs reports a cleared
+	// session's DEAD transcript with exit 0, and a self-rebooting leader is a cleared
+	// session by construction.
+	{
+		// A fake `claude` parent, so the control has a session pid to key on whatever
+		// launched the suite. Without it the row is honestly "not a session", and the
+		// property would go untested on exactly the machines that run this from a script.
+		// Two commands in the -c string, so the shell cannot exec-optimise itself away and
+		// take the argv[0] this depends on with it.
+		const fake = join(tmp, "claude")
+		try { symlinkSync("/bin/sh", fake) } catch {}
+		const out = join(tmp, "registry.out")
+		// A REAL file: the row reads what bin/context.mjs reads, so a fixture pointing at a
+		// path that does not exist is a session that has already failed. This arm's job is
+		// the healthy control, and the unhealthy one is armed below it.
+		const tp = join(tmp, "66666666-6666-6666-6666-666666666666.jsonl")
+		writeFileSync(tp, JSON.stringify({ type: "assistant", message: { usage: { input_tokens: 10 } } }) + "\n")
+		const asSession = (runtime) => {
+			spawnSync(fake, ["-c",
+				`CLAUDE_COMM_RUNTIME=${runtime} ${process.execPath} ${SELFFILE} --json --fast --hook ` +
+				`--root ${pkg} --field ${tmp} > ${out} 2>&1; echo done`],
+				{ encoding: "utf8", input: JSON.stringify({ source: "startup", transcript_path: tp }) })
+			try {
+				const x = JSON.parse(readFileSync(out, "utf8")).rows.find((y) => y.label === "registry")
+				return { level: x ? x.level : -1, text: x ? x.text : "" }
+			} catch { return { level: -1, text: "" } }
+		}
+
+		const rt = join(tmp, "registry-rt")
+		const good = asSession(rt)
+		const stored = (() => {
+			try {
+				const d = join(rt, "claude-comm", "sessions")
+				return readdirSync(d).map((f) => JSON.parse(readFileSync(join(d, f), "utf8")).transcript)
+			} catch { return [] }
+		})()
+		assert("registry: a --hook boot records this session",
+			good.level === OK && /written and re-read/.test(good.text) && stored.includes(tp),
+			`row=${LV[good.level]}, on disk: ${stored.length ? stored.map((x) => basename(x)).join(",") : "NOTHING"}`)
+
+		// ONE VARIABLE: the same run against a runtime directory it cannot write. The row
+		// must say so, because a registry that silently did not write reads later as a
+		// machine with no sessions on it - and the reader would refuse for a session that
+		// is perfectly alive.
+		const ro = join(tmp, "registry-ro")
+		mkdirSync(ro, { recursive: true })
+		spawnSync("chmod", ["500", ro])
+		const bad = asSession(ro)
+		spawnSync("chmod", ["755", ro])
+		assert("registry: a write that fails WARNS",
+			bad.level === WARN && /NOT RECORDED/.test(bad.text),
+			`unwritable runtime dir -> ${LV[bad.level]}: ${bad.text.slice(0, 46)}`)
+
+		// ONE VARIABLE against the healthy control above: the same successful write, to a
+		// transcript that is not there. The row used to tick on the lookup alone and say
+		// "bin/context.mjs can resolve this session" while context refused - a green row
+		// over a dead sensor. Found on a real boot report, not by this suite, which is why
+		// it is now armed.
+		rmSync(tp, { force: true })
+		const gone = asSession(join(tmp, "registry-rt2"))
+		assert("registry: an entry whose transcript is GONE warns",
+			gone.level === WARN && /does not exist/.test(gone.text),
+			`transcript deleted, entry intact -> ${LV[gone.level]}: ${gone.text.slice(0, 46)}`)
+	}
+
 	// The close's own two refusals, which no boot row expresses.
 	{
 		const st2 = join(pkg, "STATUS.md")
@@ -983,11 +1122,19 @@ function proveRed() {
 
 		writeFileSync(join(pkg, "dirty.txt"), "x\n")
 		const unacked = closeRun()
-		const acked = closeRun(["--ack", "tree=fixture is deliberately dirty"])
+		// The rows to name are DERIVED from the fixture's own boot, not listed here. Listed,
+		// this arm asserted that acking `tree` closes - and the day a twelfth row was added
+		// that warns in a fixture (the registry, 2026-09-04), the arm went red for a reason
+		// that had nothing to do with the property it verifies. A control that has to be
+		// edited whenever an unrelated row is added is a control that will be edited
+		// carelessly. This is also what an operator actually does: read the report, name
+		// what it names.
+		const openRows = run(false).rows.filter((r) => r.label && r.label !== "close" && r.level !== OK)
+		const acked = closeRun(openRows.flatMap((r) => ["--ack", `${r.label}=fixture: deliberately ${r.label}`]))
 		rmSync(join(pkg, "dirty.txt"), { force: true })
 		assert("close refuses an unnamed row, accepts a named one",
 			unacked.status === 1 && /NOT CLOSED/.test(unacked.stdout) && acked.status === 0 && /CLOSED at/.test(acked.stdout),
-			`unacked exit=${unacked.status}, acked exit=${acked.status}`)
+			`${openRows.length} open row(s) named [${openRows.map((r) => r.label).join(",")}]: unacked exit=${unacked.status}, acked exit=${acked.status}`)
 	}
 
 	console.log(`\n  session: INFORMATIONAL - reports /proc, has no failing state, is not a gate`)

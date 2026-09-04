@@ -863,6 +863,27 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 // document here the moment a gate reads it.
 // gate-docs: FINDINGS.md
 //
+// The tools that carry reasoning pointers, ENUMERATED rather than listed.
+//
+// This list has gone stale three times. Review #3 R11 found A28 one filename wide;
+// review #4 R7 found A27 not widened alongside it; and `bin/session-registry.mjs` was
+// written on 2026-09-04 citing `FINDINGS.md#clear-blind` from outside both. A hardcoded
+// list is a promise that whoever adds the next tool will remember these two gates, and
+// that promise has now been broken by every person who has ever added a tool here -
+// including the one who wrote this comment.
+//
+// Reading the directory is STRUCTURAL, not idiomatic: it cannot be one refactor behind
+// the way review #3 R4's source-regex was, because a new tool is a new file by
+// construction. The floor below is what keeps an empty read from passing as a clean one.
+const POINTER_SOURCES = (() => {
+	let out = []
+	try {
+		out = readdirSync(join(PKG, "bin")).filter((f) => f.endsWith(".mjs")).sort().map((f) => `bin/${f}`)
+	} catch {}
+	if (existsSync(join(PKG, "install.mjs"))) out.push("install.mjs")
+	return out
+})()
+
 // A27 — every FINDINGS.md pointer in the bus must resolve.
 //
 // This gate exists because of the 2026-08-06 split. A22 hit 95% and 55% of the bus
@@ -883,7 +904,7 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 	// fixtures now cite a real finding, and the scan covers every tool that carries
 	// reasoning pointers rather than the bus alone.
 	let busSrcA = ""
-	for (const f of ["bin/comm.mjs", "bin/boot.mjs", "bin/context.mjs", "bin/ledger.mjs", "install.mjs"]) {
+	for (const f of POINTER_SOURCES) {
 		try { busSrcA += readFileSync(join(PKG, f), "utf8") } catch {}
 	}
 	let findings = ""
@@ -915,7 +936,7 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 // would redden the gate for a reason foreign to what it verifies.
 {
 	let refs = []
-	for (const f of ["bin/comm.mjs", "install.mjs", "bin/boot.mjs", "bin/context.mjs", "bin/ledger.mjs"]) {
+	for (const f of POINTER_SOURCES) {
 		let src = ""
 		try { src = readFileSync(join(PKG, f), "utf8") } catch { continue }
 		for (const m of src.matchAll(/([A-Za-z][A-Za-z0-9_-]*\.md)(?:#[A-Za-z0-9-]+|\s+§\s*[0-9]+)/g)) {
