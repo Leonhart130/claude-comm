@@ -80,8 +80,12 @@ defects this project has already paid for:
   `{startup: 5}` to `{startup: 7, clear: 1}` with no code change, and the ledger classified the restart into
   the reboot arm unprompted. **The reboot loop is constructible.** Two facts came with it, both measured
   rather than assumed: `/clear` **mints a new session id and a new transcript** (`803208db` → `57ede2e1`,
-  46 104 B → 6 471 B), so a restart is a genuinely new session to every tool here; and see the finding
-  below, which nobody was looking for.
+  46 104 B → 6 471 B), so a restart is a genuinely new session to every tool here.
+- 🔴 **NEW BLOCKER from the same measurement: `FINDINGS.md#clear-blind`.** A cleared process keeps its
+  pre-clear scratch directory, so the pid→transcript resolver returns the **dead** session's transcript and
+  the sensor reports its final context with exit 0. After a real self-reboot the pre-clear context is large
+  by definition, so the trigger would re-fire at once and the agent would reboot forever. **The sensor must
+  be able to tell a cleared session from a fresh one before any of this ships.**
 - **That `kitten @ launch` works from inside an agent session.** The socket is live and `@ ls` was verified
   in session 3, but `launch` and `send-text --match` have never been fired in anger. `send-text` **exits 0
   when it matches nothing** — already measured — so the resolver must gate every send.

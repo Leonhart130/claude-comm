@@ -419,33 +419,59 @@ Three refusals, each of which is a way this file could otherwise print a confide
   so the rule that turns a measurement into an arm is one function — correct it later and every record ever
   written is re-read under the correction.
 
-## `#clear-blind` — a cleared session stops being resolvable by pid, and says so
+## `#clear-blind` — a cleared session resolves to its DEAD transcript, and answers
 
-Measured 2026-09-04, on the `/clear` that answered the `source` question. Not looked for.
+Found 2026-09-04 by the `/clear` that answered the `source` question. Not looked for. **This entry replaced
+an earlier version of itself written forty minutes before it, and the correction is the finding**: the first
+reading caught the transient state and called the tool's behaviour correct. The steady state is the opposite.
 
-`bin/context.mjs` resolves a session's transcript exactly, through the descriptor a session holds on its own
+`bin/context.mjs` resolves a session's transcript through the descriptor a session holds on its own
 `/tmp/claude-<uid>/<slug>/<uuid>/` scratch directory — built that way because newest-mtime was wrong by 68 %
-the first time it met the field, several agents sharing one directory being the hub topology rather than an
-edge case.
+the first time it met the field. The assumption underneath is that the scratch directory's uuid **is** the
+session's uuid.
 
-**After a `/clear`, that descriptor is gone.** The cleared session (pid 746909) held no session directory at
-all, while its uncleared sibling of the same age in the same directory (pid 744447) held its own and resolved
-normally. So:
+**A `/clear` breaks that assumption and nothing announces it.** Measured on pid 746909, launched 12:39:48 as
+session `803208db`, cleared at 12:41:04, then given one ordinary turn:
 
-```
-context.mjs --pid 746909  ->  UNKNOWN - pid 746909 names no session transcript   (exit 2)
-context.mjs --pid 744447  ->  88,737 / 1,000,000 tokens (8.9%) - OK              (exit 0)
-```
+| | |
+| --- | --- |
+| the only `/tmp` descriptor it holds | `…/803208db-…/tasks` — the **pre-clear** scratch dir, still being written at 12:46:31 |
+| anything naming the live session `57ede2e1` | **nothing**, in any descriptor or in its environment |
+| the live transcript `57ede2e1.jsonl` | 88 153 B, mtime 12:46:45, last usage **50 237** |
+| the dead transcript `803208db.jsonl` | frozen at 46 104 B and 12:41:04, last usage **44 139** |
+| `context.mjs --pid 746909` | **44 139 tokens, exit 0**, labelled `resolved from /proc/746909` |
 
-**Why this matters to the feature it was found by:** a self-rebooting leader is a session that has been
-cleared, by construction. Anything that measures a *sibling's* context by pid — a monitor, a leader deciding
-whether an expert needs restarting — goes blind on every agent that has ever restarted. The `Stop` hook path
-is unaffected: its payload carries `transcript_path` outright, and `--hook` outranks `--pid`.
+So the scratch directory identifies the **process's launch session**, permanently, while the transcript
+follows the **current** one. After a clear they diverge and the sensor reports the dead session's final
+context as if it were the live one's — not a crash, not an UNKNOWN, a plausible number in a plausible range
+from a session that no longer exists.
 
-**The design held where it counted.** The sensor did not report a stale number, a zero, or a guess: it
-reported UNKNOWN and exited 2, because rule 3 of that file is *missing data is reported as UNKNOWN, never as
-zero* and R7 made a guessed reading refuse a verdict to a machine. A path nobody anticipated hit exactly the
-refusal that was built for a different reason.
+### 🔴 Why this would have destroyed the feature that found it
 
-⚠️ **NOT measured: whether the descriptor comes back once the cleared session takes a turn.** That decides
-whether this is permanent blindness or a window, and it is one message in that window away from an answer.
+**A self-rebooting leader IS a cleared session, by construction.** And the pre-clear context is by definition
+LARGE — that is what tripped the reboot. So after the first self-reboot the sensor would keep reporting the
+large pre-clear number for a fresh session, the trigger would fire again immediately, and the agent would
+reboot forever. From outside it would look exactly like the feature working.
+
+It is not confined to `--pid`: `resolveTranscript()`'s own-session path resolves through the same function,
+so `node bin/context.mjs` — the command `CLAUDE.md` documents as *"how full is this session"* — is wrong for
+any session that has been cleared, which after this feature ships is most sessions most of the time.
+
+**The `Stop` hook path is unaffected.** Its payload carries `transcript_path` outright and `--hook` outranks
+`--pid`, so the trigger itself reads the right file. The blindness is in every out-of-band reading.
+
+### ⚠️ Deliberately NOT patched in the same breath
+
+Two fixes are candidates and neither was shipped, because a detector whose false positive is already
+demonstrable is worse than a defect that is written down:
+
+- **A registry written at `SessionStart`** — the boot hook holds the payload's `transcript_path` and can
+  resolve the session pid, so it can record `pid + process start time → transcript` and refresh it on every
+  start, clears included. Exact, no heuristics; it needs a decision about where the file lives for a project
+  whose hook is not boot's.
+- **An mtime-divergence test** (the transcript frozen while the scratch dir advances) — **rejected, with the
+  counter-example measured**: a healthy session running a background job writes into `…/tasks` while its
+  transcript sits still, which is this very repo's own session for minutes at a time. It would flag a
+  working session as cleared.
+
+Until one lands, **nothing may be built that reads a context by pid and acts on it.**

@@ -5,9 +5,14 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-**Wire the FIELD to the ledger. The instrument is built and it is recording the wrong project.**
+**Fix the context sensor FIRST (`FINDINGS.md#clear-blind`), then wire the field to the ledger.**
 
-`bin/ledger.mjs` exists, is proved red on 18 arms, and `bin/boot.mjs` now writes a `start` record on every
+The order changed on 2026-09-04, after the first real `/clear` in this repo: the sensor answers with the
+context of the session that was cleared away, and a self-rebooting leader is a cleared session by
+construction. Building the field wiring on top of a sensor that reports a dead session's number would put
+the instrument and the defect into the field together.
+
+**Then, and only then:** `bin/ledger.mjs` exists, is proved red on 18 arms, and `bin/boot.mjs` now writes a `start` record on every
 session start — but **only here**. `~/Dev/work` and `~/Dev/electio` run `.claude/comm-hook.mjs session-start`,
 which forwards to the bus and knows nothing about the ledger. The reboots will happen there, so their cold
 arm is empty and the query cannot be answered however long this repo runs.
@@ -31,11 +36,19 @@ theirs and they priced it at ~30 min; ask before guessing.
 purpose; wiring it to the project that will not use it and then shipping the feature to the project that will
 would be the same mistake with an extra step.
 
+🔴 **BLOCKER, found by that same `/clear`: the context sensor answers with the DEAD session's context.**
+`FINDINGS.md#clear-blind`. A cleared process keeps its pre-clear scratch directory, so `context.mjs`
+resolves pid → the transcript of the session that was cleared away, and reports its final number with
+exit 0. A self-rebooting leader is a cleared session by construction and its pre-clear context is large by
+definition — so the trigger would re-fire immediately and **the agent would reboot forever, looking from
+outside exactly like the feature working.** The `Stop` path is safe (its payload carries `transcript_path`).
+**Nothing that reads a context by pid may be built or shipped until this is fixed.** Two candidate fixes and
+the counter-example that killed the cheaper one are in the finding.
+
 ✅ **`/clear` reports `source: "clear"` — measured 2026-09-04, the loop is constructible.** The owner cleared
 a real session here; `.boot-state.json` moved to `{startup: 7, clear: 1}` with no code change, and the ledger
 put the restart in the reboot arm by itself. `/clear` mints a **new session id and transcript**, and it
-brought a finding nobody was looking for: `FINDINGS.md#clear-blind` — a cleared session stops being
-resolvable by pid, and `bin/context.mjs` correctly answers UNKNOWN rather than guessing.
+brought the blocker above.
 
 Still open on RSS: the first datum leans "`/clear` does not return it" (331 MB cleared/empty vs 350 MB
 uncleared at 88 737 tokens) but there is no before/after on one pid. One `VmRSS` sample either side of a
