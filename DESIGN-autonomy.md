@@ -1,0 +1,215 @@
+# DESIGN — agent autonomy
+
+**Tier 1: not read at boot.** Read it when working on the lifecycle features. `STATUS.md` carries the
+one-paragraph summary and the open items; this file carries the measurements and the reasoning.
+
+
+The owner put this repo under my direction and widened its purpose: the bus should stop being only a way to
+*talk* and become the thing that lets his agents **run themselves**.
+
+1. **An expert launches and closes its own agent**, so he never boots one by hand.
+2. **The leader reboots itself** when its context is too crowded — close protocol, restart, open protocol.
+   He calls this the important cherry.
+
+### Four mechanisms, verified rather than assumed
+
+Measured 2026-09-04 with a real `claude -p` session and a hook that dumped its own payload:
+
+| | measured |
+| --- | --- |
+| `Stop` payload | carries `transcript_path`, `session_id`, `stop_hook_active`, `last_assistant_message` |
+| `SessionStart` payload | carries `transcript_path` **and `source`** (observed `"startup"`) |
+| context size | the transcript's `usage` gives it EXACTLY: `input + cache_read + cache_creation` |
+| the wake | kitty remote control is live, pid→window resolver built and verified (session 3) |
+
+So the reboot trigger does not have to be guessed from turn counts or wall-clock. `bin/context.mjs` reads it
+in **80 ms** off a 4.7 MB transcript and agrees to the token with an independent count.
+
+### 🔴 The disagreeable finding: a reboot is a QUALITY play, not a cost saving
+
+Measured across **54 that project's leader transcripts**:
+
+| | tokens |
+| --- | --- |
+| the boot (first user turn) | **median 99 809**, worst 220 200 |
+| each round after | **median 56 172** |
+| largest context ever reached | **609 835** — in 15 turns |
+| one session reached 395 214 | in **2 turns** |
+
+Two things follow, and both cut against the plan as stated:
+
+- **Rebooting does not save money; it costs a little.** A large context is charged at *cache-read* rates,
+  while a fresh boot is full-price input plus a cache write. One reboot ≈ two crowded turns. The reason to
+  do it is that reasoning degrades in a crowded window long before the window is full — that is worth
+  buying, but it must be sold as quality, not economy.
+- **The lever with real leverage is the boot itself.** His tier-0 read set is now 849 KB ≈ 229 k tokens
+  (an append-only board file at 335 KB, an order-of-march file at 212 KB, a lessons file at 195 KB). A reboot on top of a 200 k boot
+  re-pays that bill every few rounds. **Self-reboot on an unshrunk boot makes the problem worse, not
+  better** — the handoff file has to replace most of the boot read, or the loop is negative.
+
+### The architecture, and why it reuses everything already here
+
+Nothing below needs a daemon, and that is deliberate — A21 forbids the first long-lived process in this tool.
+
+**Self-reboot** rides the two hook paths the bus already owns:
+
+1. `Stop` hook reads `transcript_path` → `context.mjs` → over budget?
+2. If so it returns `{decision:"block", reason:<pointer to the agent's own close protocol>}` — the SAME
+   nudge mechanism, carrying a POINTER, never the protocol's text. The agent takes one more turn, runs its
+   own §2, and writes its handoff **to a file**. *The file is the artifact* covers a reboot exactly as it
+   covers a message: what survives a restart is what was written down.
+3. The restart itself is `/clear` typed into the window over the kitty socket — **not** kill-and-relaunch.
+   `/clear` keeps the window, the shell, `CLAUDE_COMM_AGENT` and the kitty socket; relaunching loses all
+   four and has to rebuild them correctly, every time, or the agent comes back off-bus.
+4. `SessionStart` fires with `source` → the boot hook injects the pointer to the handoff.
+
+**Self-launch** is `kitten @ launch` with the agent's own env, guarded by three rules that follow from
+defects this project has already paid for:
+
+- **Only a name in `.comm/config.json` may be launched.** A name taken from message text would be command
+  injection wearing the bus's clothes — the pointer-not-content rule applied to process control.
+- **Refuse to launch what is already alive.** `comm who` reads `/proc` and already answers this; A17 is the
+  record of what happens when two sessions share one identity.
+- **An agent may close ITSELF, never a sibling.** Closing someone else's window destroys a context that
+  cannot be recovered, and delivery is a turn boundary — there is no safe moment to judge from outside.
+
+### ⚠️ Not verified, and load-bearing
+
+- **That `SessionStart` fires with `source: "clear"` after `/clear`.** Only `"startup"` has been observed.
+  The whole reboot loop hangs on this one; it is the first thing to measure, and it needs an interactive
+  session, so a headless probe cannot settle it.
+- **That `kitten @ launch` works from inside an agent session.** The socket is live and `@ ls` was verified
+  in session 3, but `launch` and `send-text --match` have never been fired in anger. `send-text` **exits 0
+  when it matches nothing** — already measured — so the resolver must gate every send.
+- **Whether an idle session even processes a `Stop` hook's block.** An agent in no turn takes no turn end.
+  This is open item 1's gap, and the reboot inherits it.
+- **What a handoff must contain to replace a 100 k boot.** Unknown, and it decides whether any of this pays.
+
+
+
+## 🧠 RAM — measured 2026-09-04, and it changes the /clear-versus-relaunch answer
+
+The owner's second reason for wanting reboots is his machine's memory, not tokens: "sometimes the agents forget to close things, so memory grows over time." Measured before designing
+anything for it.
+
+**A session's RSS tracks its context almost linearly**, across the three that were live:
+
+| session | RSS | context |
+| --- | --- | --- |
+| the live project | 419 MB | 317 252 |
+| `~/Dev/claude-comm` | 408 MB | 246 426 |
+| the live project | 327 MB | 186 919 |
+
+≈ **200 MB of base plus ~0.7 MB per 1 000 tokens**. Extrapolated, a session at the 610 k ceiling this
+framework has actually reached costs ~630 MB, and four of those are ~2.5 GB on a 14 GB machine.
+
+⚠️ **But the stated cause did not reproduce.** There were **no orphaned agent processes**: everything at
+`ppid=1` was system (clamd, journald, the VPN daemon), and there were no stranded MCP servers, dev servers
+or node processes. Today's memory is held by Brave (~2.5 GB across its processes), clamd (968 MB) and VS
+Code (~1.4 GB); the three agent sessions together were 1.14 GB. **The leak hypothesis is unconfirmed — what
+is confirmed is that a session's own footprint grows with its context.** Before building anything that
+reaps orphans, catch one: a monitor that finds nothing proves nothing (`prove-the-probe`).
+
+**This splits the reboot into two mechanisms with different jobs and different cadences:**
+
+| | `/clear` | a real relaunch |
+| --- | --- | --- |
+| frees context | yes | yes |
+| frees RSS | **no** — V8 rarely returns a freed heap to the OS (mechanism, ⚠️ not measured) | yes, the process is gone |
+| keeps window, shell, `CLAUDE_COMM_AGENT`, kitty socket | yes | **no** — all four must be rebuilt correctly or the agent returns off-bus |
+| cost | one boot | one boot + the relaunch surface |
+| cadence | often, for context quality | **rare**, for memory — which is exactly what the owner asked for |
+
+So `/clear` is the default reboot and the relaunch is the occasional one, triggered by RSS rather than by
+tokens. The trigger for the second is therefore **not** the context sensor: it is a memory reading, and
+`bin/context.mjs --pid` already resolves a PID to its session exactly, which is what lets a monitor
+attribute memory to a named agent rather than to "some node process".
+
+⚠️ **Unverified and load-bearing: that `/clear` does not return RSS.** If it does, the relaunch path may not
+be needed at all. One `/clear` in a live session with a before/after `VmRSS` reading settles it, and the
+boot's `source` probe is already in place to catch the same event.
+
+
+## 🔴 The consumer answered, and it contradicts the premise — 2026-09-04
+
+`exchange/work-leader/REPLY-2026-09-04-lifecycle.md`. It measured before answering. **My boot median was
+confirmed independently to within 0.14 %** (their 99 671 over 32 boots, mine 99 809; re-run over their
+corrected population it is 99 809 exactly). Three corrections and one refutation followed.
+
+**Corrections to my numbers, all accepted:**
+
+1. **The population was wrong.** 18–25 of the 55 transcripts in that project directory are *adversarial
+   review instances* the owner launches by `cd`-ing into that project; they never run the boot protocol. My "395 214
+   in 2 turns" was one of them. The median survives; **"worst boot 220 200" does not — the real worst boot
+   turn is 170 568.**
+2. **"849 KB ≈ 229 k tokens if read whole" mischaracterised them.** They never read those files whole —
+   head, tail, grep, section ranges. The boot is *already* a scoped read, which is why it costs 100 k and
+   not 229 k, and why **it is not compressible by summarising**.
+3. **The boot has roughly doubled in eighteen days** (57 k on 2026-08-17 → ~100–111 k on 2026-09-04),
+   because it reads an append-only history. **Any threshold must be expressed against the current boot
+   cost, not a constant.**
+
+### 🔴 The refutation: these are BOOT defects, not crowding defects
+
+They went looking for the evidence I asked for and found the opposite. In their most defect-dense session
+(268 turns, peak 360 008), **four of five recorded defects were authored in the first thirteen minutes, at
+35–42 % of that session's peak context** — the least-read state, not the most-crowded one. The corrections
+were all authored between 305 k and 352 k.
+
+⇒ **A mechanism that reboots more often multiplies the state in which this repo's errors are actually
+made.** Not an argument against the feature — an argument that **the fifteen minutes after a restart are
+where the design effort belongs**, and that a reboot's cost is counted in defect risk, not only tokens.
+
+They supplied the counter-evidence themselves (two of the worst defects of 2026-09-03 were authored at
+82–83 % of peak) and refused to claim they could separate the confound with 55 transcripts.
+
+### ✅ The one monotone signal, and it is not a token count
+
+Share of file-opens that RE-open a file already opened in the same session, 51 sessions, 1 945 opens:
+**37 % in the 10–20 % context decile rising monotonically to 87 % in the 90–100 % decile.** Not looping —
+5 verbatim-duplicate calls in 4 069 (0 %), flat across deciles. *"I never repeat a call. I re-fetch the
+same file with a different slice"* — content present in the window but no longer usable from it.
+
+⇒ **The trigger should not be a token threshold.** It is *"you have re-fetched a file you already read this
+session"*, which a hook can count exactly, per session, with no magic number. The curve bends at 50–60 % of
+peak (150–200 k absolute for them) if a number is wanted anyway. ⚠️ Their stated confound: late-session
+work is disproportionately propagation, which legitimately re-opens files. Resolvable in ~30 min by tagging
+opens as propagation vs retrieval; not done.
+
+### ✅ The handoff carries PROOF, not prose — their design, and it is better than mine
+
+I wrote *"ideally the handoff replaces most of your boot read"*. They argued hardest against exactly that:
+**their boot read is a verification protocol, not context recovery** (*"a guard that returns output is not a
+guard that ran"*, *"if I cannot quote a line of a file, I have not read it"*). A handoff that lets a
+rebooted session skip the source and trust a summary written by a previous self is this project's signature
+defect, automated and scheduled.
+
+But a mid-session reboot faces a different problem than a next-day boot: **the next-day boot must re-read
+because the world moved; the mid-session reboot must re-read only what moved.** So the handoff carries a
+**read manifest of sha256 sums**. On restart the protocol runs `sha256sum -c` — unchanged means the previous
+session's read stands *as a verified fact about the disk*, changed means that file and only that file is
+re-read in full. **Nothing is trusted; something is proved.** On a quiet reboot the delta is zero files.
+
+Four sections: machine state no file knows (background jobs whose output paths contain the session UUID,
+other live sessions, what is uncommitted and therefore untouchable) · open obligations in his words and
+theirs · **guards already run WITH THEIR OUTPUT, never "passed"** · the read manifest.
+
+### Their answers to the rest
+
+- **Announce, then do it** — with two hard conditions: **never while a question of his is unanswered**, and
+  **the one line names the handoff file**. Silent is wrong for a concrete reason: he runs three windows and
+  relays between them by hand, so a silent reset means **he can be typing into a session that no longer
+  knows what he said.**
+- **Idle-waiting is the best moment, but for the opposite reason to mine.** It is when they hold the most
+  that no file holds. **Write the handoff FIRST, re-establish background work after** — *"reboot-then-write
+  is not a smaller version of write-then-reboot; it is the crash we already survived once"*.
+- **Hand them the number, keep a hard ceiling above it.** They priced the failure mode themselves: *"this
+  repo asked me to run one specific measurement for 23 sessions before it was run. A rule I may defer, I
+  will defer."*
+- 🔴 **A lifecycle close is NOT their §2 close.** Their board file is numbered by *work* session and is the
+  owner's index; three reboots would give him three board entries for one morning. They will write a
+  **§2-bis** that writes the handoff and nothing else — and asked me to name the file the hook will point
+  at. **Answered: `.comm/handoff/<agent>.md`** — the bus's own territory, gitignored live state, per agent,
+  and it keeps their its notes directory free of machine events.
+- **Ship the instrument with the feature.** The first ten reboots must leave a marker, so *"did the reboots
+  cost us defects"* is a query and not a debate. Their charter: *a feature with no ledger is a hobby.*
