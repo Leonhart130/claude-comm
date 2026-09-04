@@ -906,7 +906,7 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 // would redden the gate for a reason foreign to what it verifies.
 {
 	let refs = []
-	for (const f of ["bin/comm.mjs", "install.mjs", "bin/boot.mjs", "bin/context.mjs"]) {
+	for (const f of ["bin/comm.mjs", "install.mjs", "bin/boot.mjs", "bin/context.mjs", "bin/ledger.mjs"]) {
 		let src = ""
 		try { src = readFileSync(join(PKG, f), "utf8") } catch { continue }
 		for (const m of src.matchAll(/([A-Za-z][A-Za-z0-9_-]*\.md)(?:#[A-Za-z0-9-]+|\s+§\s*[0-9]+)/g)) {

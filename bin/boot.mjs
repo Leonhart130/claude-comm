@@ -108,6 +108,7 @@ function writeState(obj) {
 }
 
 let statusText = ""
+let sessionAgent = ""   // who this session is, for the ledger; resolved in row 1
 let gateDocs = []   // documents the gate suite declares it reads; feeds the fingerprint (R1)
 let nextText = ""   // what the previous close said this session must do first
 
@@ -178,12 +179,64 @@ if (has("--hook")) {
 		} catch { env = null }
 	}
 	const declared = env ? (env.get("CLAUDE_COMM_AGENT") || "").trim() : ""
+	// The ledger needs a subject and this is the only place that resolves one. An off-bus
+	// session is still a session that can author a defect in its first fifteen minutes, so
+	// it is recorded under a name that says exactly what it is rather than dropped.
+	sessionAgent = declared || "unnamed"
 	const kitty = (env && env.get("KITTY_LISTEN_ON") || "").match(/kitty-(\d+)/)
 	const where = session ? `/proc/${session}` : "no claude ancestor"
 	const src = payload && payload.source ? ` - started: ${payload.source}` : ""
 	row("session", OK,
 		`${declared ? `declared "${declared}"` : "no CLAUDE_COMM_AGENT - off the bus"} (${where})` +
 		`${kitty ? ` - kitty win ${kitty[1]}` : ""}${src}`)
+}
+
+// -- 1b. the ledger: every session start, recorded where a reboot can be compared to it -
+/**
+ * `bin/ledger.mjs` answers "did the fifteen minutes after a restart cost us a defect".
+ * It cannot answer anything without a CONTROL, and the control is every ordinary start -
+ * so the recording begins now, months before the reboot mechanism exists. A ledger that
+ * only starts recording when the feature ships has one arm and no denominator.
+ *
+ * Two properties this block is built for, both of them failure modes this repo has paid
+ * for already:
+ *
+ *   · A HOOK MUST NOT BREAK A SESSION. Every path here is wrapped and the row never
+ *     rises above WARN. The instrument is not worth one broken boot.
+ *   · A SILENT INSTRUMENT MUST NOT READ AS A QUIET WORLD. If the append fails, the
+ *     ledger later reports "no reboots recorded", which is indistinguishable from
+ *     "no reboots happened" - `prove-the-probe`, exactly. So the write is VERIFIED by
+ *     re-reading through the same tool, and a start that did not land is a WARN.
+ */
+{
+	const LEDGER = join(ROOT, "bin", "ledger.mjs")
+	const node = (args) => {
+		try { return spawnSync(process.execPath, [LEDGER, ...args, "--root", ROOT], { encoding: "utf8", timeout: 5000 }) }
+		catch { return null }
+	}
+	let wrote = null
+	if (has("--hook") && payload && payload.source && sessionAgent) {
+		// The session id comes from the transcript path, not from a payload field: `Stop`
+		// is documented to carry `session_id` and SessionStart was only ever OBSERVED to
+		// carry `transcript_path` and `source`. Deriving it from the path uses what was
+		// measured instead of what would be convenient.
+		const tp = typeof payload.transcript_path === "string" ? payload.transcript_path : ""
+		const sid = tp ? basename(tp).replace(/\.jsonl$/, "") : null
+		const r = node(["record", "start", "--agent", sessionAgent, "--source", payload.source,
+			...(sid ? ["--session", sid] : []), "--quiet"])
+		wrote = { ok: !!r && r.status === 0, sid, why: r ? (r.stderr || "").trim().split("\n")[0] : "spawn failed" }
+	}
+	const q = node(["--json"])
+	let a = null
+	try { a = JSON.parse((q && q.stdout) || "") } catch {}
+	if (!a) row("ledger", UNKNOWN, "bin/ledger.mjs did not answer - the reboot instrument is NOT reporting")
+	else {
+		const bits = [`${a.starts.cold} cold + ${a.starts.reboot} reboot start(s)`,
+			`${a.defects.total} defect(s)`, `verdict ${a.verdict}`]
+		if (a.unreadable) bits.push(`⚠ ${a.unreadable} unreadable line(s)`)
+		if (wrote && !wrote.ok) row("ledger", WARN, `THIS START WAS NOT RECORDED (${wrote.why || "no reason given"}) - ${bits.join(" - ")}`)
+		else row("ledger", a.unreadable ? WARN : OK, bits.join(" - ") + (wrote ? " - this start recorded" : ""))
+	}
 }
 
 // -- 2. the tree: what git says, not what a document says --------------------
@@ -811,6 +864,37 @@ function proveRed() {
 
 	arm("R9 this repo's own bus unreadable", "field:proj", RED,
 		...swap(join(pkg, "bin", "comm.mjs"), () => ""))
+
+	// ---- the ledger row: an instrument that cannot be seen to fail is not one ----
+	// The reboot ledger's whole value is that "no reboots recorded" must never be
+	// producible by a broken tool, because it is indistinguishable from "no reboots
+	// happened" - the shape `prove-the-probe` is named after.
+	{
+		const led = join(pkg, "bin", "ledger.mjs")
+		arm("ledger: the instrument goes silent", "ledger", UNKNOWN,
+			...swap(led, () => "syntax error ((( \n"))
+
+		const log = join(pkg, ".comm", "handoff", "leader.log")
+		arm("ledger: a line it cannot read", "ledger", WARN,
+			() => { mkdirSync(dirname(log), { recursive: true }); writeFileSync(log, "{torn\n") },
+			() => rmSync(log, { force: true }))
+
+		// And the write half, which no `arm` can reach: only a --hook run records.
+		const payloadIn = JSON.stringify({ source: "startup", transcript_path: "/x/11111111-2222-3333-4444-555555555555.jsonl" })
+		const hookRun = spawnSync(process.execPath, [SELFFILE, "--json", "--fast", "--hook", "--root", pkg, "--field", tmp],
+			{ encoding: "utf8", input: payloadIn })
+		let recorded = ""
+		try { recorded = readFileSync(join(pkg, ".comm", "handoff", "unnamed.log"), "utf8") } catch {}
+		assert("ledger: a session start is recorded", /"event":"start"/.test(recorded) && /555555555555/.test(recorded),
+			`one --hook boot -> ${recorded.split("\n").filter(Boolean).length} record(s), session id carried=${/555555555555/.test(recorded)}`)
+		// The row must SAY it recorded, so a silent writer cannot hide behind a green row.
+		let hookRows = []
+		try { hookRows = JSON.parse(hookRun.stdout).rows } catch {}
+		const lr = hookRows.find((r) => r.label === "ledger")
+		assert("ledger: the row states the write happened", !!lr && /this start recorded/.test(lr.text),
+			`row: ${lr ? lr.text.slice(0, 60) : "absent"}`)
+		try { rmSync(join(pkg, ".comm", "handoff"), { recursive: true, force: true }) } catch {}
+	}
 
 	// The close's own two refusals, which no boot row expresses.
 	{

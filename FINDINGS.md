@@ -373,3 +373,48 @@ paths such as `docs/REVIEW.md` are deliberately NOT matched: they illustrate a *
 and matching them would redden the gate for a reason foreign to what it verifies — A8's failure, restated.
 
 Proved red by restoring the pointer with the gate byte-identical: `dangling=FRAMEWORK.md (bin/comm.mjs)`.
+
+## `#ledger-control` — an instrument that records only the treatment has no denominator
+
+The `▶ NEXT` written for the ledger said: *one JSON line per lifecycle event*. Built literally, that records
+**only reboots** — and the query it exists to answer (*"did the fifteen minutes after a restart cost us a
+defect"*) is a comparison. With no control arm the first reboot arrives against nothing, and the honest
+answer stays UNKNOWN however long the feature runs.
+
+Worse, the confound is already measured: the `~/Dev/work` leader found **four of five defects authored in the
+first thirteen minutes of a session** — of *any* session, rebooted or not. So the effect a reboot-only ledger
+would eventually "find" is the effect every session start already has. The comparison is not
+*rebooted-session vs ordinary-session*; it is **reboot-start vs cold-start**, and the cold arm has to be
+recorded from before the mechanism exists.
+
+⇒ `bin/boot.mjs` records **every** session start through `bin/ledger.mjs`, months ahead of the reboot
+mechanism. The instrument ships first and the control arm accumulates first.
+
+## `#ledger-blame` — a defect timed by when it was FOUND is charged to whoever noticed it
+
+The bias runs one way and it flatters nobody by accident. Defects are found late and attributed to "the
+session I was in when I saw it"; a reboot mechanism *manufactures sessions*, so the newest session — always
+the rebooted one — collects blame for work it did not author. A ledger built on `found_at` would report the
+reboot feature as harmful no matter what the feature did.
+
+`ledger record defect` therefore refuses a defect with no authored time. The caller must supply
+`--authored-at`, `--authored-session`, or say `--authored-unknown` **out loud** — and an admission lands in
+the unknown pool, where it can withdraw a verdict rather than quietly tilt one. Proved red: 20 cold sessions
+each carrying one defect authored at +5 min and *found* ten days later still score 20/20 cold and 0/20
+reboot.
+
+## `#ledger-unknown` — the verdict has to survive the worst reading of what could not be read
+
+Three refusals, each of which is a way this file could otherwise print a confident number:
+
+- **Below the promised sample there is no verdict.** Ten starts per arm, and ten is not invented — it is the
+  consumer's own *"the first ten reboots should each leave a marker"*. Proved red: 0/3 cold against 3/3
+  reboot, an effect that could not be more lopsided, still reports UNKNOWN.
+- **Unreadable lines and unplaceable defects are a POOL, not a rounding error.** The verdict is recomputed
+  with the whole pool loaded into each arm in turn; if the answer moves, the answer is UNKNOWN. An
+  append-only log can end in a torn write, and a ledger that silently shrinks its own sample and prints a
+  clean percentage is this repo's signature failure with statistics on top.
+- **A classification is derived, never stored.** Records carry `source`, `trigger` and `prev_session`;
+  nothing carries "this was a reboot". Whether `/clear` even reports `source: "clear"` is still unverified,
+  so the rule that turns a measurement into an arm is one function — correct it later and every record ever
+  written is re-read under the correction.

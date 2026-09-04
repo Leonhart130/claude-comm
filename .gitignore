@@ -4,6 +4,9 @@ node_modules/
 .comm/inbox/
 .comm/delivered/
 .comm/corrupt/
+# The lifecycle ledger and the handoffs beside it: what a session measured about its own
+# restart is live state, per agent, and never a commit.
+.comm/handoff/
 
 # Boot state: when the gate was last green, on which fingerprint. Live state, not source.
 .boot-state.json
