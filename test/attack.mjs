@@ -1070,6 +1070,37 @@ const POINTER_SOURCES = (() => {
 		`session-start: drained=${startDrained} schema=${schemaOK} ledger=${ledgerOK} registry=${regOK}`)
 }
 
+// A30 — `whoami --agent-root` resolves against THAT agent's project, never the caller's.
+//
+// The A13 family, one level up. A13 is about a session's cwd wandering inside one project;
+// this is the same rule across projects, and it appeared the moment the bus gained a verb
+// whose whole purpose is to answer for somewhere else. Shipped broken for an hour on
+// 2026-09-04: the root followed `--agent-root` while the roster stayed the one loaded from
+// the caller's cwd, so the answer was a real agent name from the WRONG project, exit 0.
+//
+// The hazard needs two projects with an agent at the same relative path, which is not
+// exotic — `web-app/`, `app/`, `sub/` are what people call things. The generated hook stub
+// happens to spawn with its cwd inside its own project, which is exactly why this needs a
+// gate rather than a habit.
+{
+	const pa = mkdtempSync(join(tmpdir(), "comm-attack-whoami-a-"))
+	const pb = mkdtempSync(join(tmpdir(), "comm-attack-whoami-b-"))
+	process.on("exit", () => { for (const d of [pa, pb]) { try { rmSync(d, { recursive: true, force: true }) } catch {} } })
+	for (const [d, cfg] of [[pa, { leader: "alpha", agents: { alpha: ".", gamma: "sub" } }],
+		[pb, { leader: "beta", agents: { beta: ".", delta: "sub" } }]]) {
+		mkdirSync(join(d, "sub"), { recursive: true })
+		mkdirSync(join(d, ".comm"), { recursive: true })
+		writeFileSync(join(d, ".comm", "config.json"), JSON.stringify(cfg))
+	}
+	const ask = (cwd) => spawnSync("node", [join(PKG, "bin", "comm.mjs"), "whoami", "--agent-root", join(pb, "sub")],
+		{ cwd, encoding: "utf8" })
+	const home = ask(pb), foreign = ask(pa)
+	check("A30 whoami answers for the agent's project, not the caller's cwd",
+		home.stdout.trim() === "delta" && foreign.stdout.trim() === "delta",
+		`from its own project: ${JSON.stringify(home.stdout.trim())}; ` +
+		`from another project holding a different agent at the same relative path: ${JSON.stringify(foreign.stdout.trim())} (both must be "delta")`)
+}
+
 console.log(`\n${failed ? `✗ ${failed} adversarial check(s) FAILED` : "✓ all adversarial checks passed"}`)
 rmSync(root, { recursive: true, force: true })
 process.exit(failed ? 1 : 0)

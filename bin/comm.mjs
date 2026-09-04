@@ -496,8 +496,21 @@ function dispatch(root, cfg, me, cmd, rest) {
 		// means. Exit 1 and print nothing when no agent resolves — a caller must be able
 		// to tell "off the bus" from a name, and an empty string on stdout cannot.
 		case "whoami": {
+			// THE ROOT AND THE ROSTER MUST COME FROM THE SAME PROJECT. Written an hour
+			// before this comment as `whoami(findRoot(ar) || root, cfg, ar)`: the root
+			// followed --agent-root while `cfg` stayed the one loaded from the CWD, so
+			// asking about an agent in another project resolved its name against THIS
+			// project's roster. Measured: two projects each with an agent at `sub/`,
+			// asking about B's from A's cwd answered `gamma` — A's name for that
+			// relative path — with exit 0. A plausible name from the wrong world is the
+			// mislabelling the ledger counts, and cwd deciding an identity is the exact
+			// failure `--agent-root` exists to remove (FINDINGS.md#A13). Invisible in
+			// the only caller that exists today, because the hook stub happens to spawn
+			// with cwd set to agentRoot. That is what made it worth fixing at once.
 			const ar = arg(process.argv.slice(2), "agent-root")
-			const name = ar ? whoami(findRoot(ar) || root, cfg, ar) : me
+			const r2 = ar ? findRoot(ar) : root
+			if (!r2) process.exit(1)
+			const name = ar ? whoami(r2, loadConfig(r2), ar) : me
 			if (!name) process.exit(1)
 			process.stdout.write(`${name}\n`)
 			return
