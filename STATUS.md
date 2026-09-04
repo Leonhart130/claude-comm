@@ -5,50 +5,62 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-**1 — Fix the context sensor. It reports the context of a session that no longer exists.**
+*Written 2026-09-04 by the session that lived it, immediately before a real reboot. It assumes you remember
+nothing. Every claim below is checkable from the tree; check rather than trust.*
 
-`FINDINGS.md#clear-blind` carries the measurement, the two candidate fixes, and the counter-example that
-killed the cheaper one — read it, do not re-derive it. The short version: a cleared process keeps its
-**launch** session's scratch directory forever, so pid→transcript returns the dead session's file and its
-final number with exit 0. A self-rebooting leader is a cleared session by construction, and its pre-clear
-context is large by definition — so the trigger would re-fire at once and the agent would reboot forever,
-looking from outside exactly like the feature working. The `Stop` path is safe; its payload carries
-`transcript_path` outright.
+**1 — Fix `bin/context.mjs`. It reports the context of a session that no longer exists.**
 
-**Nothing that reads a context by pid may be built or shipped before this.** The favoured fix is a registry
-written at `SessionStart` — boot already holds the payload and can resolve the session pid, so it can record
-`pid + process start time → transcript` and refresh it on every start, clears included. **Where it lives is
-decided** — `$XDG_RUNTIME_DIR/claude-comm/sessions.json`, machine-global like the pids it keys; the reasoning
-is in the finding. A lookup that misses must refuse, never fall back to today's resolution.
+`FINDINGS.md#clear-blind` carries the measurement and the reasoning — read it, do not re-derive it. Short
+version: a `/clear`ed process keeps its **launch** session's scratch directory forever, so pid→transcript
+returns the dead session's file and its final number with **exit 0**. A self-rebooting leader is a cleared
+session by construction, and its pre-clear context is large by definition — so the trigger would re-fire at
+once and the agent would reboot forever, looking from outside exactly like the feature working. The `Stop`
+hook path is safe: its payload carries `transcript_path` outright.
+
+**The fix is decided, only the code is missing.** A registry written at `SessionStart`: boot already holds
+the payload and already resolves the session pid in row 1, so it records `pid + process start time →
+transcript` and refreshes it at every start, clears included. It lives in
+`$XDG_RUNTIME_DIR/claude-comm/sessions.json` — a pid is a *machine-global* name, so a per-project registry
+would look the same pid up in whichever project the reader happened to be standing in. The start-time pair
+makes a recycled pid a **miss**, and a miss must **refuse**, never fall back to today's resolution.
+
+🔴 **Review #4 left a warning attached to exactly this work:** the cheapest implementation is to widen the
+ledger's `start` record, which puts `bySession` and the newest-start span on the reboot trigger's path. Both
+were verdict-accuracy defects (R5, R9) and are now fixed — **keep them fixed**, and re-read
+`FINDINGS.md#ledger-trial` before reusing either.
 
 **2 — Then wire the field to the ledger.** `bin/ledger.mjs` records only here; `~/Dev/work` and
 `~/Dev/electio` run `.claude/comm-hook.mjs session-start`, which knows nothing about it. The reboots happen
-there, so the arm that matters is empty. Four things the next session needs and would otherwise re-derive:
+there, so the arm that matters is empty. Four things you would otherwise re-derive:
 
 1. **The obstacle is one line of the generated stub**: it forwards with `stdio: "inherit"`, so the payload on
    stdin is consumed once, by the bus. Read it ONCE, hand the bytes to both, and never let the ledger's spawn
    delay or fail delivery.
 2. **This is a delivery change** — `node test/selftest.mjs` and `--prove-red`, before and after.
-3. **The agent name comes from the stub's location** (`--agent-root`), never cwd, never the payload. The stub
-   already resolves it that way; reuse the value.
-4. **Re-install into both field projects**, then confirm `field:*` is still green — a drifted stub is a RED row.
+3. **The agent name comes from the stub's location** (`--agent-root`), never cwd, never the payload.
+4. **Re-install into both field projects**, then confirm `field:*` is still green — a drifted stub is RED.
 
-**3 — Only then the trigger.** Per the consumer's §2.4 it is *"you re-fetched a file you already read this
-session"*, countable by a hook, not a token threshold. Its confound is theirs, priced at ~30 min; ask rather
-than guess.
+**3 — Only then the trigger.** The consumer's §2.4: *"you re-fetched a file you already read this session"*,
+countable by a hook, not a token threshold. Its confound is theirs, priced at ~30 min; ask rather than guess.
 
 ⚠️ **Do not build the reboot mechanism ahead of 1 and 2.** Shipping it onto a sensor that reads a dead
 session, into a project with no control arm, is the same mistake twice with the instrument as an alibi.
 
-**Adversarial review #4 is answered in full** — `REVIEW-adversarial-4.md`, nine findings, three severe, all
-nine fixed with an arm that reddens on the old behaviour (18 → 28 arms). The dispositions table is in
-`DESIGN-autonomy.md`; the headline is `FINDINGS.md#ledger-trial`. ⚠️ **What the review left uncovered is now
-this project's list**: DST and NTP steps, network filesystems, scale past ~6 400 records, `resume`/`compact`
-payloads unobserved — and **the ledger has still never scored a real defect.**
+**One question is with the owner, unanswered.** Does `kitten @ launch --type=os-window` open into the *same*
+kitty process — same socket, agent reachable — while relaunching the `kitty` binary would create a second,
+unreachable one? He has authorised an expert opening its own window and closing it when done; the
+measurement pops a window on his screen, so it was offered and not taken. Ask again before building
+self-launch. Socket topology: `DESIGN-autonomy.md`, the "Two sockets, not one" section.
 
-**Settled today and NOT open — do not re-litigate, the measurements are in `DESIGN-autonomy.md`:**
+**Standing test debt, inherited from review #4 and NOT covered by any gate:** DST boundaries and NTP steps ·
+network filesystems (`O_APPEND` does not travel) · scale past ~6 400 records (`analyse()`'s span loop is
+O(n²)) · what `resume` and `compact` payloads actually carry · **and the ledger has still never scored a real
+defect** — every defect it has ever seen was synthetic. Its first real `record defect` is the test.
+
+**Settled 2026-09-04, NOT open — do not re-litigate, the measurements are in `DESIGN-autonomy.md`:**
 `/clear` reports `source: "clear"` (the loop is constructible) · it mints a new session id and transcript ·
-it does **not** return RSS, it costs ~14 MB, so the rare real-relaunch mechanism stays on the roadmap.
+it does **not** return RSS, it costs ~14 MB, so the rare real-relaunch mechanism stays on the roadmap ·
+one kitty socket per OS window, so `KITTY_LISTEN_ON` is a local world, not the machine.
 
 ## Where it stands
 
@@ -57,10 +69,10 @@ it does **not** return RSS, it costs ~14 MB, so the rare real-relaunch mechanism
 | toolkit | `bin/comm.mjs`, `install.mjs`, `test/attack.mjs`, `test/selftest.mjs`, `test/latency.mjs` — no dependencies |
 | repo | git initialised; **an `origin` on GitHub exists** (`Leonhart130/claude-comm`) — the "local only" line here was stale. Nothing is pushed automatically; the owner decides |
 | **electio** | in real daily use — 26 real deliveries, both directions. **Ran a bus 4 commits stale until this session** |
-| gates | `attack` **26/26** deterministic ✓, **every case proved able to go red** (defect restored in the bus, gate byte-identical) · `selftest` **now deterministic too** — 6/6 transport green |
-| boot | `node bin/boot.mjs` — 7 measured rows, **every gating one demonstrated able to go red**; `--fast` (0.28 s) is injected at session start by `.claude/settings.json`, the contract is `CLAUDE.md` |
-| **ledger** | `node bin/ledger.mjs` — the reboot instrument, **built before the mechanism**. 28 arms proved red. Recording cold starts HERE since 2026-09-04; **the field is not wired** |
-| reviews | #1 (9 findings) in `REVIEW-adversarial.md` · #2 (10 findings) in `REVIEW-adversarial-2.md` · electio leader's field reviews in `REVIEW-electio-leader.md` and `REPLY-from-electio-leader.md` |
+| gates | `attack` **29/29** deterministic, every case proved able to go red · `selftest` 6/6 transport, deterministic · `ledger` **28** arms · `context` and `boot` controls green. Numbers here go stale — run boot |
+| boot | `node bin/boot.mjs` — **11 measured rows**, every gating one demonstrated able to go red; `--fast` (0.28 s) is injected at session start by `.claude/settings.json`, the contract is `CLAUDE.md` |
+| **ledger** | `node bin/ledger.mjs` — the reboot instrument, **built before the mechanism**. Recording starts HERE since 2026-09-04; **the field is not wired**, which is why the arm that matters is empty |
+| reviews | #1, #2, #3 and **#4 (nine findings, three severe, all nine fixed — `REVIEW-adversarial-4.md`, dispositions in `DESIGN-autonomy.md`)** · the electio leader's field reviews |
 
 ## ⏭️ OPEN
 1. **🔴 Latency is a mailbox, not an interrupt.** Re-derive with `node test/latency.mjs <log>`; the table is
@@ -101,33 +113,18 @@ it does **not** return RSS, it costs ~14 MB, so the rare real-relaunch mechanism
    outranks that plan.
 
 5. **🔴 The autonomy mandate — self-launching experts, a self-rebooting leader.** Given 2026-09-04.
-   Four mechanisms verified available (both hook payloads carry `transcript_path`; `SessionStart` carries
-   `source`; the transcript's `usage` gives the exact context; kitty + the pid→window resolver are live).
-   **Design, measurements and open unknowns: [`DESIGN-autonomy.md`](DESIGN-autonomy.md).** The headline the
-   owner accepted: a reboot buys QUALITY, not tokens — and the boot read set is the lever that matters.
+   **Everything settled about it lives in [`DESIGN-autonomy.md`](DESIGN-autonomy.md)** — the four verified
+   mechanisms, the RAM measurements, the consumer's reply and the review #4 dispositions. Do not re-derive
+   any of it here; this entry carries only what is still OPEN.
 
-   **🔴 The consumer answered, and it changes the feature.** Four of five defects in its most defect-dense
-   session were authored **in the first thirteen minutes, at 35–42 % of peak context** — its defects are
-   BOOT defects, not crowding defects, so a reboot multiplies the state where errors are actually made. The
-   design effort belongs in the fifteen minutes AFTER a restart. The only monotone degradation signal it
-   could measure is re-opens (37 % → 87 % across context deciles, 51 sessions, 0 % duplicate calls), so the
-   trigger should be *"you re-fetched a file you already read"*, not a token count. And the handoff must
-   carry a **sha256 read manifest** rather than prose, so a rebooted session re-reads only what MOVED —
-   nothing trusted, something proved. Full record in `DESIGN-autonomy.md`; my answer and the three things I
-   owe it in `exchange/work-leader/2026-09-04-lifecycle-answer.md`. **Next: the ledger before the
-   mechanism** — the first ten reboots must be measurable or the feature has no way to be judged.
+   **The two findings that shape the feature, because a summary of them would be re-litigated otherwise:**
+   the consumer's defects are **BOOT defects, not crowding defects** — four of five authored in the first
+   thirteen minutes at 35–42 % of peak — so a reboot multiplies the state where errors are actually made and
+   the design effort belongs in the fifteen minutes AFTER a restart. And the handoff carries a **sha256 read
+   manifest**, never prose: a rebooted session re-reads only what MOVED. Nothing trusted, something proved.
 
-   ✅ **The ledger is built, and it was built first** — `node bin/ledger.mjs`, 28 arms proved red,
-   `DESIGN-autonomy.md#the-ledger` and `FINDINGS.md#ledger-control` / `#ledger-blame` / `#ledger-unknown`.
-   It records **every session start**, not only reboots, because the comparison is reboot-start against
-   cold-start and the control arm has to exist before the feature does. Boot writes a record on every start
-   here and carries a `ledger` row that says whether *this* start landed — an instrument that goes silent
-   must not read as a quiet world. **🔴 The field is NOT wired: `~/Dev/work` runs `comm-hook.mjs`, not boot,
-   so the arm that matters is empty.** That is the ▶ NEXT.
-
-   ⚠️ **It corrected my numbers and the corrections are settled** — population, "worst boot" (170 568, not
-   220 200), and an 18-day doubling that means any threshold tracks the *current* boot cost. Kept in
-   `DESIGN-autonomy.md`; the consultation itself is in `exchange/work-leader/`.
+   ✅ **The instrument was built first** (`node bin/ledger.mjs`) and review #4 has been answered in full.
+   🔴 **What is open is the ▶ NEXT above**: the sensor, then the field, then the trigger.
 
 ## ⚠️ What was NOT verified
 
