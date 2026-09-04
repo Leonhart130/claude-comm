@@ -55,6 +55,12 @@ sessions. Boot deliberately does not run them.
 - **Every gate proves it can go red** — one variable moved, the detector byte-identical:
   `bin/boot.mjs --prove-red` · `bin/context.mjs --prove-red` · `bin/ledger.mjs --prove-red` · `test/attack.mjs` ·
   `test/selftest.mjs --prove-red`.
+- 🔴 **And that a gate CAN redden is not yet proof it reddens for the property in its own title.** Amended
+  2026-09-04 on evidence: five of seven findings in one review pass were about the arms, not the code — an
+  arm that asserted a refusal and measured a registry miss, a snapshot that compared filenames while the
+  damage was an overwrite, a guard that never ran when the suite aborted. Each *could* go red, each did so
+  for a different variable than the one it named. **Arm the failure the arm forbids, and carry a positive
+  control proving it is armed.**
 - **Report what was NOT verified.** Its absence is a defect in the report, not a clean bill.
 - **Attack the recent fix.** Three consecutive sessions found their worst defect inside the previous
   session's patch. Two defects on 2026-09-04 were found by writing the adversarial brief, not by re-reading.

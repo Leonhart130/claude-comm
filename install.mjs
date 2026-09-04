@@ -51,11 +51,40 @@ const forward = (input) => spawnSync(process.execPath,
 	[bus, "hook", ...process.argv.slice(2), "--agent-root", agentRoot],
 	input === null ? { stdio: "inherit" } : { input, stdio: ["pipe", "inherit", "inherit"] })
 
-// STOP is the delivery path that runs at EVERY turn boundary, and it is left exactly
-// as it was: the bus reads stdin itself, nothing else is spawned, nothing is recorded.
-// Both instruments record session STARTS, so there is nothing here for them to do and
-// no reason to put anything new on the hottest path in this system.
-if (process.argv[2] !== "session-start") process.exit(forward(null).status ?? 0)
+// STOP. Delivery is unchanged in substance - same bus, same arguments - but the payload
+// is now read here rather than inherited, because the registry needs a SECOND WITNESS.
+//
+// G2 (review #5): a SessionStart that never REACHED record() - module missing, module
+// unloadable, runtime dir unwritable, hook killed during delivery - leaves the previous
+// entry standing, and after a /clear that entry names a session that has ended. Nothing
+// in the entry can reveal it: pid, boot id and start tick all still match, it is the same
+// process. \`Stop\` is the only thing on this machine that is handed the LIVE transcript at
+// every turn boundary, so it is the only thing that can heal those paths - and it heals
+// them within one turn instead of never.
+//
+// The ledger is deliberately NOT here: it records STARTS, and a start is not a turn
+// boundary. The registry work is a lookup and a string compare, and it writes only when
+// the transcript actually differs - once per session, plus once after a clear.
+if (process.argv[2] !== "session-start") {
+	let stopRaw = ""
+	try { stopRaw = readFileSync(0, "utf8") } catch {}
+	const stopped = forward(stopRaw)
+	try {
+		const reg = join(dirname(bus), "session-registry.mjs")
+		if (existsSync(reg)) {
+			const sp = JSON.parse(stopRaw || "{}")
+			if (typeof sp.transcript_path === "string" && sp.transcript_path) {
+				const m = await import(pathToFileURL(reg).href)
+				const r = m.refresh({ pid: m.sessionPid(), transcript: sp.transcript_path, agent: null, source: "stop" })
+				// Silent on the common path. A turn boundary that printed a line every time
+				// would be a warning nobody reads; this speaks only when it CHANGED something
+				// and the change failed, which is the state that matters.
+				if (!r.ok && !r.unchanged) process.stderr.write(\`claude-comm: could not refresh the session registry (\${r.why}).\\n\`)
+			}
+		}
+	} catch { /* an instrument must never break a turn boundary */ }
+	process.exit(stopped.status ?? 0)
+}
 
 // SESSION-START. The payload can be read only ONCE and the bus is no longer its only
 // consumer, so this stub reads it and hands the bytes on.
@@ -103,10 +132,10 @@ try {
 			if (!r.ok) process.stderr.write(\`claude-comm: this session is NOT in the session registry (\${r.why}). \`
 				+ \`A context reading by pid will refuse for it\${r.invalidated ? "" : ", and a previous entry may still stand"}.\\n\`)
 		} else {
-			process.stderr.write("claude-comm: session-registry.mjs is not installed beside the bus; this session is unregistered.\\n")
+			process.stderr.write("claude-comm: session-registry.mjs is not installed beside the bus, so this session could not be recorded AND ANY PREVIOUS ENTRY FOR THIS PID STILL STANDS - a context reading by pid may answer for a session that has ended.\\n")
 		}
 	} catch (e) {
-		process.stderr.write(\`claude-comm: the session registry could not be loaded (\${(e && e.message) || e}); this session is unregistered.\\n\`)
+		process.stderr.write(\`claude-comm: the session registry could not be loaded (\${(e && e.message) || e}), so this session could not be recorded AND ANY PREVIOUS ENTRY FOR THIS PID STILL STANDS - a context reading by pid may answer for a session that has ended.\\n\`)
 	}
 
 	// The ledger: the control arm for "did the fifteen minutes after a restart cost us

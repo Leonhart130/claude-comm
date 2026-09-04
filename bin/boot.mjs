@@ -181,7 +181,12 @@ if (has("--hook")) {
 	// runs boot somewhere that does. The bus is the single place identity is resolved, so
 	// this asks it, exactly as the stub does, and keeps the env var as the first authority
 	// because `whoami` gives it precedence too.
-	sessionAgent = declared || askBus(session) || "unnamed"
+	// G7 (review #5): `declared ||` short-circuited PAST the bus. `whoami` gives the env var
+	// precedence only after two tests - the name must be in the roster, and the caller's
+	// root must be the target's - and returns nothing otherwise. So a name the bus REFUSES
+	// was being written into both instruments as fact. The bus is asked first now; a
+	// declared name still wins, but it wins through the checks instead of around them.
+	sessionAgent = askBus(session) || "unnamed"
 	const kitty = (env && env.get("KITTY_LISTEN_ON") || "").match(/kitty-(\d+)/)
 	const where = session ? `/proc/${session}` : "no claude ancestor"
 	const src = payload && payload.source ? ` - started: ${payload.source}` : ""
@@ -891,6 +896,20 @@ function proveRed() {
 	// reported `pid <me> -> 44444444-....jsonl` with a green tick. A control that writes
 	// into the world it measures is not a control - this repo has the same lesson written
 	// down twice already (STATUS.md, the two measurement traps).
+	// G6 (review #5): this suite had the belt and no braces - the override was set, and
+	// nothing in the repo would have said if it stopped being. Its arms run the real
+	// `boot --hook`, whose ancestor walk reaches the operator's own session, so it is the
+	// suite with the most to lose. Same assertion as A31, contents-hashed for the same
+	// reason (a delete and an overwrite are different shapes and only one changes a name).
+	const REAL_REG = join(process.env.CLAUDE_COMM_RUNTIME || process.env.XDG_RUNTIME_DIR
+		|| `/tmp/claude-comm-${process.getuid?.() ?? "nouid"}`, "claude-comm", "sessions")
+	const snapReal = () => {
+		try {
+			return readdirSync(REAL_REG).sort()
+				.map((f) => `${f}:${createHash("sha256").update(readFileSync(join(REAL_REG, f))).digest("hex").slice(0, 12)}`).join(",")
+		} catch { return "<none>" }
+	}
+	const realBefore = snapReal()
 	process.env.CLAUDE_COMM_RUNTIME = join(tmp, "runtime")
 
 	mkdirSync(pkg)
@@ -1261,6 +1280,10 @@ function proveRed() {
 		assert("R5 no git means UNKNOWN, not 'tracked'", lv === UNKNOWN,
 			`archive in a directory with no repository -> ${LV[lv]}`)
 	}
+
+	assert("the control leaves the machine's real registry untouched",
+		snapReal() === realBefore,
+		`${REAL_REG}: ${snapReal() === realBefore ? "unchanged" : "CHANGED - this suite wrote into the world it measures"}`)
 
 	console.log(`\n${failed ? `✗ ${failed} boot row(s) could NOT be reddened - that row is decoration` : "✓ every gating boot row demonstrated able to go red"}\n`)
 	process.exit(failed ? 1 : 0)
