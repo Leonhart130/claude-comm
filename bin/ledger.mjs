@@ -281,6 +281,45 @@ function readRecords(dir, agentFilter) {
 }
 
 /**
+ * Restart notes ARMED and not yet claimed.
+ *
+ * Reported here because this is the file that will have to classify them, and because a
+ * note nobody claims is invisible until it quietly mislabels a start. Found the hard way
+ * on the mechanism's FIRST REAL USE, 2026-09-04: the `~/Dev/work` leader armed a note at
+ * the start of its close — the natural place to write a handoff — with a 15-minute
+ * promise, and a close does not fit in fifteen minutes. Nothing anywhere would have said
+ * so; I only knew because I was watching. `FINDINGS.md#reboot-signal`.
+ *
+ * This READS, it never claims: taking the note is `bin/restart-signal.mjs`'s job and its
+ * one-shot property is the whole mechanism. A note whose shape this cannot read is
+ * COUNTED rather than skipped — a file sitting in that directory that the ledger renders
+ * as silence is the void-probe shape, and it is precisely the case where something else
+ * is writing there.
+ */
+function armedNotes(handoffDir) {
+	const out = { notes: [], unreadable: 0 }
+	const dir = join(dirname(handoffDir), "restart")
+	let names = []
+	try { names = readdirSync(dir).filter((f) => f.endsWith(".json")).sort() }
+	catch { return out }
+	for (const f of names) {
+		let d = null
+		try { d = JSON.parse(readFileSync(join(dir, f), "utf8")) } catch { out.unreadable++; continue }
+		if (!d || typeof d !== "object") { out.unreadable++; continue }
+		const t = Date.parse(d.at)
+		const age = Number.isFinite(t) ? (Date.now() - t) / 1000 : null
+		const ttl = typeof d.ttl_s === "number" && Number.isFinite(d.ttl_s) ? d.ttl_s : null
+		// The MEANING comes from one place: the same rule that will judge the record when
+		// this note is finally claimed. A second freshness test here could disagree with
+		// the classification, and a boot row that says "fresh" over a ledger that will
+		// score it cold is worse than no row at all.
+		out.notes.push({ agent: basename(f, ".json"), age_s: age, ttl_s: ttl, by: d.by || null,
+			prev_session: d.prev_session || null, fresh: signalIsFresh({ age_s: age, ttl_s: ttl }) })
+	}
+	return out
+}
+
+/**
  * Was the restart signal still good when it was claimed?
  *
  * THE MECHANISM'S ONE REAL WEAKNESS, and this is where it is contained: a signal armed for
@@ -539,6 +578,22 @@ function analyse(read, windowMin) {
 		cold: { withDefect: cTally[0], without: cTally[1], anyTime: anyDefect(coldT), meanExposureMin: expCold },
 		reboot: { withDefect: rTally[0], without: rTally[1], anyTime: anyDefect(rebootT), meanExposureMin: expReboot },
 		lastStart: starts.length ? { agent: starts[starts.length - 1].agent, session: starts[starts.length - 1].session || null, at: starts[starts.length - 1].at } : null,
+		armed: armedNotes(read.dir),
+		// THE ARM SAMPLES A SUB-POPULATION, and the place to say so is where the verdict is
+		// READ. Found 2026-09-04 by the ~/Dev/work leader, an hour after the mechanism
+		// shipped and minutes after he armed the first real note: *a session that CRASHES
+		// never closes, so it never arms — and a crash is one of the commonest reasons a
+		// restart happens at all.* He measured one: his session #39 was cut off mid-work,
+		// never archived, and his next boot cost 115 609 tokens against 100 725. A real,
+		// consequential restart that lands in `cold` — correctly by these rules and wrongly
+		// for the question. He declined to propose a fix, which was right: widening the arm
+		// would trade a clean semantic for a noisy one. So the arm is not widened and the
+		// bias is NAMED, every time the arm has anything in it.
+		caveats: reboot.length ? [
+			"the reboot arm can only hold restarts that were DECLARED - a note armed before the relaunch, or a /clear. " +
+			"A session that CRASHES never closes, never arms, and its restart lands in cold. This arm therefore samples " +
+			"CLEAN reboots, not all restarts, and the two may not cost the same. FINDINGS.md#reboot-signal",
+		] : [],
 		exposureSkew, sensitivity, ...withheld,
 	}
 }
@@ -569,8 +624,22 @@ function render(a) {
 			(a.reboot.meanExposureMin === null ? `` : `   mean exposure ${a.reboot.meanExposureMin.toFixed(1)} min`),
 	]
 	lines.push(`    (anywhere in the session: cold ${a.cold.anyTime}, reboot ${a.reboot.anyTime})`)
+	// A note is a restart somebody has DECLARED and not yet performed. It is the one piece
+	// of state here that is about the future, so it is rendered as a countdown, not a count.
+	if (a.armed && a.armed.notes.length) {
+		lines.push(``, `  armed restart note(s) — declared, not yet claimed`)
+		for (const n of a.armed.notes) {
+			const age = n.age_s === null ? "age unmeasurable" : `${Math.round(n.age_s / 60)}m old`
+			const promise = n.ttl_s === null ? "no promise declared" : `${Math.round(n.ttl_s / 60)}m promise`
+			lines.push(`    ${n.agent.padEnd(10)} ${age} of its ${promise}${n.by ? ` (by ${n.by})` : ``}` +
+				(n.fresh ? `` : `   ⚠ LAPSED — the next start will be scored COLD; re-arm it as the LAST act before the restart`))
+		}
+	}
+	if (a.armed && a.armed.unreadable) lines.push(`  ⚠ ${a.armed.unreadable} restart note(s) this ledger could not read`)
 	if (a.exposureSkew) lines.push(`    ⚠ the arms had unequal exposure — the verdict is withheld, not footnoted`)
-	lines.push(``, `  verdict: ${a.verdict}`, `           ${a.why}`, ``)
+	lines.push(``, `  verdict: ${a.verdict}`, `           ${a.why}`)
+	for (const c of a.caveats || []) lines.push(``, `  ⚠ ${c}`)
+	lines.push(``)
 	console.log(lines.join("\n"))
 }
 
@@ -1042,6 +1111,76 @@ function proveRed() {
 		check("a fresh signal reaches the arm even with no predecessor id",
 			sigOnly.starts.reboot === 1,
 			`prev_session=null, signal fresh -> reboot=${sigOnly.starts.reboot}`)
+
+		// 20b. THE BIAS MUST BE NAMED WHERE THE NUMBER IS READ. A reboot arm that holds only
+		//      DECLARED restarts is not a general sample of restarts — a crashed session
+		//      never closes, never arms, and lands in cold. The caveat must appear exactly
+		//      when there is something to caveat, and stay silent otherwise, or it becomes
+		//      boilerplate nobody reads. One variable: whether any start reached the arm.
+		const withArm = fresh, withoutArm = stale
+		check("the arm's sub-population is named when the arm is non-empty, and not before",
+			withArm.caveats.length === 1 && /CRASHES/.test(withArm.caveats[0]) && withoutArm.caveats.length === 0,
+			`reboot=${withArm.starts.reboot} -> ${withArm.caveats.length} caveat(s); ` +
+			`reboot=${withoutArm.starts.reboot} -> ${withoutArm.caveats.length}`)
+	}
+
+	// ── ARMED NOTES: the only state here that is about the future ──────────────────
+	// A note is a restart DECLARED and not yet performed. Reporting it exists because the
+	// mechanism's first real use showed nothing would have said so, and the failure was
+	// silent by construction: an armed note that lapses costs the experiment its scarcest
+	// event and leaves the record looking like an ordinary cold start.
+	{
+		const mkNote = (name, note) => {
+			const r = join(dir, name)
+			mkdirSync(join(r, ".comm", "handoff"), { recursive: true })
+			mkdirSync(join(r, ".comm", "restart"), { recursive: true })
+			writeFileSync(join(r, ".comm", "handoff", "leader.log"), JSON.stringify({ v: 1,
+				at: new Date(Date.UTC(2026, 0, 1)).toISOString(), event: "start", agent: "leader",
+				session: "s0", source: "startup" }) + "\n")
+			writeFileSync(join(r, ".comm", "restart", "leader.json"), typeof note === "string" ? note : JSON.stringify(note) + "\n")
+			return r
+		}
+		const note = (ageS, ttl) => ({ v: 1, at: new Date(Date.now() - ageS * 1000).toISOString(),
+			agent: "leader", prev_session: "p", ttl_s: ttl, by: "test", by_pid: 1 })
+
+		// 21. One variable — how long ago the note was written, across its own promise.
+		const fresh = run(mkNote("note-fresh", note(60, 900)))
+		const lapsed = run(mkNote("note-lapsed", note(1000, 900)))
+		check("an armed note is reported, and one past its own promise says so",
+			fresh.armed.notes.length === 1 && fresh.armed.notes[0].fresh === true &&
+			lapsed.armed.notes.length === 1 && lapsed.armed.notes[0].fresh === false,
+			`60s of a 900s promise -> fresh=${fresh.armed.notes[0] && fresh.armed.notes[0].fresh}; ` +
+			`1000s of the same promise -> fresh=${lapsed.armed.notes[0] && lapsed.armed.notes[0].fresh}`)
+
+		// 22. THE FAILURE THIS REPORTER COULD CAUSE. Taking the note is the claimer's job and
+		//     its one-shot property is the whole mechanism; a reporter that consumed one
+		//     would delete the restart it was reporting, and the boot row that printed it
+		//     would be the thing that destroyed it. Read twice, must be there twice.
+		const twice = mkNote("note-twice", note(60, 900))
+		const first = run(twice), second = run(twice)
+		check("reporting a note does not take it",
+			first.armed.notes.length === 1 && second.armed.notes.length === 1 &&
+			existsSync(join(twice, ".comm", "restart", "leader.json")),
+			`two queries -> ${first.armed.notes.length} then ${second.armed.notes.length} note(s), file still present=${existsSync(join(twice, ".comm", "restart", "leader.json"))}`)
+
+		// 23. A file sitting in that directory that this renders as SILENCE is the void-probe
+		//     shape, and it is exactly the case where something else is writing there.
+		const bad = run(mkNote("note-bad", "{ not json\n"))
+		check("a note the ledger cannot read is counted, never silence",
+			bad.armed.unreadable === 1 && bad.armed.notes.length === 0,
+			`unparseable note -> unreadable=${bad.armed.unreadable}, notes=${bad.armed.notes.length}`)
+
+		// 24. And a project that has simply never armed one must report NOTHING, or the row
+		//     cries wolf at every session start in every project that does not use this.
+		const bare = join(dir, "note-none")
+		mkdirSync(join(bare, ".comm", "handoff"), { recursive: true })
+		writeFileSync(join(bare, ".comm", "handoff", "leader.log"), JSON.stringify({ v: 1,
+			at: new Date(Date.UTC(2026, 0, 1)).toISOString(), event: "start", agent: "leader",
+			session: "s0", source: "startup" }) + "\n")
+		const none = run(bare)
+		check("a project with no restart directory reports no notes",
+			none.armed.notes.length === 0 && none.armed.unreadable === 0,
+			`no .comm/restart at all -> notes=${none.armed.notes.length}, unreadable=${none.armed.unreadable}`)
 	}
 
 	console.log(`\n${failed ? `✗ ${failed} ledger propert(y/ies) NOT demonstrated` : "✓ every ledger property demonstrated by a moved variable"}\n`)

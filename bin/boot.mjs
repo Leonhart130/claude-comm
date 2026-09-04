@@ -267,8 +267,21 @@ if (has("--hook")) {
 		if (a.dirUnreadable) bits.push(`⚠ the ledger directory could not be read`)
 		if (a.mislabelled) bits.push(`⚠ ${a.mislabelled} line(s) naming another agent`)
 		if (a.exposureSkew) bits.push(`⚠ the arms' exposure is skewed`)
+		// A note is a restart somebody DECLARED and has not yet performed, and it is the
+		// only state here that expires. Surfaced at boot because the mechanism's first real
+		// use showed nothing anywhere would say so: the ~/Dev/work leader armed one at the
+		// start of its close with a 15-minute promise, and a close does not fit in fifteen
+		// minutes. It was visible only because I happened to be watching his screen.
+		for (const n of (a.armed && a.armed.notes) || []) {
+			const age = n.age_s === null ? "age unmeasurable" : `${Math.round(n.age_s / 60)}m old`
+			bits.push(n.fresh
+				? `◷ a restart note is armed for ${n.agent} (${age}, ${n.ttl_s === null ? "no promise" : `${Math.round(n.ttl_s / 60)}m promise`})`
+				: `⚠ the restart note for ${n.agent} has LAPSED (${age}) - the next start scores COLD; re-arm it as the LAST act before the restart`)
+		}
+		if (a.armed && a.armed.unreadable) bits.push(`⚠ ${a.armed.unreadable} restart note(s) the ledger could not read`)
+		const lapsed = ((a.armed && a.armed.notes) || []).some((n) => !n.fresh) || (a.armed && a.armed.unreadable)
 		const bad = a.unreadable || (a.unreadableFiles && a.unreadableFiles.length) || a.dirUnreadable
-			|| a.mislabelled || a.exposureSkew
+			|| a.mislabelled || a.exposureSkew || lapsed
 		if (wrote && !wrote.ok) row("ledger", WARN, `THIS START WAS NOT RECORDED (${wrote.why || "no reason given"}) - ${bits.join(" - ")}`)
 		else if (wrote && seen !== "confirmed") row("ledger", WARN, `THE WRITE WAS NOT SEEN BY THE RE-READ (${seen}) - ${bits.join(" - ")}`)
 		else row("ledger", bad ? WARN : OK, bits.join(" - ") + (wrote ? " - this start recorded and re-read" : ""))
@@ -609,6 +622,32 @@ function askBus(sessionPidForCwd) {
 			const lines = readFileSync(join(p, ".comm", "log.jsonl"), "utf8").trim().split("\n")
 			last = JSON.parse(lines[lines.length - 1]).delivered || null
 		} catch {}
+		// THE FIELD IS WHERE THE RESTARTS ARE. A note armed here and left to lapse costs the
+		// experiment its scarcest event, and I learned that by watching a peer's terminal
+		// rather than by reading my own boot. Cheap first, always: a readdir, and the ledger
+		// is spawned only when there is actually something to ask about - the same shape the
+		// hook stub uses for the doorbell, so the common boot pays one directory listing.
+		let notes = [], noteDirBad = false
+		let noteFiles = []
+		try { noteFiles = readdirSync(join(p, ".comm", "restart")).filter((f) => f.endsWith(".json")) }
+		catch (e) {
+			// ABSENCE IS NOT INACCESSIBILITY, and the first version of this block conflated
+			// them in one bare catch: a project that has simply never armed a note (no
+			// directory at all) rendered as "a restart note is armed here and could not be
+			// read". A false alarm in a row that is read at every session start is worse than
+			// no row - it is the same defect as a silent miss, wearing the opposite face.
+			// Caught on the first run, by the project that had nothing to report.
+			if (e && e.code !== "ENOENT") noteDirBad = true
+		}
+		if (noteFiles.length) {
+			try {
+				const led = spawnSync("node", [join(ROOT, "bin", "ledger.mjs"), "--root", p, "--json"],
+					{ encoding: "utf8", timeout: 5000 })
+				notes = JSON.parse(led.stdout).armed.notes || []
+			} catch { noteDirBad = true }
+		}
+		if (noteDirBad) notes = [{ agent: "?", age_s: null, ttl_s: null, fresh: false, unread: true }]
+		const lapsedNote = notes.some((n) => !n.fresh)
 		const bits = [
 			// An unparsed non-zero exit must not borrow the confident wording of a parsed one:
 			// it means the installer refused for a reason this row has not read.
@@ -620,8 +659,11 @@ function askBus(sessionPidForCwd) {
 				: `bus current (${installed.length} files)`,
 			pending ? `${pending} pending (oldest ${age(Date.now() - oldest)})` : "0 pending",
 			last ? `last delivery ${age(Date.now() - Date.parse(last))} ago` : "no delivery logged",
+			...notes.map((n) => n.unread ? "⚠ this project's restart notes could not be read at all"
+				: n.fresh ? `◷ restart note armed for ${n.agent} (${Math.round((n.age_s || 0) / 60)}m of ${Math.round((n.ttl_s || 0) / 60)}m)`
+				: `⚠ the restart note for ${n.agent} has LAPSED - its next start will score COLD`),
 		]
-		row(`field:${name}`, drift || busStale !== false ? RED : pending ? WARN : OK, bits.join(" - "))
+		row(`field:${name}`, drift || busStale !== false ? RED : pending || lapsedNote ? WARN : OK, bits.join(" - "))
 	}
 }
 
@@ -1046,6 +1088,31 @@ function proveRed() {
 	arm("channel: a peer message goes unanswered", "channel:peer", WARN,
 		() => writeFileSync(join(chIn, "question.md"), "asked\n"),
 		() => rmSync(join(chIn, "question.md"), { force: true }))
+
+	// A note that LAPSES costs the experiment its scarcest event - a real restart - and it
+	// does so silently: the record that follows looks like an ordinary cold start. The row
+	// is armed on the state that actually goes wrong, not on the presence of a note, so a
+	// fresh one must leave the row green and only an expired one may redden it.
+	const noteDir = join(pkg, ".comm", "restart")
+	const notePath = join(noteDir, "leader.json")
+	arm("ledger: a restart note left to lapse", "ledger", WARN,
+		() => {
+			mkdirSync(noteDir, { recursive: true })
+			writeFileSync(notePath, JSON.stringify({ v: 1, at: new Date(Date.now() - 3600_000).toISOString(),
+				agent: "leader", prev_session: "p", ttl_s: 900, by: "prove-red", by_pid: 1 }) + "\n")
+		},
+		() => rmSync(notePath, { force: true }))
+	// The positive control for the arm above: the SAME note, inside its promise, must not
+	// redden anything. Without this the row would pass by reddening on any note at all.
+	{
+		mkdirSync(noteDir, { recursive: true })
+		writeFileSync(notePath, JSON.stringify({ v: 1, at: new Date().toISOString(),
+			agent: "leader", prev_session: "p", ttl_s: 900, by: "prove-red", by_pid: 1 }) + "\n")
+		const lv = level(run(true), "ledger")
+		rmSync(notePath, { force: true })
+		assert("ledger: a note inside its promise does NOT redden the row", lv === OK,
+			`a note 0s old of a 900s promise -> ${LV[lv]} (must stay ok)`)
+	}
 
 	const busFile = join(pkg, "bin", "comm.mjs")
 	const stamp = statSync(busFile)

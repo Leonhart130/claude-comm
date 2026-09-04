@@ -793,6 +793,68 @@ still printing *"last green on these bytes"* — review #3 R1's finding, re-earn
 the ledger's arms inside the gate (3.7 s), and the fingerprint is **enumerated from `bin/` with the two
 non-bus tools named as exceptions**, so a tool added tomorrow is a gate input by default. Armed as R11.
 
+**FIRST REAL USE, 2026-09-04 20:26, and it found the design fact nobody had.** The `~/Dev/work` leader read
+this, agreed, and armed a note for his own restart within minutes — `--by handoff --ttl 900`, at the **start**
+of his close. A close is boot, STATUS, a commit and a handoff; it does not fit in fifteen minutes. His note
+would have lapsed and his first real reboot would have been filed as a cold start. He read it that way because
+my own ▶ NEXT said *"write the handoff, then arm, then restart"*, which reads as a sequence when what matters
+is the **gap between the last two steps**.
+
+So the mechanism's real weakness is not "someone forgets". It is that **the natural place to write a handoff
+is not the natural place to declare a restart, and they are fifteen minutes apart.** Found by him, on first
+contact, and worth more than a smooth run would have been.
+
+Two things changed on that evidence, neither of them the TTL — one data point does not move a classification
+rule. **The ledger now reports notes that are armed and unclaimed**, and boot renders them in the `ledger` row
+and in every `field:*` row, as a countdown rather than a count: *"◷ restart note armed for leader (1m of
+15m)"*, and `⚠ LAPSED` when the promise is spent. The failure was silent by construction — an expired note
+leaves a record that looks like an ordinary cold start — and I only saw it because I happened to be watching
+his terminal. Armed in boot both ways (a lapsed note reddens the row; a note inside its promise must NOT), and
+in the ledger with the arm that matters most: **reporting a note may not TAKE it.** A reporter that consumed
+one would delete the restart it was reporting, and the row that printed it would be the thing that destroyed
+it. Read twice, present twice.
+
+**And a false alarm in that same change, caught on its first run by the project that had nothing to report:**
+`readdirSync` on a project with no `.comm/restart/` at all throws ENOENT, one bare catch turned that into
+*"a restart note is armed here and could not be read"*, and `field:electio` — which has never armed one — said
+so. Absence is not inaccessibility. A row that cries wolf at every session start is the same defect as a
+silent miss, wearing the opposite face.
+
+**THE SIGNAL CROSSED A REAL RESTART, 2026-09-04 20:44:22 local.** The `~/Dev/work` leader armed the note as
+his last act, his owner relaunched him, and his `SessionStart` hook claimed it:
+
+```
+{"event":"start","agent":"leader","session":"13ca269e-…","source":"startup",
+ "prev_session":"f5d48736-…","signal":{"src":"handoff","age_s":259.4,"ttl_s":900}}
+
+starts   cold 3 · reboot 1   [startup:4]
+verdict  needs 10 starts in each arm     (was: "the reboot arm is UNREACHABLE here")
+```
+
+**All four of his starts report `source: "startup"`** — that one bracket is the whole case for the mechanism:
+the payload can never tell a relaunch from a cold start, and only the note does. The verdict line moved from a
+shortfall that *could not be closed* to one that more sessions will close. It took two lapse warnings to get
+there, which is the finding above.
+
+**⚠ AND THE ARM SAMPLES A SUB-POPULATION — found by him, minutes after arming that note, and it outranks the
+crossing.** *A session that CRASHES never closes, so it never arms — and a crash is one of the commonest
+reasons a restart happens at all.* He had measured one that same evening: his session #39 was cut off
+mid-work, never archived, left his task list swollen from 20 KB to 48 KB, and **his next boot cost 115 609
+tokens against 100 725 for the previous one.** A real, consequential restart that lands in `cold` — correctly
+by these rules and wrongly for the question. So the reboot arm is not under-sampled; **it holds clean reboots
+only, and the two kinds may not cost the same.**
+
+He declined to propose a fix — *"I would rather you know the arm is biased than have me widen it for you"* —
+and that was right: arming early and refreshing trades a clean semantic for a noisy one. **The arm is not
+widened. The bias is NAMED where the verdict is read**, in the ledger's own output, every time the arm holds
+anything (armed on one variable: whether any start reached it). A caveat that appeared when there was nothing
+to caveat would be boilerplate inside a month.
+
+**And what `ttl_s` actually bounds, in his words: not staleness on disk — how long a human may take.** Two
+sessions with identical hygiene land in different arms because one owner answered a message faster. That is a
+real cost of this design, it is not fixable by choosing a bigger number, and it is why `arm` is cheap to
+re-run: the fix is to arm LAST, not to promise longer.
+
 **What is NOT closed by this.** Nothing arms the signal automatically yet: a restart still has to say so, and
 in the field that means the owner's hand (`node bin/restart-signal.mjs arm --agent <name> --prev-session
 <id>`) or a future self-reboot that owns its own relaunch. The mechanism cannot detect a liar — an armer that
