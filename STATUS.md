@@ -50,6 +50,11 @@ experts. `FINDINGS.md#hookless-launch` and `#wake-doorbell`.
 
 **Standing test debt from review #4, none of it gated:** `FINDINGS.md#test-debt`.
 
+**Every field project carries its own notice** at `.comm/README.md` — what `.comm/` is, why never to commit
+it, the commands, how to update, and where to send feedback (`exchange/field/in/`, which boot watches). A
+`SessionStart` guard asks whether anything under `.comm/` is *tracked*, because a notice is a promise.
+`FINDINGS.md#field-notice`, including the escape bug that killed every hook while it was being added.
+
 **Telling a peer is one command, and must be that one:** `node bin/exchange-bell.mjs --peer work-leader
 --ref <file in their out/>`. Boot's `channel:` row tells only *me* when they write; three hand-rung bells
 produced one quoting a number two re-arms stale. `FINDINGS.md#exchange-bell`.
@@ -65,8 +70,8 @@ the bus, never by absolute path · the doorbell resolves by pid and refuses rath
 | | state |
 | --- | --- |
 | toolkit | `bin/comm.mjs` · `session-registry.mjs` · `ledger.mjs` · `restart-signal.mjs` · `wake.mjs` · `exchange-bell.mjs` · `context.mjs` · `boot.mjs` · `install.mjs` · `test/` — no dependencies |
-| repo | git initialised; **an `origin` on GitHub exists** (`Leonhart130/claude-comm`) — the "local only" line here was stale. Nothing is pushed automatically; the owner decides |
-| **electio** | in real daily use — 26 real deliveries, both directions. **Ran a bus 4 commits stale until this session** |
+| repo | an `origin` exists (`Leonhart130/claude-comm`); nothing is pushed automatically — the owner decides |
+| **electio** | in real daily use — 26 real deliveries, both directions |
 | gates | `attack` (deterministic, every case armed) · `ledger --prove-red`, now run INSIDE it · `selftest` (real sessions, not gated by boot) · `context` and `boot` controls. **Counts live in boot's output, never here** |
 | boot | `node bin/boot.mjs` — every gating row demonstrated able to go red; `--fast` is injected at session start by `.claude/settings.json`, the contract is `CLAUDE.md` |
 | **ledger** | `node bin/ledger.mjs` — the reboot instrument, **built before the mechanism**, which now exists (`restart-signal.mjs`). Records here AND in the field; a field arm is `--root ~/Dev/electio`. Its own arms run inside `attack` as A34 |
@@ -84,14 +89,10 @@ the bus, never by absolute path · the doorbell resolves by pid and refuses rath
 2. **`--reply-to <id>` (threading).** Requested by the field, then deprioritised by it: with two agents,
    threading adds identity surface while the substance already lives in the file.
 
-3. ✅ **Phase 2 — the wake is BUILT and verified against a real agent** (`bin/wake.mjs`, 2026-09-04). A
-   sender's Stop hook rings it; it resolves the target's kitty window **by pid** and refuses when it cannot,
-   because `send-text --match` exits 0 on no match. Gated by A32, armed both ways. Design and the two things
-   the first live run got wrong: `FINDINGS.md#wake-doorbell`.
-
-   🔴 **Still open here:** item 1's latency table was measured BEFORE this existed and has not been
-   re-measured with it. The claim "this bus is a mailbox, never an interrupt" is unchanged and still true —
-   the wake does not deliver, it only makes a turn happen.
+3. ✅ **Phase 2 — the wake is BUILT** and verified against a real agent (`bin/wake.mjs`; A32, armed both
+   ways; `FINDINGS.md#wake-doorbell`). 🔴 **Still open:** item 1's latency table predates it and has not been
+   re-measured. The wake does not deliver — it only makes a turn happen — so "mailbox, never an interrupt"
+   is unchanged.
 
 4. **🔴 Holding a machine resource is not an event anybody publishes.** Two agents in **one** project root
    collided over a port and killed each other's servers, 2026-09-04. **The failure is not transport, which is
@@ -100,25 +101,16 @@ the bus, never by absolute path · the doorbell resolves by pid and refuses rath
    assumed: `bin/comm.mjs` has no notion of a port, a lock or a server; its only "claim" is a sender's
    identity. Full incident and the peer's reply: `HISTORY.md`, "The port collision".
 
-   ⭐ **The fix is a claim file, and it respects the hub rule exactly** — `claims/<resource>` carrying pid,
-   purpose and time; the file is the artifact; no transport, no daemon. Three properties: a stale claim is
-   **diagnosable, not authoritative** (the pid lets a reader see the holder is dead — evidence of a crash,
-   never a lock that outlives it); it **advises, it does not enforce**; and it ships with a gate proved able
-   to go red on a claim left by a dead process. **Deliberately not next**, but a second COLLISION outranks
-   that plan — a near-miss does not, and the peer reported one on 2026-09-04 and priced it himself as
-   evidence the fix is cheap rather than needed.
+   ⭐ **The fix is designed and deliberately NOT next: a claim file** (`FINDINGS.md#claim-file`). A second
+   COLLISION outranks the current plan; a near-miss does not, and the peer reported one on 2026-09-04 and
+   priced it himself as evidence the fix is cheap rather than needed.
 
 5. **🔴 A session launched outside an interactive shell has NO bus, and says nothing.** `node` lives only
-   under nvm, which only an interactive shell puts on `PATH`, so `kitten @ launch claude` (or a `.desktop`
-   file, or cron) starts a session whose **every hook dies** — no mail at any turn boundary, no instruments —
-   while it looks normal. **A self-launched expert is launched by a program, never by a shell**, so this is
-   the shape that would have made the whole autonomy program measure nothing. Measurement, both halves of the
-   fix and what the fix does *not* do: `FINDINGS.md#hookless-launch`.
-
-   ✅ Half-fixed 2026-09-04 and reinstalled into both field projects: the `SessionStart` hook now says out
-   loud when node is missing, still exiting 0. Selftest and `--prove-red` run before and after.
-   🔴 Open: the guard warns, it does not make such a session work. The working fix is to launch through a
-   login shell, and that only covers launchers this framework owns.
+   under nvm, so `kitten @ launch claude` (or cron, or a `.desktop` file) starts a session whose **every hook
+   dies** while it looks normal. **A self-launched expert is launched by a program, never by a shell** — the
+   shape that would have made the whole autonomy program measure nothing. `FINDINGS.md#hookless-launch`.
+   ✅ Half-fixed: the hook now says so out loud, still exiting 0. 🔴 Open: it warns, it does not make such a
+   session work. The fix is a login shell, and that covers only launchers this framework owns.
 
 6. **🔴 The autonomy mandate — self-launching experts, a self-rebooting leader.** Given 2026-09-04.
    **Everything settled about it lives in [`DESIGN-autonomy.md`](DESIGN-autonomy.md)** — the four verified
@@ -151,6 +143,9 @@ the bus, never by absolute path · the doorbell resolves by pid and refuses rath
   `/proc/sys/kernel/random/boot_id`; without both it refuses to record, which is a refusal, not support.
 - **The ledger has never scored a real defect.** Sixteen arms move it on synthetic records; nothing has yet
   been recorded by a hand that was not writing a fixture. Its first real `record defect` is the test.
+- **Nobody has read the notice.** It is installed in both field projects and no agent has been observed
+  using it, the feedback path has never carried a file, and the `SessionStart` git guard has never fired
+  outside a fixture — both field projects were already clean when it shipped.
 - **The crossing has happened ONCE**, in one project, armed by one agent, relaunched by one hand
   (2026-09-04 20:44). It took two lapse warnings to land. Not verified: that it survives an unattended
   relaunch, that anyone repeats it without being reminded, or that the arm ever reaches ten.
