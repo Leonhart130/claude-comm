@@ -5,55 +5,43 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-**Fix the context sensor FIRST (`FINDINGS.md#clear-blind`), then wire the field to the ledger.**
+**1 — Fix the context sensor. It reports the context of a session that no longer exists.**
 
-The order changed on 2026-09-04, after the first real `/clear` in this repo: the sensor answers with the
-context of the session that was cleared away, and a self-rebooting leader is a cleared session by
-construction. Building the field wiring on top of a sensor that reports a dead session's number would put
-the instrument and the defect into the field together.
+`FINDINGS.md#clear-blind` carries the measurement, the two candidate fixes, and the counter-example that
+killed the cheaper one — read it, do not re-derive it. The short version: a cleared process keeps its
+**launch** session's scratch directory forever, so pid→transcript returns the dead session's file and its
+final number with exit 0. A self-rebooting leader is a cleared session by construction, and its pre-clear
+context is large by definition — so the trigger would re-fire at once and the agent would reboot forever,
+looking from outside exactly like the feature working. The `Stop` path is safe; its payload carries
+`transcript_path` outright.
 
-**Then, and only then:** `bin/ledger.mjs` exists, is proved red on 18 arms, and `bin/boot.mjs` now writes a `start` record on every
-session start — but **only here**. `~/Dev/work` and `~/Dev/electio` run `.claude/comm-hook.mjs session-start`,
-which forwards to the bus and knows nothing about the ledger. The reboots will happen there, so their cold
-arm is empty and the query cannot be answered however long this repo runs.
+**Nothing that reads a context by pid may be built or shipped before this.** The favoured fix is a registry
+written at `SessionStart` — boot already holds the payload and can resolve the session pid, so it can record
+`pid + process start time → transcript` and refresh it on every start, clears included. The open decision is
+where that file lives for a project whose SessionStart hook is not boot's.
 
-1. **The obstacle is one line of the generated stub.** It forwards with `stdio: "inherit"`, so the hook
-   payload on stdin is consumed once, by the bus. To also record a start the stub must read stdin itself,
-   hand the bytes to the bus, and spawn `bin/ledger.mjs record start`. Read the payload ONCE and pass it to
-   both; do not let the ledger's spawn be able to delay or fail the delivery path.
-2. **This is a delivery change.** `node test/selftest.mjs` and `--prove-red` before and after — minutes, real
-   sessions. That is why it was not done in the session that built the instrument.
-3. **The agent name must come from the stub's location** (`--agent-root`), never from cwd and never from the
-   payload. The stub already resolves it that way for the bus; reuse that value, do not re-derive it.
-4. **Then re-install into both field projects** and confirm with `node bin/boot.mjs` that `field:*` stays
-   green — a stub that drifts from the packaged one is already a RED row.
+**2 — Then wire the field to the ledger.** `bin/ledger.mjs` records only here; `~/Dev/work` and
+`~/Dev/electio` run `.claude/comm-hook.mjs session-start`, which knows nothing about it. The reboots happen
+there, so the arm that matters is empty. Four things the next session needs and would otherwise re-derive:
 
-**After that, and not before: the trigger.** Per the consumer's §2.4 it is *"you re-fetched a file you already
-read this session"*, countable by a hook, not a token threshold. Its confound (propagation vs retrieval) is
-theirs and they priced it at ~30 min; ask before guessing.
+1. **The obstacle is one line of the generated stub**: it forwards with `stdio: "inherit"`, so the payload on
+   stdin is consumed once, by the bus. Read it ONCE, hand the bytes to both, and never let the ledger's spawn
+   delay or fail delivery.
+2. **This is a delivery change** — `node test/selftest.mjs` and `--prove-red`, before and after.
+3. **The agent name comes from the stub's location** (`--agent-root`), never cwd, never the payload. The stub
+   already resolves it that way; reuse the value.
+4. **Re-install into both field projects**, then confirm `field:*` is still green — a drifted stub is a RED row.
 
-⚠️ **Do not build the reboot mechanism while the field ledger is empty.** The instrument was put first on
-purpose; wiring it to the project that will not use it and then shipping the feature to the project that will
-would be the same mistake with an extra step.
+**3 — Only then the trigger.** Per the consumer's §2.4 it is *"you re-fetched a file you already read this
+session"*, countable by a hook, not a token threshold. Its confound is theirs, priced at ~30 min; ask rather
+than guess.
 
-🔴 **BLOCKER, found by that same `/clear`: the context sensor answers with the DEAD session's context.**
-`FINDINGS.md#clear-blind`. A cleared process keeps its pre-clear scratch directory, so `context.mjs`
-resolves pid → the transcript of the session that was cleared away, and reports its final number with
-exit 0. A self-rebooting leader is a cleared session by construction and its pre-clear context is large by
-definition — so the trigger would re-fire immediately and **the agent would reboot forever, looking from
-outside exactly like the feature working.** The `Stop` path is safe (its payload carries `transcript_path`).
-**Nothing that reads a context by pid may be built or shipped until this is fixed.** Two candidate fixes and
-the counter-example that killed the cheaper one are in the finding.
+⚠️ **Do not build the reboot mechanism ahead of 1 and 2.** Shipping it onto a sensor that reads a dead
+session, into a project with no control arm, is the same mistake twice with the instrument as an alibi.
 
-✅ **`/clear` reports `source: "clear"` — measured 2026-09-04, the loop is constructible.** The owner cleared
-a real session here; `.boot-state.json` moved to `{startup: 7, clear: 1}` with no code change, and the ledger
-put the restart in the reboot arm by itself. `/clear` mints a **new session id and transcript**, and it
-brought the blocker above.
-
-✅ **RSS settled too: `/clear` does NOT return memory, it costs ~14 MB.** Before/after on one pid —
-318.6 MB at 50 237 tokens → 332.5 MB at ~0. A freed heap would have dropped ~35 MB. **So the real-relaunch
-mechanism is not optional**, and the two-mechanism split in `DESIGN-autonomy.md` stands: `/clear` often for
-context quality, a relaunch rarely for memory — which was the owner's original complaint.
+**Settled today and NOT open — do not re-litigate, the measurements are in `DESIGN-autonomy.md`:**
+`/clear` reports `source: "clear"` (the loop is constructible) · it mints a new session id and transcript ·
+it does **not** return RSS, it costs ~14 MB, so the rare real-relaunch mechanism stays on the roadmap.
 
 ## Where it stands
 

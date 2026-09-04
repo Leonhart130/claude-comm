@@ -369,6 +369,37 @@ built the instrument.
       **architectural** property, not a Node-versus-Rust one, and it is now **gated by A21** (import
       allowlist + no long-lived construct) rather than left to good intentions. The wake must therefore be
       driven from the existing per-turn hook invocation, not from a resident watcher.
+   ### 🔴 Two sockets, not one — measured 2026-09-04 when the owner mentioned he splits
+
+   He said in passing that he **splits kitty rather than opening new windows**: one OS window per project,
+   one split per agent. Measured rather than assumed, and it moved a load-bearing fact:
+
+   | socket | os_window | splits |
+   | --- | --- | --- |
+   | `/tmp/kitty-526075` | 1 | 3 × `claude` in `~/Dev/claude-comm` (shell pids 526092, 580310, 745419) |
+   | `/tmp/kitty-8435` | 1 | `claude` in `~/Dev/work`, plus idle shells in `~/Dev/work` and `~/Dev/work/HartEdge` |
+
+   **Each OS window is its own kitty PROCESS, so `listen_on unix:/tmp/kitty-{kitty_pid}` gives one socket per
+   OS window — not one per machine.** `KITTY_LISTEN_ON` therefore names an agent's *local* world only: from
+   `~/Dev/claude-comm` the three panes beside me are reachable and the `~/Dev/work` leader is not, because it
+   lives behind a different socket.
+
+   ⚠️ **This is the silent-no-op shape again, one level up.** A wake that consults only `$KITTY_LISTEN_ON`
+   would resolve nothing for any cross-window target, and `send-text --match` **exits 0 on no match** — so it
+   would read on screen exactly like *"no agent needed waking"*. The rule that follows: **enumerate
+   `/tmp/kitty-*` and ask every socket**, then match by pid as constraint 1 already requires. Never treat one
+   socket as the world.
+
+   ✅ **What the splits do NOT change:** the pid→window resolver is unaffected. Each split is a kitty window
+   with its own shell pid and its own root, so the nearest-ancestor walk resolves a split exactly as it
+   resolved a separate window — and `window.pid` is still the SHELL, with the agent in
+   `foreground_processes`, which is the trap already recorded above.
+
+   ⚠️ **Do not encode "one socket = one project".** It is his current habit, it makes self-launch convenient
+   (an expert launches into its leader's own socket), and it is exactly the kind of assumption that becomes a
+   silent misroute the day he splits two projects into one window. Identity comes from the pid, never from
+   the socket, the cwd or the title.
+
    5. A third option the owner surfaced remains unexplored: an **MCP channel that pushes into the session**
       (`--dangerously-load-development-channels`) — undocumented, dev-flagged, unverified.
 
