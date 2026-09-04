@@ -21,12 +21,11 @@ him deliberately and the ledger filed it as cold. `classify()` reaches the arm o
 Two candidates, and **the owner of the other project has been asked which he would trust** (his reply, if it
 has arrived, is in `exchange/work-leader/in/`):
 
-1. **His:** the restarting party knows it is a restart, so let it say so — an env var, or a file the next
-   `SessionStart` hook reads and clears. Needs a new mechanism; cannot lie.
-2. **Mine:** the ledger's `handoff` event is already written by the session about to be restarted, so a
-   `start` whose agent's previous event was a `handoff` with no intervening start is a reboot. No new
-   mechanism; **but a session that writes a handoff and is not restarted for an hour mislabels the next
-   start.**
+1. **His:** the restarter knows it is a restart — an env var, or a file the next `SessionStart` reads and
+   clears. New mechanism; cannot lie.
+2. **Mine:** the ledger's `handoff` is already written by the session about to restart, so a `start` whose
+   agent's previous event was a `handoff` is a reboot. No new mechanism; **but a handoff not followed by a
+   restart mislabels the next start.**
 
 ⚠️ **This changes the classification the whole experiment is scored from, and review #4 spent nine findings
 on that file.** Do it as its own piece of work, with arms, not as the tail of something else.
@@ -45,12 +44,10 @@ experts. `FINDINGS.md#hookless-launch` and `#wake-doorbell`.
 **the ledger has never scored a real defect** — its first real `record defect` is the test.
 
 **Settled 2026-09-04, do not re-litigate — measurements in `DESIGN-autonomy.md` and `FINDINGS.md`:**
-`/clear` reports `source: "clear"`, mints a new session and transcript, costs ~14 MB and does not return RSS ·
-one kitty socket per OS window, and `kitten @ launch --type=os-window` stays in the SAME process, so a
-launched expert is reachable at once · pid → transcript comes from the registry, a miss REFUSES, and a hook
-records only for a session running inside its own project · the instruments travel beside the bus in
-`.comm/bin/`, never by absolute path · the doorbell resolves by pid and refuses rather than hoping, because
-`send-text --match` exits 0 on no match.
+`/clear` mints a new session, costs ~14 MB, returns no RSS · one kitty socket per OS window, and
+`kitten @ launch --type=os-window` stays in the SAME process · pid → transcript comes from the registry, a
+miss REFUSES, and a hook records only for a session inside its own project · the instruments travel beside
+the bus, never by absolute path · the doorbell resolves by pid and refuses rather than hoping.
 
 ## Where it stands
 
