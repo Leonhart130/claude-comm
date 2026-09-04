@@ -90,6 +90,37 @@ export function startTimeOf(pid) {
 	} catch { return null }
 }
 
+/**
+ * The nearest ancestor that IS the session, by argv[0]. Walk up, do not match the whole
+ * chain: on this box the session's argv is exactly `claude`, its parent is the shell and
+ * its grandparent kitty, so a chain match would also match kitty and init.
+ *
+ * ONE implementation, deliberately. It was written twice already - boot's row 1 and
+ * context's own-session path - and the field hook stub was about to make three. An
+ * identity rule with three copies is an identity rule that will disagree with itself,
+ * and this project has already paid for that once: `whoami` in the bus exists because
+ * two ways of naming an agent produced two different answers and the log recorded the
+ * wrong one. The registry is this rule's natural home, because a registry keyed on a pid
+ * is the thing that has to agree with everyone about which pid that is.
+ */
+export function sessionPid(from = process.pid) {
+	const ppidOf = (pid) => {
+		try {
+			const st = readFileSync(`/proc/${pid}/stat`, "utf8")
+			return Number(st.slice(st.lastIndexOf(")") + 2).split(" ")[1]) || 0
+		} catch { return 0 }
+	}
+	const argv0 = (pid) => {
+		try { return basename(readFileSync(`/proc/${pid}/cmdline`, "utf8").split("\0")[0] || "") } catch { return "" }
+	}
+	let pid = from
+	for (let i = 0; i < 12 && pid > 1; i++) {
+		if (argv0(pid) === "claude") return pid
+		pid = ppidOf(pid)
+	}
+	return 0
+}
+
 /** Read one entry, or null. Never throws - a corrupt entry is a miss, not a crash. */
 function readEntry(p) {
 	try { return JSON.parse(readFileSync(p, "utf8")) } catch { return null }
