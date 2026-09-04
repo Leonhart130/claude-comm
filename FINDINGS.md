@@ -616,7 +616,7 @@ network filesystems (`O_APPEND` does not travel) · scale past ~6 400 records (`
 O(n²)) · what `resume` and `compact` payloads actually carry · **and the ledger has still never scored a real
 defect** — every defect it has ever seen was synthetic. Its first real `record defect` is the test.
 
-## `#measurement-traps` — four ways a control lied here
+## `#measurement-traps` — five ways a control lied here
 
 `delivered/` file mtimes look like drain times and are not — `renameSync` preserves mtime, so they are
 *creation* times. The only honest source is the `delivered` field in `.comm/log.jsonl`.
@@ -683,3 +683,46 @@ before the hermetic override is set. `test/attack.mjs` and `test/selftest.mjs` b
 fixture. Anything the control executes that resolves *the machine's* state — a pid, a socket, a runtime
 directory, a registry — reaches past the fixture by construction, and does so most easily when the suite is
 run by exactly the kind of agent the code was written for.
+
+## `#wake-doorbell` — what the first real wake taught, in the twenty minutes it took to work
+
+Built 2026-09-04 and tested against a real launched agent in its own kitty window, with real mail on a real
+bus. It works: `who --json` sees the target, the window resolves by pid, the nudge lands, the idle session
+takes a turn, and the delivery logs `via: "hook"`. Two things went wrong first, and both are worth more than
+the mechanism.
+
+**1. A self-launched agent in a NEW directory exits on the trust prompt, and its window closes.** The first
+launch returned a window id and left nothing behind — `kitten @ ls` had no such window seconds later, and no
+`claude` process existed in the fixture. Claude Code asks *"Is this a project you created or one you trust?"*
+with **"No, exit" selected by default**, and nothing was there to answer. From outside, a launch that
+returned an id and produced no agent. This is `#hookless-launch`'s twin: the launcher appears to succeed and
+the agent is gone. Any self-launch into a fresh worktree, a scratch directory or a new clone hits it. Not yet
+fixed — the launcher must answer the prompt, or the directory must be trusted before the agent is started.
+
+**2. The doorbell must give NO instruction.** The first nudge read *"Run `comm inbox` to see what arrived."*
+Measured consequence: the woken agent went hunting, discovered that **`comm` on `PATH` is coreutils' `comm`,
+not this bus**, dug for the real binary, and dismissed the message by hand. The delivery logged
+`via: "dismiss"` instead of `via: "hook"` — so the wake had *bypassed* the one path that is gated, measured
+and proved able to go red, in favour of an agent improvising. The second version asks for nothing, and the
+same test then logged `via: "hook"`, `id_src: "stub"`.
+
+**The general form is the one this project keeps meeting:** a mechanism that tells an agent *what to do*
+competes with the mechanism that was built to do it. The doorbell's whole contract is that the agent does
+not fetch its own mail — it takes a turn, and the turn boundary delivers.
+
+**Recorded, unfixed:** the woken agent observed that it can end a turn on an acknowledgement written *before*
+the Stop hook delivers, so a real brief could be acted on a turn late. The `decision: "block"` path feeds the
+mail back into the same turn, so this is bounded — but it was its observation, not mine, and it is not
+measured.
+
+**A fifth, hours after the fourth, and this one had no test in it at all.** Reproducing an unrelated bug, I
+fired a field project's stop hook **by hand from my own session**. The stub resolved the nearest `claude`
+ancestor - me - and wrote my registry entry to point at the fixture's transcript. The next boot reported
+`pid 820277 -> fake.jsonl (stop)`, **green**, and `bin/context.mjs` would have answered with a fixture's
+context as if it were mine.
+
+A31 could not see it: A31 guards the SUITE, and this was a person at a prompt. So the fix is not another
+gate on the tests, it is an invariant in the code: **a hook records only for a session running inside its own
+project.** A hook belongs to a project; if the session it resolved is running somewhere else, something is
+firing it on behalf of a session it does not speak for, and the only safe act is to record nothing. That
+closes the whole family - A18, this, and whatever fires a stub next - and it is armed in A29 both ways.

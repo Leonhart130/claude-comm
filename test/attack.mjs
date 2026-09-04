@@ -15,10 +15,11 @@
  * directives? Measuring the wrong thing produced a confident, plausible, wrong
  * result, which is this project's signature failure mode.
  */
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync, statSync } from "node:fs"
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync, statSync, symlinkSync } from "node:fs"
 import { join } from "node:path"
 import { execFileSync, spawnSync, spawn } from "node:child_process"
 import { createHash } from "node:crypto"
+import { pathToFileURL } from "node:url"
 import { tmpdir } from "node:os"
 import { MAX_NOTE, MAX_RENDER, MAX_REF } from "../bin/comm.mjs"
 
@@ -1081,7 +1082,27 @@ const POINTER_SOURCES = (() => {
 	const tp = join(rootA, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee.jsonl")
 	writeFileSync(tp, "\n")
 	const stub = join(rootA, "app", ".claude", "comm-hook.mjs")
-	const fire = (verb) => spawnSync("node", [stub, verb], {
+	// The stub records only for a session RUNNING INSIDE its own project - the invariant that
+	// stops a hook fired by anything else from writing the CALLER's registry entry. So the
+	// honest fixture needs a `claude` ancestor whose cwd is in this project, and the suite's
+	// own session (running in claude-comm) is exactly what that invariant excludes. Two
+	// commands in the -c string so the shell cannot exec-optimise its argv[0] away.
+	const fakeClaude = join(rootA, "claude")
+	try { symlinkSync("/bin/sh", fakeClaude) } catch {}
+	const fire = (verb) => {
+		const out = join(rootA, `${verb}.out`)
+		spawnSync(fakeClaude, ["-c", `cd ${join(rootA, "app")} && ${process.execPath} ${stub} ${verb} > ${out} 2>&1; echo done`], {
+			encoding: "utf8",
+			input: JSON.stringify({ cwd: join(rootA, "app"), source: "startup", transcript_path: tp }),
+			env: { ...process.env, CLAUDE_COMM_RUNTIME: rt },
+		})
+		let stdout = ""
+		try { stdout = readFileSync(out, "utf8") } catch {}
+		return { stdout }
+	}
+	// The same hook fired with NO such ancestor - the shape a test suite, or an operator
+	// reproducing a bug, actually produces. It must record nothing at all.
+	const fireForeign = (verb) => spawnSync("node", [stub, verb], {
 		cwd: join(rootA, "app"), encoding: "utf8",
 		input: JSON.stringify({ cwd: join(rootA, "app"), source: "startup", transcript_path: tp }),
 		env: { ...process.env, CLAUDE_COMM_RUNTIME: rt },
@@ -1101,9 +1122,27 @@ const POINTER_SOURCES = (() => {
 	// The bounded-cost property: a second identical stop must not rewrite anything.
 	const stamp = () => { try { const d = join(rt, "claude-comm", "sessions")
 		return readdirSync(d).map((f) => `${f}:${statSync(join(d, f)).mtimeMs}`).join(",") } catch { return "" } }
-	const beforeSecond = stamp()
-	fire("stop")
-	const stopIdempotent = stamp() === beforeSecond
+	// Both stops must come from the SAME live session, or the "did it rewrite?" question is
+	// answered by two different pids owning two different entries. One shell, two stops,
+	// and the shell itself records the entry's timestamp between them.
+	const payload = join(rootA, "payload.json")
+	writeFileSync(payload, JSON.stringify({ cwd: join(rootA, "app"), source: "startup", transcript_path: tp }))
+	const sessDir = join(rt, "claude-comm", "sessions")
+	const s1 = join(rootA, "s1"), s2 = join(rootA, "s2")
+	spawnSync(fakeClaude, ["-c",
+		`cd ${join(rootA, "app")} && ${process.execPath} ${stub} stop < ${payload} > /dev/null 2>&1; ` +
+		`stat -c %y ${sessDir}/*.json > ${s1} 2>&1; ` +
+		`${process.execPath} ${stub} stop < ${payload} > /dev/null 2>&1; ` +
+		`stat -c %y ${sessDir}/*.json > ${s2} 2>&1; echo done`],
+		{ encoding: "utf8", env: { ...process.env, CLAUDE_COMM_RUNTIME: rt } })
+	const rd = (f) => { try { return readFileSync(f, "utf8") } catch { return "" } }
+	const stopIdempotent = rd(s1) !== "" && rd(s1) === rd(s2)
+	// ARMED PAIR for the ownership invariant: same hook, same payload, no in-project
+	// ancestor. Measured five times on 2026-09-04 as the caller's own entry being
+	// overwritten with a fixture transcript - once in the operator's own boot report.
+	const beforeForeign = stamp()
+	fireForeign("stop")
+	const foreignRecordedNothing = stamp() === beforeForeign
 
 	// ARM 2: session-start. It must deliver AND record in both.
 	execFileSync("node", [join(rootA, ".comm", "bin", "comm.mjs"), "send", "app", "--ref", "docs/REVIEW.md"],
@@ -1123,9 +1162,9 @@ const POINTER_SOURCES = (() => {
 
 	check("A29 the field hook records a start in both instruments, and still delivers",
 		stopDrained && !stopTouchedLedger && stopRegistered && stopIdempotent &&
-		startDrained && schemaOK && ledgerOK && regOK,
+		foreignRecordedNothing && startDrained && schemaOK && ledgerOK && regOK,
 		`stop: drained=${stopDrained} ledger-untouched=${!stopTouchedLedger} registry-refreshed=${stopRegistered} ` +
-		`no-rewrite-when-unchanged=${stopIdempotent}; ` +
+		`no-rewrite-when-unchanged=${stopIdempotent} fired-from-outside-records-nothing=${foreignRecordedNothing}; ` +
 		`session-start: drained=${startDrained} schema=${schemaOK} ledger=${ledgerOK} registry=${regOK}`)
 }
 
@@ -1158,6 +1197,53 @@ const POINTER_SOURCES = (() => {
 		home.stdout.trim() === "delta" && foreign.stdout.trim() === "delta",
 		`from its own project: ${JSON.stringify(home.stdout.trim())}; ` +
 		`from another project holding a different agent at the same relative path: ${JSON.stringify(foreign.stdout.trim())} (both must be "delta")`)
+}
+
+// A32 — the doorbell resolves before it rings, and never breaks a turn boundary.
+//
+// `kitten @ send-text --match` EXITS 0 WHEN IT MATCHES NOTHING. A wake aimed at a session
+// that is not there would therefore read on screen exactly like a wake that worked - the
+// silent no-op shape this project keeps finding, on the one mechanism whose entire job is
+// to make something happen. So the window is resolved first, by id, and a failure to
+// resolve is a refusal that says why.
+//
+// The resolver is exercised against a SYNTHETIC window list rather than the machine's, so
+// the arm means the same thing on a box with no kitty running. Both directions, one
+// variable: whether the window's shell is an ancestor of the pid.
+{
+	const wake = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
+	const hit = wake.resolveWindow(process.pid, [{ sock: "/tmp/kitty-1", id: 7, shellPid: process.pid, fg: [] }])
+	const miss = wake.resolveWindow(process.pid, [{ sock: "/tmp/kitty-1", id: 7, shellPid: 999999, fg: [] }])
+	const byFg = wake.resolveWindow(4242, [{ sock: "/tmp/kitty-1", id: 9, shellPid: 1, fg: [4242] }])
+
+	// And the doorbell must never cost a delivery. Mail waits for `app`; the LEADER ends a
+	// turn; its own delivery and its exit code must be exactly what they were.
+	const rootW = mkdtempSync(join(tmpdir(), "comm-attack-wake-"))
+	process.on("exit", () => { try { rmSync(rootW, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(rootW, "app", "docs"), { recursive: true })
+	mkdirSync(join(rootW, ".comm"), { recursive: true })
+	writeFileSync(join(rootW, "app", "docs", "REVIEW.md"), "# review\n")
+	writeFileSync(join(rootW, ".comm", "config.json"),
+		JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app" } }))
+	execFileSync("node", [join(PKG, "install.mjs"), rootW], { stdio: "pipe" })
+	const busW = join(rootW, ".comm", "bin", "comm.mjs")
+	execFileSync("node", [busW, "send", "app", "--ref", "docs/REVIEW.md"], { cwd: rootW, stdio: "pipe" })
+	// The ref is resolved from the SENDER's own directory, then rewritten for the recipient.
+	execFileSync("node", [busW, "send", "leader", "--ref", "docs/REVIEW.md"], { cwd: join(rootW, "app"), stdio: "pipe" })
+	const mineBefore = readdirSync(join(rootW, ".comm", "inbox", "leader")).filter((f) => f.endsWith(".json")).length
+	const stop = spawnSync("node", [join(rootW, ".claude", "comm-hook.mjs"), "stop"], {
+		cwd: rootW, encoding: "utf8",
+		input: JSON.stringify({ cwd: rootW, transcript_path: join(rootW, "t.jsonl") }),
+	})
+	const mineAfter = readdirSync(join(rootW, ".comm", "inbox", "leader")).filter((f) => f.endsWith(".json")).length
+	const theirs = readdirSync(join(rootW, ".comm", "inbox", "app")).filter((f) => f.endsWith(".json")).length
+
+	check("A32 the doorbell resolves before it rings, and costs no delivery",
+		hit.ok && byFg.ok && !miss.ok && /no kitty window/.test(miss.why || "") &&
+		mineBefore === 1 && mineAfter === 0 && theirs === 1 && stop.status === 0,
+		`resolve: ancestor=${hit.ok} foreground=${byFg.ok} unresolvable=${miss.ok ? "ANSWERED" : "refused"}; ` +
+		`sender's own mail ${mineBefore}->${mineAfter}, the other agent's still ${theirs} (undelivered, correctly), ` +
+		`hook exit=${stop.status}`)
 }
 
 // A31 — this suite must not touch the machine's real session registry.

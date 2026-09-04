@@ -637,6 +637,19 @@ function dispatch(root, cfg, me, cmd, rest) {
 		}
 		case "who": {
 			const live = liveAgents(root, cfg)
+			// `--json` exists so the WAKE does not have to scan /proc a second time.
+			// "Which claude process is which agent" already has one implementation, right
+			// here, and this project has now been bitten twice in one day by a second one
+			// disagreeing with it (F7, G7 of review #5). A program asking that question gets
+			// the same answer a person does, from the same call.
+			if (rest.includes("--json")) {
+				const out = { root, leader: cfg.leader, you: me || null, agents: {} }
+				for (const id of Object.keys(cfg.agents)) {
+					out.agents[id] = { pids: (live[id] || []).map((x) => x.pid), pending: pending(root, id).msgs.length }
+				}
+				console.log(JSON.stringify(out))
+				return
+			}
 			console.log(`project: ${root}\nleader:  ${cfg.leader}\nyou:     ${me || "(not inside a known agent directory)"}\n`)
 			for (const id of Object.keys(cfg.agents)) {
 				const l = live[id]
