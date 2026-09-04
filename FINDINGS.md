@@ -726,3 +726,38 @@ gate on the tests, it is an invariant in the code: **a hook records only for a s
 project.** A hook belongs to a project; if the session it resolved is running somewhere else, something is
 firing it on behalf of a session it does not speak for, and the only safe act is to record nothing. That
 closes the whole family - A18, this, and whatever fires a stub next - and it is armed in A29 both ways.
+
+## `#reboot-signal` — the reboot arm cannot fill, and the verdict was calling that a sampling problem
+
+Found 2026-09-04 by the `~/Dev/work` leader, against this project's newest instrument, an hour after it
+started recording there — and he was the evidence. The owner restarted him deliberately, at this project's
+request; it is the cleanest reboot available, and the ledger recorded it as:
+
+```
+{"event":"start","agent":"leader","source":"startup","trigger":null,"prev_session":null}
+starts   cold 2 · reboot 0
+verdict: UNKNOWN — needs 10 starts in each arm; have cold=1, reboot=0
+```
+
+**`prev_session` is null because nothing survives the restart to carry it.** At the hook, a relaunch and a
+cold start are the same event. So the reboot arm was not under-filled, it was **unreachable**, and ten more
+sessions would not have moved it. `classify()` reaches the reboot arm on `source: "clear"`, on a `trigger`,
+or on a `prev_session` — a `/clear` therefore fills it, which is why *this* repo's arm has records and the
+field's never will until something declares the restart.
+
+**This is this project's own recurring shape turned on itself:** a row asserting something it never checked.
+The registry row said "the sensor can resolve this session" without reading the file; this said "needs 10 in
+each arm" without asking whether an arm could receive one.
+
+**Fixed, minimally and honestly:** `verdictOf` now takes reachability, computed from the same records the
+arms are built from, and when the reboot arm is empty *and* no start has ever carried a crossing signal it
+says so — *"the reboot arm is UNREACHABLE here … this is not a sampling shortfall and more sessions will not
+close it"*. Armed in `--prove-red` on one variable: whether a single record carries `source: "clear"`.
+
+**NOT fixed, and it is the real one.** A signal must be made to cross the restart. His proposal is the cheap
+one and it is right: **the restarting party knows it is a restart**, so let it say so — an env var, or a file
+the next `SessionStart` hook reads and clears. A second candidate is already on disk here: the ledger's own
+`handoff` event is written by the session that is about to be restarted, so *a `start` whose agent's previous
+event was a `handoff`, with no intervening start, is a reboot*. That is a change to the instrument the whole
+experiment is scored from, and review #4 spent nine findings on this file — it gets its own session, not the
+tail of this one.

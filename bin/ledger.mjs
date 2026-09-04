@@ -300,9 +300,25 @@ function fisher(a, b, c, d) {
 }
 
 /** cold = [with-defect, without], reboot = [with-defect, without]. */
-function verdictOf(cold, reboot) {
+function verdictOf(cold, reboot, rebootReachable = true) {
 	const [a, b] = cold, [c, d] = reboot
 	if (a + b < MIN_ARM || c + d < MIN_ARM) {
+		// A SHORTFALL YOU CANNOT CLOSE IS NOT A SHORTFALL. Found 2026-09-04 by the
+		// ~/Dev/work leader, against this instrument, an hour after it started recording
+		// there: the owner restarted him deliberately, the cleanest reboot available, and
+		// it landed in the COLD arm. `prev_session` is null because NOTHING SURVIVES THE
+		// RESTART TO CARRY IT, so at the hook a relaunch and a cold start are the same
+		// event. The line still said "needs 10 starts in each arm", reporting a sampling
+		// problem where the truth is a classification one - ten more sessions would not
+		// have moved it. That is this project's own recurring shape, turned on itself: a
+		// row asserting something it never checked. FINDINGS.md#reboot-signal
+		if (c + d < MIN_ARM && !rebootReachable) {
+			return { verdict: "UNKNOWN", p: null,
+				why: `the reboot arm is UNREACHABLE here - no start has ever carried a signal that survives a restart ` +
+					`(a trigger, a prev_session, or source "clear"), so a relaunch is indistinguishable from a cold start ` +
+					`at the hook. This is not a sampling shortfall and more sessions will not close it. ` +
+					`cold=${a + b}` }
+		}
 		return { verdict: "UNKNOWN", why: `needs ${MIN_ARM} starts in each arm; have cold=${a + b}, reboot=${c + d}`, p: null }
 	}
 	const p = fisher(a, b, c, d)
@@ -404,20 +420,23 @@ function analyse(read, windowMin) {
 	const tally = (list) => [list.filter((s) => s.inWindow > 0).length, list.filter((s) => s.inWindow === 0).length]
 	const anyDefect = (list) => list.filter((s) => s.total > 0).length
 	const cTally = tally(coldT), rTally = tally(rebootT)
+	// Has ANY start here ever carried a signal that crosses a restart? Not "did the reboot
+	// arm fill" - whether it CAN. Read from the same records the arms are built from.
+	const rebootReachable = starts.some((s) => s.kind === "reboot")
 	// Defects authored inside a window that never completed are not scored against anyone -
 	// so they are reported, loudly, rather than vanishing between the two arms.
 	const inExcluded = [...cold, ...reboot, ...other].filter((s) => !s.complete)
 		.reduce((n, s) => n + s.inWindow, 0)
 
-	const base = verdictOf(cTally, rTally)
+	const base = verdictOf(cTally, rTally, rebootReachable)
 	// Property 3. Everything unreadable or unplaceable could be a first-window defect.
 	// Load the whole pool into each arm in turn; if the answer moves, there is no answer.
 	const U = unattributable + read.unreadable + sessionOnly + inExcluded
 	let sensitivity = null
 	if (base.verdict !== "UNKNOWN" && U > 0) {
 		const push = ([w, wo], n) => { const add = Math.min(n, wo); return [w + add, wo - add] }
-		const worstReboot = verdictOf(cTally, push(rTally, U))
-		const worstCold = verdictOf(push(cTally, U), rTally)
+		const worstReboot = verdictOf(cTally, push(rTally, U), rebootReachable)
+		const worstCold = verdictOf(push(cTally, U), rTally, rebootReachable)
 		if (worstReboot.verdict !== base.verdict || worstCold.verdict !== base.verdict) {
 			sensitivity = { pool: U, ifAllReboot: worstReboot.verdict, ifAllCold: worstCold.verdict }
 		}
@@ -859,6 +878,27 @@ function proveRed() {
 		const esc = rec(root, ["start", "--agent", "../../../../tmp/pwned", "--source", "startup"])
 		check("an agent name cannot traverse out of the log directory", esc.status === EX_USAGE && !existsSync("/tmp/pwned.log"),
 			`exit ${esc.status}, /tmp/pwned.log exists=${existsSync("/tmp/pwned.log")}`)
+	}
+
+	// A SHORTFALL YOU CANNOT CLOSE MUST NOT BE REPORTED AS A SAMPLING PROBLEM.
+	// Found against this instrument by the ~/Dev/work leader, who WAS the reboot: the owner
+	// restarted him deliberately, and the start landed in the cold arm because nothing
+	// survives a restart to say otherwise. The line still asked for "10 starts in each arm".
+	// One variable between these two worlds: whether a single record carries `source: clear`.
+	{
+		const mk = (name, sources) => {
+			const r = join(dir, name)
+			mkdirSync(join(r, ".comm", "handoff"), { recursive: true })
+			writeFileSync(join(r, ".comm", "handoff", "leader.log"), sources.map((src, k) =>
+				JSON.stringify({ v: 1, at: new Date(Date.UTC(2026, 0, k + 1)).toISOString(), event: "start",
+					agent: "leader", session: `s${k}`, source: src })).join("\n") + "\n")
+			return run(r)
+		}
+		const unreachable = mk("unreach", ["startup", "startup", "startup"])
+		const reachable = mk("reach", ["startup", "startup", "clear"])
+		check("an arm that CANNOT fill says so, not 'needs 10'",
+			/UNREACHABLE/.test(unreachable.why || "") && /needs \d+ starts/.test(reachable.why || ""),
+			`only relaunches -> ${String(unreachable.why).slice(0, 46)}...; one clear -> ${String(reachable.why).slice(0, 34)}...`)
 	}
 
 	console.log(`\n${failed ? `✗ ${failed} ledger propert(y/ies) NOT demonstrated` : "✓ every ledger property demonstrated by a moved variable"}\n`)
