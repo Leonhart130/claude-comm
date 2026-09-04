@@ -7,6 +7,10 @@ node_modules/
 # The lifecycle ledger and the handoffs beside it: what a session measured about its own
 # restart is live state, per agent, and never a commit.
 .comm/handoff/
+# The note a restarting party leaves for the session that replaces it. One file, consumed
+# by the next SessionStart. Live state by definition: a committed one would be a restart
+# claimed by every clone of this repo.
+.comm/restart/
 
 # Boot state: when the gate was last green, on which fingerprint. Live state, not source.
 .boot-state.json

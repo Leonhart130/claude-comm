@@ -5,30 +5,35 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-**1 — Make a signal cross the restart. The reboot arm is UNREACHABLE until you do, and the trigger is
-worthless without it.**
+**1 — Arm the signal on a REAL restart. The mechanism exists now; nothing outside a fixture has used it.**
 
-*Written 2026-09-04 by the session that built the wake. It assumes you remember nothing, and boot injects
-only this first line — so the first line is the instruction. Every claim below is checkable; check it.*
+*Written 2026-09-04 by the session that built it. It assumes you remember nothing, and boot injects only this
+first line — so the first line is the instruction. Every claim below is checkable; check it.*
 
-`node bin/ledger.mjs --root ~/Dev/work` says it in the tool's own words: **the reboot arm is unreachable
-there.** `prev_session` is null because nothing survives a restart to carry it, so at the hook a relaunch and
-a cold start are the same event. The `~/Dev/work` leader proved it by BEING the reboot — the owner restarted
-him deliberately and the ledger filed it as cold. `classify()` reaches the arm on `source: "clear"`, a
-`trigger`, or a `prev_session`; a `/clear` therefore fills it and a relaunch never will.
-**`FINDINGS.md#reboot-signal` carries the measurement and both candidate fixes — read it, do not re-derive.**
+`bin/restart-signal.mjs` is the signal that crosses: the restarting party leaves `.comm/restart/<agent>.json`,
+the next `SessionStart` hook **takes** it (a rename, so exactly one session can), and the ledger classifies on
+it. Gated by A33 and A34, six ledger arms and boot's R11; installed into both field projects; `selftest` and
+`--prove-red` green before and after. **`FINDINGS.md#reboot-signal` carries the design, the defect the arms
+caught inside it an hour old, and what it deliberately does NOT do — read it, do not re-derive.**
 
-Two candidates, and **the owner of the other project has been asked which he would trust** (his reply, if it
-has arrived, is in `exchange/work-leader/in/`):
+What is missing is a restart that actually uses it, because **nothing arms it automatically.**
 
-1. **His:** the restarter knows it is a restart — an env var, or a file the next `SessionStart` reads and
-   clears. New mechanism; cannot lie.
-2. **Mine:** the ledger's `handoff` is already written by the session about to restart, so a `start` whose
-   agent's previous event was a `handoff` is a reboot. No new mechanism; **but a handoff not followed by a
-   restart mislabels the next start.**
+- **Here:** write the handoff, then `node bin/restart-signal.mjs arm --agent unnamed --prev-session <this
+  session's id> --by handoff --ttl 900`, then restart. The next boot's `ledger` row must count a reboot that
+  no `/clear` produced. Until one real restart does that, the arm is reachable and empty — which is progress
+  and is not evidence.
+- **In `~/Dev/work`:** its leader is restarted by the owner's hand, so the hand (or the leader, one command
+  before it dies) has to arm it. Ask, do not guess: that project's ledger is the one whose arm was proved
+  unreachable, and it is the only place a real reboot has ever happened.
+- ⚠️ **Do not arm a signal to test the plumbing in a project whose ledger is being scored.** A fixture root
+  costs nothing; a fake reboot in `~/Dev/work` is a control writing into the world it measures
+  (`FINDINGS.md#measurement-traps`).
 
-⚠️ **This changes the classification the whole experiment is scored from, and review #4 spent nine findings
-on that file.** Do it as its own piece of work, with arms, not as the tail of something else.
+**The peer was asked which mechanism he would trust and had not replied when this shipped** (`exchange/
+work-leader/out/2026-09-04-unreachable-arm.md`, sent 18:50). The design chose HIS — an explicit note that
+cannot lie — over pairing a `start` against the previous `handoff`, and kept what his objection was really
+about (an abandoned note poisoning a later start) as an expiry the ledger applies. If his reply argues for
+the other one, it now argues against shipped code with arms.
 
 **2 — Then the reboot trigger.** The consumer's §2.4: *"you re-fetched a file you already read this
 session"*, countable by a hook, not a token threshold. Its confound is theirs, priced at ~30 min; ask rather
@@ -53,14 +58,14 @@ the bus, never by absolute path · the doorbell resolves by pid and refuses rath
 
 | | state |
 | --- | --- |
-| toolkit | `bin/comm.mjs`, `bin/session-registry.mjs`, `install.mjs`, `test/attack.mjs`, `test/selftest.mjs`, `test/latency.mjs` — no dependencies |
+| toolkit | `bin/comm.mjs` · `session-registry.mjs` · `ledger.mjs` · `restart-signal.mjs` · `wake.mjs` · `context.mjs` · `boot.mjs` · `install.mjs` · `test/` — no dependencies |
 | repo | git initialised; **an `origin` on GitHub exists** (`Leonhart130/claude-comm`) — the "local only" line here was stale. Nothing is pushed automatically; the owner decides |
 | **electio** | in real daily use — 26 real deliveries, both directions. **Ran a bus 4 commits stale until this session** |
-| gates | `attack` **29/29** deterministic, every case proved able to go red · `selftest` 6/6 transport, deterministic · `ledger` **28** arms · `context` and `boot` controls green. Numbers here go stale — run boot |
-| boot | `node bin/boot.mjs` — **12 measured rows**, every gating one demonstrated able to go red; `--fast` (0.28 s) is injected at session start by `.claude/settings.json`, the contract is `CLAUDE.md` |
-| **ledger** | `node bin/ledger.mjs` — the reboot instrument, **built before the mechanism**. Records here AND in the field since 2026-09-04; a field arm is `--root ~/Dev/electio`. Verified in electio itself, not only in a fixture |
-| **sensor** | `node bin/context.mjs` — resolves pid → transcript through `bin/session-registry.mjs` (written by the `SessionStart` hook, keyed on pid + start time + boot id) and **refuses on a miss**. 16 arms. `FINDINGS.md#clear-blind` |
-| reviews | #1–#4 · **#5, 2026-09-04 — the first launched by the leader itself rather than by the owner. Two passes. Eight findings then seven more on the fixes; all fifteen dispositioned. Its lasting contribution is a method amendment, now in `CLAUDE.md`: **five of the second pass's seven findings were about the ARMS, not the code** — a gate that can redden is not yet a gate that reddens for the property in its own title. F1 was the named best catch and was real: `#clear-blind` reachable THROUGH its own fix, erring toward "reboot". `REVIEW-adversarial-5.md`** · the electio leader's field reviews |
+| gates | `attack` (deterministic, every case armed) · `ledger --prove-red`, now run INSIDE it · `selftest` (real sessions, not gated by boot) · `context` and `boot` controls. **Counts live in boot's output, never here** |
+| boot | `node bin/boot.mjs` — every gating row demonstrated able to go red; `--fast` is injected at session start by `.claude/settings.json`, the contract is `CLAUDE.md` |
+| **ledger** | `node bin/ledger.mjs` — the reboot instrument, **built before the mechanism**, which now exists (`restart-signal.mjs`). Records here AND in the field; a field arm is `--root ~/Dev/electio`. Its own arms run inside `attack` as A34 |
+| **sensor** | `node bin/context.mjs` — resolves pid → transcript through `bin/session-registry.mjs` (written by the `SessionStart` hook, keyed on pid + start time + boot id) and **refuses on a miss**. `FINDINGS.md#clear-blind` |
+| reviews | #1–#5, all dispositioned (`REVIEW-adversarial-5.md`, the first the leader launched itself) · the electio leader's field reviews. **#5's lasting output is the method amendment now in `CLAUDE.md`: a gate that CAN redden is not yet one that reddens for the property in its own title** |
 
 ## ⏭️ OPEN
 1. **🔴 Latency is a mailbox, not an interrupt.** Re-derive with `node test/latency.mjs <log>`; the table is
@@ -73,13 +78,10 @@ the bus, never by absolute path · the doorbell resolves by pid and refuses rath
 2. **`--reply-to <id>` (threading).** Requested by the field, then deprioritised by it: with two agents,
    threading adds identity surface while the substance already lives in the file.
 
-3. ✅ **Phase 2 — the wake is BUILT and verified against a real agent** (`bin/wake.mjs`, 2026-09-04).
-   A sender's Stop hook rings it when mail is waiting for someone else; it resolves the target's kitty
-   window **by pid** and refuses when it cannot, because `send-text --match` exits 0 on no match. The idle
-   session takes a turn and its own gated Stop path delivers — measured `via: "hook"`, `id_src: "stub"`.
-   Gated by A32, armed both ways. Design, and the two things the first live run got wrong (a trust prompt
-   that silently kills a self-launched agent; a doorbell that instructed and so bypassed the gated path):
-   `FINDINGS.md#wake-doorbell`.
+3. ✅ **Phase 2 — the wake is BUILT and verified against a real agent** (`bin/wake.mjs`, 2026-09-04). A
+   sender's Stop hook rings it; it resolves the target's kitty window **by pid** and refuses when it cannot,
+   because `send-text --match` exits 0 on no match. Gated by A32, armed both ways. Design and the two things
+   the first live run got wrong: `FINDINGS.md#wake-doorbell`.
 
    🔴 **Still open here:** item 1's latency table was measured BEFORE this existed and has not been
    re-measured with it. The claim "this bus is a mailbox, never an interrupt" is unchanged and still true —
@@ -94,12 +96,11 @@ the bus, never by absolute path · the doorbell resolves by pid and refuses rath
 
    ⭐ **The fix is a claim file, and it respects the hub rule exactly** — `claims/<resource>` carrying pid,
    purpose and time; the file is the artifact; no transport, no daemon. Three properties: a stale claim is
-   **diagnosable, not authoritative** (the pid is there so a reader can see the holder is dead — evidence of
-   a crash, never a lock that outlives it); it **advises, it does not enforce** (a mutex every agent can
-   delete is a promise the filesystem does not make); and it ships with a gate proved able to go red on a
-   claim left by a dead process. **Deliberately not next** — the field wiring is — but a second COLLISION
-   outranks that plan. A near-miss does not: the peer reported one on 2026-09-04 and priced it himself as
-   evidence the fix is cheap, not that it is needed.
+   **diagnosable, not authoritative** (the pid lets a reader see the holder is dead — evidence of a crash,
+   never a lock that outlives it); it **advises, it does not enforce**; and it ships with a gate proved able
+   to go red on a claim left by a dead process. **Deliberately not next**, but a second COLLISION outranks
+   that plan — a near-miss does not, and the peer reported one on 2026-09-04 and priced it himself as
+   evidence the fix is cheap rather than needed.
 
 5. **🔴 A session launched outside an interactive shell has NO bus, and says nothing.** `node` lives only
    under nvm, which only an interactive shell puts on `PATH`, so `kitten @ launch claude` (or a `.desktop`
@@ -124,8 +125,9 @@ the bus, never by absolute path · the doorbell resolves by pid and refuses rath
    the design effort belongs in the fifteen minutes AFTER a restart. And the handoff carries a **sha256 read
    manifest**, never prose: a rebooted session re-reads only what MOVED. Nothing trusted, something proved.
 
-   ✅ **The instrument was built first** (`node bin/ledger.mjs`) and review #4 has been answered in full.
-   🔴 **What is open is the ▶ NEXT above**: the sensor, then the field, then the trigger.
+   ✅ **The instrument was built first** (`node bin/ledger.mjs`), review #4 is answered in full, and the
+   signal that makes its reboot arm reachable now exists (`bin/restart-signal.mjs`, `#reboot-signal`).
+   🔴 **What is open is the ▶ NEXT above**: a real restart that arms it, then the trigger.
 
 ## ⚠️ What was NOT verified
 
@@ -133,10 +135,6 @@ the bus, never by absolute path · the doorbell resolves by pid and refuses rath
   (`FINDINGS.md#clear-blind`). Now MOOT for the sensor — the registry does not consult that descriptor for an
   answer — but still unmeasured, and it is what decides whether the "session CLEARED" note the sensor prints
   is permanent or transient.
-- ~~The registry has never been written by a real `/clear`.~~ **VERIFIED 2026-09-04 16:00** in a disposable
-  session launched for it: the scratch descriptor stayed on the dead launch session (frozen at 44 398 tokens)
-  while the registry followed the live one (45 712, advancing), and the sensor printed
-  `session CLEARED (launched as 707192c3)` unprompted. `FINDINGS.md#clear-blind`.
 - **What happens to the entry when a session is `resume`d or `compact`ed.** Both fire `SessionStart` with a
   source this repo has never seen, so whether they carry a `transcript_path` at all is unknown. A payload
   without one leaves the previous entry standing, which is the safe direction and is not the same as correct.
@@ -147,20 +145,22 @@ the bus, never by absolute path · the doorbell resolves by pid and refuses rath
   `/proc/sys/kernel/random/boot_id`; without both it refuses to record, which is a refusal, not support.
 - **The ledger has never scored a real defect.** Sixteen arms move it on synthetic records; nothing has yet
   been recorded by a hand that was not writing a fixture. Its first real `record defect` is the test.
+- **The restart signal has never crossed a REAL restart.** Every crossing so far is a fixture: A33 through
+  the installed stub, and the module's own arms. Nobody has armed one, been restarted, and watched the
+  ledger count it — so what is proved is that the mechanism works, not that the workflow around it does.
+- **Whether a session can arm a signal on its way out at all.** The armer has to run one command between
+  deciding to restart and being restarted, and in the field that decision belongs to a human hand.
 - **Whether two consumers of one hook stdin work.** The ▶ NEXT depends on the generated stub reading the
   payload and handing it to both the bus and the ledger. It currently uses `stdio: "inherit"` and has never
   been asked to do anything else.
-- **Whether finding 1 ever actually ate mail in electio.** Still unanswerable — but the reason stated here
-  for three sessions was **wrong, and the wrong reason was the more dangerous half.** It said the log "never
-  records which agent's hook drained it". It does: `to_agent`, since the initial commit. What it records is
-  the **resolved name**, and every theft class this project has had works by making the thief resolve to the
-  *victim's* name — so the field is clean by construction in exactly the cases it would need to catch. I
-  proved that the hard way on 2026-08-06 (see session 7). `id_src` now separates the two, but it is only on
-  rows written from today; the 37 historical rows stay unauditable. Review #1's finding 6, one level up.
-- **How long the wandered-cwd window stays open.** Proved within a single `-p` turn. Whether an interactive
-  session's Bash cwd resets between turns, or after `/clear`, is unmeasured — it decides the exposure, not
-  the existence, of the defect. Now moot for delivery (identity no longer reads cwd) but it still governs
-  the `whoami`-returns-null case in open item 2.
+- **Whether finding 1 ever actually ate mail in electio.** Unanswerable, and not for the reason this file
+  gave for three sessions: the log DOES record who drained (`to_agent`, since the first commit), but it
+  records the **resolved** name, and every theft class here works by making the thief resolve to the
+  victim's name — clean by construction in exactly the cases it would need to catch. `id_src` separates the
+  two now, on new rows only; the 37 historical rows stay unauditable. Review #1's finding 6, one level up.
+- **How long the wandered-cwd window stays open.** Proved within a single `-p` turn; whether an interactive
+  session's Bash cwd resets between turns is unmeasured. It decides the exposure, not the existence, of the
+  defect. Moot for delivery (identity no longer reads cwd); still governs `whoami`-returns-null, open item 2.
 - **Behaviour when an agent is mid-tool-call** rather than mid-turn. Still unexercised.
 - **`selftest`'s BEHAVIOUR half is not a gate and never will be** — 3 of 6 runs showed the agent not reading
   the file it was pointed at. That is allowed by design, but it means this bus regularly rings a bell nobody
@@ -177,14 +177,11 @@ the bus, never by absolute path · the doorbell resolves by pid and refuses rath
   sees a partial file — but two interleaved read-modify-writes can still lose one update. The record it
   holds is a counter, so a lost count is recoverable where a lost file was not. Not measured.
 
-## Measurement traps
+## Two conventions, kept here because both erode silently
 
-Three recorded, all of them ways a control lied: `FINDINGS.md#measurement-traps`. The one-line version —
-**a control that does not travel the same code as the arms validates nothing, and one that writes into the
-world it measures is not a control at all.**
+**Measurement traps** — three recorded, all of them ways a control lied (`FINDINGS.md#measurement-traps`):
+a control that does not travel the same code as the arms validates nothing, and one that writes into the
+world it measures is not a control at all.
 
-## Where the mistakes are recorded
-
-Findings are written into the code and gate comments at the point they apply (`test/attack.mjs` header for
-A8; the A10 rewrite note; `hookDeliver`'s identity comment; `firstPositional`; `resolveRef`/`refForRecipient`
-in `bin/comm.mjs`). *A rule whose cost you cannot see is a rule someone will simplify away.*
+**Findings live in the code**, in the comment at the point they apply, not only in a document — *a rule
+whose cost you cannot see is a rule someone will simplify away.*

@@ -28,7 +28,7 @@
  * One JSON object per line, appended, in `.comm/handoff/<agent>.log` — beside the
  * handoff, in the same gitignored live-state territory. `v` is the schema version.
  *
- *   start    {v,at,event,agent,session,source,prev_session,trigger,context,manifest}
+ *   start    {v,at,event,agent,session,source,prev_session,signal,trigger,context,manifest}
  *   handoff  {v,at,event,agent,session,context,trigger,manifest,ref}
  *   defect   {v,at,event,agent,ref,authored_at,authored_session,found_at}
  *
@@ -106,6 +106,14 @@ const MIN_ARM = 10
 // A convention, and named as one. It decides only whether a DIFFERENCE is reported; the
 // counts are printed either way and are the durable part of the record.
 const ALPHA = 0.05
+// The longest a restart signal may claim to stay valid. The signal carries its own
+// `ttl_s` because only the armer knows whether a program or a human hand is doing the
+// restarting — but the armer is also the only party with an interest in the reboot arm
+// filling, so it may SHORTEN its promise and not extend it. Without this ceiling a signal
+// armed with ttl_s = 10^9 turns every later start into a reboot, and the ledger would
+// have no way to tell that from a real one. One hour: longer than any restart anybody has
+// performed here, shorter than a working day.
+const SIGNAL_TTL_MAX_S = 3600
 
 
 /**
@@ -190,6 +198,16 @@ function writeRecord() {
 			// said; property 1 is what keeps that honest.
 			rec.source = opt("--source", null)
 			rec.prev_session = opt("--prev-session", null)
+			// HOW the prev_session got here, and how old it was when it arrived. Stored,
+			// never applied: `classify()` decides whether that age still counts, so the
+			// rule can be corrected later and every record ever written is re-read under
+			// it. A record that said `stale: true` would freeze today's TTL into the data.
+			// See bin/restart-signal.mjs — property 2. FINDINGS.md#reboot-signal
+			const sigSrc = opt("--signal-src", null)
+			const sigAge = numOrNull("--signal-age")
+			const sigTtl = numOrNull("--signal-ttl")
+			rec.signal = sigSrc === null && sigAge === null && sigTtl === null
+				? null : { src: sigSrc, age_s: sigAge, ttl_s: sigTtl }
 		} else {
 			rec.ref = opt("--ref", null)
 		}
@@ -263,6 +281,45 @@ function readRecords(dir, agentFilter) {
 }
 
 /**
+ * Was the restart signal still good when it was claimed?
+ *
+ * THE MECHANISM'S ONE REAL WEAKNESS, and this is where it is contained: a signal armed for
+ * a restart that never happened waits on disk and hands `prev_session` to whatever start
+ * comes next — hours later, from a cold launch nobody restarted. The armer says how long
+ * its promise is good for, the claimer measures how old it actually was, and this decides.
+ *
+ * Three ways to be not-fresh, and none of them may read as fresh:
+ *   · older than the promise;
+ *   · a promise longer than SIGNAL_TTL_MAX_S, which is the armer overreaching;
+ *   · a signal that names no promise at all — an unverifiable claim is not a fresh one,
+ *     and defaulting it here would put the guess back that `ttl_s` exists to remove;
+ *   · an age that could not be measured at all (an unparseable stamp), or one that is
+ *     NEGATIVE — a signal stamped in the future is a clock problem or a forgery, and it
+ *     is the reading that would otherwise look freshest of all.
+ *
+ * `signal === null` is honoured: that is every record written before this field existed,
+ * and any caller that sets `--prev-session` directly. Refusing those would silently
+ * re-classify history the day this shipped.
+ */
+function signalIsFresh(sig) {
+	if (sig === null || sig === undefined) return true
+	if (!sig || typeof sig !== "object") return false
+	// `typeof x === "number"`, NOT `Number(x)`. Caught by arm 18 below on the day this was
+	// written: `Number(null)` is 0, so an age that could not be measured at all — the
+	// field's own way of saying "unknown" — passed `0 >= 0 && 0 <= ttl` as the FRESHEST
+	// reading obtainable, and every unmeasurable signal became a reboot. A coercion that
+	// turns absence into a favourable number is this project's signature defect wearing
+	// arithmetic. A string "5" is refused for the same reason: it did not come from the
+	// writer, so it is not a measurement this file made.
+	const num = (x) => (typeof x === "number" && Number.isFinite(x) ? x : null)
+	const age = num(sig.age_s)
+	if (age === null || age < 0) return false
+	const ttl = num(sig.ttl_s)
+	if (ttl === null || ttl <= 0) return false
+	return age <= Math.min(ttl, SIGNAL_TTL_MAX_S)
+}
+
+/**
  * The one place a measurement becomes an arm. Correct THIS when `/clear`'s `source` is
  * finally observed, and every record ever written is re-read under the new rule.
  *
@@ -273,7 +330,14 @@ function readRecords(dir, agentFilter) {
  *            silently folding it into either arm would move the answer.
  */
 function classify(r) {
-	if (r.trigger || r.prev_session) return "reboot"
+	if (r.trigger) return "reboot"
+	// The SIGNAL is the assertion "this start is a restart"; `prev_session` is evidence
+	// about it, and the armer does not always know it — a human hand restarting an agent
+	// knows it is restarting long before it knows a session id. Keying the arm on
+	// prev_session alone would have thrown away every signal a human left. Either one
+	// reaches the arm, and both are subject to the same freshness rule; `signal === null`
+	// is fresh by definition, which is what keeps every pre-existing record readable.
+	if ((r.signal || r.prev_session) && signalIsFresh(r.signal)) return "reboot"
 	const s = (r.source || "").toLowerCase()
 	if (s === "clear") return "reboot"
 	if (s === "startup") return "cold"
@@ -899,6 +963,85 @@ function proveRed() {
 		check("an arm that CANNOT fill says so, not 'needs 10'",
 			/UNREACHABLE/.test(unreachable.why || "") && /needs \d+ starts/.test(reachable.why || ""),
 			`only relaunches -> ${String(unreachable.why).slice(0, 46)}...; one clear -> ${String(reachable.why).slice(0, 34)}...`)
+	}
+
+	// ── THE SIGNAL THAT CROSSES THE RESTART ────────────────────────────────────────
+	// The arm above proves the reboot arm can be UNREACHABLE. These prove the mechanism
+	// that reaches it, and each of them arms the failure IT forbids rather than the
+	// nearest failure that happens to be easy to stage (CLAUDE.md, amended 2026-09-04).
+	// Every world below is `source: "startup"` throughout, so a `/clear` cannot reach the
+	// arm behind the signal's back and flatter any of them. bin/restart-signal.mjs.
+	{
+		const mkSig = (name, recs) => {
+			const r = join(dir, name)
+			mkdirSync(join(r, ".comm", "handoff"), { recursive: true })
+			writeFileSync(join(r, ".comm", "handoff", "leader.log"),
+				recs.map((x) => JSON.stringify(x)).join("\n") + "\n")
+			return run(r)
+		}
+		const st = (k, extra) => ({ v: 1, at: new Date(Date.UTC(2026, 0, k + 1)).toISOString(), event: "start",
+			agent: "leader", session: `s${k}`, source: "startup", ...extra })
+		const world = (name, sig, prev = "p") => mkSig(name, [st(0, {}), st(1, {}), st(2, { prev_session: prev, signal: sig })])
+
+		// 15. THE ONE THAT MATTERS. Two identical worlds; the only difference is two
+		//     seconds of age across the promise the armer made. A signal whose restart
+		//     never came must not turn the next cold launch into a reboot — that is the
+		//     mechanism's one real weakness and the reason it carries a TTL at all.
+		//     The verdict TEXT is checked too: it is what a session actually reads.
+		const fresh = world("sig-fresh", { src: "test", age_s: 899, ttl_s: 900 })
+		const stale = world("sig-stale", { src: "test", age_s: 901, ttl_s: 900 })
+		check("a signal fills the reboot arm, and a stale one leaves it unreachable",
+			fresh.starts.reboot === 1 && stale.starts.reboot === 0 && stale.starts.cold === 3 &&
+			/needs \d+ starts/.test(fresh.why || "") && /UNREACHABLE/.test(stale.why || ""),
+			`age 899 of ttl 900 -> reboot=${fresh.starts.reboot}, "${String(fresh.why).slice(0, 24)}"; ` +
+			`age 901 of the same ttl -> reboot=${stale.starts.reboot}, cold=${stale.starts.cold}, "${String(stale.why).slice(0, 24)}"`)
+
+		// 16. The armer declares the promise, so the armer is the party that would extend
+		//     it. A ttl of a billion seconds turns every later start into a reboot and
+		//     nothing downstream could tell that from a real one.
+		const over = world("sig-over", { src: "test", age_s: 100_000, ttl_s: 1e9 })
+		const under = world("sig-under", { src: "test", age_s: 100, ttl_s: 1e9 })
+		check("a promise longer than the ceiling is capped, not honoured",
+			over.starts.reboot === 0 && under.starts.reboot === 1,
+			`ttl 1e9, age 100000 -> reboot=${over.starts.reboot}; same ttl, age 100 -> reboot=${under.starts.reboot} (ceiling ${SIGNAL_TTL_MAX_S}s)`)
+
+		// 17. A signal stamped in the FUTURE is a clock fault or a forgery, and it is the
+		//     reading that would otherwise look freshest of all — a negative age passes
+		//     every naive `age <= ttl` test ever written.
+		const future = world("sig-future", { src: "test", age_s: -5, ttl_s: 900 })
+		const past = world("sig-past", { src: "test", age_s: 5, ttl_s: 900 })
+		check("an age from the future is not the freshest reading of all",
+			future.starts.reboot === 0 && past.starts.reboot === 1,
+			`age -5 -> reboot=${future.starts.reboot}; age +5 -> reboot=${past.starts.reboot}`)
+
+		// 18. A signal with no promise and no measured age cannot be SHOWN fresh, and an
+		//     unverifiable claim must not be given the benefit of the doubt — defaulting
+		//     here would restore the guess `ttl_s` exists to remove.
+		const noTtl = world("sig-nottl", { src: "test", age_s: 1, ttl_s: null })
+		const noAge = world("sig-noage", { src: "test", age_s: null, ttl_s: 900 })
+		const both = world("sig-both", { src: "test", age_s: 1, ttl_s: 900 })
+		check("a signal that cannot be shown fresh is not counted as one",
+			noTtl.starts.reboot === 0 && noAge.starts.reboot === 0 && both.starts.reboot === 1,
+			`no ttl -> ${noTtl.starts.reboot}; no age -> ${noAge.starts.reboot}; both present -> ${both.starts.reboot}`)
+
+		// 19. Every record written before this field existed carries `prev_session` and no
+		//     `signal`. Refusing those would silently re-classify history on the day this
+		//     shipped — the same class of harm as storing a verdict in the data.
+		const legacy = mkSig("sig-legacy", [st(0, {}), st(1, {}),
+			{ v: 1, at: new Date(Date.UTC(2026, 0, 3)).toISOString(), event: "start", agent: "leader",
+			  session: "s2", source: "startup", prev_session: "p" }])
+		const none = mkSig("sig-none", [st(0, {}), st(1, {}), st(2, {})])
+		check("a record older than this mechanism keeps the arm it always had",
+			legacy.starts.reboot === 1 && none.starts.reboot === 0,
+			`prev_session with no signal field -> reboot=${legacy.starts.reboot}; neither -> ${none.starts.reboot}`)
+
+		// 20. The armer does not always know a session id — a hand that restarts an agent
+		//     knows it is restarting long before it knows what to call the predecessor. A
+		//     fresh signal alone must reach the arm, or every human-armed restart is lost.
+		const sigOnly = world("sig-only", { src: "hand", age_s: 3, ttl_s: 900 }, null)
+		check("a fresh signal reaches the arm even with no predecessor id",
+			sigOnly.starts.reboot === 1,
+			`prev_session=null, signal fresh -> reboot=${sigOnly.starts.reboot}`)
 	}
 
 	console.log(`\n${failed ? `✗ ${failed} ledger propert(y/ies) NOT demonstrated` : "✓ every ledger property demonstrated by a moved variable"}\n`)

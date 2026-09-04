@@ -190,9 +190,49 @@ try {
 	try {
 		const led = join(binDir, "ledger.mjs")
 		if (existsSync(led) && p.source && tp) {
-			spawnSync(process.execPath, [led, "record", "start", "--agent", agent,
+			// THE SIGNAL THAT CROSSES THE RESTART, claimed here and nowhere else. At this
+			// hook a relaunch and a cold start are the same event — \`source\` is "startup"
+			// for both — so without this the reboot arm of the experiment is not
+			// under-filled, it is UNREACHABLE. FINDINGS.md#reboot-signal
+			//
+			// Claimed INSIDE the guard that records, so a signal is never consumed by a
+			// hook that was not going to write a start: a one-shot note taken by a path
+			// that then records nothing is a reboot silently filed as cold.
+			let sig = []
+			try {
+				const rs = join(binDir, "restart-signal.mjs")
+				if (existsSync(rs)) {
+					const m = await import(pathToFileURL(rs).href)
+					const c = m.claim({ root: projectRoot, agent })
+					if (!c.ok) {
+						// Never silent. A signal that could not be read is a restart about to be
+						// recorded as a cold start, which is the exact defect this mechanism exists
+						// to remove — and a bare catch here would hide it forever.
+						process.stderr.write(\`claude-comm: a restart signal for \${agent} could not be claimed (\${c.why}); this start is being recorded as COLD.\\n\`)
+					} else if (c.signal) {
+						// Measurements only. Whether this age still counts is the ledger's
+						// \`classify()\` to decide, so the rule stays correctable over records
+						// already written. An age that could not be measured is OMITTED rather
+						// than sent as a placeholder: the ledger refuses a non-numeric flag, and
+						// refusing would cost the whole start record.
+						if (c.signal.prev_session) sig.push("--prev-session", String(c.signal.prev_session))
+						sig.push("--signal-src", String(c.signal.by || "unknown"))
+						if (Number.isFinite(c.age_s)) sig.push("--signal-age", String(c.age_s))
+						if (Number.isFinite(c.signal.ttl_s)) sig.push("--signal-ttl", String(c.signal.ttl_s))
+					}
+				}
+			} catch (e) {
+				process.stderr.write(\`claude-comm: the restart signal could not be loaded (\${(e && e.message) || e}); this start is being recorded as COLD.\\n\`)
+			}
+			const rec = spawnSync(process.execPath, [led, "record", "start", "--agent", agent,
 				"--source", p.source, "--session", basename(tp).replace(/\\.jsonl$/, ""),
-				"--root", projectRoot, "--quiet"], { timeout: 5000, stdio: "ignore" })
+				"--root", projectRoot, "--quiet", ...sig], { timeout: 5000, stdio: "ignore" })
+			// A claim is destructive and a record is not retried. If the write failed after
+			// the note was taken, that restart is gone and this line is the only thing that
+			// will ever say so.
+			if (sig.length && rec.status !== 0) {
+				process.stderr.write(\`claude-comm: a restart signal for \${agent} was claimed but the ledger did not record it (exit \${rec.status}); that restart is now UNCOUNTED.\\n\`)
+			}
 		}
 	} catch {}
 } catch { /* an instrument must never break a session */ }
@@ -308,7 +348,7 @@ write(join(commDir, "bin", "comm.mjs"), busSrc, results)
 // checkout moves, and breaks it silently — hooks exit 0 by design. A copy can go
 // stale instead, which is a failure this project already detects: `field:*` compares
 // the installed files against this repo's and reddens on any difference.
-for (const f of ["session-registry.mjs", "ledger.mjs", "wake.mjs"]) {
+for (const f of ["session-registry.mjs", "ledger.mjs", "wake.mjs", "restart-signal.mjs"]) {
 	write(join(commDir, "bin", f), readFileSync(join(HERE, "bin", f), "utf8"), results)
 }
 

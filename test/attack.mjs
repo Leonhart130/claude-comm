@@ -1246,6 +1246,146 @@ const POINTER_SOURCES = (() => {
 		`hook exit=${stop.status}`)
 }
 
+// A33 — THE SIGNAL THAT CROSSES THE RESTART, through the real generated stub.
+//
+// At `SessionStart` a relaunch and a cold start are the same event: `source` is "startup"
+// for both, and `prev_session` is null because nothing survived the restart to carry it.
+// Measured 2026-09-04 on the `~/Dev/work` leader, who WAS the reboot — his owner restarted
+// him deliberately and the ledger filed it as cold. The reboot arm of the experiment this
+// project exists to run was not under-filled, it was UNREACHABLE. FINDINGS.md#reboot-signal
+//
+// The mechanism is a note the restarting party leaves on disk. Everything that can go
+// wrong with it is a way to get a CONFIDENT WRONG COUNT in the arm being measured, so each
+// arm below stages the failure it forbids rather than the nearest failure that is easy to
+// produce, and carries the control that proves it was armed at all.
+{
+	const rootS = mkdtempSync(join(tmpdir(), "comm-attack-restart-"))
+	process.on("exit", () => { try { rmSync(rootS, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(rootS, "app", "docs"), { recursive: true })
+	mkdirSync(join(rootS, ".comm"), { recursive: true })
+	writeFileSync(join(rootS, "app", "docs", "REVIEW.md"), "# review\n")
+	writeFileSync(join(rootS, ".comm", "config.json"),
+		JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app" } }))
+	execFileSync("node", [join(PKG, "install.mjs"), rootS], { stdio: "pipe" })
+
+	// The INSTALLED copy, not this checkout's: a tool the installer forgot to carry is a
+	// hook that silently records every restart as a cold start, and the field would look
+	// exactly like it does today. Same reason session-registry.mjs travels beside the bus.
+	const rsBin = join(rootS, ".comm", "bin", "restart-signal.mjs")
+	const travelled = existsSync(rsBin)
+
+	// Same fixture shape as A29, and for the same reason: the stub records only for a
+	// session running INSIDE its own project, so the hook needs a `claude` ancestor whose
+	// cwd is in this project, and its own runtime directory so the suite cannot overwrite
+	// the operator's live registry entry (FINDINGS.md#measurement-traps).
+	const rt = join(rootS, "runtime")
+	const tp = join(rootS, "11111111-2222-3333-4444-555555555555.jsonl")
+	writeFileSync(tp, "\n")
+	const payload = join(rootS, "payload.json")
+	writeFileSync(payload, JSON.stringify({ cwd: join(rootS, "app"), source: "startup", transcript_path: tp }))
+	const fakeClaude = join(rootS, "claude")
+	try { symlinkSync("/bin/sh", fakeClaude) } catch {}
+	const start = () => spawnSync(fakeClaude, ["-c",
+		`cd ${join(rootS, "app")} && ${process.execPath} ${join(rootS, "app", ".claude", "comm-hook.mjs")} session-start ` +
+		`< ${payload} > /dev/null 2>&1; echo done`],
+		{ encoding: "utf8", env: { ...process.env, CLAUDE_COMM_RUNTIME: rt } })
+	const lastRecord = () => {
+		try {
+			const lines = readFileSync(join(rootS, ".comm", "handoff", "app.log"), "utf8").trim().split("\n")
+			return JSON.parse(lines[lines.length - 1])
+		} catch { return null }
+	}
+	const armSignal = (extra) => spawnSync("node", [rsBin, "arm", "--agent", "app", "--root", rootS, "--quiet", ...extra],
+		{ encoding: "utf8" })
+
+	// ARM 1's CONTROL: an ordinary launch, nothing on disk. This is the state the field has
+	// been in for every start it has ever recorded, and it must stay reachable — a
+	// mechanism that turns every start into a reboot destroys the denominator instead.
+	start()
+	const cold = lastRecord()
+	const coldOK = cold && cold.prev_session === null && cold.signal === null
+
+	// ARM 1: the same hook, the same payload, ONE VARIABLE — a note on disk. The relaunch
+	// must arrive in the ledger as a relaunch.
+	armSignal(["--prev-session", "PREV-SESSION-ID", "--ttl", "900", "--by", "attack"])
+	start()
+	const hot = lastRecord()
+	const crossed = hot && hot.prev_session === "PREV-SESSION-ID" && hot.signal && hot.signal.src === "attack" &&
+		Number.isFinite(hot.signal.age_s) && hot.signal.ttl_s === 900
+
+	// ARM 2: ONE-SHOT. The note is taken, not read. A second start that reuses it inflates
+	// the very arm this mechanism exists to fill, and it would do so invisibly — the log
+	// would show two honest-looking reboots where one restart happened.
+	start()
+	const reused = lastRecord()
+	const oneShot = reused && reused.prev_session === null && reused.signal === null
+
+	// ARM 3: THE MECHANISM'S OWN WEAKNESS, staged. A signal armed for a restart that never
+	// came waits on disk. Written by hand at an age no `arm` call could produce quickly,
+	// which is exactly the state an abandoned restart leaves behind.
+	writeFileSync(join(rootS, ".comm", "restart", "app.json"), JSON.stringify({
+		v: 1, at: new Date(Date.now() - 3600_000).toISOString(), agent: "app",
+		prev_session: "STALE-SESSION-ID", ttl_s: 900, by: "attack-stale", by_pid: process.pid }) + "\n")
+	start()
+	const staleRec = lastRecord()
+	// It is CLAIMED and RECORDED - the measurement is kept - and it is not counted.
+	const staleStored = staleRec && staleRec.prev_session === "STALE-SESSION-ID" && staleRec.signal &&
+		staleRec.signal.age_s > 900
+
+	// Four starts: one control, one real restart, one attempted reuse, one abandoned
+	// signal. Exactly ONE of them may reach the reboot arm.
+	let arms = null
+	try {
+		arms = JSON.parse(spawnSync("node", [join(PKG, "bin", "ledger.mjs"), "--root", rootS, "--json"],
+			{ encoding: "utf8" }).stdout).starts
+	} catch {}
+	const counted = arms && arms.reboot === 1 && arms.cold === 3
+
+	// ARM 4: two sessions starting at the same instant. `rename` is why exactly one of them
+	// can win; a read-then-unlink would hand the same restart to every one of them and the
+	// arm would inflate by however many agents happened to boot together.
+	armSignal(["--prev-session", "RACE-SESSION-ID", "--ttl", "900", "--by", "race"])
+	const race = spawnSync("/bin/sh", ["-c",
+		`for i in 1 2 3 4 5 6 7 8; do node ${rsBin} claim --agent app --root ${rootS} > ${rootS}/claim.$i 2>&1 & done; ` +
+		`wait; grep -l RACE-SESSION-ID ${rootS}/claim.* 2>/dev/null | wc -l`], { encoding: "utf8" })
+	const winners = Number(String(race.stdout).trim())
+
+	check("A33 a restart crosses into the ledger exactly once, and a stale one not at all",
+		travelled && coldOK && crossed && oneShot && staleStored && counted && winners === 1,
+		`installed=${travelled}; unarmed start -> prev_session=${cold && cold.prev_session}; ` +
+		`armed -> prev_session=${hot && hot.prev_session} signal=${hot && JSON.stringify(hot.signal)}; ` +
+		`reused -> ${reused && reused.prev_session}; abandoned signal stored-but-stale=${staleStored}; ` +
+		`arms=${JSON.stringify(arms)} (want reboot 1, cold 3); 8 racing claimers -> ${winners} winner(s)`)
+}
+
+// A34 — the instrument the experiment is SCORED FROM runs its own arms inside the gate.
+//
+// `bin/ledger.mjs` decides which arm every session start lands in, and until this case it
+// had 34 arms that only ever ran when somebody remembered to type them. Boot's gate runs
+// `test/attack.mjs` and nothing else, so the classification rule could be relaxed - by a
+// refactor, by a simplification, by a fix for something else - and every boot would stay
+// green. The same is true of `bin/restart-signal.mjs`, which A33 exercises end to end but
+// only along the paths a passing restart takes.
+//
+// Three and a bit seconds, once per full boot. The alternative is a gate that covers the
+// bus and leaves the instrument that answers the project's actual question uncovered.
+{
+	const t0 = Date.now()
+	const g = spawnSync("node", [join(PKG, "bin", "ledger.mjs"), "--prove-red"], { encoding: "utf8" })
+	const out = `${g.stdout || ""}${g.stderr || ""}`
+	// The same counter idiom as boot's gate row, and the same trap avoided: `\s` matches a
+	// newline, so `^\s+✓` under /m swallows the blank line before the summary banner and
+	// counts it as a passing arm (review #5 F5).
+	const passed = (out.match(/^[^\S\n]+✓/gm) || []).length
+	// A FLOOR, not just an exit code. A suite that fell over before it ran anything exits
+	// 0 in several plausible ways, and "0 of 0 arms green" is the void-probe shape this
+	// project keeps finding.
+	check("A34 the ledger's own arms run in the gate",
+		g.status === 0 && passed >= 30,
+		`bin/ledger.mjs --prove-red -> exit ${g.status}, ${passed} arm(s) demonstrated (want >=30) in ${((Date.now() - t0) / 1000).toFixed(1)}s` +
+		(g.status === 0 ? "" : `\n      ${out.split("\n").filter((l) => /✗/.test(l)).join("\n      ")}`))
+}
+
 // A31 — this suite must not touch the machine's real session registry.
 //
 // Not a property of the bus: a property of the SUITE, and it is here because the trap has
