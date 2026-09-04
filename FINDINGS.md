@@ -754,10 +754,47 @@ arms are built from, and when the reboot arm is empty *and* no start has ever ca
 says so — *"the reboot arm is UNREACHABLE here … this is not a sampling shortfall and more sessions will not
 close it"*. Armed in `--prove-red` on one variable: whether a single record carries `source: "clear"`.
 
-**NOT fixed, and it is the real one.** A signal must be made to cross the restart. His proposal is the cheap
-one and it is right: **the restarting party knows it is a restart**, so let it say so — an env var, or a file
-the next `SessionStart` hook reads and clears. A second candidate is already on disk here: the ledger's own
-`handoff` event is written by the session that is about to be restarted, so *a `start` whose agent's previous
-event was a `handoff`, with no intervening start, is a reboot*. That is a change to the instrument the whole
-experiment is scored from, and review #4 spent nine findings on this file — it gets its own session, not the
-tail of this one.
+**FIXED 2026-09-04, the session after, and it is his design.** `bin/restart-signal.mjs`: the restarting party
+leaves a note — `.comm/restart/<agent>.json` — and the next `SessionStart` hook takes it. The second candidate
+(pair a `start` against the agent's previous `handoff`) was **not built**: it needs no new mechanism but it
+cannot tell a restart from a handoff that was never restarted, and the whole point is a signal that cannot
+lie. What that candidate was really worried about — an abandoned note poisoning a later start — is handled
+here by an expiry instead, so the cheap idea survives as a property rather than as a mechanism.
+
+Four properties, each of them a way to produce a confident wrong number in the arm being measured:
+
+- **One-shot, enforced by `rename`, not by care.** `claim()` renames before it reads, so of two sessions
+  starting at the same instant exactly one gets the signal. A read-then-unlink gives it to BOTH — measured:
+  with the rename swapped for a copy, one restart became two reboots and eight racing claimers all won (A33).
+- **It carries its own expiry and does not apply it.** The armer declares `ttl_s`, the claimer measures
+  `age_s`, and `classify()` in the ledger decides — one function, correctable later, re-read over every
+  record ever written. Storing "this was fresh" would freeze today's TTL into the data (ledger property 1).
+  The ledger caps the promise at `SIGNAL_TTL_MAX_S` = 3600 s, because the armer is the only party with an
+  interest in the reboot arm filling: it may shorten its promise and not extend it.
+- **The signal is the assertion; `prev_session` is only evidence for it.** A hand that restarts an agent
+  knows it is restarting long before it knows a session id, so keying the arm on `prev_session` alone would
+  have thrown away every human-armed restart.
+- **A signal it cannot read is set aside, never dropped**, and a claim that fails says so on stderr: an
+  unreadable note is a restart about to be recorded as a cold start, which is the defect this closes.
+
+**One defect found by these arms, in this code, an hour old, and it is this project's signature shape wearing
+arithmetic:** `Number(null)` is `0`, so an age that could not be measured at all — the field's own way of
+saying *unknown* — passed `0 >= 0 && 0 <= ttl` as the **freshest reading obtainable**, and every unmeasurable
+signal became a reboot. Caught by the arm named "a signal that cannot be shown fresh is not counted as one",
+which failed the first time it ran. The rule now tests `typeof x === "number"`, and a coercion that turns
+absence into a favourable number is worth looking for wherever this repo compares a measurement to a bound.
+
+**And the arms themselves were not covered.** `bin/ledger.mjs` decides which arm every start lands in, and its
+34 arms only ever ran when somebody typed them: boot's gate runs `test/attack.mjs` and nothing else. Worse,
+the gate's staleness fingerprint covered `bin/comm.mjs`, `install.mjs` and `test/attack.mjs` — while A29 has
+been *executing* `bin/ledger.mjs` and `bin/session-registry.mjs` through the generated stub since the day it
+was written, and A32 imports `bin/wake.mjs`. Any of them could have been relaxed with every `--fast` boot
+still printing *"last green on these bytes"* — review #3 R1's finding, re-earned by accretion. A34 now runs
+the ledger's arms inside the gate (3.7 s), and the fingerprint is **enumerated from `bin/` with the two
+non-bus tools named as exceptions**, so a tool added tomorrow is a gate input by default. Armed as R11.
+
+**What is NOT closed by this.** Nothing arms the signal automatically yet: a restart still has to say so, and
+in the field that means the owner's hand (`node bin/restart-signal.mjs arm --agent <name> --prev-session
+<id>`) or a future self-reboot that owns its own relaunch. The mechanism cannot detect a liar — an armer that
+claims a restart it is not performing is indistinguishable from a real one — it can only make the claim
+visible: `by`, `by_pid` and the age are all in the record.

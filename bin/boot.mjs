@@ -563,6 +563,20 @@ function askBus(sessionPidForCwd) {
 		const name = basename(p)
 		const chk = spawnSync("node", [join(ROOT, "install.mjs"), p, "--check"], { encoding: "utf8" })
 		const drift = chk.status !== 0
+		// NAME WHAT DRIFTED. This row printed "HOOK DRIFT" for any non-zero exit, and on
+		// 2026-09-04 it said exactly that when what had actually changed was the field
+		// project's `.gitignore` - its owner had just put the repo under git and dropped the
+		// `.comm/` rule, so live delivery state became committable. The row sent a reader to
+		// look at hooks that were byte-perfect. A row that names something other than what it
+		// measured is this project's signature defect, and here it was in the row whose whole
+		// job is to report on somebody else's machine. The installer already prints the list;
+		// only this file was throwing it away.
+		// BOTH streams: `install.mjs --check` reports drift on stderr and its green summary on
+		// stdout, and reading only stdout is why the first version of this parse produced an
+		// empty list and fell back to the vaguer wording - a fix that reported the same
+		// nothing in politer words.
+		const drifted = `${chk.stdout || ""}${chk.stderr || ""}`.split("\n")
+			.map((l) => /^ {4}(\S.*)$/.exec(l)).filter(Boolean).map((m) => m[1].trim())
 		// Checked independently of the installer's own count: the installed bus is the
 		// file the hooks actually execute, and it going stale is a defect this project
 		// has already shipped twice without noticing.
@@ -596,7 +610,10 @@ function askBus(sessionPidForCwd) {
 			last = JSON.parse(lines[lines.length - 1]).delivered || null
 		} catch {}
 		const bits = [
-			drift ? "HOOK DRIFT" : "hooks in sync",
+			// An unparsed non-zero exit must not borrow the confident wording of a parsed one:
+			// it means the installer refused for a reason this row has not read.
+			drift ? (drifted.length ? `DRIFT: ${drifted.join(", ")}` : `install --check refused (exit ${chk.status})`)
+				: "hooks in sync",
 			busStale === null ? `UNCOMPARED (this repo has no ${uncomparable.join(", ")} to compare against)`
 				: !installed.length ? "NOTHING INSTALLED in .comm/bin"
 				: busStale ? `STALE vs repo: ${staleFiles.join(", ")}`
@@ -677,8 +694,30 @@ function askBus(sessionPidForCwd) {
 	// - which A27 reads - left the fingerprint byte-identical at 817a7c78e24a while the
 	// gate went red. A fingerprint that misses a gate's inputs claims a green it cannot
 	// support, which is the whole failure class this project keeps finding.
+	//
+	// Widened 2026-09-04, and the hole was three tools wide before anyone looked: the list
+	// read `bin/comm.mjs, install.mjs, test/attack.mjs`, while A29 has been executing
+	// bin/ledger.mjs and bin/session-registry.mjs through the generated stub since the day
+	// it was written, A32 imports bin/wake.mjs, and A34 now runs the ledger's own 34 arms.
+	// Any of those could be relaxed and every --fast boot would go on printing "last green
+	// on these bytes" - review #3 R1's finding, re-earned by accretion rather than by a bad
+	// commit. So the set is now ENUMERATED FROM THE DIRECTORY and the exceptions are named:
+	// a tool added to bin/ tomorrow is a gate input by DEFAULT. An opt-in list is a promise
+	// that whoever adds the next tool will remember this line, and that promise has been
+	// broken here twice (see test/attack.mjs's POINTER_SOURCES for the same lesson).
+	//
+	// The two exclusions are the two files CLAUDE.md already declares are not the bus: they
+	// spawn, the gate does not run them, and each carries its own --prove-red. Counting them
+	// would redden this row every time the boot is edited - a warning that fires for a
+	// reason foreign to what it measures, which is how a row gets ignored.
+	const NOT_GATE_INPUTS = new Set(["boot.mjs", "context.mjs"])
+	let gateCode = []
+	try {
+		gateCode = readdirSync(join(ROOT, "bin")).filter((f) => f.endsWith(".mjs") && !NOT_GATE_INPUTS.has(f))
+			.sort().map((f) => `bin/${f}`)
+	} catch {}
 	const fp = createHash("sha256")
-	for (const rel of ["bin/comm.mjs", "install.mjs", "test/attack.mjs", ...gateDocs]) {
+	for (const rel of [...gateCode, "install.mjs", "test/attack.mjs", ...gateDocs]) {
 		try { fp.update(readFileSync(join(ROOT, rel))) } catch {}
 	}
 	const print = fp.digest("hex").slice(0, 12)
@@ -1035,6 +1074,25 @@ function proveRed() {
 		fixDoc()
 		assert("R1 a gate INPUT changing moves --fast", after === WARN && full === RED,
 			`one anchor renamed in FINDINGS.md -> fast=${LV[after]} full=${LV[full]}`)
+	}
+
+	// R11, 2026-09-04. R1 above proves a gate's DOCUMENT is covered. Its CODE was not: the
+	// print was taken over the bus, the installer and the gate file only, while the suite
+	// has been executing bin/ledger.mjs and bin/session-registry.mjs through the generated
+	// stub since A29 was written, and now runs the ledger's own 34 arms in A34. A relaxed
+	// classification rule in the instrument the reboot experiment is SCORED FROM would have
+	// left this print byte-identical, and every --fast boot - which is ~100 % of boots -
+	// would have gone on saying "last green on these bytes". One variable: one byte in a
+	// tool the gate runs and never reads as a document.
+	{
+		run(false)   // re-record a green on the restored tree
+		const quiet = level(run(true), "gate")
+		const [breakTool, fixTool] = swap(join(pkg, "bin", "ledger.mjs"), (t) => `${t}\n// one byte the gate runs\n`)
+		breakTool()
+		const moved = level(run(true), "gate")
+		fixTool()
+		assert("R11 a TOOL the gate runs is a gate input", quiet === UNKNOWN && moved === WARN,
+			`same bytes -> ${LV[quiet]} ("on these bytes"); one byte in bin/ledger.mjs -> ${LV[moved]} ("DIFFERENT bytes")`)
 	}
 
 	// R2: a full boot used to overwrite the hook's source record wholesale.
