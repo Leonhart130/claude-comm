@@ -5,44 +5,52 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-**1 — Build the reboot trigger. Both instruments are now wired to the field; nothing else blocks it.**
+**1 — Make a signal cross the restart. The reboot arm is UNREACHABLE until you do, and the trigger is
+worthless without it.**
 
-*Written 2026-09-04 by the session that wired them. It assumes you remember nothing, and boot injects only
-this first line — so the first line is the instruction. Every claim below is checkable from the tree; check
-rather than trust.*
+*Written 2026-09-04 by the session that built the wake. It assumes you remember nothing, and boot injects
+only this first line — so the first line is the instruction. Every claim below is checkable; check it.*
 
-The trigger is the consumer's §2.4: *"you re-fetched a file you already read this session"* — countable by a
-hook, not a token threshold. Its confound is theirs, priced at ~30 min. **Ask rather than guess.**
+`node bin/ledger.mjs --root ~/Dev/work` says it in the tool's own words: **the reboot arm is unreachable
+there.** `prev_session` is null because nothing survives a restart to carry it, so at the hook a relaunch and
+a cold start are the same event. The `~/Dev/work` leader proved it by BEING the reboot — the owner restarted
+him deliberately and the ledger filed it as cold. `classify()` reaches the arm on `source: "clear"`, a
+`trigger`, or a `prev_session`; a `/clear` therefore fills it and a relaunch never will.
+**`FINDINGS.md#reboot-signal` carries the measurement and both candidate fixes — read it, do not re-derive.**
 
-Three things that are true now and were not this morning, so do not re-derive them:
+Two candidates, and **the owner of the other project has been asked which he would trust** (his reply, if it
+has arrived, is in `exchange/work-leader/in/`):
 
-1. **The sensor is correct across a `/clear`** (`FINDINGS.md#clear-blind`, verified against a real one). It
-   refuses on a miss rather than answering for a dead session, so it is safe to act on.
-2. **The field records.** `.claude/comm-hook.mjs` reads the SessionStart payload once and hands the bytes to
-   the bus first, then to the ledger and the registry. Verified in `~/Dev/electio` itself, not only in a
-   fixture. Read a field arm with `node bin/ledger.mjs --root ~/Dev/electio`. Gated by A29 and by the
-   `field:*` row, which now compares all three installed files.
-3. **`kitten @ launch --type=os-window` stays in the same kitty process**, so a launched expert is reachable
-   at once (`DESIGN-autonomy.md`).
+1. **His:** the restarting party knows it is a restart, so let it say so — an env var, or a file the next
+   `SessionStart` hook reads and clears. Needs a new mechanism; cannot lie.
+2. **Mine:** the ledger's `handoff` event is already written by the session about to be restarted, so a
+   `start` whose agent's previous event was a `handoff` with no intervening start is a reboot. No new
+   mechanism; **but a session that writes a handoff and is not restarted for an hour mislabels the next
+   start.**
 
-⚠️ **Do not put anything on the `stop` path.** It runs at every turn boundary and is the hottest path in this
-system; both instruments record STARTS, so the stub deliberately leaves `stop` exactly as it was — bus reads
-stdin, nothing else spawned. A29's third property is the arm that catches a "simplification" that unifies
-them.
+⚠️ **This changes the classification the whole experiment is scored from, and review #4 spent nine findings
+on that file.** Do it as its own piece of work, with arms, not as the tail of something else.
 
-**2 — The other half of `#hookless-launch`: write the launcher.** Anything that starts an agent must start it
-through a login shell (`zsh -lic claude`, measured), or that agent comes up with no bus at all. Today only the
-warning exists. This is a prerequisite for self-launching experts, not a nicety.
+**2 — Then the reboot trigger.** The consumer's §2.4: *"you re-fetched a file you already read this
+session"*, countable by a hook, not a token threshold. Its confound is theirs, priced at ~30 min; ask rather
+than guess. **Do not build it before 1** — a trigger whose effect the instrument cannot classify is a feature
+with no ledger, which is this project's own definition of a hobby.
+
+**3 — The other half of `#hookless-launch`, now with a second failure beside it.** A self-launched agent
+needs a login shell (no `node` on `PATH` otherwise) **and** an answer to the trust prompt, which kills it in
+any new directory while the launch still returns a window id. Both are prerequisites for self-launching
+experts. `FINDINGS.md#hookless-launch` and `#wake-doorbell`.
 
 **Standing test debt from review #4, none of it gated:** `FINDINGS.md#test-debt`. The one to keep in mind:
 **the ledger has never scored a real defect** — its first real `record defect` is the test.
 
-**Settled 2026-09-04, NOT open — do not re-litigate; measurements in `DESIGN-autonomy.md` and
-`FINDINGS.md`:** `/clear` reports `source: "clear"`, mints a new session id and transcript, and does **not**
-return RSS (~14 MB, so the rare real-relaunch mechanism stays on the roadmap) · one kitty socket per OS
-window · **pid → transcript comes from the registry and a miss REFUSES** · the instruments travel *beside the
-bus* in `.comm/bin/`, not by absolute path into this checkout — an absolute path breaks every field hook
-silently the day the checkout moves, and a stale copy is a failure `field:*` already detects.
+**Settled 2026-09-04, do not re-litigate — measurements in `DESIGN-autonomy.md` and `FINDINGS.md`:**
+`/clear` reports `source: "clear"`, mints a new session and transcript, costs ~14 MB and does not return RSS ·
+one kitty socket per OS window, and `kitten @ launch --type=os-window` stays in the SAME process, so a
+launched expert is reachable at once · pid → transcript comes from the registry, a miss REFUSES, and a hook
+records only for a session running inside its own project · the instruments travel beside the bus in
+`.comm/bin/`, never by absolute path · the doorbell resolves by pid and refuses rather than hoping, because
+`send-text --match` exits 0 on no match.
 
 ## Where it stands
 
