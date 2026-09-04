@@ -48,6 +48,11 @@ const log = (s) => console.log(s)
 const fail = (s) => { console.error(`\n✗ ${s}`); process.exit(1) }
 
 // ── stand up a scratch project ──────────────────────────────────────────────
+// HERMETIC REGISTRY, before any child is spawned. This spawns REAL sessions running the
+// REAL stub, which since 2026-09-04 invalidates the registry entry for the session pid it
+// resolves — and from an agent-run suite that pid is the operator's own session. Same
+// reason as the block at the top of test/attack.mjs, which carries the measurement.
+process.env.CLAUDE_COMM_RUNTIME = mkdtempSync(join(tmpdir(), "comm-selftest-runtime-"))
 const root = mkdtempSync(join(tmpdir(), "comm-selftest-"))
 const app = join(root, "app")
 mkdirSync(join(app, "docs"), { recursive: true })

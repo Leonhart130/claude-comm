@@ -113,8 +113,14 @@ export function sessionPid(from = process.pid) {
 	const argv0 = (pid) => {
 		try { return basename(readFileSync(`/proc/${pid}/cmdline`, "utf8").split("\0")[0] || "") } catch { return "" }
 	}
+	// F8 (review #5): measured field depth is 3 (claude -> sh -> node) and no realistic
+	// chain exceeded 12, but exhausting the walk was indistinguishable from "not a session
+	// at all" - both return 0 and both fell through to the same unannotated guess. The
+	// fall-through is now labelled in BOTH its branches (F3), so exhaustion lands somewhere
+	// a machine can see; the limit is raised anyway, because its only job is to stop a
+	// cycle, and 32 is as cheap as 12.
 	let pid = from
-	for (let i = 0; i < 12 && pid > 1; i++) {
+	for (let i = 0; i < 32 && pid > 1; i++) {
 		if (argv0(pid) === "claude") return pid
 		pid = ppidOf(pid)
 	}
@@ -160,11 +166,31 @@ function prune(dir) {
  */
 export function record({ pid, transcript, agent, source }) {
 	if (!pid) return { ok: false, why: "no session pid could be resolved - nothing to key an entry on" }
-	if (!transcript) return { ok: false, why: "the hook payload carried no transcript_path" }
-	if (!BOOT_ID) return { ok: false, why: "no /proc boot id - a stale entry could not be told from a live one" }
-	const start = startTimeOf(pid)
-	if (start === null) return { ok: false, why: `/proc/${pid}/stat is unreadable - the (pid, start) pair cannot be built` }
 	const dir = registryDir()
+
+	// INVALIDATE BEFORE WRITING. Found by adversarial review #5 as F1, the best catch the
+	// brief named, and it is `FINDINGS.md#clear-blind` reachable THROUGH its own fix.
+	//
+	// The three proofs below - pid, boot id, start tick - all still match after a `/clear`,
+	// because it is the same process. They can tell a recycled pid from a live one; they
+	// can say nothing whatever about whether the session inside that process has been
+	// replaced. So an entry whose refresh did not happen stayed indistinguishable from a
+	// fresh one, and the sensor answered with the DEAD transcript at exit 0 - measured at
+	// 813 000 tokens, `state:"close"`, `guessed:false`: an affirmative instruction to
+	// reboot, derived from a session that had ended.
+	//
+	// A SessionStart firing for this pid IS the event that invalidates the old entry, and
+	// it is the only moment anything on this machine knows. So the entry is removed FIRST
+	// and every failure below now leaves NO entry rather than a stale one. A miss refuses;
+	// that is the whole contract. Removing a good entry costs a refusal until the next
+	// start, which is the direction this file is allowed to be wrong in.
+	let invalidated = false
+	try { unlinkSync(join(dir, `${pid}.json`)); invalidated = true } catch {}
+
+	if (!transcript) return { ok: false, invalidated, why: "the hook payload carried no transcript_path" }
+	if (!BOOT_ID) return { ok: false, invalidated, why: "no /proc boot id - a stale entry could not be told from a live one" }
+	const start = startTimeOf(pid)
+	if (start === null) return { ok: false, invalidated, why: `/proc/${pid}/stat is unreadable - the (pid, start) pair cannot be built` }
 	try {
 		mkdirSync(dir, { recursive: true, mode: 0o700 })
 		const rec = { v: 1, pid, start, boot: BOOT_ID, transcript,
@@ -176,7 +202,7 @@ export function record({ pid, transcript, agent, source }) {
 		prune(dir)
 		return { ok: true, path: p, transcript }
 	} catch (e) {
-		return { ok: false, why: `${dir}: ${(e && e.message) || e}` }
+		return { ok: false, invalidated, why: `${dir}: ${(e && e.message) || e}` }
 	}
 }
 

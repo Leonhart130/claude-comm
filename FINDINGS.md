@@ -616,7 +616,7 @@ network filesystems (`O_APPEND` does not travel) · scale past ~6 400 records (`
 O(n²)) · what `resume` and `compact` payloads actually carry · **and the ledger has still never scored a real
 defect** — every defect it has ever seen was synthetic. Its first real `record defect` is the test.
 
-## `#measurement-traps` — three ways a control lied here
+## `#measurement-traps` — four ways a control lied here
 
 `delivered/` file mtimes look like drain times and are not — `renameSync` preserves mtime, so they are
 *creation* times. The only honest source is the `delivered` field in `.comm/log.jsonl`.
@@ -664,3 +664,22 @@ prints the token figure beside the bytes, using this measured constant.
 emoji and code fences. It must be re-measured if tier 0 changes character, and the constant carries the date
 it was taken for exactly that reason. Two independent corpora now sit at 2.0 and 2.70; neither is anywhere
 near 4, which is the only part that generalises.
+
+**A fourth, 2026-09-04, and the first that DESTROYED rather than dirtied.** The session registry gained
+invalidate-before-write (review #5's F1): a `SessionStart` for a pid removes that pid's entry before
+validating anything, so a failed write leaves a miss instead of a lie. `test/attack.mjs`'s A18 fires the real
+generated stub with a payload that has never carried a `transcript_path` — and the stub resolves the session
+pid by walking to the nearest `claude` ancestor, which when an agent runs the suite is **the operator's own
+session**. So the suite deleted the live registry entry for the session running it. Measured: the `registry`
+row went from a green tick to `pid 820277 is not in the session registry` with no code change between the
+two boots.
+
+Three occurrences in one day, each caught by reading output rather than by a test, so the fourth is now a
+gate: **A31 asserts the suite leaves the machine's real registry untouched**, with the listing captured
+before the hermetic override is set. `test/attack.mjs` and `test/selftest.mjs` both set
+`CLAUDE_COMM_RUNTIME` before spawning their first child.
+
+**The generalisation, which is the part worth carrying:** it is not enough for a control to build its own
+fixture. Anything the control executes that resolves *the machine's* state — a pid, a socket, a runtime
+directory, a registry — reaches past the fixture by construction, and does so most easily when the suite is
+run by exactly the kind of agent the code was written for.

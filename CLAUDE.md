@@ -15,7 +15,7 @@ doorbell** — and a reboot obeys it too, since what survives a restart is what 
 | **2 — on demand** | `HISTORY.md` (how each decision was reached) · `BRIEF-*` / `REVIEW-*` correspondence | when re-opening something already settled |
 
 ```bash
-node bin/boot.mjs          # ~14 s · state + the adversarial gate (29 checks)
+node bin/boot.mjs          # ~14 s · state + the adversarial gate (it prints the count; do not restate it here)
 node bin/boot.mjs --fast   # ~0.3 s · state only, when you are not touching the bus
 node bin/context.mjs       # how full this session is, resolved from /proc - exact, not guessed
 node bin/ledger.mjs        # did a restart cost us a defect? UNKNOWN until 10 starts per arm

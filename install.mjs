@@ -88,13 +88,26 @@ try {
 	// than a spawn, because it is one function call and cannot fail slowly. Without it
 	// a context sensor answers with the session this process was LAUNCHED as, which
 	// after a /clear is a dead one. FINDINGS.md#clear-blind
+	// The result is READ, not dropped. This file's own contract says a registry that
+	// silently did not write reads later as a machine with no sessions on it - and review
+	// #5 found the only field caller discarding that reason inside a bare catch, which is
+	// the enabling condition for a stale entry answering as if it were fresh. stderr,
+	// never stdout: stdout carries the hook's JSON contract and one extra byte there
+	// breaks delivery. record() is called even with NO transcript_path, because its first
+	// act is to invalidate the entry this pid already had.
 	try {
 		const reg = join(binDir, "session-registry.mjs")
-		if (existsSync(reg) && tp) {
+		if (existsSync(reg)) {
 			const m = await import(pathToFileURL(reg).href)
-			m.record({ pid: m.sessionPid(), transcript: tp, agent, source: p.source })
+			const r = m.record({ pid: m.sessionPid(), transcript: tp, agent, source: p.source })
+			if (!r.ok) process.stderr.write(\`claude-comm: this session is NOT in the session registry (\${r.why}). \`
+				+ \`A context reading by pid will refuse for it\${r.invalidated ? "" : ", and a previous entry may still stand"}.\\n\`)
+		} else {
+			process.stderr.write("claude-comm: session-registry.mjs is not installed beside the bus; this session is unregistered.\\n")
 		}
-	} catch {}
+	} catch (e) {
+		process.stderr.write(\`claude-comm: the session registry could not be loaded (\${(e && e.message) || e}); this session is unregistered.\\n\`)
+	}
 
 	// The ledger: the control arm for "did the fifteen minutes after a restart cost us
 	// a defect". It records into THIS project, beside this project's bus, because this
