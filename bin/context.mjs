@@ -40,7 +40,7 @@ import { join, basename } from "node:path"
 import { homedir, tmpdir } from "node:os"
 import { fileURLToPath } from "node:url"
 import { spawnSync } from "node:child_process"
-import { lookup as registryLookup, record as registryRecord, registryDir, startTimeOf } from "./session-registry.mjs"
+import { lookup as registryLookup, record as registryRecord, registryDir, startTimeOf, sessionPid } from "./session-registry.mjs"
 
 const ARGV = process.argv.slice(2)
 const has = (f) => ARGV.includes(f)
@@ -189,7 +189,7 @@ const PROJECTS = () => process.env.CLAUDE_COMM_PROJECTS || join(homedir(), ".cla
  * Kept because that disagreement is exactly how a cleared session announces itself, and
  * saying so out loud is worth more than the four lines it costs.
  */
-/** argv[0]'s basename - the same test boot and ownSessionPid use to recognise a session. */
+/** argv[0]'s basename - the same test boot and sessionPid() use to recognise a session. */
 function argv0Of(pid) {
 	try { return basename(readFileSync(`/proc/${pid}/cmdline`, "utf8").split("\0")[0] || "") } catch { return "" }
 }
@@ -232,24 +232,6 @@ function transcriptOfPid(pid) {
 	return { path: r.transcript, why: null, note }
 }
 
-/** The nearest ancestor that is the session itself, by argv[0] - same test boot uses. */
-function ownSessionPid() {
-	const ppidOf = (pid) => {
-		try {
-			const s = readFileSync(`/proc/${pid}/stat`, "utf8")
-			return Number(s.slice(s.lastIndexOf(")") + 2).split(" ")[1]) || 0
-		} catch { return 0 }
-	}
-	let pid = process.pid
-	for (let i = 0; i < 12 && pid > 1; i++) {
-		try {
-			if (basename(readFileSync(`/proc/${pid}/cmdline`, "utf8").split("\0")[0] || "") === "claude") return pid
-		} catch {}
-		pid = ppidOf(pid)
-	}
-	return 0
-}
-
 /**
  * Which transcript are we measuring? In order of authority, and it always says which:
  * an explicit path, a hook payload, this session's own PID, another PID, and only then
@@ -281,7 +263,7 @@ function resolveTranscript() {
 		return r.path ? { path: r.path, how: `registry: pid ${askedPid}${r.note}` }
 			: { path: null, how: r.why }
 	}
-	const own = ownSessionPid()
+	const own = sessionPid()
 	if (own) {
 		const r = transcriptOfPid(own)
 		if (r.path) return { path: r.path, how: `registry: pid ${own} (own session)${r.note}` }

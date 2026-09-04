@@ -38,7 +38,7 @@ import { join, dirname, resolve, basename } from "node:path"
 import { fileURLToPath } from "node:url"
 import { execFileSync, spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
-import { record as registryRecord, lookup as registryLookup, registryDir } from "./session-registry.mjs"
+import { record as registryRecord, lookup as registryLookup, registryDir, sessionPid } from "./session-registry.mjs"
 
 const ARGV = process.argv.slice(2)
 const has = (f) => ARGV.includes(f)
@@ -110,7 +110,7 @@ function writeState(obj) {
 
 let statusText = ""
 let sessionAgent = ""   // who this session is, for the ledger; resolved in row 1
-let sessionPid = 0      // the pid of this session, for the registry; resolved in row 1
+let thisPid = 0         // the pid of this session, for the registry; resolved in row 1
 let gateDocs = []   // documents the gate suite declares it reads; feeds the fingerprint (R1)
 let nextText = ""   // what the previous close said this session must do first
 
@@ -153,23 +153,11 @@ if (has("--hook")) {
 
 // -- 1. session identity, read the way every other scanner reads it ----------
 {
-	const ppidOf = (pid) => {
-		try {
-			const s = readFileSync(`/proc/${pid}/stat`, "utf8")
-			return Number(s.slice(s.lastIndexOf(")") + 2).split(" ")[1]) || 0
-		} catch { return 0 }
-	}
-	const argv0 = (pid) => {
-		try { return basename(readFileSync(`/proc/${pid}/cmdline`, "utf8").split("\0")[0] || "") } catch { return "" }
-	}
-	// Walk to the NEAREST ancestor that is the session itself. Measured on this box:
-	// the session's argv is exactly `claude`, its parent is the shell, its grandparent
-	// kitty. Matching the whole chain instead would also match kitty and init.
-	let pid = process.pid, session = 0
-	for (let i = 0; i < 12 && pid > 1; i++) {
-		if (argv0(pid) === "claude") { session = pid; break }
-		pid = ppidOf(pid)
-	}
+	// The walk itself lives in bin/session-registry.mjs, imported by boot, by
+	// bin/context.mjs and by the generated field hook stub. It used to be written out
+	// here and again there; three copies of "which pid is this session" is three
+	// chances for them to disagree about the answer every instrument is keyed on.
+	const session = sessionPid()
 	let env = null
 	if (session) {
 		try {
@@ -180,7 +168,7 @@ if (has("--hook")) {
 			}
 		} catch { env = null }
 	}
-	sessionPid = session
+	thisPid = session
 	const declared = env ? (env.get("CLAUDE_COMM_AGENT") || "").trim() : ""
 	// The ledger needs a subject and this is the only place that resolves one. An off-bus
 	// session is still a session that can author a defect in its first fifteen minutes, so
@@ -298,9 +286,9 @@ if (has("--hook")) {
 	let wrote = null
 	if (has("--hook")) {
 		const tp = payload && typeof payload.transcript_path === "string" ? payload.transcript_path : ""
-		wrote = registryRecord({ pid: sessionPid, transcript: tp, agent: sessionAgent, source: payload && payload.source })
+		wrote = registryRecord({ pid: thisPid, transcript: tp, agent: sessionAgent, source: payload && payload.source })
 	}
-	const back = registryLookup(sessionPid)
+	const back = registryLookup(thisPid)
 	const where = registryDir()
 	if (has("--hook")) {
 		if (!wrote.ok) {
@@ -309,11 +297,11 @@ if (has("--hook")) {
 			// The re-read is the whole point: a write nobody read back is a claim.
 			row("registry", WARN, `THE WRITE WAS NOT SEEN BY THE RE-READ (${back.ok ? `it names ${basename(back.transcript)}` : back.why})`)
 		} else if (!existsSync(back.transcript)) {
-			row("registry", WARN, `recorded ${basename(back.transcript)} for pid ${sessionPid}, and that file does not exist`)
+			row("registry", WARN, `recorded ${basename(back.transcript)} for pid ${thisPid}, and that file does not exist`)
 		} else {
-			row("registry", OK, `pid ${sessionPid} -> ${basename(back.transcript)} (${back.source || "no source"}) - written and re-read - ${where}`)
+			row("registry", OK, `pid ${thisPid} -> ${basename(back.transcript)} (${back.source || "no source"}) - written and re-read - ${where}`)
 		}
-	} else if (!sessionPid) {
+	} else if (!thisPid) {
 		// Not a session at all: a script, a cron shell, a fixture run. There is nothing
 		// to register, and inventing a warning here would train people to ignore the row.
 		row("registry", OK, "no claude ancestor - not a session, nothing to register")
@@ -324,9 +312,9 @@ if (has("--hook")) {
 		// green: a green row over a dead sensor, which is the one shape this project keeps
 		// paying for. If the row is going to speak for the reader, it reads what the reader
 		// reads.
-		row("registry", WARN, `pid ${sessionPid} -> ${basename(back.transcript)}, and that file is GONE - bin/context.mjs will REFUSE`)
+		row("registry", WARN, `pid ${thisPid} -> ${basename(back.transcript)}, and that file is GONE - bin/context.mjs will REFUSE`)
 	} else if (back.ok) {
-		row("registry", OK, `pid ${sessionPid} -> ${basename(back.transcript)} (${back.source || "no source"}) - bin/context.mjs can resolve this session`)
+		row("registry", OK, `pid ${thisPid} -> ${basename(back.transcript)} (${back.source || "no source"}) - bin/context.mjs can resolve this session`)
 	} else {
 		// Truthful and self-healing: the next SessionStart in this process records it.
 		// Until then `bin/context.mjs` refuses for this session, which is the point.
@@ -456,10 +444,19 @@ if (has("--hook")) {
 		try { reported = JSON.parse(readFileSync(join(ROOT, ".boot-state.json"), "utf8")).reportBytes || 0 } catch {}
 		total += reported
 		const pct = Math.round((total / TIER0_BUDGET) * 100)
+		// MEASURED, not assumed. This row counts BYTES while the reason the cap exists is
+		// a cost in TOKENS, and a ratio nobody checked is how the ~/Dev/work leader spent a
+		// day reporting a 25 k-token saving that was worth approximately nothing: he used
+		// bytes/4, his corpus tokenises at ~2.0, and the error ran in the comfortable
+		// direction. Measured here 2026-09-04 by two `claude -p` probes differing in one
+		// thing - 19 739 B of this repo's own tier 0 pasted into the prompt, not read
+		// through a tool, so no preamble inflates it: 7 317 tokens, 2.70 B/token.
+		// Re-measure if this corpus changes character. FINDINGS.md#tier0-calibration
+		const BYTES_PER_TOKEN = 2.70
 		row("budget", missing.length ? RED : total > TIER0_BUDGET ? RED : total > TIER0_BUDGET * 0.85 ? WARN : OK,
 			missing.length
 				? `tier 0 names ${missing.join(", ")}, which do not exist`
-				: `tier 0 is ${total} B of ${TIER0_BUDGET} (${pct}%) across ${names.join(" + ")}` +
+				: `tier 0 is ${total} B of ${TIER0_BUDGET} (${pct}%, ~${Math.round(total / BYTES_PER_TOKEN)} tokens) across ${names.join(" + ")}` +
 				  (reported ? ` + ${reported} B of injected report` : " (report size not yet recorded)") +
 				  (total > TIER0_BUDGET ? " - split it or cut it; raising the cap is not a fix" : ""))
 	}
@@ -505,7 +502,12 @@ if (has("--hook")) {
 			.filter((p) => resolve(p) !== ROOT)
 	} catch {}
 	if (!projects.length) row("field", WARN, `no installed project under ${FIELD}`)
-	const repoBus = sha(join(ROOT, "bin", "comm.mjs"))
+	// Every file the field hooks actually EXECUTE, not just the bus. `comm.mjs` was the
+	// only one compared until the two instruments started travelling beside it
+	// (2026-09-04); a copy that can go stale and is compared by nothing is a drift class
+	// with no detector, which is the shape this row exists to remove.
+	const INSTALLED = ["comm.mjs", "session-registry.mjs", "ledger.mjs"]
+	const repoHash = Object.fromEntries(INSTALLED.map((f) => [f, sha(join(ROOT, "bin", f))]))
 	for (const p of projects) {
 		const name = basename(p)
 		const chk = spawnSync("node", [join(ROOT, "install.mjs"), p, "--check"], { encoding: "utf8" })
@@ -516,7 +518,9 @@ if (has("--hook")) {
 		// R9: a null repoBus used to DISABLE the comparison, so the row printed the
 		// reassuring "bus current" having compared nothing - a void probe standing behind
 		// a working one, since the installer happens to fail on the same condition.
-		const busStale = repoBus === null ? null : sha(join(p, ".comm", "bin", "comm.mjs")) !== repoBus
+		const uncomparable = INSTALLED.filter((f) => repoHash[f] === null)
+		const staleFiles = INSTALLED.filter((f) => repoHash[f] !== null && sha(join(p, ".comm", "bin", f)) !== repoHash[f])
+		const busStale = uncomparable.length ? null : staleFiles.length > 0
 		let pending = 0, oldest = 0
 		const ibx = join(p, ".comm", "inbox")
 		try {
@@ -538,7 +542,8 @@ if (has("--hook")) {
 		} catch {}
 		const bits = [
 			drift ? "HOOK DRIFT" : "hooks in sync",
-			busStale === null ? "BUS UNCOMPARED (this repo's own bus is unreadable)" : busStale ? "BUS STALE vs repo" : "bus current",
+			busStale === null ? `UNCOMPARED (this repo's own ${uncomparable.join(", ")} is unreadable)`
+				: busStale ? `STALE vs repo: ${staleFiles.join(", ")}` : "bus current",
 			pending ? `${pending} pending (oldest ${age(Date.now() - oldest)})` : "0 pending",
 			last ? `last delivery ${age(Date.now() - Date.parse(last))} ago` : "no delivery logged",
 		]
@@ -892,6 +897,13 @@ function proveRed() {
 
 	const fieldBus = join(proj, ".comm", "bin", "comm.mjs")
 	arm("field: the installed bus goes stale", "field:proj", RED, ...swap(fieldBus, (s) => `${s}\n// stale\n`))
+
+	// The same arm on an INSTRUMENT rather than the bus. It is not decoration: until
+	// 2026-09-04 this row compared `comm.mjs` alone, so a stale session registry beside
+	// a current bus was invisible - and a stale registry is a context sensor answering
+	// for the wrong session, which is the defect the registry was built to remove.
+	const fieldReg = join(proj, ".comm", "bin", "session-registry.mjs")
+	arm("field: an installed INSTRUMENT goes stale", "field:proj", RED, ...swap(fieldReg, (s) => `${s}\n// stale\n`))
 
 	const msg = join(proj, ".comm", "inbox", "app", "0001-x.json")
 	arm("field: mail sits undelivered", "field:proj", WARN,

@@ -488,6 +488,20 @@ function main() {
 
 function dispatch(root, cfg, me, cmd, rest) {
 	switch (cmd) {
+		// The one place identity is resolved, made askable. The generated hook stub is
+		// the caller that matters: it records a session start in the ledger, and a
+		// ledger keyed on a name some second implementation guessed is a ledger that
+		// disagrees with the bus about who did what. `--agent-root` is how a stub names
+		// itself; without it this answers for the cwd, which is what a person typing it
+		// means. Exit 1 and print nothing when no agent resolves — a caller must be able
+		// to tell "off the bus" from a name, and an empty string on stdout cannot.
+		case "whoami": {
+			const ar = arg(process.argv.slice(2), "agent-root")
+			const name = ar ? whoami(findRoot(ar) || root, cfg, ar) : me
+			if (!name) process.exit(1)
+			process.stdout.write(`${name}\n`)
+			return
+		}
 		case "send": {
 			const to = firstPositional(rest)
 			if (!to) throw new Error("usage: comm send <to> --ref <file> [--note <text>] [--kind nudge|done|blocked|fyi]")

@@ -5,56 +5,44 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-**1 — Wire the FIELD to the ledger and to the session registry. The instruments only record HERE.**
+**1 — Build the reboot trigger. Both instruments are now wired to the field; nothing else blocks it.**
 
-*Written 2026-09-04 by the session that built the registry. It assumes you remember nothing, and boot
-injects only this first line — so the first line is the instruction. Every claim below is checkable from the
-tree; check rather than trust.*
+*Written 2026-09-04 by the session that wired them. It assumes you remember nothing, and boot injects only
+this first line — so the first line is the instruction. Every claim below is checkable from the tree; check
+rather than trust.*
 
-`bin/ledger.mjs` and `bin/session-registry.mjs` are both written by **this repo's** `SessionStart` hook and
-by nothing else. `~/Dev/work` and `~/Dev/electio` run `.claude/comm-hook.mjs session-start`, which knows
-about neither. **The reboots and the crowded sessions happen THERE**, so the arm that matters is empty and
-the context sensor refuses for every field session. Five things you would otherwise re-derive:
+The trigger is the consumer's §2.4: *"you re-fetched a file you already read this session"* — countable by a
+hook, not a token threshold. Its confound is theirs, priced at ~30 min. **Ask rather than guess.**
 
-1. **The obstacle is one line of the generated stub**: it forwards with `stdio: "inherit"`, so the payload on
-   stdin is consumed once, by the bus. Read it ONCE, hand the bytes to every consumer, and never let a
-   spawn delay or fail delivery.
-2. **The registry needs a DECISION you should not make silently.** It is machine-global by design, but the
-   writer lives in `bin/session-registry.mjs` and a field project only has `.comm/bin/comm.mjs`. Either
-   `install.mjs` copies the module beside the bus (then a stale copy is a new drift class — `field:*` already
-   gates exactly that for `comm.mjs`), or the stub spawns this repo's boot by absolute path (then a moved
-   checkout breaks every field hook). **Ask the owner; do not pick the cheap one alone.**
-3. **This is a delivery change** — `node test/selftest.mjs` and `--prove-red`, before and after.
-4. **The agent name comes from the stub's location** (`--agent-root`), never cwd, never the payload.
-5. **Re-install into both field projects**, then confirm `field:*` is still green — a drifted stub is RED.
+Three things that are true now and were not this morning, so do not re-derive them:
 
-**2 — Then the trigger.** The consumer's §2.4: *"you re-fetched a file you already read this session"*,
-countable by a hook, not a token threshold. Its confound is theirs, priced at ~30 min; ask rather than guess.
+1. **The sensor is correct across a `/clear`** (`FINDINGS.md#clear-blind`, verified against a real one). It
+   refuses on a miss rather than answering for a dead session, so it is safe to act on.
+2. **The field records.** `.claude/comm-hook.mjs` reads the SessionStart payload once and hands the bytes to
+   the bus first, then to the ledger and the registry. Verified in `~/Dev/electio` itself, not only in a
+   fixture. Read a field arm with `node bin/ledger.mjs --root ~/Dev/electio`. Gated by A29 and by the
+   `field:*` row, which now compares all three installed files.
+3. **`kitten @ launch --type=os-window` stays in the same kitty process**, so a launched expert is reachable
+   at once (`DESIGN-autonomy.md`).
 
-⚠️ **Do not build the reboot mechanism ahead of 1.** Shipping it into a project with no control arm is the
-same mistake the sensor nearly made, with the instrument as an alibi.
+⚠️ **Do not put anything on the `stop` path.** It runs at every turn boundary and is the hottest path in this
+system; both instruments record STARTS, so the stub deliberately leaves `stop` exactly as it was — bus reads
+stdin, nothing else spawned. A29's third property is the arm that catches a "simplification" that unifies
+them.
 
-**✅ ANSWERED 2026-09-04, do not ask a third time.** `kitten @ launch --type=os-window` opens a window of
-the **same** kitty process — no new process, no new socket, and the launched process inherits
-`KITTY_LISTEN_ON`. So an expert launched by its leader lands in the leader's socket and is reachable at
-once; only relaunching the `kitty` *binary* would create the unreachable second process. Measurement and the
-three details that go with it (`--keep-focus`, closing by returned window id, `window.pid` is the shell):
-`DESIGN-autonomy.md`, "stays in the SAME process".
+**2 — The other half of `#hookless-launch`: write the launcher.** Anything that starts an agent must start it
+through a login shell (`zsh -lic claude`, measured), or that agent comes up with no bus at all. Today only the
+warning exists. This is a prerequisite for self-launching experts, not a nicety.
 
-🔴 **The owner's standing rule, and it binds every agent this framework launches:** an agent may close
-**only the windows it created itself**. His windows and other agents' windows are never fair game — several
-of his sessions live in them — unless that agent has agreed to it. He does not need to be asked before a
-measurement; he will say if something bothers him.
+**Standing test debt from review #4, none of it gated:** `FINDINGS.md#test-debt`. The one to keep in mind:
+**the ledger has never scored a real defect** — its first real `record defect` is the test.
 
-**Standing test debt from review #4, none of it gated:** `FINDINGS.md#test-debt`. The one to keep in
-mind: **the ledger has never scored a real defect** — its first real `record defect` is the test.
-
-**Settled 2026-09-04, NOT open — do not re-litigate, the measurements are in `DESIGN-autonomy.md` and
-`FINDINGS.md#clear-blind`:** `/clear` reports `source: "clear"` (the loop is constructible) · it mints a new
-session id and transcript · it does **not** return RSS, it costs ~14 MB, so the rare real-relaunch mechanism
-stays on the roadmap · one kitty socket per OS window, so `KITTY_LISTEN_ON` is a local world, not the
-machine · **pid → transcript comes from the registry and a miss REFUSES** — the scratch-directory
-resolution is gone from the answer path and kept only as evidence of a clear.
+**Settled 2026-09-04, NOT open — do not re-litigate; measurements in `DESIGN-autonomy.md` and
+`FINDINGS.md`:** `/clear` reports `source: "clear"`, mints a new session id and transcript, and does **not**
+return RSS (~14 MB, so the rare real-relaunch mechanism stays on the roadmap) · one kitty socket per OS
+window · **pid → transcript comes from the registry and a miss REFUSES** · the instruments travel *beside the
+bus* in `.comm/bin/`, not by absolute path into this checkout — an absolute path breaks every field hook
+silently the day the checkout moves, and a stale copy is a failure `field:*` already detects.
 
 ## Where it stands
 
@@ -65,7 +53,7 @@ resolution is gone from the answer path and kept only as evidence of a clear.
 | **electio** | in real daily use — 26 real deliveries, both directions. **Ran a bus 4 commits stale until this session** |
 | gates | `attack` **29/29** deterministic, every case proved able to go red · `selftest` 6/6 transport, deterministic · `ledger` **28** arms · `context` and `boot` controls green. Numbers here go stale — run boot |
 | boot | `node bin/boot.mjs` — **12 measured rows**, every gating one demonstrated able to go red; `--fast` (0.28 s) is injected at session start by `.claude/settings.json`, the contract is `CLAUDE.md` |
-| **ledger** | `node bin/ledger.mjs` — the reboot instrument, **built before the mechanism**. Recording starts HERE since 2026-09-04; **the field is not wired**, which is why the arm that matters is empty |
+| **ledger** | `node bin/ledger.mjs` — the reboot instrument, **built before the mechanism**. Records here AND in the field since 2026-09-04; a field arm is `--root ~/Dev/electio`. Verified in electio itself, not only in a fixture |
 | **sensor** | `node bin/context.mjs` — resolves pid → transcript through `bin/session-registry.mjs` (written by the `SessionStart` hook, keyed on pid + start time + boot id) and **refuses on a miss**. 16 arms. `FINDINGS.md#clear-blind` |
 | reviews | #1, #2, #3 and **#4 (nine findings, three severe, all nine fixed — `REVIEW-adversarial-4.md`, dispositions in `DESIGN-autonomy.md`)** · the electio leader's field reviews |
 

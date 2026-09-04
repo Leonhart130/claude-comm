@@ -25,7 +25,8 @@ Read the boot report; if a row is `⚠` or `✗`, resolve or name it before anyt
 `STATUS.md` in place of running boot** — this project shipped a bus 4 commits stale in the field while its
 status file read green.
 
-🔴 **Tier 0 is size-capped and boot gates it.** When the `budget` row goes red the fix is to **split or cut**;
+🔴 **Tier 0 is capped in BYTES — 2.70 B/token measured on this corpus, so 28 000 B is ~10 400 tokens;
+converting with `/4` is low by a third (`FINDINGS.md#tier0-calibration`) — and boot gates it.** When the `budget` row goes red the fix is to **split or cut**;
 raising the cap is not a fix. The cost of a boot is paid on every session, forever — measured 2026-09-04,
 a leader agent in the owner's live project pays ~100 k tokens per boot and up to 170 k. That is what
 made the tiering above non-negotiable here.

@@ -995,6 +995,81 @@ const POINTER_SOURCES = (() => {
 		`if this is red, split it or cut it; raising the budget is not a fix`)
 }
 
+// A29 — the field hook records the session start in BOTH instruments, and delivery is
+// untouched.
+//
+// Until 2026-09-04 the generated stub forwarded with `stdio: "inherit"`, so the payload
+// on stdin was consumed once, by the bus, and neither instrument could ever see it. The
+// consequence was not a missing feature: `bin/ledger.mjs` answers "did the fifteen
+// minutes after a restart cost us a defect", and the restarts happen in the FIELD, so
+// the arm that mattered was structurally empty while the tool reported a verdict of
+// UNKNOWN that looked like patience rather than blindness.
+//
+// Three properties, and the third is the one that could quietly rot:
+//
+//   · the mail still drains — an instrument that costs a delivery is not worth having;
+//   · both instruments record, under the name the BUS resolves, not one this stub
+//     guessed for itself;
+//   · the STOP path records NOTHING. It runs at every turn boundary, it is the hottest
+//     path in this system, and both instruments record STARTS. Same fixture, same file,
+//     one variable moved: the verb.
+{
+	const rootA = mkdtempSync(join(tmpdir(), "comm-attack-instruments-"))
+	process.on("exit", () => { try { rmSync(rootA, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(rootA, "app", "docs"), { recursive: true })
+	mkdirSync(join(rootA, ".comm"), { recursive: true })
+	writeFileSync(join(rootA, "app", "docs", "REVIEW.md"), "# review\n")
+	writeFileSync(join(rootA, ".comm", "config.json"),
+		JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app" } }))
+	execFileSync("node", [join(PKG, "install.mjs"), rootA], { stdio: "pipe" })
+
+	// The registry is MACHINE-GLOBAL and keyed by pid, and the pid this stub resolves is
+	// the pid of the session RUNNING THIS SUITE. Without its own runtime directory this
+	// arm would overwrite the operator's live registry entry with a fixture path — the
+	// trap recorded as FINDINGS.md#measurement-traps, met twice in one day.
+	const rt = join(rootA, "runtime")
+	const tp = join(rootA, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee.jsonl")
+	writeFileSync(tp, "\n")
+	const stub = join(rootA, "app", ".claude", "comm-hook.mjs")
+	const fire = (verb) => spawnSync("node", [stub, verb], {
+		cwd: join(rootA, "app"), encoding: "utf8",
+		input: JSON.stringify({ cwd: join(rootA, "app"), source: "startup", transcript_path: tp }),
+		env: { ...process.env, CLAUDE_COMM_RUNTIME: rt },
+	})
+	const mail = () => readdirSync(join(rootA, ".comm", "inbox", "app")).filter((f) => f.endsWith(".json")).length
+	const ledgerLog = () => { try { return readFileSync(join(rootA, ".comm", "handoff", "app.log"), "utf8") } catch { return "" } }
+	const registered = () => { try { return readdirSync(join(rt, "claude-comm", "sessions")).length } catch { return 0 } }
+
+	// ARM 1: stop. It must deliver and record nothing at all.
+	execFileSync("node", [join(rootA, ".comm", "bin", "comm.mjs"), "send", "app", "--ref", "docs/REVIEW.md"],
+		{ cwd: rootA, stdio: "pipe" })
+	const beforeStop = mail()
+	fire("stop")
+	const stopDrained = beforeStop === 1 && mail() === 0
+	const stopRecorded = ledgerLog().length > 0 || registered() > 0
+
+	// ARM 2: session-start. It must deliver AND record in both.
+	execFileSync("node", [join(rootA, ".comm", "bin", "comm.mjs"), "send", "app", "--ref", "docs/REVIEW.md"],
+		{ cwd: rootA, stdio: "pipe" })
+	const beforeStart = mail()
+	const h = fire("session-start")
+	const startDrained = beforeStart === 1 && mail() === 0
+	let schemaOK = false
+	try { schemaOK = JSON.parse(h.stdout)?.hookSpecificOutput?.hookEventName === "SessionStart" } catch {}
+	const led = ledgerLog()
+	const ledgerOK = /"event":"start"/.test(led) && /"agent":"app"/.test(led) && /eeeeeeeeeeee/.test(led)
+	let regOK = false
+	try {
+		const d = join(rt, "claude-comm", "sessions")
+		regOK = readdirSync(d).some((f) => JSON.parse(readFileSync(join(d, f), "utf8")).transcript === tp)
+	} catch {}
+
+	check("A29 the field hook records a start in both instruments, and still delivers",
+		stopDrained && !stopRecorded && startDrained && schemaOK && ledgerOK && regOK,
+		`stop: drained=${stopDrained} recorded=${stopRecorded} (must be false); ` +
+		`session-start: drained=${startDrained} schema=${schemaOK} ledger=${ledgerOK} registry=${regOK}`)
+}
+
 console.log(`\n${failed ? `✗ ${failed} adversarial check(s) FAILED` : "✓ all adversarial checks passed"}`)
 rmSync(root, { recursive: true, force: true })
 process.exit(failed ? 1 : 0)

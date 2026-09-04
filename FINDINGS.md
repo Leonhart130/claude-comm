@@ -633,3 +633,34 @@ wrong — a relative path in a hand-built hook payload made `findRoot` miss and 
 which is indistinguishable from a clean result. Its positive control passed *because it used an absolute
 path and so never travelled the broken path.* **A control that does not go through the same code as the arms
 validates nothing.** Both reviewers hit a version of this in the same session and recorded it.
+
+## `#tier0-calibration` — the tier-0 cap counts bytes; here is what a byte is worth
+
+Prompted 2026-09-04 by the `~/Dev/work` leader, who found the same class of defect in his own instrument and
+sent it over. His boot-cost guard converted bytes to tokens with `/4`, reported green six times in a day, and
+on its word he archived ~750 KB and reported the startup falling from ~105 000 tokens to ~80 000. He then
+measured the real turn: **100 725**, against 99 809 / 102 753 / 111 464 before the archiving. **The archiving
+had bought approximately nothing, and the instrument had reported a win.** His corpus tokenises at ~2.0
+bytes per token, and the error ran in the direction that required no work.
+
+`bin/boot.mjs`'s `budget` row is the same shape: it counts **bytes** against 28 000, while the reason the cap
+exists is a cost in **tokens**. So it was calibrated rather than defended.
+
+**Method — two `claude -p` probes differing in exactly one thing.** The corpus (this repo's own
+`CLAUDE.md` + `STATUS.md`, 19 739 B) was pasted into the *prompt*, not read through a tool, so no tool
+preamble or line numbering inflates the count. Same model, same cwd, same everything else. Totals are
+`input + cache_read + cache_creation` from `--output-format json`.
+
+| | tokens |
+| --- | --- |
+| baseline prompt | 20 113 |
+| with the corpus | 27 430 |
+| **difference** | **7 317 for 19 739 B → 2.70 B/token** |
+
+So the 28 000 B cap is **~10 400 tokens**, and anyone converting it with `/4` is low by a third. The row now
+prints the token figure beside the bytes, using this measured constant.
+
+**What is not settled:** the ratio is a property of *this* corpus — English-leaning markdown with tables,
+emoji and code fences. It must be re-measured if tier 0 changes character, and the constant carries the date
+it was taken for exactly that reason. Two independent corpora now sit at 2.0 and 2.70; neither is anywhere
+near 4, which is the only part that generalises.
