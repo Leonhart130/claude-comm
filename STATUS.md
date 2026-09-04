@@ -5,10 +5,11 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*Written 2026-09-04 by the session that lived it, immediately before a real reboot. It assumes you remember
-nothing. Every claim below is checkable from the tree; check rather than trust.*
-
 **1 — Fix `bin/context.mjs`. It reports the context of a session that no longer exists.**
+
+*Written 2026-09-04 by the session that lived it, immediately before a real reboot. It assumes you remember
+nothing, and boot injects only its first line — so the first line is the instruction. Every claim below is
+checkable from the tree; check rather than trust.*
 
 `FINDINGS.md#clear-blind` carries the measurement and the reasoning — read it, do not re-derive it. Short
 version: a `/clear`ed process keeps its **launch** session's scratch directory forever, so pid→transcript
