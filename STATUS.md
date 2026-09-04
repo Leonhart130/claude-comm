@@ -50,9 +50,10 @@ a real session here; `.boot-state.json` moved to `{startup: 7, clear: 1}` with n
 put the restart in the reboot arm by itself. `/clear` mints a **new session id and transcript**, and it
 brought the blocker above.
 
-Still open on RSS: the first datum leans "`/clear` does not return it" (331 MB cleared/empty vs 350 MB
-uncleared at 88 737 tokens) but there is no before/after on one pid. One `VmRSS` sample either side of a
-`/clear` settles it.
+✅ **RSS settled too: `/clear` does NOT return memory, it costs ~14 MB.** Before/after on one pid —
+318.6 MB at 50 237 tokens → 332.5 MB at ~0. A freed heap would have dropped ~35 MB. **So the real-relaunch
+mechanism is not optional**, and the two-mechanism split in `DESIGN-autonomy.md` stands: `/clear` often for
+context quality, a relaunch rarely for memory — which was the owner's original complaint.
 
 ## Where it stands
 
