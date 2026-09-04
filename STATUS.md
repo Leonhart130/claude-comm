@@ -50,6 +50,10 @@ experts. `FINDINGS.md#hookless-launch` and `#wake-doorbell`.
 
 **Standing test debt from review #4, none of it gated:** `FINDINGS.md#test-debt`.
 
+**Telling a peer is one command, and must be that one:** `node bin/exchange-bell.mjs --peer work-leader
+--ref <file in their out/>`. Boot's `channel:` row tells only *me* when they write; three hand-rung bells
+produced one quoting a number two re-arms stale. `FINDINGS.md#exchange-bell`.
+
 **Settled 2026-09-04, do not re-litigate — measurements in `DESIGN-autonomy.md` and `FINDINGS.md`:**
 `/clear` mints a new session, costs ~14 MB, returns no RSS · one kitty socket per OS window, and
 `kitten @ launch --type=os-window` stays in the SAME process · pid → transcript comes from the registry, a
@@ -60,7 +64,7 @@ the bus, never by absolute path · the doorbell resolves by pid and refuses rath
 
 | | state |
 | --- | --- |
-| toolkit | `bin/comm.mjs` · `session-registry.mjs` · `ledger.mjs` · `restart-signal.mjs` · `wake.mjs` · `context.mjs` · `boot.mjs` · `install.mjs` · `test/` — no dependencies |
+| toolkit | `bin/comm.mjs` · `session-registry.mjs` · `ledger.mjs` · `restart-signal.mjs` · `wake.mjs` · `exchange-bell.mjs` · `context.mjs` · `boot.mjs` · `install.mjs` · `test/` — no dependencies |
 | repo | git initialised; **an `origin` on GitHub exists** (`Leonhart130/claude-comm`) — the "local only" line here was stale. Nothing is pushed automatically; the owner decides |
 | **electio** | in real daily use — 26 real deliveries, both directions. **Ran a bus 4 commits stale until this session** |
 | gates | `attack` (deterministic, every case armed) · `ledger --prove-red`, now run INSIDE it · `selftest` (real sessions, not gated by boot) · `context` and `boot` controls. **Counts live in boot's output, never here** |

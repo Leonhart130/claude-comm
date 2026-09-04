@@ -860,3 +860,43 @@ in the field that means the owner's hand (`node bin/restart-signal.mjs arm --age
 <id>`) or a future self-reboot that owns its own relaunch. The mechanism cannot detect a liar — an armer that
 claims a restart it is not performing is indistinguishable from a real one — it can only make the claim
 visible: `by`, `by_pid` and the age are all in the record.
+
+
+## `#exchange-bell` — the one path with no tool on it grew a stale number within three uses
+
+`exchange/` is a file exchange, not a bus, and that asymmetry had never been named: **`bin/boot.mjs` tells ME
+when a peer has written, and NOTHING tells the peer when I have.** The `exchange/README.md` protocol closes
+that with a human — *"write a file, then tell your owner it exists"* — and on 2026-09-04 the owner delegated
+the telling to me. So the channel ran for one evening on hand-typed `kitten @ send-text`.
+
+**It took three uses to produce a false alarm.** The third bell said *"your note expires 20:41:59 (armed
+18:26:59Z + 900s)"*. The note on disk at that moment read `at: 18:30:34Z` — the peer had re-armed twice and
+had 357 seconds left. The tool I had asked (`ledger --root ~/Dev/work`, run 30 s earlier) had answered
+**correctly**; the sentence I typed quoted what I remembered arming.
+
+He caught it and returned my own rule: *"a row that speaks for another tool has to read what that tool
+reads."* And he named the consequence, which is worse than a wrong status line: **a stale expiry warning is an
+alarm that fires when nothing is wrong.** Had he trusted the bell over the file he would have re-armed in a
+panic mid-report — the rushed ordering my *previous* message existed to prevent. Two mechanisms fighting each
+other, and what saved it was the project's first rule rather than anyone's care: *the file is the artifact,
+the bell is only the bell.* **He read the file.**
+
+**`bin/exchange-bell.mjs` is the fix, and the property is not "be careful".** It is that there is **nowhere to
+put anything but a pointer**: the message text is fixed, and its only interpolations are the ref and the reply
+directory. This is the bus's own rule (`--ref` required, no `--body`) applied to the one path that had been
+exempt because a human was typing it. Everything else is `bin/wake.mjs`'s five rules, reused rather than
+reimplemented — resolve by pid then send, never `--match` on a guess, every socket, no daemon, a quiet period
+that is a written record and not a timer.
+
+**Armed as A35, and arm 4 is deliberately STRUCTURAL rather than behavioural**: it parses the message template
+out of the source and requires every `${…}` in it to be `ref` or `inDir`. A behavioural check ("today's text
+carries no digits") passes for a year and then somebody adds `${age}`; this fails on the commit that adds it.
+Proved red by adding a timestamp to the text — caught, and named in the failure line.
+
+**Two things this does NOT do.** It does not deliver: the peer reads the file when their turn ends, and the
+channel's only real answer is their file in `in/`, which boot's `channel:` row already watches. And it does
+not know whether they read it.
+
+**And the case for it was three hand-rung bells, not a theory** — which is the right order, but note the cost:
+the defect reached a live peer before the tool existed, and it was caught by the peer rather than by me.
+
