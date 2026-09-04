@@ -506,6 +506,43 @@ function proveRed() {
 			`cold exposure ${r.cold.meanExposureMin} min (15 requested, rebooted at +5)`)
 	}
 
+	// 8a. The p-value is hand-rolled (log-factorials, "sum the tables at most as probable").
+	//     A wrong tail sum would not look wrong - it would look like a p-value, and a
+	//     p-value decides whether the reboot feature is allowed to exist. So it is checked
+	//     against a SECOND implementation that shares no code and no floating point in the
+	//     part that matters: exact BigInt binomials, with the "at most as probable" test
+	//     done by comparing integers rather than logs.
+	{
+		const C = (n, k) => {
+			if (k < 0 || k > n) return 0n
+			let r = 1n
+			for (let i = 0n; i < BigInt(k); i++) r = (r * BigInt(n - Number(i))) / (i + 1n)
+			return r
+		}
+		const exact = (a, b, c, d) => {
+			const r1 = a + b, r2 = c + d, c1 = a + c, n = r1 + r2
+			const w = (x) => C(r1, x) * C(r2, c1 - x)
+			const obs = w(a)
+			let num = 0n
+			for (let x = Math.max(0, c1 - r2); x <= Math.min(r1, c1); x++) if (w(x) <= obs) num += w(x)
+			return Number(num) / Number(C(n, c1))
+		}
+		// And the reference itself is anchored to a published value, so the two
+		// implementations cannot be wrong the same way: Fisher's tea-tasting table
+		// [3 1 / 1 3] is 0.4857142857 in every textbook and in R's fisher.test.
+		const tea = exact(3, 1, 1, 3)
+		let worst = 0, cases = 0
+		for (const [cd, rd] of [[1, 16], [8, 8], [3, 11], [0, 5], [10, 2], [19, 4], [2, 3]]) {
+			const r = run(world({ coldStarts: 20, coldDefects: cd, rebootStarts: 20, rebootDefects: rd }))
+			const ref = exact(cd, 20 - cd, rd, 20 - rd)
+			if (typeof r.p === "number") { worst = Math.max(worst, Math.abs(r.p - ref) / Math.max(ref, 1e-300)); cases++ }
+		}
+		check("the p-value agrees with an exact-integer Fisher",
+			cases === 7 && worst < 1e-9 && Math.abs(tea - 0.4857142857) < 1e-9,
+			`${cases}/7 tables compared, worst relative error ${worst.toExponential(2)}; ` +
+			`reference on the tea-tasting table = ${tea.toFixed(10)} (want 0.4857142857)`)
+	}
+
 	// 8b. A defect attributed BY SESSION ID whose stamp predates that session's start is a
 	//     record disagreeing with itself. It stays attributed and stays out of the window.
 	{

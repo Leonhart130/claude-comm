@@ -7,7 +7,7 @@ fold the settled parts into the README.
 
 **Wire the FIELD to the ledger. The instrument is built and it is recording the wrong project.**
 
-`bin/ledger.mjs` exists, is proved red on 17 arms, and `bin/boot.mjs` now writes a `start` record on every
+`bin/ledger.mjs` exists, is proved red on 18 arms, and `bin/boot.mjs` now writes a `start` record on every
 session start — but **only here**. `~/Dev/work` and `~/Dev/electio` run `.claude/comm-hook.mjs session-start`,
 which forwards to the bus and knows nothing about the ledger. The reboots will happen there, so their cold
 arm is empty and the query cannot be answered however long this repo runs.
@@ -43,7 +43,7 @@ boot records the first automatically (`.boot-state.json`, `sources`) — nothing
 | **electio** | in real daily use — 26 real deliveries, both directions. **Ran a bus 4 commits stale until this session** |
 | gates | `attack` **26/26** deterministic ✓, **every case proved able to go red** (defect restored in the bus, gate byte-identical) · `selftest` **now deterministic too** — 6/6 transport green |
 | boot | `node bin/boot.mjs` — 7 measured rows, **every gating one demonstrated able to go red**; `--fast` (0.28 s) is injected at session start by `.claude/settings.json`, the contract is `CLAUDE.md` |
-| **ledger** | `node bin/ledger.mjs` — the reboot instrument, **built before the mechanism**. 17 arms proved red. Recording cold starts HERE since 2026-09-04; **the field is not wired** |
+| **ledger** | `node bin/ledger.mjs` — the reboot instrument, **built before the mechanism**. 18 arms proved red. Recording cold starts HERE since 2026-09-04; **the field is not wired** |
 | reviews | #1 (9 findings) in `REVIEW-adversarial.md` · #2 (10 findings) in `REVIEW-adversarial-2.md` · electio leader's field reviews in `REVIEW-electio-leader.md` and `REPLY-from-electio-leader.md` |
 
 ## ⏭️ OPEN
@@ -101,7 +101,7 @@ boot records the first automatically (`.boot-state.json`, `sources`) — nothing
    owe it in `exchange/work-leader/2026-09-04-lifecycle-answer.md`. **Next: the ledger before the
    mechanism** — the first ten reboots must be measurable or the feature has no way to be judged.
 
-   ✅ **The ledger is built, and it was built first** — `node bin/ledger.mjs`, 17 arms proved red,
+   ✅ **The ledger is built, and it was built first** — `node bin/ledger.mjs`, 18 arms proved red,
    `DESIGN-autonomy.md#the-ledger` and `FINDINGS.md#ledger-control` / `#ledger-blame` / `#ledger-unknown`.
    It records **every session start**, not only reboots, because the comparison is reboot-start against
    cold-start and the control arm has to exist before the feature does. Boot writes a record on every start
