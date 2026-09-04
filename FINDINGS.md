@@ -616,6 +616,14 @@ network filesystems (`O_APPEND` does not travel) · scale past ~6 400 records (`
 O(n²)) · what `resume` and `compact` payloads actually carry · **and the ledger has still never scored a real
 defect** — every defect it has ever seen was synthetic. Its first real `record defect` is the test.
 
+**Moved out of STATUS.md 2026-09-04 when tier 0 hit its cap — cut from the capped file, kept here, because
+a caveat deleted is a caveat retracted and neither of these has been measured:**
+
+- **A8's two guards under partial mutation.** Each alone is uncaught, both together are caught; the
+  in-between cases were never enumerated.
+- **Behaviour when an agent is mid-TOOL-CALL** rather than mid-turn. Still unexercised, on every delivery
+  path, and the one state where a Stop hook's timing assumptions are least obviously safe.
+
 ## `#measurement-traps` — five ways a control lied here
 
 `delivered/` file mtimes look like drain times and are not — `renameSync` preserves mtime, so they are
@@ -764,8 +772,14 @@ here by an expiry instead, so the cheap idea survives as a property rather than 
 Four properties, each of them a way to produce a confident wrong number in the arm being measured:
 
 - **One-shot, enforced by `rename`, not by care.** `claim()` renames before it reads, so of two sessions
-  starting at the same instant exactly one gets the signal. A read-then-unlink gives it to BOTH — measured:
-  with the rename swapped for a copy, one restart became two reboots and eight racing claimers all won (A33).
+  starting at the same instant exactly one gets the signal.
+  ⚠️ **Corrected by review #6 (F1): A33 proves the note is CONSUMED, not that consumption is ATOMIC**, and the
+  sentence here used to imply the second. My mutation swapped the rename for a copy that left the file in
+  place — which ARM 2 already catches. A *genuine* read-then-unlink, with the unlink deferred past the parse,
+  **passes A33 green**, because eight `node` startups do not overlap at the critical read; with a 150 ms
+  window inserted it yields 8 winners while `rename` still yields 1. `rename` is atomic and the mutant is
+  racy; the arm cannot tell them apart. Restoring the stronger claim needs claimants that synchronise before
+  racing. `REVIEW-adversarial-6.md` F1.
 - **It carries its own expiry and does not apply it.** The armer declares `ttl_s`, the claimer measures
   `age_s`, and `classify()` in the ledger decides — one function, correctable later, re-read over every
   record ever written. Storing "this was fresh" would freeze today's TTL into the data (ledger property 1).
