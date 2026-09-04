@@ -64,6 +64,55 @@ boot records the first automatically; nothing to do but wait for a real clear.
    can deliver; **no daemon, no timer, no watcher** (A21); and identity comes from the pid→window walk, never
    from a title or a cwd. Design and measurements: `DESIGN-autonomy.md`.
 
+4. **🔴 Holding a machine resource is not an event anybody publishes.** Reported from the field
+   2026-09-04, and it lands on this bus's design rather than on the reporter's. Two agents inside **one**
+   project root collided over a port: an adversarial reviewer took the project's default preview port,
+   re-ran a browser suite against it, and twice killed processes listening there — one of which may have
+   belonged to the app developer working in the same repo, who discovered his own runner could photograph
+   another session's server and moved his port. Everything else the reviewer did was clean.
+
+   **The failure is not transport, which is why a bigger bus would not have prevented it.** Both agents had
+   a hub available and still could not see each other, because *nothing in this tool has ever had a concept
+   of a thing an agent is holding.* Verified rather than assumed: `bin/comm.mjs` contains no notion of a
+   port, a lock or a server — its only "claim" is a sender's identity.
+
+   ⭐ **The fix is a claim file, and it respects the hub rule exactly** — `claims/<resource>` carrying pid,
+   purpose and time; the file is the artifact; no transport, no daemon. Three properties: a stale claim is
+   **diagnosable, not authoritative** (the pid is there so a reader can see the holder is dead — evidence of
+   a crash, never a lock that outlives it); it **advises, it does not enforce** (a mutex every agent can
+   delete is a promise the filesystem does not make); and it ships with a gate proved able to go red on a
+   claim left by a dead process. **Deliberately not next** — the ledger is — but a second occurrence
+   outranks that plan.
+
+5. **🔴 The autonomy mandate — self-launching experts, a self-rebooting leader.** Given 2026-09-04.
+   Four mechanisms verified available (both hook payloads carry `transcript_path`; `SessionStart` carries
+   `source`; the transcript's `usage` gives the exact context; kitty + the pid→window resolver are live).
+   **Design, measurements and open unknowns: [`DESIGN-autonomy.md`](DESIGN-autonomy.md).** The headline the
+   owner accepted: a reboot buys QUALITY, not tokens — and the boot read set is the lever that matters.
+
+   **🔴 The consumer answered, and it changes the feature.** Four of five defects in its most defect-dense
+   session were authored **in the first thirteen minutes, at 35–42 % of peak context** — its defects are
+   BOOT defects, not crowding defects, so a reboot multiplies the state where errors are actually made. The
+   design effort belongs in the fifteen minutes AFTER a restart. The only monotone degradation signal it
+   could measure is re-opens (37 % → 87 % across context deciles, 51 sessions, 0 % duplicate calls), so the
+   trigger should be *"you re-fetched a file you already read"*, not a token count. And the handoff must
+   carry a **sha256 read manifest** rather than prose, so a rebooted session re-reads only what MOVED —
+   nothing trusted, something proved. Full record in `DESIGN-autonomy.md`; my answer and the three things I
+   owe it in `exchange/work-leader/2026-09-04-lifecycle-answer.md`. **Next: the ledger before the
+   mechanism** — the first ten reboots must be measurable or the feature has no way to be judged.
+
+   ⚠️ **It also corrected my numbers:** ~20 of the 55 transcripts in its project directory are adversarial
+   review instances, not leader boots. The median survived (99 809, re-derived); **"worst boot 220 200" did
+   not — it is 170 568.** And its boot has doubled in 18 days, so a threshold must track the current boot
+   cost rather than a constant.
+
+   The original consultation: The owner's ruling on how a reboot should behave:
+   "you handle it, ideally the two of you talk" — so the question went to the agent it would be
+   applied to, in `exchange/work-leader/2026-09-04-lifecycle-consultation.md`. Six questions, of which one
+   decides the feature: **does a crowded context actually degrade it, and where?** If the quality theory is
+   wrong the whole thing is a cost with no benefit, and only the agent living at 500 k can say. There is no
+   bus between the two projects yet, so the owner relays.
+
 ## ⚠️ What was NOT verified
 
 - **Whether finding 1 ever actually ate mail in electio.** Still unanswerable — but the reason stated here

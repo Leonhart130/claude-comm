@@ -619,3 +619,20 @@ holds only what is OPEN; a settled item sitting there is read as live work and c
    ⚠️ **All 26 rows predate the `via` field, so delivery, dismissal, and a drain by the wrong agent are
    indistinguishable across the whole history.** The script says so on every run rather than printing a
    clean table. New rows are not exposed to this.
+
+## ⚠️ A trap from the same session: a trim that silently dropped an open item
+
+Compressing the OPEN list on 2026-09-04 to get tier 0 back under its cap, I rewrote the section body in one
+substitution and re-emitted three items. The list had seven. **Four were carried out to `HISTORY.md` and
+`DESIGN-autonomy.md` deliberately; the autonomy mandate — the largest live item in the project — was not
+carried anywhere. It simply stopped existing**, and the boot's OPEN list dutifully printed the four that
+remained without any sign that a fifth had ever been there.
+
+Caught by accident: an unrelated `assert` failed while adding a new item, because the anchor it looked for
+was gone. Recovered from `git show HEAD~1`.
+
+**The lesson is not "be careful when editing."** It is that *a list is the one structure whose loss leaves no
+evidence* — a deleted paragraph shows up as a diff, a deleted list entry shows up as a shorter list that
+looks complete. Every surface in this project that renders a list (`comm inbox`, `comm who`, the boot's OPEN
+section) has this property, and none of them counts. Worth remembering before trusting any of them to tell
+you that nothing is missing.
