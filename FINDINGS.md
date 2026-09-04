@@ -465,10 +465,15 @@ any session that has been cleared, which after this feature ships is most sessio
 Two fixes are candidates and neither was shipped, because a detector whose false positive is already
 demonstrable is worse than a defect that is written down:
 
-- **A registry written at `SessionStart`** — the boot hook holds the payload's `transcript_path` and can
-  resolve the session pid, so it can record `pid + process start time → transcript` and refresh it on every
-  start, clears included. Exact, no heuristics; it needs a decision about where the file lives for a project
-  whose hook is not boot's.
+- **A registry written at `SessionStart`** — the hook holds the payload's `transcript_path` and can resolve
+  the session pid, so it records `pid + process start time → transcript` and refreshes it on every start,
+  clears included. Exact, no heuristics. **Decided 2026-09-04: it lives in
+  `$XDG_RUNTIME_DIR/claude-comm/sessions.json`, not in any project.** A pid is a *machine-global* name, so a
+  per-project registry is the wrong shape — the same pid would be looked up in whichever project the reader
+  happened to be standing in. `XDG_RUNTIME_DIR` is user-private, is tmpfs, and is emptied at logout, which is
+  exactly the lifetime of the pids it keys. The `pid + start time` pair is what makes a recycled pid a miss
+  rather than a wrong answer. A lookup that finds nothing must REFUSE, never fall through to today's
+  resolution.
 - **An mtime-divergence test** (the transcript frozen while the scratch dir advances) — **rejected, with the
   counter-example measured**: a healthy session running a background job writes into `…/tasks` while its
   transcript sits still, which is this very repo's own session for minutes at a time. It would flag a

@@ -17,8 +17,9 @@ looking from outside exactly like the feature working. The `Stop` path is safe; 
 
 **Nothing that reads a context by pid may be built or shipped before this.** The favoured fix is a registry
 written at `SessionStart` — boot already holds the payload and can resolve the session pid, so it can record
-`pid + process start time → transcript` and refresh it on every start, clears included. The open decision is
-where that file lives for a project whose SessionStart hook is not boot's.
+`pid + process start time → transcript` and refresh it on every start, clears included. **Where it lives is
+decided** — `$XDG_RUNTIME_DIR/claude-comm/sessions.json`, machine-global like the pids it keys; the reasoning
+is in the finding. A lookup that misses must refuse, never fall back to today's resolution.
 
 **2 — Then wire the field to the ledger.** `bin/ledger.mjs` records only here; `~/Dev/work` and
 `~/Dev/electio` run `.claude/comm-hook.mjs session-start`, which knows nothing about it. The reboots happen
