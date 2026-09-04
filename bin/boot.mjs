@@ -506,8 +506,15 @@ if (has("--hook")) {
 	// only one compared until the two instruments started travelling beside it
 	// (2026-09-04); a copy that can go stale and is compared by nothing is a drift class
 	// with no detector, which is the shape this row exists to remove.
-	const INSTALLED = ["comm.mjs", "session-registry.mjs", "ledger.mjs"]
-	const repoHash = Object.fromEntries(INSTALLED.map((f) => [f, sha(join(ROOT, "bin", f))]))
+	//
+	// ENUMERATED from what is actually installed, never listed here. The first version of
+	// this widening was a literal list — and `install.mjs` has its own list of what it
+	// copies, so two lists had to agree and nothing checked that they did. That is the
+	// identical defect A27/A28 carried for three reviews, re-created hours after being
+	// removed, by the person who had just removed it. Reading the directory also catches
+	// what a list never could: a module left behind by an older install that the repo no
+	// longer ships, still sitting on the path a hook executes.
+	const repoHash = (f) => sha(join(ROOT, "bin", f))
 	for (const p of projects) {
 		const name = basename(p)
 		const chk = spawnSync("node", [join(ROOT, "install.mjs"), p, "--check"], { encoding: "utf8" })
@@ -518,9 +525,13 @@ if (has("--hook")) {
 		// R9: a null repoBus used to DISABLE the comparison, so the row printed the
 		// reassuring "bus current" having compared nothing - a void probe standing behind
 		// a working one, since the installer happens to fail on the same condition.
-		const uncomparable = INSTALLED.filter((f) => repoHash[f] === null)
-		const staleFiles = INSTALLED.filter((f) => repoHash[f] !== null && sha(join(p, ".comm", "bin", f)) !== repoHash[f])
-		const busStale = uncomparable.length ? null : staleFiles.length > 0
+		let installed = []
+		try { installed = readdirSync(join(p, ".comm", "bin")).filter((f) => f.endsWith(".mjs")).sort() } catch {}
+		const uncomparable = installed.filter((f) => repoHash(f) === null)
+		const staleFiles = installed.filter((f) => repoHash(f) !== null && sha(join(p, ".comm", "bin", f)) !== repoHash(f))
+		// An empty directory must not read as "everything matches": the bus is the file
+		// every hook executes, so its absence is the loudest possible staleness.
+		const busStale = !installed.length ? true : uncomparable.length ? null : staleFiles.length > 0
 		let pending = 0, oldest = 0
 		const ibx = join(p, ".comm", "inbox")
 		try {
@@ -542,8 +553,10 @@ if (has("--hook")) {
 		} catch {}
 		const bits = [
 			drift ? "HOOK DRIFT" : "hooks in sync",
-			busStale === null ? `UNCOMPARED (this repo's own ${uncomparable.join(", ")} is unreadable)`
-				: busStale ? `STALE vs repo: ${staleFiles.join(", ")}` : "bus current",
+			busStale === null ? `UNCOMPARED (this repo has no ${uncomparable.join(", ")} to compare against)`
+				: !installed.length ? "NOTHING INSTALLED in .comm/bin"
+				: busStale ? `STALE vs repo: ${staleFiles.join(", ")}`
+				: `bus current (${installed.length} files)`,
 			pending ? `${pending} pending (oldest ${age(Date.now() - oldest)})` : "0 pending",
 			last ? `last delivery ${age(Date.now() - Date.parse(last))} ago` : "no delivery logged",
 		]
