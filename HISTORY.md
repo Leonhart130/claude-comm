@@ -545,3 +545,77 @@ Claude Code enforces the hook `timeout`, which is R8's only remaining mitigation
    first move, and it is also the honest test of the installer's portability claim**, which has never been
    exercised on a project it was not written beside.
 
+
+## ✅ Closed — items retired from STATUS on 2026-09-04
+
+These were carried in OPEN long after they stopped being open. STATUS.md's own header says it
+holds only what is OPEN; a settled item sitting there is read as live work and costs every boot.
+
+**The reasoning archive, closed the morning of 2026-09-04.**
+
+**🔴 The reasoning archive is not in git, and one `git clean` deletes it.** `661a1aa "Removed
+   conversations"` deleted `FINDINGS.md` and `STATUS.md` from the index, and `.gitignore`'s `*.md` keeps them
+   out. The repo now has a remote (`github.com:Leonhart130/claude-comm`), so **what is published is the bus
+   with none of the reasoning that justifies its guards** — and this file, the only record of what is open,
+   exists in exactly one working tree with no backup.
+
+   Measured, not argued: a fresh `git clone` of this repo and `node test/attack.mjs` on it → **A27 RED, 21
+   dangling pointers.** One variable moved (the ignored files), the gate byte-identical. So A27 — the gate
+   whose whole purpose is "a dangling pointer is worse than none" — is green only in this working tree.
+
+   The chat files (`REPLY-*`, `REPORT-*`, `REVIEW-*`, `BRIEF-*`) were clearly meant to go. `FINDINGS.md` and
+   `STATUS.md` were collateral. **This is the owner's call and boot will keep it red until it is made:**
+   re-track the two documents (`git add -f`), or state that the archive is deliberately local-only and
+   change A27 so it does not claim a coverage it cannot have off this machine.
+
+
+**The bus install, closed the same day.**
+
+**✅ CLOSED 2026-09-04 — the bus is installed where the work is.** The owner's live project now carries `.comm/` with
+   **leader + the site expert**; `--check` green. First install outside the project this tool was written beside.
+   ⏸️ **electio is abandoned** (owner, same day); its install is left in place and harmless.
+   ⚠️ Left to the owner: relaunching so the hooks bind, and whether the site expert commits its two `.claude` files.
+   Narrative in `HISTORY.md`.
+
+
+**selflo, uninstalled 2026-08-04.**
+
+**selflo is UNINSTALLED** (owner's call, 2026-08-04). Backup:
+   `scratchpad/selflo-comm-backup-2026-08-04.tgz`. ⚠️ Its `COORDINATION.md`, `scripts/sync-agent-files.mjs`
+   and 6 `docs/START_HERE.md` **still document the bus** — an agent relaunched there before reinstall will
+   follow those docs into a missing file.
+
+
+**The latency narrative** (the table itself is re-derived by `node test/latency.mjs <log>`):
+
+**🔴 Latency is a mailbox — not an interrupt.** Re-derive with `node test/latency.mjs <log>`; the table
+   is no longer transcribed. From electio's 26 real deliveries:
+
+   | direction | n | median | max |
+   | --- | --- | --- | --- |
+   | leader → web-app | 12 | **1462 s (24.4 min)** | 3324 s (55.4 min) |
+   | web-app → leader | 14 | 586 s (9.8 min) | 986 s (16.4 min) |
+
+   The asymmetry is structural: mail lands at the recipient's *turn boundary*, and the expert's turns are
+   long. **An agent that is alive but idle never receives its mail** — the electio leader hit this twice,
+   session alive and pid visible, because it was in no turn at all. `who` showing "running" does not mean
+   reachable. Do not describe the bus as real-time in any doc.
+
+   ⚠️ **A second mechanism contributed to this tail, and it is now FIXED — which means the historical
+   numbers above are worse than what the bus does today.** Review #2 found that a turn ending with cwd in a
+   non-agent directory made `whoami` return null, so the hook exited 0 and the agent's own mail was silently
+   not delivered. Measured on the pre-fix bus, leader's own mail, one variable moved:
+
+   | turn ends in | old bus | new bus |
+   | --- | --- | --- |
+   | `.` (root) | delivered | delivered |
+   | `docs/`, `scripts/` | **silently not delivered** | delivered |
+   | `web-app/` (another agent's dir) | **stolen — drained into the wrong inbox** | delivered |
+
+   So an unknown share of the tail was a turn that simply ended in the wrong directory, not an idle agent.
+   The log cannot say which rows. Going forward only idleness remains, and **that one is still open** — it
+   is the whole justification for item 3. Gated by **A16**.
+
+   ⚠️ **All 26 rows predate the `via` field, so delivery, dismissal, and a drain by the wrong agent are
+   indistinguishable across the whole history.** The script says so on every run rather than printing a
+   clean table. New rows are not exposed to this.

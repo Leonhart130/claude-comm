@@ -109,6 +109,7 @@ function writeState(obj) {
 
 let statusText = ""
 let gateDocs = []   // documents the gate suite declares it reads; feeds the fingerprint (R1)
+let nextText = ""   // what the previous close said this session must do first
 
 if (has("--prove-red")) proveRed()
 
@@ -322,6 +323,7 @@ if (has("--hook")) {
 	if (!existsSync(p)) row("status", WARN, "STATUS.md absent - nothing states what is OPEN")
 	else {
 		statusText = readFileSync(p, "utf8")
+		const txt = statusText
 		const m = statusText.match(/^#\s*STATUS.*?(\d{4}-\d{2}-\d{2})/m)
 		const stamp = m ? m[1] : "undated"
 		const doc = statSync(p).mtimeMs
@@ -337,6 +339,8 @@ if (has("--hook")) {
 			if (mt > newest) { newest = mt; newestFile = rel }
 		}
 		const stale = newest > doc
+		const nx = txt.match(/^##\s*▶\s*NEXT\b[^\n]*\n([\s\S]*?)(?=^## |\Z)/m)
+		nextText = nx ? nx[1].trim() : ""
 		row("status", stale ? WARN : OK,
 			`headed ${stamp}` +
 			(stale ? ` - but ${newestFile} is newer by ${age(newest - doc)}: read it as a claim` : " - newer than the code it describes"))
@@ -547,11 +551,35 @@ if (CLOSE) {
 	// it - so it reports, it does not block. Blocking on it would make every first close
 	// require an acknowledgement for the condition it exists to remove, and would inflate
 	// the erosion count of a row that was never the problem.
+	// A close that does not carry the next move forces the next session to re-derive it -
+	// which is the boot cost this whole project has been fighting, paid in judgment
+	// instead of tokens. The section is written BY ME in STATUS.md, never by this tool:
+	// a mechanism that authors the handoff is a plausible answer standing where a real
+	// one should be, and it is the one thing I promised the other project's leader I
+	// would not build.
+	const statusPath = join(ROOT, "STATUS.md")
+	let statusTouched = false
+	try {
+		const stc = st.lastClose && Date.parse(st.lastClose.at)
+		statusTouched = !stc || statSync(statusPath).mtimeMs > stc
+	} catch {}
+	if (!nextText) {
+		closeFailed = true
+		closeReport = "\n  ✗ NOT CLOSED - STATUS.md carries no `## ▶ NEXT` section.\n" +
+			"    Write what the next session must do FIRST, in enough detail that a session with no\n" +
+			"    memory of this one can act on it without re-deriving anything.\n"
+	} else if (!statusTouched) {
+		closeFailed = true
+		closeReport = "\n  ✗ NOT CLOSED - STATUS.md has not been touched since the last close.\n" +
+			"    Either this session changed nothing, or the record does not reflect what it changed.\n"
+	}
+
 	const open = rows.filter((r) => r.label && r.label !== "close" && r.level !== OK)
 	const unacked = open.filter((r) => !ACKS.has(r.label))
 	const lines = []
 
-	if (unacked.length) {
+	if (closeFailed) { /* the NEXT check already failed the close */ }
+	else if (unacked.length) {
 		closeFailed = true
 		lines.push("  ✗ NOT CLOSED - these rows are neither fixed nor named:")
 		for (const r of unacked) lines.push(`      ${r.label}  ${r.text.slice(0, 96)}`)
@@ -579,7 +607,7 @@ if (CLOSE) {
 		lines.push("")
 		lines.push(`  ✓ CLOSED at ${st.lastClose.head} - the next boot inherits a tree whose every row is green or named.`)
 	}
-	closeReport = "\n" + lines.join("\n") + "\n"
+	if (!closeReport) closeReport = "\n" + lines.join("\n") + "\n"
 }
 
 // -- render -----------------------------------------------------------------
@@ -596,6 +624,14 @@ const open = statusText.split(/^## /m).find((x) => /OPEN/.test(x.slice(0, 12)))
 // that matters.
 const report =
 	`\nclaude-comm boot - ${new Date().toISOString().slice(0, 10)} - ${ROOT}\n\n` +
+	// The headline only. The full section is in STATUS.md, which is tier 0 and read
+	// anyway - printing all of it here would put the boot's own cost back where this
+	// session spent the morning removing it.
+	(nextText
+		? `  ▶ NEXT, from the last close:\n` +
+		  nextText.split("\n\n")[0].split("\n").map((l) => "    " + l.replace(/\*\*/g, "")).join("\n") +
+		  `\n    (full section: STATUS.md ## NEXT)\n\n`
+		: "") +
 	rows.map((r) => `  ${r.label ? MARK[r.level] : " "} ${r.label.padEnd(pad)}  ${r.text}`).join("\n") + "\n" +
 	(open
 		? "\n  open (STATUS.md's claim - verify before acting):\n" +
@@ -775,6 +811,27 @@ function proveRed() {
 
 	arm("R9 this repo's own bus unreadable", "field:proj", RED,
 		...swap(join(pkg, "bin", "comm.mjs"), () => ""))
+
+	// The close's own two refusals, which no boot row expresses.
+	{
+		const st2 = join(pkg, "STATUS.md")
+		const orig = readFileSync(st2, "utf8")
+		const closeRun = (extra = []) => spawnSync(process.execPath,
+			[SELFFILE, "--close", "--root", pkg, "--field", tmp, ...extra], { encoding: "utf8" })
+		writeFileSync(st2, orig.replace(/^## ▶ NEXT[\s\S]*?(?=^## )/m, ""))
+		const noNext = closeRun()
+		writeFileSync(st2, orig)
+		assert("close refuses without a stated next move", noNext.status === 1 && /carries no `## ▶ NEXT`/.test(noNext.stdout),
+			`exit=${noNext.status}`)
+
+		writeFileSync(join(pkg, "dirty.txt"), "x\n")
+		const unacked = closeRun()
+		const acked = closeRun(["--ack", "tree=fixture is deliberately dirty"])
+		rmSync(join(pkg, "dirty.txt"), { force: true })
+		assert("close refuses an unnamed row, accepts a named one",
+			unacked.status === 1 && /NOT CLOSED/.test(unacked.stdout) && acked.status === 0 && /CLOSED at/.test(acked.stdout),
+			`unacked exit=${unacked.status}, acked exit=${acked.status}`)
+	}
 
 	console.log(`\n  session: INFORMATIONAL - reports /proc, has no failing state, is not a gate`)
 	// R5: the archive row said "tracked" when git had been asked nothing at all.

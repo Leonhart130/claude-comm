@@ -213,3 +213,74 @@ theirs · **guards already run WITH THEIR OUTPUT, never "passed"** · the read m
   and it keeps their its notes directory free of machine events.
 - **Ship the instrument with the feature.** The first ten reboots must leave a marker, so *"did the reboots
   cost us defects"* is a query and not a debate. Their charter: *a feature with no ledger is a hobby.*
+
+## Phase 2 — the kitty wake, as it stood before the lifecycle mandate
+
+**Phase 2 — kitty wake for the idle agent. RESTART DONE, RESOLVER BUILT AND VERIFIED LIVE, SEND NOT BUILT.**
+   Item 1 is its justification: an agent alive but in no turn never receives its mail, and that is the last
+   delivery gap.
+
+   **2026-08-05, after the owner's reboot — measured against the four real sessions on his screen**
+   (`node test/kitty-resolve.mjs <pid>...`, read-only, sends nothing):
+
+   | | result |
+   | --- | --- |
+   | remote control survived the restart | ✓ socket `/tmp/kitty-384996`, `KITTY_LISTEN_ON` set in every window |
+   | every live agent resolved to exactly one window | ✓ 4/4, distinct windows, via nearest-ancestor `/proc` walk |
+   | a live process outside kitty is refused | ✓ orphaned stand-in → chain `408083 → 5084 → 1`, unresolved |
+   | pid 1, and kitty's own pid as a window root | ✓ both correctly refused / absent |
+
+   🔴 **The obvious implementation would have been a permanent silent no-op.** `@ ls` reports a window
+   `pid`, and it is the window's **shell** — the agent is in `foreground_processes`. Matching `window.pid`
+   against the pids `comm who` knows resolved **0 of 4** on the real layout. Under constraint 2 (refuse
+   when the match does not resolve) that is a wake that never fires and reads on screen exactly like *"no
+   idle agent needed waking"* — this project's signature failure shape, and it is kept as a live control in
+   the probe rather than as a comment.
+
+   ⚠️ A whole-chain match is *not* equivalent to nearest-ancestor: every chain passes through kitty itself
+   and up to init, so a wider match adds only false hits. Refusing those as "ambiguous" would be safe in
+   the wrong direction — the same silent no-op. The nearest ancestor that is a window's root **is** the
+   window; there is nothing to disambiguate.
+
+   **Constraint 1 is now confirmed by observation rather than argument.** Two of the five windows share
+   `~/Dev/electio` (the leader and an off-bus adversarial reviewer), so cwd cannot identify an
+   agent — and the window **title changed between two `@ ls` calls seconds apart**, because the spinner
+   glyph is part of it (`⠐ Consult with leader expert` → `⠂ …`). Titles are not merely fragile; they are
+   not stable across two consecutive reads.
+
+   **Done 2026-08-05:** `~/.config/kitty/kitty.conf` now sets `allow_remote_control socket-only` and
+   `listen_on unix:/tmp/kitty-{kitty_pid}` (backup in scratchpad). `socket-only` because the windows run
+   coding agents — it means the socket is the only control path, not in-band escape codes from inside a
+   window. ⚠️ *That refusal is kitty's documented behaviour; I verified the socket path works and did NOT
+   verify the refusal.* **Takes effect on the next kitty restart.**
+
+   **Verified BEFORE committing to that restart**, with a scratch headless instance launched against the
+   real edited config:
+
+   | | result |
+   | --- | --- |
+   | socket created at the configured path | ✓ `/tmp/kitty-<pid>` |
+   | reachable via `kitten @ --to` | ✓ |
+   | `KITTY_LISTEN_ON` set inside each window | ✓ — the bus can discover the socket with nothing hardcoded |
+   | `@ ls` exposes per-window `pid`, `title`, foreground `cwd` | ✓ |
+
+   **Design constraints the probes settled — do not re-litigate these by reasoning:**
+   1. **Match agent → window by PID, not title and not cwd.** `liveAgents` already knows each agent's pid
+      from `/proc`; `@ ls` reports each window's pid and its foreground processes. Titles are fragile, and
+      cwd is now ambiguous by design — several agents may share one directory (A17).
+   2. **Resolve the match FIRST and refuse to send when it does not resolve.** Measured: `send-text --match`
+      hitting nothing **exits 0 silently**. `send-text`'s exit code may never be treated as delivery
+      evidence — that is the property this whole bus exists to deny.
+   3. **The wake text must carry NO substance.** It is a doorbell that makes the idle session take a turn;
+      the real nudge is then delivered by the `Stop` hook at that turn's end, through the path that is
+      already gated. Anything else is content injection, which the project refuses by its first rule.
+   4. **NO DAEMON, NO TIMER, NO WATCHER — the wake stays a short-lived process.** The natural way to build
+      a wake is a process that watches inboxes and lives forever. That would be the first long-lived thing
+      in this project, and it is the only way this tool could ever acquire a memory leak: today `comm`
+      starts, does file I/O and exits in 61 ms, so nothing lives long enough to leak. That is an
+      **architectural** property, not a Node-versus-Rust one, and it is now **gated by A21** (import
+      allowlist + no long-lived construct) rather than left to good intentions. The wake must therefore be
+      driven from the existing per-turn hook invocation, not from a resident watcher.
+   5. A third option the owner surfaced remains unexplored: an **MCP channel that pushes into the session**
+      (`--dangerously-load-development-channels`) — undocumented, dev-flagged, unverified.
+
