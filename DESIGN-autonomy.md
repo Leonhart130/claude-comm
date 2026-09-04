@@ -216,7 +216,7 @@ theirs · **guards already run WITH THEIR OUTPUT, never "passed"** · the read m
 
 ## The ledger — built 2026-09-04, BEFORE the mechanism
 
-`node bin/ledger.mjs` · negative control `--prove-red` (17 arms) · findings `FINDINGS.md#ledger-control`,
+`node bin/ledger.mjs` · negative control `--prove-red` (18 arms) · findings `FINDINGS.md#ledger-control`,
 `FINDINGS.md#ledger-blame`, `FINDINGS.md#ledger-unknown`.
 
 The consumer's charter, and the reason this exists first: *"nobody can answer whether a rebooted session is
