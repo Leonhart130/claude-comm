@@ -75,9 +75,13 @@ defects this project has already paid for:
 
 ### ⚠️ Not verified, and load-bearing
 
-- **That `SessionStart` fires with `source: "clear"` after `/clear`.** Only `"startup"` has been observed.
-  The whole reboot loop hangs on this one; it is the first thing to measure, and it needs an interactive
-  session, so a headless probe cannot settle it.
+- ~~That `SessionStart` fires with `source: "clear"` after `/clear`.~~ ✅ **MEASURED 2026-09-04, and it
+  fires.** The owner cleared a real interactive session in this repo; `.boot-state.json` went from
+  `{startup: 5}` to `{startup: 7, clear: 1}` with no code change, and the ledger classified the restart into
+  the reboot arm unprompted. **The reboot loop is constructible.** Two facts came with it, both measured
+  rather than assumed: `/clear` **mints a new session id and a new transcript** (`803208db` → `57ede2e1`,
+  46 104 B → 6 471 B), so a restart is a genuinely new session to every tool here; and see the finding
+  below, which nobody was looking for.
 - **That `kitten @ launch` works from inside an agent session.** The socket is live and `@ ls` was verified
   in session 3, but `launch` and `send-text --match` have never been fired in anger. `send-text` **exits 0
   when it matches nothing** — already measured — so the resolver must gate every send.
@@ -125,9 +129,15 @@ tokens. The trigger for the second is therefore **not** the context sensor: it i
 `bin/context.mjs --pid` already resolves a PID to its session exactly, which is what lets a monitor
 attribute memory to a named agent rather than to "some node process".
 
-⚠️ **Unverified and load-bearing: that `/clear` does not return RSS.** If it does, the relaunch path may not
-be needed at all. One `/clear` in a live session with a before/after `VmRSS` reading settles it, and the
-boot's `source` probe is already in place to catch the same event.
+⚠️ **That `/clear` does not return RSS: still not settled, but the first real datum leans that way.**
+Measured 2026-09-04 across two sessions of the same age in the same directory: the **cleared** one held
+**331 MB with an empty context**, its uncleared sibling **350 MB at 88 737 tokens**. If the heap came back
+the cleared one should sit near the ~200 MB base, and it does not.
+
+**This is suggestive and NOT decisive, and the reason is stated rather than buried:** there is no before/after
+reading on the *same* process, the cleared session's pre-clear context was never recorded, and the 200 MB
+base comes from a three-point fit. The decisive measurement is one `VmRSS` sample either side of a `/clear`
+on one pid — cheap, and now the only thing standing between this row and an answer.
 
 
 ## 🔴 The consumer answered, and it contradicts the premise — 2026-09-04

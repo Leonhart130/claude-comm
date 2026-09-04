@@ -418,3 +418,34 @@ Three refusals, each of which is a way this file could otherwise print a confide
   nothing carries "this was a reboot". Whether `/clear` even reports `source: "clear"` is still unverified,
   so the rule that turns a measurement into an arm is one function — correct it later and every record ever
   written is re-read under the correction.
+
+## `#clear-blind` — a cleared session stops being resolvable by pid, and says so
+
+Measured 2026-09-04, on the `/clear` that answered the `source` question. Not looked for.
+
+`bin/context.mjs` resolves a session's transcript exactly, through the descriptor a session holds on its own
+`/tmp/claude-<uid>/<slug>/<uuid>/` scratch directory — built that way because newest-mtime was wrong by 68 %
+the first time it met the field, several agents sharing one directory being the hub topology rather than an
+edge case.
+
+**After a `/clear`, that descriptor is gone.** The cleared session (pid 746909) held no session directory at
+all, while its uncleared sibling of the same age in the same directory (pid 744447) held its own and resolved
+normally. So:
+
+```
+context.mjs --pid 746909  ->  UNKNOWN - pid 746909 names no session transcript   (exit 2)
+context.mjs --pid 744447  ->  88,737 / 1,000,000 tokens (8.9%) - OK              (exit 0)
+```
+
+**Why this matters to the feature it was found by:** a self-rebooting leader is a session that has been
+cleared, by construction. Anything that measures a *sibling's* context by pid — a monitor, a leader deciding
+whether an expert needs restarting — goes blind on every agent that has ever restarted. The `Stop` hook path
+is unaffected: its payload carries `transcript_path` outright, and `--hook` outranks `--pid`.
+
+**The design held where it counted.** The sensor did not report a stale number, a zero, or a guess: it
+reported UNKNOWN and exited 2, because rule 3 of that file is *missing data is reported as UNKNOWN, never as
+zero* and R7 made a guessed reading refuse a verdict to a machine. A path nobody anticipated hit exactly the
+refusal that was built for a different reason.
+
+⚠️ **NOT measured: whether the descriptor comes back once the cleared session takes a turn.** That decides
+whether this is permanent blindness or a window, and it is one message in that window away from an answer.

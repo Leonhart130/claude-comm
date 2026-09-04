@@ -31,8 +31,15 @@ theirs and they priced it at ~30 min; ask before guessing.
 purpose; wiring it to the project that will not use it and then shipping the feature to the project that will
 would be the same mistake with an extra step.
 
-Still mine to measure, unchanged: whether `/clear` reports `source: "clear"` and whether it returns RSS. The
-boot records the first automatically (`.boot-state.json`, `sources`) — nothing to do but wait for a real clear.
+✅ **`/clear` reports `source: "clear"` — measured 2026-09-04, the loop is constructible.** The owner cleared
+a real session here; `.boot-state.json` moved to `{startup: 7, clear: 1}` with no code change, and the ledger
+put the restart in the reboot arm by itself. `/clear` mints a **new session id and transcript**, and it
+brought a finding nobody was looking for: `FINDINGS.md#clear-blind` — a cleared session stops being
+resolvable by pid, and `bin/context.mjs` correctly answers UNKNOWN rather than guessing.
+
+Still open on RSS: the first datum leans "`/clear` does not return it" (331 MB cleared/empty vs 350 MB
+uncleared at 88 737 tokens) but there is no before/after on one pid. One `VmRSS` sample either side of a
+`/clear` settles it.
 
 ## Where it stands
 
@@ -115,6 +122,9 @@ boot records the first automatically (`.boot-state.json`, `sources`) — nothing
 
 ## ⚠️ What was NOT verified
 
+- **Whether the pid→transcript descriptor returns after a cleared session takes a turn**
+  (`FINDINGS.md#clear-blind`). It decides whether the blindness is permanent or a window, and it is one
+  message in that window away from being answered.
 - **The ledger has never scored a real defect.** Sixteen arms move it on synthetic records; nothing has yet
   been recorded by a hand that was not writing a fixture. Its first real `record defect` is the test.
 - **Whether two consumers of one hook stdin work.** The ▶ NEXT depends on the generated stub reading the
