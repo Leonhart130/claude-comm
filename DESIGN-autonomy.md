@@ -133,16 +133,30 @@ tokens. The trigger for the second is therefore **not** the context sensor: it i
 `bin/context.mjs --pid` already resolves a PID to its session exactly, which is what lets a monitor
 attribute memory to a named agent rather than to "some node process".
 
-⚠️ **That `/clear` does not return RSS: still not settled, but the first real datum leans that way.**
-Measured 2026-09-04 across two sessions of the same age in the same directory: the **cleared** one held
-**331 MB with an empty context**, its uncleared sibling **350 MB at 88 737 tokens**. If the heap came back
-the cleared one should sit near the ~200 MB base, and it does not.
+✅ **SETTLED 2026-09-04: `/clear` does not return RSS. It costs a little.** Before/after on **one pid**,
+which is the measurement this row had been waiting for:
 
-**This is suggestive and NOT decisive, and the reason is stated rather than buried:** there is no before/after
-reading on the *same* process, the cleared session's pre-clear context was never recorded, and the 200 MB
-base comes from a three-point fit. The decisive measurement is one `VmRSS` sample either side of a `/clear`
-on one pid — cheap, and now the only thing standing between this row and an answer.
+| | |
+| --- | --- |
+| pid 746909, before the clear | **318.6 MB**, live context 50 237 tokens |
+| the same pid, after it | **332.5 MB**, context ~0 |
 
+If the heap came back, ~35 MB should have fallen (0.7 MB per 1 000 tokens, the slope measured above).
+**14 MB were added instead** — the new boot allocating, with nothing returned. A 49 MB gap against the
+prediction, far outside any drift in a VmRSS reading.
+
+⚠️ **What this does not cover:** one session, one clear, 50 k of context. A session at 400 k might behave
+differently if V8 releases large regions differently, and that is unmeasured. The direction is unambiguous at
+this scale and it matches the mechanism.
+
+⇒ **The consequence for the mandate is concrete: the relaunch path is NOT optional.** This row previously
+read *"if `/clear` returns RSS, the relaunch path may not be needed at all"*. It does not, so the split
+stands — `/clear` is the frequent reboot for context quality, and a real relaunch remains the rare one for
+the owner's actual complaint, memory. Two mechanisms, two triggers, two cadences.
+
+**A third confirmation of `#clear-blind` arrived free with this:** after a SECOND clear the process still
+holds `803208db`, its original launch session. The scratch directory is pinned to the process for its whole
+life, not to the session, however many times it restarts.
 
 ## 🔴 The consumer answered, and it contradicts the premise — 2026-09-04
 
