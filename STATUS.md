@@ -40,6 +40,12 @@ than guess.
 ⚠️ **Do not build the reboot mechanism ahead of 1 and 2.** Shipping it onto a sensor that reads a dead
 session, into a project with no control arm, is the same mistake twice with the instrument as an alibi.
 
+**Adversarial review #4 is answered in full** — `REVIEW-adversarial-4.md`, nine findings, three severe, all
+nine fixed with an arm that reddens on the old behaviour (18 → 28 arms). The dispositions table is in
+`DESIGN-autonomy.md`; the headline is `FINDINGS.md#ledger-trial`. ⚠️ **What the review left uncovered is now
+this project's list**: DST and NTP steps, network filesystems, scale past ~6 400 records, `resume`/`compact`
+payloads unobserved — and **the ledger has still never scored a real defect.**
+
 **Settled today and NOT open — do not re-litigate, the measurements are in `DESIGN-autonomy.md`:**
 `/clear` reports `source: "clear"` (the loop is constructible) · it mints a new session id and transcript ·
 it does **not** return RSS, it costs ~14 MB, so the rare real-relaunch mechanism stays on the roadmap.
@@ -53,7 +59,7 @@ it does **not** return RSS, it costs ~14 MB, so the rare real-relaunch mechanism
 | **electio** | in real daily use — 26 real deliveries, both directions. **Ran a bus 4 commits stale until this session** |
 | gates | `attack` **26/26** deterministic ✓, **every case proved able to go red** (defect restored in the bus, gate byte-identical) · `selftest` **now deterministic too** — 6/6 transport green |
 | boot | `node bin/boot.mjs` — 7 measured rows, **every gating one demonstrated able to go red**; `--fast` (0.28 s) is injected at session start by `.claude/settings.json`, the contract is `CLAUDE.md` |
-| **ledger** | `node bin/ledger.mjs` — the reboot instrument, **built before the mechanism**. 18 arms proved red. Recording cold starts HERE since 2026-09-04; **the field is not wired** |
+| **ledger** | `node bin/ledger.mjs` — the reboot instrument, **built before the mechanism**. 28 arms proved red. Recording cold starts HERE since 2026-09-04; **the field is not wired** |
 | reviews | #1 (9 findings) in `REVIEW-adversarial.md` · #2 (10 findings) in `REVIEW-adversarial-2.md` · electio leader's field reviews in `REVIEW-electio-leader.md` and `REPLY-from-electio-leader.md` |
 
 ## ⏭️ OPEN
@@ -111,7 +117,7 @@ it does **not** return RSS, it costs ~14 MB, so the rare real-relaunch mechanism
    owe it in `exchange/work-leader/2026-09-04-lifecycle-answer.md`. **Next: the ledger before the
    mechanism** — the first ten reboots must be measurable or the feature has no way to be judged.
 
-   ✅ **The ledger is built, and it was built first** — `node bin/ledger.mjs`, 18 arms proved red,
+   ✅ **The ledger is built, and it was built first** — `node bin/ledger.mjs`, 28 arms proved red,
    `DESIGN-autonomy.md#the-ledger` and `FINDINGS.md#ledger-control` / `#ledger-blame` / `#ledger-unknown`.
    It records **every session start**, not only reboots, because the comparison is reboot-start against
    cold-start and the control arm has to exist before the feature does. Boot writes a record on every start
