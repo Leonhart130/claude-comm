@@ -264,12 +264,21 @@ function resolveTranscript() {
 	// becomes the value. This exact class is already refused for `--budget` here and
 	// gated in bin/ledger.mjs; --pid was the third tool of three and the one the reboot
 	// decision reads. A flag that was WRITTEN must be honoured or refused, never ignored.
-	const pidRaw = opt("--pid", null)
-	if (pidRaw !== null && !/^[1-9]\d*$/.test(pidRaw)) {
-		console.error(`context: --pid must be a positive integer, got ${JSON.stringify(pidRaw)}`)
-		process.exit(2)
+	// G1 (review #5, second pass). That first fix used `opt()`, which returns its DEFAULT
+	// when the next argv slot is falsy - so `--pid` last on the line and `--pid ""` (the
+	// QUOTED spelling, the one shellcheck asks for) both produced null, skipped the guard
+	// and fell through exactly as before. Three of five shapes closed, and the two left
+	// open were the two that read most like real usage. A flag's PRESENCE is what obliges
+	// an answer, so presence is now tested independently of whether its value is truthy.
+	const pidIdx = ARGV.indexOf("--pid")
+	if (pidIdx >= 0) {
+		const v = ARGV[pidIdx + 1]
+		if (v === undefined || !/^[1-9]\d*$/.test(v)) {
+			console.error(`context: --pid must be a positive integer, got ${v === undefined ? "no value at all" : JSON.stringify(v)}`)
+			process.exit(2)
+		}
 	}
-	const askedPid = Number(pidRaw || 0)
+	const askedPid = pidIdx >= 0 ? Number(ARGV[pidIdx + 1]) : 0
 	if (askedPid) {
 		const r = transcriptOfPid(askedPid)
 		return r.path ? { path: r.path, how: `registry: pid ${askedPid}${r.note}` }
@@ -559,7 +568,16 @@ function proveRed() {
 		// own-session path and answer - a DIFFERENT session's number, exit 0, guessed:false.
 		{
 			registryRecord({ pid: me, transcript: live, agent: "control", source: "startup" })
-			const eaten = read(null, ["--pid"])           // the shell dropped the value
+			// G1: the first version of this arm was a VOID PROBE. It asserted a refusal and
+			// measured a registry MISS - the hermetic registry held no entry for the child's
+			// own session, so the fall-through it exists to forbid answered nothing anyway.
+			// The fall-through has to be ARMED for the assertion to mean anything. `fallback`
+			// is the positive control that proves it is: if that ever stops being a number,
+			// this arm has gone void again and every refusal below proves nothing.
+			registryRecord({ pid: sessionPid(), transcript: live, agent: "control", source: "startup" })
+			const fallback = read(null, [])
+			const eaten = read(null, ["--pid"])           // --pid last on the line
+			const empty = read(null, ["--pid", ""])       // --pid "$UNSET", quoted
 			const junk = read(null, ["--pid", "12x"])
 			const zero = read(null, ["--pid", "0"])
 			// exit 2 AND no verdict at all. An argument this tool could not honour is a
@@ -567,10 +585,11 @@ function proveRed() {
 			// stderr and nothing on stdout. What must never happen is a NUMBER - which is
 			// what the own-session fall-through produced, for a different session.
 			const noVerdict = (r) => r.exit === 2 && r.tokens == null && !/"state":"(ok|watch|close)"/.test(r.raw || "")
-			check("F2 a --pid that was eaten or unparseable REFUSES",
-				[eaten, junk, zero].every(noVerdict),
-				`--pid <eaten> -> ${eaten.exit}, --pid 12x -> ${junk.exit}, --pid 0 -> ${zero.exit} ` +
-				`(all must be exit 2 with no verdict; the defect answered with the caller's OWN session)`)
+			check("F2/G1 a --pid that was eaten or unparseable REFUSES",
+				fallback.tokens === 321_000 && [eaten, empty, junk, zero].every(noVerdict),
+				`positive control (the own-session fall-through IS armed) = ${fallback.tokens}; ` +
+				`--pid <last> -> ${eaten.exit}, --pid "" -> ${empty.exit}, --pid 12x -> ${junk.exit}, ` +
+				`--pid 0 -> ${zero.exit} (all must be exit 2 with no verdict)`)
 		}
 
 		// REGRESSION GUARD, and the one that matters most. A real session - a process with

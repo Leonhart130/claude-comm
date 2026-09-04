@@ -233,6 +233,35 @@ export function lookup(pid) {
 	return { ok: true, transcript: raw.transcript, agent: raw.agent, source: raw.source, at: raw.at }
 }
 
+/**
+ * Confirm, at a turn boundary, that this pid's entry still names the session it is
+ * writing. Writes only when it does not.
+ *
+ * G2 (review #5, second pass). Invalidate-before-write turned "record() ran and failed"
+ * from a lie into a miss - and did nothing for "record() was never REACHED". Measured,
+ * four of five paths still produced the original defect: the module absent, the module
+ * unloadable, the runtime directory unwritable, and the hook killed during delivery. Each
+ * one leaves the previous entry standing and answering, and after a `/clear` that entry
+ * names a session that has ended - 813 000 tokens, state "close", exit 1. An affirmative
+ * instruction to reboot, from a session that is gone.
+ *
+ * No proof added to `lookup()` can see that: pid, boot id and start tick all still match,
+ * because it is the same process. The only thing that KNOWS is a payload that carries the
+ * live transcript, and `Stop` carries one at every turn boundary. So the fix is not a
+ * better test, it is a second witness - and it makes every one of those paths
+ * self-healing within one turn instead of standing forever.
+ *
+ * The cost is bounded on purpose: a lookup and a string compare, and a write ONLY when
+ * the transcript differs - once per session, plus once after a clear. `Stop` is the
+ * hottest path in this system and it does not get a write per turn.
+ */
+export function refresh({ pid, transcript, agent, source }) {
+	if (!pid || !transcript) return { ok: false, unchanged: false, why: "no pid or no transcript in the payload" }
+	const cur = lookup(pid)
+	if (cur.ok && cur.transcript === transcript) return { ok: true, unchanged: true }
+	return { ...record({ pid, transcript, agent, source }), unchanged: false }
+}
+
 /** Every live entry, newest first - for a person asking what this machine thinks it has. */
 export function entries() {
 	const dir = registryDir()

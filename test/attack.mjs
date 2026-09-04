@@ -15,9 +15,10 @@
  * directives? Measuring the wrong thing produced a confident, plausible, wrong
  * result, which is this project's signature failure mode.
  */
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from "node:fs"
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync, statSync } from "node:fs"
 import { join } from "node:path"
 import { execFileSync, spawnSync, spawn } from "node:child_process"
+import { createHash } from "node:crypto"
 import { tmpdir } from "node:os"
 import { MAX_NOTE, MAX_RENDER, MAX_REF } from "../bin/comm.mjs"
 
@@ -46,9 +47,35 @@ writeFileSync(join(root, ".comm", "config.json"), JSON.stringify({ leader: "lead
 // invalidation destroys where the earlier two only overwrote. A31 at the end of this file
 // asserts the real registry is untouched, so the fourth occurrence fails a gate instead of
 // being noticed by someone reading a boot report.
-const REAL_REGISTRY = join(process.env.XDG_RUNTIME_DIR || `/tmp/claude-comm-${process.getuid?.() ?? "nouid"}`,
-	"claude-comm", "sessions")
-const realBefore = (() => { try { return readdirSync(REAL_REGISTRY).sort().join(",") } catch { return "<none>" } })()
+// G4: `CLAUDE_COMM_RUNTIME` FIRST, exactly as bin/session-registry.mjs resolves it. An
+// operator who already had it exported has their real registry somewhere else, and the
+// snapshot would have watched a directory nothing writes to.
+const REAL_REGISTRY = join(process.env.CLAUDE_COMM_RUNTIME || process.env.XDG_RUNTIME_DIR
+	|| `/tmp/claude-comm-${process.getuid?.() ?? "nouid"}`, "claude-comm", "sessions")
+// G4: CONTENTS, not names. The first version listed filenames - which catches a DELETE
+// (A18's shape, the incident it was written for) and passes silently over an OVERWRITE
+// (A29's shape: delete-then-write leaves the same filename holding a fixture transcript).
+// The overwrite is the shape that already happened once, under the operator's own pid,
+// with a green tick over it. A hash is the same one line.
+const snapshotReal = () => {
+	try {
+		return readdirSync(REAL_REGISTRY).sort()
+			.map((f) => `${f}:${createHash("sha256").update(readFileSync(join(REAL_REGISTRY, f))).digest("hex").slice(0, 12)}`)
+			.join(",")
+	} catch { return "<none>" }
+}
+const realBefore = snapshotReal()
+// G5: an aborted suite is the run whose effect on the world is LEAST known, and a check()
+// in the normal flow is silent on exactly it. This fires on every exit path there is.
+let a31Ran = false
+process.on("exit", () => {
+	if (a31Ran) return
+	const after = snapshotReal()
+	if (after !== realBefore) {
+		console.log(`\n  ✗ THE SUITE ABORTED AND LEFT THE REAL REGISTRY CHANGED\n      ${REAL_REGISTRY}\n` +
+			`      before: ${realBefore}\n      after:  ${after}`)
+	}
+})
 process.env.CLAUDE_COMM_RUNTIME = mkdtempSync(join(tmpdir(), "comm-attack-runtime-"))
 
 execFileSync("node", [join(PKG, "install.mjs"), root], { stdio: "pipe" })
@@ -1029,9 +1056,13 @@ const POINTER_SOURCES = (() => {
 //   · the mail still drains — an instrument that costs a delivery is not worth having;
 //   · both instruments record, under the name the BUS resolves, not one this stub
 //     guessed for itself;
-//   · the STOP path records NOTHING. It runs at every turn boundary, it is the hottest
-//     path in this system, and both instruments record STARTS. Same fixture, same file,
-//     one variable moved: the verb.
+//   · the STOP path never touches the LEDGER, and refreshes the registry ONLY when the
+//     transcript changed. Amended 2026-09-04 with evidence, not opinion: the original
+//     property was "stop records nothing", and review #5's G2 measured four paths on which
+//     a SessionStart never reaches record() and the previous entry then answers forever
+//     for a session that has ended. `Stop` is the only thing handed the live transcript at
+//     every turn boundary, so it is the only witness that can heal them. What must stay
+//     true is the COST: a lookup and a compare, never a write per turn.
 {
 	const rootA = mkdtempSync(join(tmpdir(), "comm-attack-instruments-"))
 	process.on("exit", () => { try { rmSync(rootA, { recursive: true, force: true }) } catch {} })
@@ -1059,13 +1090,20 @@ const POINTER_SOURCES = (() => {
 	const ledgerLog = () => { try { return readFileSync(join(rootA, ".comm", "handoff", "app.log"), "utf8") } catch { return "" } }
 	const registered = () => { try { return readdirSync(join(rt, "claude-comm", "sessions")).length } catch { return 0 } }
 
-	// ARM 1: stop. It must deliver and record nothing at all.
+	// ARM 1: stop. It must deliver, never touch the ledger, and refresh the registry.
 	execFileSync("node", [join(rootA, ".comm", "bin", "comm.mjs"), "send", "app", "--ref", "docs/REVIEW.md"],
 		{ cwd: rootA, stdio: "pipe" })
 	const beforeStop = mail()
 	fire("stop")
 	const stopDrained = beforeStop === 1 && mail() === 0
-	const stopRecorded = ledgerLog().length > 0 || registered() > 0
+	const stopTouchedLedger = ledgerLog().length > 0
+	const stopRegistered = registered() > 0
+	// The bounded-cost property: a second identical stop must not rewrite anything.
+	const stamp = () => { try { const d = join(rt, "claude-comm", "sessions")
+		return readdirSync(d).map((f) => `${f}:${statSync(join(d, f)).mtimeMs}`).join(",") } catch { return "" } }
+	const beforeSecond = stamp()
+	fire("stop")
+	const stopIdempotent = stamp() === beforeSecond
 
 	// ARM 2: session-start. It must deliver AND record in both.
 	execFileSync("node", [join(rootA, ".comm", "bin", "comm.mjs"), "send", "app", "--ref", "docs/REVIEW.md"],
@@ -1084,8 +1122,10 @@ const POINTER_SOURCES = (() => {
 	} catch {}
 
 	check("A29 the field hook records a start in both instruments, and still delivers",
-		stopDrained && !stopRecorded && startDrained && schemaOK && ledgerOK && regOK,
-		`stop: drained=${stopDrained} recorded=${stopRecorded} (must be false); ` +
+		stopDrained && !stopTouchedLedger && stopRegistered && stopIdempotent &&
+		startDrained && schemaOK && ledgerOK && regOK,
+		`stop: drained=${stopDrained} ledger-untouched=${!stopTouchedLedger} registry-refreshed=${stopRegistered} ` +
+		`no-rewrite-when-unchanged=${stopIdempotent}; ` +
 		`session-start: drained=${startDrained} schema=${schemaOK} ledger=${ledgerOK} registry=${regOK}`)
 }
 
@@ -1127,7 +1167,8 @@ const POINTER_SOURCES = (() => {
 // into the world it measures is not a control, and the registry is the world the context
 // sensor reads. The listing is captured at the top of this file, before the override.
 {
-	const realAfter = (() => { try { return readdirSync(REAL_REGISTRY).sort().join(",") } catch { return "<none>" } })()
+	const realAfter = snapshotReal()
+	a31Ran = true
 	check("A31 the suite leaves the machine's real registry untouched",
 		realAfter === realBefore,
 		`${REAL_REGISTRY}: ${realBefore === realAfter ? "unchanged" : `CHANGED\n      before: ${realBefore}\n      after:  ${realAfter}`}`)
