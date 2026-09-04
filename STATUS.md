@@ -39,7 +39,7 @@ boot records the first automatically (`.boot-state.json`, `sources`) — nothing
 | | state |
 | --- | --- |
 | toolkit | `bin/comm.mjs`, `install.mjs`, `test/attack.mjs`, `test/selftest.mjs`, `test/latency.mjs` — no dependencies |
-| repo | git initialised, local only, no remote |
+| repo | git initialised; **an `origin` on GitHub exists** (`Leonhart130/claude-comm`) — the "local only" line here was stale. Nothing is pushed automatically; the owner decides |
 | **electio** | in real daily use — 26 real deliveries, both directions. **Ran a bus 4 commits stale until this session** |
 | gates | `attack` **26/26** deterministic ✓, **every case proved able to go red** (defect restored in the bus, gate byte-identical) · `selftest` **now deterministic too** — 6/6 transport green |
 | boot | `node bin/boot.mjs` — 7 measured rows, **every gating one demonstrated able to go red**; `--fast` (0.28 s) is injected at session start by `.claude/settings.json`, the contract is `CLAUDE.md` |
