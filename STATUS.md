@@ -68,11 +68,17 @@ silently the day the checkout moves, and a stale copy is a failure `field:*` alr
 2. **`--reply-to <id>` (threading).** Requested by the field, then deprioritised by it: with two agents,
    threading adds identity surface while the substance already lives in the file.
 
-3. **Phase 2 — a wake for the idle agent. Resolver built and verified live; SEND NOT BUILT.** Item 1 is
-   its justification. Four constraints are settled and must not be re-litigated — resolve through
-   `kitten @ ls` and refuse when the target does not resolve (`send-text --match` **exits 0 on no match**);
-   the wake carries **no substance**; **no daemon, no timer, no watcher** (A21); identity comes from the
-   pid→window walk, never a title or a cwd. Design and measurements: `DESIGN-autonomy.md`.
+3. ✅ **Phase 2 — the wake is BUILT and verified against a real agent** (`bin/wake.mjs`, 2026-09-04).
+   A sender's Stop hook rings it when mail is waiting for someone else; it resolves the target's kitty
+   window **by pid** and refuses when it cannot, because `send-text --match` exits 0 on no match. The idle
+   session takes a turn and its own gated Stop path delivers — measured `via: "hook"`, `id_src: "stub"`.
+   Gated by A32, armed both ways. Design, and the two things the first live run got wrong (a trust prompt
+   that silently kills a self-launched agent; a doorbell that instructed and so bypassed the gated path):
+   `FINDINGS.md#wake-doorbell`.
+
+   🔴 **Still open here:** item 1's latency table was measured BEFORE this existed and has not been
+   re-measured with it. The claim "this bus is a mailbox, never an interrupt" is unchanged and still true —
+   the wake does not deliver, it only makes a turn happen.
 
 4. **🔴 Holding a machine resource is not an event anybody publishes.** Two agents in **one** project root
    collided over a port and killed each other's servers, 2026-09-04. **The failure is not transport, which is
