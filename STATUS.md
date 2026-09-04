@@ -34,16 +34,20 @@ countable by a hook, not a token threshold. Its confound is theirs, priced at ~3
 ⚠️ **Do not build the reboot mechanism ahead of 1.** Shipping it into a project with no control arm is the
 same mistake the sensor nearly made, with the instrument as an alibi.
 
-**One question is with the owner, unanswered, asked twice now.** Does `kitten @ launch --type=os-window`
-open into the *same* kitty process — same socket, agent reachable — while relaunching the `kitty` binary
-would create a second, unreachable one? He has authorised an expert opening its own window and closing it
-when done; the measurement pops a window on his screen, so it was offered and not taken. Ask again before
-building self-launch. Socket topology: `DESIGN-autonomy.md`, the "Two sockets, not one" section.
+**✅ ANSWERED 2026-09-04, do not ask a third time.** `kitten @ launch --type=os-window` opens a window of
+the **same** kitty process — no new process, no new socket, and the launched process inherits
+`KITTY_LISTEN_ON`. So an expert launched by its leader lands in the leader's socket and is reachable at
+once; only relaunching the `kitty` *binary* would create the unreachable second process. Measurement and the
+three details that go with it (`--keep-focus`, closing by returned window id, `window.pid` is the shell):
+`DESIGN-autonomy.md`, "stays in the SAME process".
 
-**Standing test debt, inherited from review #4 and NOT covered by any gate:** DST boundaries and NTP steps ·
-network filesystems (`O_APPEND` does not travel) · scale past ~6 400 records (`analyse()`'s span loop is
-O(n²)) · what `resume` and `compact` payloads actually carry · **and the ledger has still never scored a real
-defect** — every defect it has ever seen was synthetic. Its first real `record defect` is the test.
+🔴 **The owner's standing rule, and it binds every agent this framework launches:** an agent may close
+**only the windows it created itself**. His windows and other agents' windows are never fair game — several
+of his sessions live in them — unless that agent has agreed to it. He does not need to be asked before a
+measurement; he will say if something bothers him.
+
+**Standing test debt from review #4, none of it gated:** `FINDINGS.md#test-debt`. The one to keep in
+mind: **the ledger has never scored a real defect** — its first real `record defect` is the test.
 
 **Settled 2026-09-04, NOT open — do not re-litigate, the measurements are in `DESIGN-autonomy.md` and
 `FINDINGS.md#clear-blind`:** `/clear` reports `source: "clear"` (the loop is constructible) · it mints a new
@@ -76,12 +80,11 @@ resolution is gone from the answer path and kept only as evidence of a clear.
 2. **`--reply-to <id>` (threading).** Requested by the field, then deprioritised by it: with two agents,
    threading adds identity surface while the substance already lives in the file.
 
-3. **Phase 2 — a wake for the idle agent. Resolver built and verified live; SEND NOT BUILT.** Item 1 is its
-   justification. Four constraints are settled and must not be re-litigated: resolve the target through
-   `kitten @ ls` and refuse to send when it does not resolve (`send-text --match` **exits 0 on no match**);
-   the wake text carries **no substance**, it only makes an idle session take a turn so the gated Stop path
-   can deliver; **no daemon, no timer, no watcher** (A21); and identity comes from the pid→window walk, never
-   from a title or a cwd. Design and measurements: `DESIGN-autonomy.md`.
+3. **Phase 2 — a wake for the idle agent. Resolver built and verified live; SEND NOT BUILT.** Item 1 is
+   its justification. Four constraints are settled and must not be re-litigated — resolve through
+   `kitten @ ls` and refuse when the target does not resolve (`send-text --match` **exits 0 on no match**);
+   the wake carries **no substance**; **no daemon, no timer, no watcher** (A21); identity comes from the
+   pid→window walk, never a title or a cwd. Design and measurements: `DESIGN-autonomy.md`.
 
 4. **🔴 Holding a machine resource is not an event anybody publishes.** Two agents in **one** project root
    collided over a port and killed each other's servers, 2026-09-04. **The failure is not transport, which is
@@ -99,7 +102,19 @@ resolution is gone from the answer path and kept only as evidence of a clear.
    outranks that plan. A near-miss does not: the peer reported one on 2026-09-04 and priced it himself as
    evidence the fix is cheap, not that it is needed.
 
-5. **🔴 The autonomy mandate — self-launching experts, a self-rebooting leader.** Given 2026-09-04.
+5. **🔴 A session launched outside an interactive shell has NO bus, and says nothing.** `node` lives only
+   under nvm, which only an interactive shell puts on `PATH`, so `kitten @ launch claude` (or a `.desktop`
+   file, or cron) starts a session whose **every hook dies** — no mail at any turn boundary, no instruments —
+   while it looks normal. **A self-launched expert is launched by a program, never by a shell**, so this is
+   the shape that would have made the whole autonomy program measure nothing. Measurement, both halves of the
+   fix and what the fix does *not* do: `FINDINGS.md#hookless-launch`.
+
+   ✅ Half-fixed 2026-09-04 and reinstalled into both field projects: the `SessionStart` hook now says out
+   loud when node is missing, still exiting 0. Selftest and `--prove-red` run before and after.
+   🔴 Open: the guard warns, it does not make such a session work. The working fix is to launch through a
+   login shell, and that only covers launchers this framework owns.
+
+6. **🔴 The autonomy mandate — self-launching experts, a self-rebooting leader.** Given 2026-09-04.
    **Everything settled about it lives in [`DESIGN-autonomy.md`](DESIGN-autonomy.md)** — the four verified
    mechanisms, the RAM measurements, the consumer's reply and the review #4 dispositions. Do not re-derive
    any of it here; this entry carries only what is still OPEN.
@@ -119,10 +134,10 @@ resolution is gone from the answer path and kept only as evidence of a clear.
   (`FINDINGS.md#clear-blind`). Now MOOT for the sensor — the registry does not consult that descriptor for an
   answer — but still unmeasured, and it is what decides whether the "session CLEARED" note the sensor prints
   is permanent or transient.
-- **The registry has never been written by a real `/clear`.** Every entry it has ever held was written by a
-  `startup`, including the one verifying it live in this session. The clear path is the case it exists for,
-  it is argued from a measurement made *before* the registry (the ledger's 10:41:04 `clear` record naming the
-  live session, not the launch one), and it will be proved or broken by the first real clear in this repo.
+- ~~The registry has never been written by a real `/clear`.~~ **VERIFIED 2026-09-04 16:00** in a disposable
+  session launched for it: the scratch descriptor stayed on the dead launch session (frozen at 44 398 tokens)
+  while the registry followed the live one (45 712, advancing), and the sensor printed
+  `session CLEARED (launched as 707192c3)` unprompted. `FINDINGS.md#clear-blind`.
 - **What happens to the entry when a session is `resume`d or `compact`ed.** Both fire `SessionStart` with a
   source this repo has never seen, so whether they carry a `transcript_path` at all is unknown. A payload
   without one leaves the previous entry standing, which is the safe direction and is not the same as correct.
@@ -163,23 +178,11 @@ resolution is gone from the answer path and kept only as evidence of a clear.
   sees a partial file — but two interleaved read-modify-writes can still lose one update. The record it
   holds is a counter, so a lost count is recoverable where a lost file was not. Not measured.
 
-## A measurement trap, recorded
+## Measurement traps
 
-`delivered/` file mtimes look like drain times and are not — `renameSync` preserves mtime, so they are
-*creation* times. The only honest source is the `delivered` field in `.comm/log.jsonl`.
-
-**A third, from 2026-09-04, and it is the second one's twin:** `bin/boot.mjs --prove-red` ran the real boot
-with `--hook`, and that child's ancestor walk reached the **operator's own live session** — so the negative
-control wrote its fixture transcript into the machine's real session registry under the operator's pid, and
-the next boot reported `pid <me> → 44444444-….jsonl` under a green tick. **A control that writes into the
-world it measures is not a control.** Found by reading a boot report, not by any test. Every child of
-`proveRed` now runs with `CLAUDE_COMM_RUNTIME` inside its own fixture.
-
-**A second one, from an earlier session:** a probe that reported "the defect does not reproduce" on both arms was
-wrong — a relative path in a hand-built hook payload made `findRoot` miss and the hook exit 0 silently,
-which is indistinguishable from a clean result. Its positive control passed *because it used an absolute
-path and so never travelled the broken path.* **A control that does not go through the same code as the arms
-validates nothing.** Both reviewers hit a version of this in the same session and recorded it.
+Three recorded, all of them ways a control lied: `FINDINGS.md#measurement-traps`. The one-line version —
+**a control that does not travel the same code as the arms validates nothing, and one that writes into the
+world it measures is not a control at all.**
 
 ## Where the mistakes are recorded
 

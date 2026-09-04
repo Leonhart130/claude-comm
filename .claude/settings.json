@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/bin/boot.mjs\" --fast --hook 2>/dev/null || true",
+            "command": "if command -v node >/dev/null 2>&1; then node \"$CLAUDE_PROJECT_DIR/bin/boot.mjs\" --fast --hook 2>/dev/null || true; else echo \"claude-comm: node is NOT on this session PATH, so boot did not run. This session has NO bus, NO ledger and NO registry entry, and nothing else will say so. It was launched outside an interactive shell (kitten @ launch, a .desktop file, cron). Relaunch it through a login shell before trusting anything here.\"; fi",
             "timeout": 20
           }
         ]
