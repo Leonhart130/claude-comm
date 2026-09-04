@@ -117,6 +117,29 @@ const NOTE_AT_MAX = "N".repeat(MAX_NOTE)
 // to mean anything.
 const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 
+// A0 — THE GENERATED STUB PARSES. First, because everything after it assumes so.
+//
+// `install.mjs` builds the hook stub as a TEMPLATE LITERAL, so every escape in it is
+// resolved when the stub is WRITTEN rather than when it runs. Adding one guard with a
+// single-backslash newline escape put a real line break inside a string literal, the
+// generated hook stopped parsing, and EVERY hook path in every project exited 1 — a dead
+// bus, in exactly the way this project's first rule forbids.
+//
+// The suite DID catch it, and that is the reason this case exists: it surfaced as
+// "✗ A5 corrupt config is inert — hook exit=1", a case about corrupt configuration, and
+// the run then hung at A8. A whole-file syntax error can only present as somebody else's
+// symptom, so it has to be asked about by name, before anything else has a chance to
+// mis-attribute it.
+{
+	const stubs = Object.values(JSON.parse(readFileSync(join(root, ".comm", "config.json"), "utf8")).agents)
+		.map((rel) => join(root, rel, ".claude", "comm-hook.mjs"))
+	const bad = stubs.filter((f) => spawnSync("node", ["--check", f], { encoding: "utf8" }).status !== 0)
+	// A floor: zero stubs checked would pass an "all of them parse" test having checked none.
+	check("A0 every generated hook stub parses",
+		stubs.length >= 2 && bad.length === 0,
+		`${stubs.length} stub(s) checked (want >=2); unparseable: ${bad.length ? bad.map((f) => f.replace(root + "/", "")).join(", ") : "none"}`)
+}
+
 // A1 — concurrency: no message may be lost.
 // Notes are sent at MAX_NOTE, not as the 2-char "c0"…"c39" they used to be: A1
 // supplies the corpus A2 then measures, so a benign corpus here silently made
@@ -1466,6 +1489,81 @@ const POINTER_SOURCES = (() => {
 		`dangling ref -> exit ${dangling.status}; the same call with a real ref -> exit ${present.status} (past validation); ` +
 		`ref outside the channel -> exit ${stray.status}; unknown agent -> exit ${wrongAgent.status}; ` +
 		`the message template interpolates ${holes ? JSON.stringify(holes) : "COULD NOT BE PARSED"} (only ref/inDir allowed)`)
+}
+
+// A36 — live bus state committed to a project's git, and the notice that explains why not.
+//
+// Measured 2026-09-04. The ~/Dev/work leader put his repo under git and wrote a careful
+// .gitignore — against the things he was thinking about. In his words: *".comm/ did not
+// exist in my head as a category, so it did not exist in the file."* Six files of live
+// state were committed: the delivery log, four delivered messages, his config. The
+// installer HAD added the ignore rule; it runs once, and a .gitignore rewritten afterwards
+// silently undoes it. Nothing told him, and it was caught only because a peer's boot
+// happened to run `install --check` against his project.
+//
+// Two things are gated here, and the second is the reason the first exists at all: a rule
+// nobody is told about is a rule that will be broken by someone acting reasonably.
+{
+	const rootG = mkdtempSync(join(tmpdir(), "comm-attack-git-"))
+	process.on("exit", () => { try { rmSync(rootG, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(rootG, "app", "docs"), { recursive: true })
+	writeFileSync(join(rootG, "app", "docs", "NOTE.md"), "# note\n")
+	mkdirSync(join(rootG, ".comm"), { recursive: true })
+	writeFileSync(join(rootG, ".comm", "config.json"),
+		JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app" } }))
+	execFileSync("node", [join(PKG, "install.mjs"), rootG], { stdio: "pipe" })
+
+	const stub = join(rootG, "app", ".claude", "comm-hook.mjs")
+	const fire = () => spawnSync("node", [stub, "session-start"], {
+		cwd: join(rootG, "app"), encoding: "utf8",
+		input: JSON.stringify({ cwd: join(rootG, "app"), source: "startup" }),
+		env: { ...process.env, CLAUDE_COMM_RUNTIME: join(rootG, "runtime") },
+	})
+	const warned = (r) => /LIVE BUS STATE are committed/.test(r.stderr || "")
+
+	// CONTROL 1: no git at all. A project that is not a repository must be told nothing —
+	// a guard that speaks where there is no possible defect is how a warning gets ignored.
+	const noGit = fire()
+
+	// The repository, with the ignore rule the installer wrote left in place. Still nothing
+	// to say: this is what a correct project looks like, and it must stay silent.
+	execFileSync("git", ["init", "-q"], { cwd: rootG, stdio: "pipe" })
+	execFileSync("git", ["add", "-A"], { cwd: rootG, stdio: "pipe" })
+	const ignored = fire()
+
+	// ARM: the defect itself, staged the way it actually happens — the .gitignore rewritten
+	// afterwards by someone thinking about other things, and the live state added.
+	writeFileSync(join(rootG, ".gitignore"), "node_modules/\n.env\n")
+	execFileSync("git", ["add", "-A", "-f"], { cwd: rootG, stdio: "pipe" })
+	// A guard on the delivery path must not cost a delivery, so the arm is fired with mail
+	// actually waiting. The first version asserted the SessionStart schema on an EMPTY
+	// inbox, where producing no output is correct — it was testing the fixture, not the
+	// guard, and it failed for a reason foreign to what it claimed to check.
+	execFileSync("node", [join(rootG, ".comm", "bin", "comm.mjs"), "send", "app", "--ref", "docs/NOTE.md"],
+		{ cwd: rootG, stdio: "pipe" })
+	const waiting = () => readdirSync(join(rootG, ".comm", "inbox", "app")).filter((f) => f.endsWith(".json")).length
+	const before = waiting()
+	const tracked = fire()
+	const tellsHow = /git rm -r --cached/.test(tracked.stderr || "")
+	let schemaOK = false
+	try { schemaOK = JSON.parse(tracked.stdout)?.hookSpecificOutput?.hookEventName === "SessionStart" } catch {}
+	const stillDelivers = before === 1 && waiting() === 0 && schemaOK
+
+	// THE NOTICE. An agent in a field project has hooks, a bus and a ledger, and the design
+	// lives in a repository it has no reason to open. The notice is the only thing in its
+	// own tree that explains any of it — and the feedback path it names must EXIST, or it
+	// is a dangling pointer, which this project holds to be worse than none (A27/A28).
+	let notice = ""
+	try { notice = readFileSync(join(rootG, ".comm", "README.md"), "utf8") } catch {}
+	const fb = /^([^\n]*exchange[^\n]*field[^\n]*in)$/m.exec(notice)
+	const noticeOK = /Never commit/.test(notice) && /git rm -r --cached/.test(notice) &&
+		notice.includes(join(PKG, "install.mjs")) && !!fb && existsSync(fb[1].trim())
+
+	check("A36 committed bus state is caught, and the notice that prevents it is installed",
+		!warned(noGit) && !warned(ignored) && warned(tracked) && tellsHow && stillDelivers && noticeOK,
+		`no repo -> ${warned(noGit) ? "WARNED (must not)" : "silent"}; repo with the rule -> ${warned(ignored) ? "WARNED (must not)" : "silent"}; ` +
+		`rule removed and .comm added -> ${warned(tracked) ? "warned" : "SILENT (must warn)"}, names the fix=${tellsHow}, mail still drained ${before}->${waiting()} with the schema intact=${stillDelivers}; ` +
+		`notice: ${noticeOK ? "installed, names the update command, and its feedback directory exists" : "MISSING OR INCOMPLETE"}`)
 }
 
 // A31 — this suite must not touch the machine's real session registry.
