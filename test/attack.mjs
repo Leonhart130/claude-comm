@@ -1386,6 +1386,88 @@ const POINTER_SOURCES = (() => {
 		(g.status === 0 ? "" : `\n      ${out.split("\n").filter((l) => /✗/.test(l)).join("\n      ")}`))
 }
 
+// A35 — the exchange bell carries a POINTER, and cannot carry anything that goes stale.
+//
+// `exchange/` is a file exchange, not a bus: boot tells ME when a peer has written and
+// NOTHING tells the peer when I have. So for one evening that channel ran on a human
+// typing `kitten @ send-text`, and the third such message carried a stale number — it
+// said "your note expires 20:41:59 (armed 18:26:59Z)" while the note on disk read
+// 18:30:34Z, because the peer had re-armed twice and the sentence quoted what its author
+// remembered arming. The tool that had been asked answered correctly; the sentence did
+// not. The peer caught it and named the consequence: **a stale expiry warning is an alarm
+// that fires when nothing is wrong**, and trusting it over the file would have caused a
+// panicked re-arm mid-report — the exact rushed ordering the previous message existed to
+// prevent. Two mechanisms fighting each other.
+//
+// So the property is not "the bell is careful". It is that there is NOWHERE to put
+// anything but a pointer, and that is what these arms hold shut.
+{
+	const rootE = mkdtempSync(join(tmpdir(), "comm-attack-bell-"))
+	process.on("exit", () => { try { rmSync(rootE, { recursive: true, force: true }) } catch {} })
+	// A fixture exchange root, so this case never touches the live correspondence.
+	const ex = join(rootE, "exchange")
+	const out = join(ex, "peer", "out")
+	mkdirSync(out, { recursive: true })
+	mkdirSync(join(ex, "peer", "in"), { recursive: true })
+	const good = join(out, "LETTER.md")
+	writeFileSync(good, "# a letter\n")
+	const outside = join(rootE, "ELSEWHERE.md")
+	writeFileSync(outside, "# not in the channel\n")
+
+	// A peer project with a real bus whose leader is NOT running: the honest terminal state
+	// for a test box, and the one that must not be reported as a successful ring.
+	const proj = join(rootE, "project")
+	mkdirSync(join(proj, ".comm"), { recursive: true })
+	writeFileSync(join(proj, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: "." } }))
+	execFileSync("node", [join(PKG, "install.mjs"), proj], { stdio: "pipe" })
+	writeFileSync(join(ex, "peer", "peer.json"), JSON.stringify({ project: proj, agent: "leader" }))
+
+	const bell = (args) => spawnSync("node", [join(PKG, "bin", "exchange-bell.mjs"),
+		"--exchange", ex, "--peer", "peer", ...args], { encoding: "utf8" })
+
+	// ARM 1: a bell for a file that is not there. A dangling pointer reads as "the substance
+	// is recorded elsewhere" while the substance is nowhere — A27/A28's rule, on the one
+	// path where the reader is another agent who will go looking.
+	// 64 is the usage-error exit code, spelled out because this suite has no constant for
+	// it: borrowing one from bin/ledger.mjs would be a second list to keep in step, and
+	// referencing a name that does not exist here ABORTED THE WHOLE RUN the first time this
+	// case was written — every arm after it silently never ran. CLAUDE.md names that shape.
+	const USAGE = 64
+	const dangling = bell(["--ref", join(out, "NOPE.md")])
+	// CONTROL: the same call with a file that exists must get PAST ref validation. It stops
+	// at "not running", which is exit 3 and a different sentence — proving arm 1 refused for
+	// the ref and not for the peer.
+	const present = bell(["--ref", good])
+	const refusedForRef = dangling.status === USAGE && /does not exist/.test(dangling.stderr || "")
+	const gotPastRef = present.status === 3 && /not running/.test(present.stdout || "")
+
+	// ARM 2: a ref outside the channel. The peer cannot be expected to hold a path this
+	// channel does not carry, and an unconstrained --ref is a traversal surface besides.
+	const stray = bell(["--ref", outside])
+	const refusedForContainment = stray.status === USAGE && /inside/.test(stray.stderr || "")
+
+	// ARM 3: an agent the peer's own bus does not know must be a refusal with a reason, not
+	// a silent no-op — the shape `send-text --match` produces by default and the reason
+	// wake.mjs resolves before it rings.
+	const wrongAgent = bell(["--ref", good, "--agent", "nobody"])
+	const refusedUnknownAgent = wrongAgent.status === USAGE && /does not know an agent/.test(wrongAgent.stderr || "")
+
+	// ARM 4: THE ONE THAT MATTERS, and it is structural rather than behavioural on purpose.
+	// The bell's text may interpolate the REF and the reply directory and nothing else. A
+	// behavioural check ("today's text has no digits in it") passes for a year and then
+	// someone adds `${age}` — this fails on the commit that adds it.
+	const src = readFileSync(join(PKG, "bin", "exchange-bell.mjs"), "utf8")
+	const tpl = /const TEXT = ([\s\S]*?)\n\nif \(has\("--dry-run"\)\)/.exec(src)
+	const holes = tpl ? [...tpl[1].matchAll(/\$\{([^}]*)\}/g)].map((m) => m[1].trim()) : null
+	const onlyPointer = !!holes && holes.length > 0 && holes.every((h) => h === "ref" || h === "inDir")
+
+	check("A35 the exchange bell carries a pointer and nothing that can go stale",
+		refusedForRef && gotPastRef && refusedForContainment && refusedUnknownAgent && onlyPointer,
+		`dangling ref -> exit ${dangling.status}; the same call with a real ref -> exit ${present.status} (past validation); ` +
+		`ref outside the channel -> exit ${stray.status}; unknown agent -> exit ${wrongAgent.status}; ` +
+		`the message template interpolates ${holes ? JSON.stringify(holes) : "COULD NOT BE PARSED"} (only ref/inDir allowed)`)
+}
+
 // A31 — this suite must not touch the machine's real session registry.
 //
 // Not a property of the bus: a property of the SUITE, and it is here because the trap has
