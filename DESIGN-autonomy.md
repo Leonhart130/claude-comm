@@ -428,6 +428,37 @@ built the instrument.
    silent misroute the day he splits two projects into one window. Identity comes from the pid, never from
    the socket, the cwd or the title.
 
+   ### ✅ `kitten @ launch --type=os-window` stays in the SAME process — measured 2026-09-04
+
+   The question that had been open for two sessions, because the measurement pops a window on the owner's
+   screen. He gave standing authorisation, and it took thirty seconds:
+
+   | | before | after |
+   | --- | --- | --- |
+   | kitty processes | `8435 526075` | `8435 526075` — **unchanged** |
+   | sockets in `/tmp` | `kitty-526075`, `kitty-8435` | **unchanged** |
+   | the new window | — | `os_window=2` on the **existing** socket `/tmp/kitty-526075` |
+   | env inside the launched process | — | `KITTY_PID=526075`, `KITTY_LISTEN_ON=unix:/tmp/kitty-526075` |
+
+   **So a launched OS window is a window of the launching kitty, not a new kitty.** An expert launched with
+   `kitten @ --to $KITTY_LISTEN_ON launch --type=os-window` lands inside its leader's socket and is therefore
+   reachable by the wake mechanism from the moment it exists. Relaunching the `kitty` **binary** is the thing
+   that would have produced a second, unreachable process — that is what the two sockets above already are.
+
+   Three details worth keeping:
+
+   - **`--keep-focus` is the courteous default.** Without it the new window steals focus from whatever the
+     owner is doing. The measurement used it and nothing on his screen moved.
+   - **`launch` returns the new window id on stdout.** That id is what makes cleanup safe: close by
+     `--match id:<id>`, never by title, cwd or "the newest one". The owner's standing rule is that an agent
+     may close **only windows it created itself**, never his and never another agent's, unless that agent has
+     agreed — several of his sessions live in these windows.
+   - **`window.pid` is still the SHELL**, with the real command in `foreground_processes` — the trap already
+     recorded above, confirmed again here (`pid=911070` was the `sh`, not the `sleep`).
+
+   ⚠️ **What this does NOT license:** it says nothing about launching into *another* socket. A leader launches
+   into its own; the enumerate-every-socket rule above is unchanged, and identity still comes from the pid.
+
    5. A third option the owner surfaced remains unexplored: an **MCP channel that pushes into the session**
       (`--dangerously-load-development-channels`) — undocumented, dev-flagged, unverified.
 

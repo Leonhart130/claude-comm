@@ -74,6 +74,33 @@ function readJson(p, fallback) {
 	}
 }
 
+/**
+ * The hook command, and why it is not just `node ... comm-hook.mjs`.
+ *
+ * `FINDINGS.md#hookless-launch`: a session launched outside an interactive shell -
+ * `kitten @ launch`, a `.desktop` file, cron - inherits a PATH with no nvm on it, so
+ * `node` is not found, EVERY hook dies, and the session runs normally with no bus, no
+ * mail delivered at any turn boundary, and nothing saying so. A self-launched expert is
+ * launched by a program, never by a person's shell, so this is the shape that would have
+ * made the whole autonomy program measure nothing.
+ *
+ * The guard does not make a node-less session work. It makes one impossible to mistake
+ * for a working one, and only at `SessionStart` - a warning printed at every turn
+ * boundary is a warning nobody reads, so `Stop` stays silent and relies on the one the
+ * session was given when it started.
+ *
+ * It still exits 0 on every path: a broken bus must never break a session.
+ */
+const hookCommand = (verb) => {
+	const run = `node "$CLAUDE_PROJECT_DIR/.claude/comm-hook.mjs" ${verb}`
+	if (verb !== "session-start") return `if command -v node >/dev/null 2>&1; then ${run}; fi`
+	return `if command -v node >/dev/null 2>&1; then ${run}; else ` +
+		`echo "claude-comm: node is NOT on this session PATH, so the bus hooks did not run. ` +
+		`No mail will be delivered at any turn boundary and nothing else will say so. ` +
+		`This session was launched outside an interactive shell (kitten @ launch, a .desktop file, cron); ` +
+		`relaunch it through a login shell."; fi`
+}
+
 /** Merge our two hooks into a settings object without disturbing anything else. */
 function withHooks(settings) {
 	const s = { ...settings }
@@ -84,7 +111,7 @@ function withHooks(settings) {
 		)
 		s.hooks[event] = [
 			...keep,
-			{ hooks: [{ type: "command", command: `node "$CLAUDE_PROJECT_DIR/.claude/comm-hook.mjs" ${verb}` }] },
+			{ hooks: [{ type: "command", command: hookCommand(verb) }] },
 		]
 	}
 	return s

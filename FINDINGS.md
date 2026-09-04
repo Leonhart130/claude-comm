@@ -532,6 +532,23 @@ session that cannot be resolved at all. A per-pid file has no merge to lose. The
 boot id)` — start time alone is ticks since boot, so a reboot could hand the same pair to a different process
 honestly.
 
+**✅ VERIFIED against a real `/clear`, 2026-09-04 16:00**, in a disposable session launched for the purpose
+(pid 920745). Launched as `707192c3`, cleared, then given a turn:
+
+| | |
+| --- | --- |
+| the ledger | recorded `source: "clear"`, new session `6379efc5`, same process |
+| the scratch descriptor the process holds | `…/707192c3-…` — **the launch session, dead and frozen** at 47 063 B / 44 398 tokens |
+| the registry | `pid 920745 → 6379efc5` — the live one, advancing, 59 613 B / 45 712 tokens |
+| `context.mjs --pid 920745` | **45 712 tokens**, labelled `session CLEARED (launched as 707192c3)` |
+
+Two things this added over the original measurement. **The scratch descriptor appears only once the session
+opens its scratch directory** — a fresh session holds none at all, so the old resolver did not merely answer
+wrongly, it answered *nothing* and fell through to newest-mtime in a directory holding twelve transcripts.
+And the descriptor that eventually appeared, created by a background task started **after** the clear, still
+named the **launch** session: the scratch directory is fixed at launch, permanently, on a second independent
+measurement.
+
 `bin/context.mjs` now resolves pid → transcript through it and **refuses on a miss**, including the
 own-session path that used to fall through to newest-mtime. Four arms in `bin/context.mjs --prove-red` and
 three in `bin/boot.mjs --prove-red` demonstrate it: a registered pid resolves to *its* transcript, a recycled
@@ -549,3 +566,70 @@ shapes this repo already had names for:
   having never checked the transcript existed. With a stale entry, context refused while the row stayed
   green — a **green row over a dead sensor**. The row now reads what the reader reads, and that direction is
   armed.
+
+## `#hookless-launch` — a session launched outside an interactive shell has NO bus, and says nothing
+
+Found 2026-09-04 while launching a disposable session to test `/clear`. Not looked for, and it is the largest
+thing found today.
+
+`kitten @ launch --type=os-window claude` starts Claude Code with **kitty's** environment, and kitty here was
+started from a `.desktop` file. Node is installed under nvm, which is put on `PATH` by an interactive shell's
+profile and by nothing else. Measured on the launched process:
+
+| | |
+| --- | --- |
+| `PATH` of the launched session | **no nvm entry** |
+| `PATH` of a session started from an interactive zsh | `/home/leonh/.config/nvm/versions/node/v24.18.0/bin` |
+| what the session printed | `SessionStart:startup hook error` · `/bin/sh: 1: node: not found` |
+
+**So every hook died, and the session ran normally.** No bus, no ledger, no registry entry, no mail delivered
+at any turn boundary — and nothing in the session says so beyond one non-blocking line that scrolls away.
+`install.mjs` generates the field hooks the same way (`node "$CLAUDE_PROJECT_DIR/.claude/comm-hook.mjs"`), so
+`~/Dev/work` and `~/Dev/electio` carry the identical failure.
+
+### 🔴 Why this is fatal to the autonomy mandate specifically
+
+**A self-launched expert is launched by a program, not by a person's shell.** It would come up with no bus,
+receive no mail, record nothing in either instrument, and look completely normal — the silent no-op shape
+this project keeps finding, at the level of the whole agent rather than one call. Every measurement about
+delivery, latency and lifecycle taken on a hand-opened terminal would simply not transfer.
+
+### The fix, in two halves
+
+1. **Launch through a login shell.** `kitten @ launch --type=os-window --keep-focus --cwd <dir> zsh -lic claude`
+   — measured to recover node from a bare environment. This is the recipe for self-launch, recorded in
+   `DESIGN-autonomy.md`.
+2. **Make the failure loud**, because the launcher is not always ours. The `SessionStart` hook command now
+   tests for node first and, when it is absent, prints one line saying the session has no bus, no ledger and
+   no registry entry. It still exits 0 — a broken bus must never break a session — so the change is a
+   message, not a guard. Both directions are demonstrated with one variable moved: the same command string
+   under a node-less `PATH` prints the warning and exits 0; with node present it prints the boot report and
+   exits 0. The `Stop` hook stays silent, because a warning at every turn boundary is a warning nobody reads.
+
+⚠️ **What this does NOT do:** it does not make a node-less session work. It makes one impossible to mistake
+for a working one. The working fix is the launch recipe, and it only covers launchers this framework owns.
+
+## `#test-debt` — inherited from review #4, covered by no gate
+
+**Standing test debt, inherited from review #4 and NOT covered by any gate:** DST boundaries and NTP steps ·
+network filesystems (`O_APPEND` does not travel) · scale past ~6 400 records (`analyse()`'s span loop is
+O(n²)) · what `resume` and `compact` payloads actually carry · **and the ledger has still never scored a real
+defect** — every defect it has ever seen was synthetic. Its first real `record defect` is the test.
+
+## `#measurement-traps` — three ways a control lied here
+
+`delivered/` file mtimes look like drain times and are not — `renameSync` preserves mtime, so they are
+*creation* times. The only honest source is the `delivered` field in `.comm/log.jsonl`.
+
+**A third, from 2026-09-04, and it is the second one's twin:** `bin/boot.mjs --prove-red` ran the real boot
+with `--hook`, and that child's ancestor walk reached the **operator's own live session** — so the negative
+control wrote its fixture transcript into the machine's real session registry under the operator's pid, and
+the next boot reported `pid <me> → 44444444-….jsonl` under a green tick. **A control that writes into the
+world it measures is not a control.** Found by reading a boot report, not by any test. Every child of
+`proveRed` now runs with `CLAUDE_COMM_RUNTIME` inside its own fixture.
+
+**A second one, from an earlier session:** a probe that reported "the defect does not reproduce" on both arms was
+wrong — a relative path in a hand-built hook payload made `findRoot` miss and the hook exit 0 silently,
+which is indistinguishable from a clean result. Its positive control passed *because it used an absolute
+path and so never travelled the broken path.* **A control that does not go through the same code as the arms
+validates nothing.** Both reviewers hit a version of this in the same session and recorded it.
