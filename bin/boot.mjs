@@ -35,7 +35,7 @@
 import { readFileSync, writeFileSync, renameSync, existsSync, readdirSync, statSync, utimesSync, mkdtempSync, mkdirSync, cpSync, rmSync, symlinkSync, readlinkSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, dirname, resolve, basename } from "node:path"
-import { fileURLToPath } from "node:url"
+import { fileURLToPath, pathToFileURL } from "node:url"
 import { execFileSync, spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
 import { record as registryRecord, lookup as registryLookup, registryDir, sessionPid } from "./session-registry.mjs"
@@ -237,8 +237,32 @@ if (has("--hook")) {
 		// measured instead of what would be convenient.
 		const tp = typeof payload.transcript_path === "string" ? payload.transcript_path : ""
 		const sid = tp ? basename(tp).replace(/\.jsonl$/, "") : null
+		// THE RESTART SIGNAL, CLAIMED HERE TOO. Review #6 F2: the claim lived only in the
+		// generated hook stub, and THIS repo has no stub - its SessionStart hook is
+		// `boot.mjs --hook`, so boot is the only recorder here. The signal was therefore
+		// inert in the project that owns it: a note could be armed, the row would PRINT it,
+		// and the same row would file the start as cold in the same sentence. STATUS.md's
+		// own ▶ NEXT told the next session to arm one and restart, which could not have
+		// worked. Reporting half shipped where the acting half did not exist.
+		let sig = []
+		try {
+			const rs = join(ROOT, "bin", "restart-signal.mjs")
+			if (existsSync(rs)) {
+				const m = await import(pathToFileURL(rs).href)
+				const c = m.claim({ root: ROOT, agent: sessionAgent })
+				if (!c.ok) process.stderr.write(`claude-comm: a restart signal for ${sessionAgent} could not be claimed (${c.why}); this start is being recorded as COLD.\n`)
+				else if (c.signal) {
+					if (c.signal.prev_session) sig.push("--prev-session", String(c.signal.prev_session))
+					sig.push("--signal-src", String(c.signal.by || "unknown"))
+					if (Number.isFinite(c.age_s)) sig.push("--signal-age", String(c.age_s))
+					if (Number.isFinite(c.signal.ttl_s)) sig.push("--signal-ttl", String(c.signal.ttl_s))
+				}
+			}
+		} catch (e) {
+			process.stderr.write(`claude-comm: the restart signal could not be loaded (${(e && e.message) || e}); this start is being recorded as COLD.\n`)
+		}
 		const r = node(["record", "start", "--agent", sessionAgent, "--source", payload.source,
-			...(sid ? ["--session", sid] : []), "--quiet"])
+			...(sid ? ["--session", sid] : []), "--quiet", ...sig])
 		wrote = { ok: !!r && r.status === 0, sid, why: r ? (r.stderr || "").trim().split("\n")[0] : "spawn failed" }
 	}
 	const q = node(["--json"])

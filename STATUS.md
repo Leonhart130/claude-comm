@@ -5,38 +5,48 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-**1 — Record a defect. The arms fill on their own now; the NUMERATOR has never once been written.**
+**1 — Dispose review #6: five findings OPEN, and recording them is the numerator this ledger never had.**
 
-*Written 2026-09-04 by the session that made the signal cross. It assumes you remember nothing, and boot
-injects only this first line — so the first line is the instruction. Every claim below is checkable; check it.*
+*Written 2026-09-04 by the session that took the review. It assumes you remember nothing, and boot injects only
+this first line — so the first line is the instruction. Every claim below is checkable; check it.*
 
-✅ **The crossing works and is no longer open.** `bin/restart-signal.mjs`; the `~/Dev/work` leader armed a note
-as his last act at 20:40:03, his owner relaunched him, and his hook claimed it at 20:44:22 — `prev_session`
-carried, `signal {src: handoff, age_s: 259, ttl_s: 900}`, and his verdict moved from *"the reboot arm is
-UNREACHABLE"* to *"needs 10 starts in each arm"*. All four of his starts say `source: "startup"`, which is the
-whole case for the mechanism. Design, both lapse warnings it took, and the bias below:
-**`FINDINGS.md#reboot-signal`** — read it, do not re-derive.
+**`REVIEW-adversarial-6.md` is the full record — read it, do not re-derive.** Seven findings on that day's own
+code; **five were about the ARMS, not the code**, the same ratio as review #5. Disposition so far:
 
-🔴 **What is open is the other half of the experiment.** Every start is recorded automatically; **a defect is
-recorded by hand, and nobody has ever done it.** Ten reboots and ten cold starts still produce *"no difference
-detected"* if the numerator is 0/10 against 0/10 — the instrument would answer confidently and mean nothing.
-This is the same shape as the arming problem that cost two warnings today: **a workflow nobody performs is
-indistinguishable from a mechanism that does not work.**
+- ✅ **F2 — the restart signal was INERT in this repo.** The claim lived only in the generated stub, and this
+  project has no stub: its hook is `boot.mjs --hook`. A note could be armed, the row would PRINT it and file
+  the start as COLD in the same sentence — and the ▶ NEXT told the next session to do exactly that. Fixed and
+  verified by hand. 🔴 **NOT ARMED**, and the existing arm cannot notice because it never arms a note.
+- ✅ **F1 — the prose in `#reboot-signal` is corrected.** A33 proves the note is *consumed*, not that
+  consumption is *atomic*; a genuine read-then-unlink passes it green. 🔴 The arm still needs a real barrier.
+- 🔴 **F3** the `DRIFT:` list names files that did not drift, including a shell command · **F4** A35 misses
+  concatenation and nothing ever executes the bell · **F5** boot drops the ledger's `caveats` — R6's defect
+  re-created in the commit that added the field · **F6** a tampered note is deleted, against the file's own
+  Property 3 · **F7** the git guard is blind below the git root. Plus four more he raised without staging,
+  including a bare `catch {}` that silently narrows the gate fingerprint.
 
-- Start with the ones already found: `node bin/ledger.mjs record defect --agent <you> --ref
-  FINDINGS.md#<anchor> --authored-at <iso, with a Z>`. Two were authored in this session — the `Number(null)`
-  coercion and the ENOENT false alarm, both in `#reboot-signal`.
-- ⚠️ **`--authored-at`, never `found_at`.** A defect charged to whoever noticed it flows to the newest
-  session, and reboots manufacture sessions — the arm would collect defects it did not author. The tool
-  refuses an untimed defect unless you say `--authored-unknown` out loud.
-- **Then say so in a `## ▶ NEXT` that asks the next session to keep doing it.** One session recording defects
-  is an anecdote.
+**Then record them.** Every start is recorded automatically; **a defect is recorded by hand and nobody ever
+has.** Ten reboots against ten cold starts still produce *"no difference detected"* if the numerator is 0/10
+against 0/10. These findings are the first real material:
+`node bin/ledger.mjs record defect --agent unnamed --ref REVIEW-adversarial-6.md --authored-at <iso with a Z>`.
+⚠️ **`--authored-at`, never found_at:** a defect charged to whoever noticed it flows to the newest session, and
+reboots manufacture sessions. The tool refuses an untimed defect unless you say `--authored-unknown` out loud.
 
-⚠️ **The reboot arm samples CLEAN reboots only, and this is not fixable by trying harder.** A session that
-crashes never closes, so it never arms; its restart lands in `cold`. The `~/Dev/work` leader found this hours
-after the mechanism shipped and measured one (a crash cost him **115 609 tokens on the next boot against
-100 725**). The arm is deliberately NOT widened — the ledger names the sub-population every time the arm holds
-anything. Do not "fix" this by arming early and refreshing; that trades a clean semantic for a noisy one.
+⚠️ **The arm also needs a covariate the peer measured and I have not built.** A crashed restart cost 115 609
+tokens, a *declared* one 116 413 — the clean one cost MORE, and he named the confound: 246 lines of report
+were waiting. **The boot turn is governed by what the session finds in front of it**, so without recording
+pending work at start both arms measure the luck of the queue. Cheap partial proxy: inbox depth at start,
+which the hook already knows. Label it partial. `exchange/work-leader/out/2026-09-04-covariate.md`.
+
+**The field answered the notice the day it shipped** — `exchange/field/in/`'s first file ever
+(`work-leader-2026-09-04-premiere-lecture-notice.md`). Two items change plans: the notice covers MAIL and says
+nothing about **resources two agents in one tree contend over** (he found three of his apps on port 4173), and
+🔴 *"a notice is not read because it is there — it is read when someone says it is not"* ⇒ **`SessionStart`
+should NAME it once.** Also: his `.comm/` is ignored by **his** line, not the installer's, so that control
+proves his rule exists, not that install places one.
+
+⚠️ **Launch tomorrow's reviewer in a SEPARATE WINDOW.** A `general-purpose` subagent does not inherit the
+conversation, but it inherits the brief — and the brief is mine. Ask the owner.
 
 **2 — Then the reboot trigger.** The consumer's §2.4: *"you re-fetched a file you already read this
 session"*, countable by a hook, not a token threshold. Its confound is theirs, priced at ~30 min; ask rather
@@ -73,21 +83,20 @@ the bus, never by absolute path · the doorbell resolves by pid and refuses rath
 | repo | an `origin` exists (`Leonhart130/claude-comm`); nothing is pushed automatically — the owner decides |
 | **electio** | in real daily use — 26 real deliveries, both directions |
 | gates | `attack` (deterministic, every case armed) · `ledger --prove-red`, now run INSIDE it · `selftest` (real sessions, not gated by boot) · `context` and `boot` controls. **Counts live in boot's output, never here** |
-| boot | `node bin/boot.mjs` — every gating row demonstrated able to go red; `--fast` is injected at session start by `.claude/settings.json`, the contract is `CLAUDE.md` |
+| boot | `node bin/boot.mjs` — every gating row armed; `--fast` is injected at session start, contract in `CLAUDE.md` |
 | **ledger** | `node bin/ledger.mjs` — the reboot instrument, **built before the mechanism**, which now exists (`restart-signal.mjs`). Records here AND in the field; a field arm is `--root ~/Dev/electio`. Its own arms run inside `attack` as A34 |
-| **sensor** | `node bin/context.mjs` — resolves pid → transcript through `bin/session-registry.mjs` (written by the `SessionStart` hook, keyed on pid + start time + boot id) and **refuses on a miss**. `FINDINGS.md#clear-blind` |
-| reviews | #1–#5, all dispositioned (`REVIEW-adversarial-5.md`, the first the leader launched itself) · the electio leader's field reviews. **#5's lasting output is the method amendment now in `CLAUDE.md`: a gate that CAN redden is not yet one that reddens for the property in its own title** |
+| **sensor** | `node bin/context.mjs` — pid → transcript through `bin/session-registry.mjs` (the `SessionStart` hook writes it, keyed on pid + start time + boot id); **refuses on a miss**. `FINDINGS.md#clear-blind` |
+| reviews | #1–#5 dispositioned · **#6 is OPEN — `REVIEW-adversarial-6.md`, see ▶ NEXT.** #5's amendment is in `CLAUDE.md`: *a gate that CAN redden is not yet one that reddens for the property in its own title* — **#6 hit that ratio again, 5 of 7** |
 
 ## ⏭️ OPEN
-1. **🔴 Latency is a mailbox, not an interrupt.** Re-derive with `node test/latency.mjs <log>`; the table is
-   never transcribed. From 26 real field deliveries: leader→expert median **1462 s**, expert→leader **586 s**.
-   The asymmetry is structural — mail lands at the recipient's *turn boundary*. **An agent that is alive but
-   idle never receives its mail**, and that one is still open: it is the whole justification for item 3.
-   `who` showing "running" does not mean reachable. Never describe this bus as real-time. Gated by A16;
-   history in `HISTORY.md`.
+1. **🔴 Latency is a mailbox, not an interrupt.** Re-derive with `node test/latency.mjs <log>`; never
+   transcribe the table. 26 real deliveries: leader→expert median **1462 s**, expert→leader **586 s** — the
+   asymmetry is structural, mail lands at the recipient's *turn boundary*. **An agent alive but idle never
+   receives its mail**, which is the whole justification for item 3. `who` showing "running" does not mean
+   reachable. Never call this bus real-time. Gated by A16; `HISTORY.md`.
 
-2. **`--reply-to <id>` (threading).** Requested by the field, then deprioritised by it: with two agents,
-   threading adds identity surface while the substance already lives in the file.
+2. **`--reply-to <id>` (threading).** Field-requested, then field-deprioritised: it adds identity surface
+   while the substance already lives in the file.
 
 3. ✅ **Phase 2 — the wake is BUILT** and verified against a real agent (`bin/wake.mjs`; A32, armed both
    ways; `FINDINGS.md#wake-doorbell`). 🔴 **Still open:** item 1's latency table predates it and has not been
@@ -102,8 +111,8 @@ the bus, never by absolute path · the doorbell resolves by pid and refuses rath
    identity. Full incident and the peer's reply: `HISTORY.md`, "The port collision".
 
    ⭐ **The fix is designed and deliberately NOT next: a claim file** (`FINDINGS.md#claim-file`). A second
-   COLLISION outranks the current plan; a near-miss does not, and the peer reported one on 2026-09-04 and
-   priced it himself as evidence the fix is cheap rather than needed.
+   COLLISION outranks the current plan; a near-miss does not. 🔴 **The count is now three:** a near-miss, then
+   **three of his apps on port 4173**, and two new experts holding 4174/4175 *written, never started*.
 
 5. **🔴 A session launched outside an interactive shell has NO bus, and says nothing.** `node` lives only
    under nvm, so `kitten @ launch claude` (or cron, or a `.desktop` file) starts a session whose **every hook
@@ -117,11 +126,10 @@ the bus, never by absolute path · the doorbell resolves by pid and refuses rath
    mechanisms, the RAM measurements, the consumer's reply and the review #4 dispositions. Do not re-derive
    any of it here; this entry carries only what is still OPEN.
 
-   **The two findings that shape the feature, because a summary of them would be re-litigated otherwise:**
-   the consumer's defects are **BOOT defects, not crowding defects** — four of five authored in the first
-   thirteen minutes at 35–42 % of peak — so a reboot multiplies the state where errors are actually made and
-   the design effort belongs in the fifteen minutes AFTER a restart. And the handoff carries a **sha256 read
-   manifest**, never prose: a rebooted session re-reads only what MOVED. Nothing trusted, something proved.
+   **The two findings that shape it:** the consumer's defects are **BOOT defects, not crowding defects** —
+   four of five authored in the first thirteen minutes at 35–42 % of peak — so the design effort belongs in
+   the fifteen minutes AFTER a restart. And the handoff carries a **sha256 read manifest**, never prose: a
+   rebooted session re-reads only what MOVED.
 
    ✅ **The instrument was built first** (`node bin/ledger.mjs`), review #4 is answered in full, and the
    signal that makes its reboot arm reachable now exists (`bin/restart-signal.mjs`, `#reboot-signal`).
@@ -130,9 +138,8 @@ the bus, never by absolute path · the doorbell resolves by pid and refuses rath
 ## ⚠️ What was NOT verified
 
 - **Whether the pid→transcript descriptor returns after a cleared session takes a turn**
-  (`FINDINGS.md#clear-blind`). Now MOOT for the sensor — the registry does not consult that descriptor for an
-  answer — but still unmeasured, and it is what decides whether the "session CLEARED" note the sensor prints
-  is permanent or transient.
+  (`FINDINGS.md#clear-blind`). MOOT for the sensor now, still unmeasured — it decides whether the sensor's
+  "session CLEARED" note is permanent or transient.
 - **What happens to the entry when a session is `resume`d or `compact`ed.** Both fire `SessionStart` with a
   source this repo has never seen, so whether they carry a `transcript_path` at all is unknown. A payload
   without one leaves the previous entry standing, which is the safe direction and is not the same as correct.
@@ -143,9 +150,8 @@ the bus, never by absolute path · the doorbell resolves by pid and refuses rath
   `/proc/sys/kernel/random/boot_id`; without both it refuses to record, which is a refusal, not support.
 - **The ledger has never scored a real defect.** Sixteen arms move it on synthetic records; nothing has yet
   been recorded by a hand that was not writing a fixture. Its first real `record defect` is the test.
-- **Nobody has read the notice.** It is installed in both field projects and no agent has been observed
-  using it, the feedback path has never carried a file, and the `SessionStart` git guard has never fired
-  outside a fixture — both field projects were already clean when it shipped.
+- **The git guard has never fired outside a fixture.** Both field projects were clean when it shipped, and
+  the one agent who read the notice did not stage a case where it should fire.
 - **The crossing has happened ONCE**, in one project, armed by one agent, relaunched by one hand
   (2026-09-04 20:44). It took two lapse warnings to land. Not verified: that it survives an unattended
   relaunch, that anyone repeats it without being reminded, or that the arm ever reaches ten.
@@ -160,27 +166,25 @@ the bus, never by absolute path · the doorbell resolves by pid and refuses rath
 - **How long the wandered-cwd window stays open.** Proved within a single `-p` turn; whether an interactive
   session's Bash cwd resets between turns is unmeasured. It decides the exposure, not the existence, of the
   defect. Moot for delivery (identity no longer reads cwd); still governs `whoami`-returns-null, open item 2.
-- **Behaviour when an agent is mid-tool-call** rather than mid-turn. Still unexercised.
 - **`selftest`'s BEHAVIOUR half is not a gate and never will be** — 3 of 6 runs showed the agent not reading
   the file it was pointed at. That is allowed by design, but it means this bus regularly rings a bell nobody
   answers, and no gate can tell you that happened in production.
 - **Anything non-Linux**: `comm who` reads `/proc` and degrades to "not running" everywhere else.
-- **A8's two guards under partial mutation.** Each alone is uncaught, both together are caught; the
-  in-between cases were not enumerated.
 - **The `-restored` duplicate id** in electio's log, unexplained across three reviews now.
+- Two older standing caveats were moved to `FINDINGS.md#test-debt` when this file hit its cap: A8's partial
+  mutations, and behaviour mid-TOOL-CALL. Cut from here, not retracted.
 
-- **Whether Claude Code enforces `"timeout": 20` on a SessionStart hook.** `--hook` now refuses a TTY, but a
-  pipe that never closes still blocks, and `|| true` rewrites an exit code without touching a hang. The
-  timeout is the harness's promise and neither I nor review #3 could close it from here.
-- **`.boot-state.json` under concurrent writers.** Writes are atomic (rename) since session 10, so no reader
-  sees a partial file — but two interleaved read-modify-writes can still lose one update. The record it
-  holds is a counter, so a lost count is recoverable where a lost file was not. Not measured.
+- **Whether Claude Code enforces `"timeout": 20` on a SessionStart hook.** `--hook` refuses a TTY, but a pipe
+  that never closes still blocks and `|| true` cannot touch a hang. The harness's promise, not mine.
+- **`.boot-state.json` under concurrent writers.** Writes are atomic (rename), so no reader sees a partial
+  file — but two interleaved read-modify-writes can lose one update. It holds a counter, so a lost count is
+  recoverable. Not measured.
 
-## Two conventions, kept here because both erode silently
+## Two conventions that erode silently
 
-**Measurement traps** — three recorded, all of them ways a control lied (`FINDINGS.md#measurement-traps`):
-a control that does not travel the same code as the arms validates nothing, and one that writes into the
-world it measures is not a control at all.
+**Measurement traps** (`FINDINGS.md#measurement-traps`): a control that does not travel the same code as the
+arms validates nothing, and one that writes into the world it measures is not a control at all. **Four
+instances now** — the fourth was this session, by hand, in a sandbox run with no runtime isolation.
 
-**Findings live in the code**, in the comment at the point they apply, not only in a document — *a rule
-whose cost you cannot see is a rule someone will simplify away.*
+**Findings live in the code**, at the point they apply — *a rule whose cost you cannot see is a rule someone
+will simplify away.*
