@@ -214,6 +214,66 @@ theirs · **guards already run WITH THEIR OUTPUT, never "passed"** · the read m
 - **Ship the instrument with the feature.** The first ten reboots must leave a marker, so *"did the reboots
   cost us defects"* is a query and not a debate. Their charter: *a feature with no ledger is a hobby.*
 
+## The ledger — built 2026-09-04, BEFORE the mechanism
+
+`node bin/ledger.mjs` · negative control `--prove-red` (17 arms) · findings `FINDINGS.md#ledger-control`,
+`FINDINGS.md#ledger-blame`, `FINDINGS.md#ledger-unknown`.
+
+The consumer's charter, and the reason this exists first: *"nobody can answer whether a rebooted session is
+measurably worse, because there has never been a reboot. A feature with no ledger is a hobby."*
+
+**The question it answers is not "did the reboot save tokens".** It is **"did the fifteen minutes after a
+restart cost us a defect"** — because four of five of their recorded defects were authored in the first
+thirteen minutes at 35–42 % of peak, and a reboot manufactures more first minutes.
+
+### The record
+
+One JSON object per line in `.comm/handoff/<agent>.log` — beside the handoff, gitignored live state, per
+agent. Three events, and the writer is the only thing that produces them:
+
+| event | carries |
+| --- | --- |
+| `start` | `session` · `source` (verbatim from the hook payload) · `prev_session` · `trigger` · `context` · `manifest` |
+| `handoff` | `session` · `context` before the restart · `trigger` and its measured value · the sha256 manifest's verdict · `ref` |
+| `defect` | `ref` (a POINTER, never the story) · `authored_at` · `authored_session` · `found_at` |
+
+Nothing stores "this was a reboot". `classify()` derives the arm from `source`/`trigger`/`prev_session`, so
+when `/clear`'s real `source` is finally observed, one function changes and every record ever written is
+re-read under the correction. A stored verdict would have frozen today's guess into the data.
+
+### What it refuses to do
+
+- **It records the CONTROL.** `bin/boot.mjs` writes a `start` record on every session start from today,
+  months before the mechanism. Reboot-only recording gives one arm and no denominator
+  (`FINDINGS.md#ledger-control`).
+- **It says UNKNOWN below ten starts per arm** — their number, not one chosen so this tool could speak
+  sooner. Exit 2, never a percentage.
+- **It survives the worst reading of what it could not read.** Unreadable lines and unplaceable defects form
+  a pool; the verdict is recomputed with the pool in each arm, and a verdict that moves is withdrawn.
+- **It refuses an untimed defect**, because `found_at` charges a defect to whoever noticed it and reboots
+  manufacture noticers (`FINDINGS.md#ledger-blame`).
+- **Exposure is measured, not assumed.** A session cut short by the next start keeps only the minutes it
+  had, and arms whose mean exposure differs by more than 20 % are flagged in the report.
+
+### The instrument cannot go silent unnoticed
+
+A ledger reporting "no reboots recorded" is indistinguishable from "no reboots happened" — `prove-the-probe`,
+exactly. So boot carries a **`ledger` row** that reads the tool's own answer (never a reimplementation of it)
+and states whether *this* session's start was recorded. Both halves are armed in `bin/boot.mjs --prove-red`:
+the instrument made unparseable drives the row to `?`, a torn line drives it to `⚠`, and a `--hook` boot is
+asserted to leave a record carrying the right session id.
+
+Cost measured: `--fast` went **0.20 s → 0.30 s** (two extra `node` spawns on the SessionStart path, one to
+write and one to read back). Paid once per session.
+
+### ⚠️ What is NOT recorded yet, and it is the half that matters
+
+**The field is not wired.** `~/Dev/work` and `~/Dev/electio` run `comm-hook.mjs session-start`, not boot, so
+no field session leaves a record. The reboots will happen there, and their cold arm is therefore still
+empty. Wiring it means changing the generated hook stub in `install.mjs` — a **delivery change**, gated by
+`test/selftest.mjs` before and after, which is why it was deliberately not done in the same session that
+built the instrument.
+
 ## Phase 2 — the kitty wake, as it stood before the lifecycle mandate
 
 **Phase 2 — kitty wake for the idle agent. RESTART DONE, RESOLVER BUILT AND VERIFIED LIVE, SEND NOT BUILT.**

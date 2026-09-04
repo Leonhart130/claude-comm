@@ -15,9 +15,10 @@ doorbell** — and a reboot obeys it too, since what survives a restart is what 
 | **2 — on demand** | `HISTORY.md` (how each decision was reached) · `BRIEF-*` / `REVIEW-*` correspondence | when re-opening something already settled |
 
 ```bash
-node bin/boot.mjs          # ~14 s · state + the adversarial gate (28 checks)
-node bin/boot.mjs --fast   # ~0.2 s · state only, when you are not touching the bus
+node bin/boot.mjs          # ~14 s · state + the adversarial gate (29 checks)
+node bin/boot.mjs --fast   # ~0.3 s · state only, when you are not touching the bus
 node bin/context.mjs       # how full this session is, resolved from /proc - exact, not guessed
+node bin/ledger.mjs        # did a restart cost us a defect? UNKNOWN until 10 starts per arm
 ```
 
 Read the boot report; if a row is `⚠` or `✗`, resolve or name it before anything else. **Never paraphrase
@@ -51,7 +52,8 @@ sessions. Boot deliberately does not run them.
 - **No claim without a measurement.** If you cannot state what would have made a check fail, you have not
   checked anything.
 - **Every gate proves it can go red** — one variable moved, the detector byte-identical:
-  `bin/boot.mjs --prove-red` · `bin/context.mjs --prove-red` · `test/attack.mjs` · `test/selftest.mjs --prove-red`.
+  `bin/boot.mjs --prove-red` · `bin/context.mjs --prove-red` · `bin/ledger.mjs --prove-red` · `test/attack.mjs` ·
+  `test/selftest.mjs --prove-red`.
 - **Report what was NOT verified.** Its absence is a defect in the report, not a clean bill.
 - **Attack the recent fix.** Three consecutive sessions found their worst defect inside the previous
   session's patch. Two defects on 2026-09-04 were found by writing the adversarial brief, not by re-reading.

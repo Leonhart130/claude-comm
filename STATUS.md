@@ -1,39 +1,38 @@
-# STATUS — claude-comm, 2026-08-06 (sessions 4–7)
+# STATUS — claude-comm, 2026-09-04 (sessions 4–12)
 
 Design and gates are in `README.md`; **this file is only what is OPEN.** Keep it short — when it grows,
 fold the settled parts into the README.
 
 ## ▶ NEXT
 
-**Build the ledger before the reboot mechanism. Do not build the mechanism first.**
+**Wire the FIELD to the ledger. The instrument is built and it is recording the wrong project.**
 
-The ruling is the other project's leader, and it is right: *"nobody can answer whether a rebooted session is
-measurably worse, because there has never been a reboot. If you ship it, ship the instrument with it — the
-first ten reboots must be a query, not a debate. A feature with no ledger is a hobby."*
+`bin/ledger.mjs` exists, is proved red on 17 arms, and `bin/boot.mjs` now writes a `start` record on every
+session start — but **only here**. `~/Dev/work` and `~/Dev/electio` run `.claude/comm-hook.mjs session-start`,
+which forwards to the bus and knows nothing about the ledger. The reboots will happen there, so their cold
+arm is empty and the query cannot be answered however long this repo runs.
 
-Concretely, in this order:
+1. **The obstacle is one line of the generated stub.** It forwards with `stdio: "inherit"`, so the hook
+   payload on stdin is consumed once, by the bus. To also record a start the stub must read stdin itself,
+   hand the bytes to the bus, and spawn `bin/ledger.mjs record start`. Read the payload ONCE and pass it to
+   both; do not let the ledger's spawn be able to delay or fail the delivery path.
+2. **This is a delivery change.** `node test/selftest.mjs` and `--prove-red` before and after — minutes, real
+   sessions. That is why it was not done in the session that built the instrument.
+3. **The agent name must come from the stub's location** (`--agent-root`), never from cwd and never from the
+   payload. The stub already resolves it that way for the bus; reuse that value, do not re-derive it.
+4. **Then re-install into both field projects** and confirm with `node bin/boot.mjs` that `field:*` stays
+   green — a stub that drifts from the packaged one is already a RED row.
 
-1. **Define the reboot record.** One JSON line per lifecycle event in `.comm/handoff/<agent>.log` (beside
-   the handoff, same gitignored live-state territory): timestamp · agent · trigger that fired and its
-   measured value · context before · context after · which files the sha256 manifest said had moved · and a
-   field for what the session got wrong afterwards, filled in later by whoever finds it.
-2. **Write the query first, then the writer.** `node bin/ledger.mjs` must answer *"did sessions after a
-   reboot produce more retracted findings than sessions that were not rebooted"* — and must say **UNKNOWN**
-   rather than a number until there are enough records. Build it against synthetic records so its shape is
-   settled before any real one exists; a ledger designed after the fact is designed to confirm.
-3. **Prove it can go red** (`--prove-red`), like every other gate here: one variable moved, and it must
-   report a degradation that is there and refuse to report one that is not.
-4. **Only then** wire the trigger. Per the consumer's §2.4 the trigger is *"you re-fetched a file you
-   already read this session"*, countable exactly by a hook — not a token threshold. Its confound
-   (propagation vs retrieval) is theirs to resolve and they priced it at ~30 minutes; ask before guessing.
+**After that, and not before: the trigger.** Per the consumer's §2.4 it is *"you re-fetched a file you already
+read this session"*, countable by a hook, not a token threshold. Its confound (propagation vs retrieval) is
+theirs and they priced it at ~30 min; ask before guessing.
 
-⚠️ **The thing that makes this hard is not the code.** Their finding is that four of five recorded defects
-were authored in the *first thirteen minutes* of a session, at 35–42 % of peak context. A reboot manufactures
-more first minutes. So the ledger's real question is not "did the reboot save tokens" — it is **"did the
-fifteen minutes after a restart cost us a defect"**, and the record must be shaped to answer that one.
+⚠️ **Do not build the reboot mechanism while the field ledger is empty.** The instrument was put first on
+purpose; wiring it to the project that will not use it and then shipping the feature to the project that will
+would be the same mistake with an extra step.
 
 Still mine to measure, unchanged: whether `/clear` reports `source: "clear"` and whether it returns RSS. The
-boot records the first automatically; nothing to do but wait for a real clear.
+boot records the first automatically (`.boot-state.json`, `sources`) — nothing to do but wait for a real clear.
 
 ## Where it stands
 
@@ -43,7 +42,8 @@ boot records the first automatically; nothing to do but wait for a real clear.
 | repo | git initialised, local only, no remote |
 | **electio** | in real daily use — 26 real deliveries, both directions. **Ran a bus 4 commits stale until this session** |
 | gates | `attack` **26/26** deterministic ✓, **every case proved able to go red** (defect restored in the bus, gate byte-identical) · `selftest` **now deterministic too** — 6/6 transport green |
-| boot | `node bin/boot.mjs` — 6 measured rows, **every gating one demonstrated able to go red**; `--fast` (0.2 s) is injected at session start by `.claude/settings.json`, the contract is `CLAUDE.md` |
+| boot | `node bin/boot.mjs` — 7 measured rows, **every gating one demonstrated able to go red**; `--fast` (0.28 s) is injected at session start by `.claude/settings.json`, the contract is `CLAUDE.md` |
+| **ledger** | `node bin/ledger.mjs` — the reboot instrument, **built before the mechanism**. 17 arms proved red. Recording cold starts HERE since 2026-09-04; **the field is not wired** |
 | reviews | #1 (9 findings) in `REVIEW-adversarial.md` · #2 (10 findings) in `REVIEW-adversarial-2.md` · electio leader's field reviews in `REVIEW-electio-leader.md` and `REPLY-from-electio-leader.md` |
 
 ## ⏭️ OPEN
@@ -101,20 +101,25 @@ boot records the first automatically; nothing to do but wait for a real clear.
    owe it in `exchange/work-leader/2026-09-04-lifecycle-answer.md`. **Next: the ledger before the
    mechanism** — the first ten reboots must be measurable or the feature has no way to be judged.
 
-   ⚠️ **It also corrected my numbers:** ~20 of the 55 transcripts in its project directory are adversarial
-   review instances, not leader boots. The median survived (99 809, re-derived); **"worst boot 220 200" did
-   not — it is 170 568.** And its boot has doubled in 18 days, so a threshold must track the current boot
-   cost rather than a constant.
+   ✅ **The ledger is built, and it was built first** — `node bin/ledger.mjs`, 17 arms proved red,
+   `DESIGN-autonomy.md#the-ledger` and `FINDINGS.md#ledger-control` / `#ledger-blame` / `#ledger-unknown`.
+   It records **every session start**, not only reboots, because the comparison is reboot-start against
+   cold-start and the control arm has to exist before the feature does. Boot writes a record on every start
+   here and carries a `ledger` row that says whether *this* start landed — an instrument that goes silent
+   must not read as a quiet world. **🔴 The field is NOT wired: `~/Dev/work` runs `comm-hook.mjs`, not boot,
+   so the arm that matters is empty.** That is the ▶ NEXT.
 
-   The original consultation: The owner's ruling on how a reboot should behave:
-   "you handle it, ideally the two of you talk" — so the question went to the agent it would be
-   applied to, in `exchange/work-leader/2026-09-04-lifecycle-consultation.md`. Six questions, of which one
-   decides the feature: **does a crowded context actually degrade it, and where?** If the quality theory is
-   wrong the whole thing is a cost with no benefit, and only the agent living at 500 k can say. There is no
-   bus between the two projects yet, so the owner relays.
+   ⚠️ **It corrected my numbers and the corrections are settled** — population, "worst boot" (170 568, not
+   220 200), and an 18-day doubling that means any threshold tracks the *current* boot cost. Kept in
+   `DESIGN-autonomy.md`; the consultation itself is in `exchange/work-leader/`.
 
 ## ⚠️ What was NOT verified
 
+- **The ledger has never scored a real defect.** Sixteen arms move it on synthetic records; nothing has yet
+  been recorded by a hand that was not writing a fixture. Its first real `record defect` is the test.
+- **Whether two consumers of one hook stdin work.** The ▶ NEXT depends on the generated stub reading the
+  payload and handing it to both the bus and the ledger. It currently uses `stdio: "inherit"` and has never
+  been asked to do anything else.
 - **Whether finding 1 ever actually ate mail in electio.** Still unanswerable — but the reason stated here
   for three sessions was **wrong, and the wrong reason was the more dangerous half.** It said the log "never
   records which agent's hook drained it". It does: `to_agent`, since the initial commit. What it records is
