@@ -53,7 +53,11 @@ import { fileURLToPath } from "node:url"
 const SCHEMA = 1
 // A default, and named as one. A restart driven by a program takes seconds; one driven by
 // a human hand — which is every restart this project has actually observed — takes as long
-// as the human takes. 15 minutes is generous enough for the second and short enough that a
+// as the human takes. Be exact about what this bounds, in the ~/Dev/work leader's words:
+// **it does not bound staleness on disk, it bounds how long a human may take.** Two sessions
+// with identical hygiene land in different arms because one owner answered a message faster.
+// That is a real cost of this design, it is not fixable by choosing a bigger number, and it
+// is why `arm` is cheap to re-run: the fix is to arm LAST, not to promise longer. 15 minutes is generous enough for the second and short enough that a
 // signal abandoned at the end of a workday is dead by morning. The armer overrides it, the
 // record stores it, and the ledger applies it: three places to correct this, none of them
 // a number frozen into data.

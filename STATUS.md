@@ -5,35 +5,38 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-**1 — Arm the signal on a REAL restart. The mechanism exists now; nothing outside a fixture has used it.**
+**1 — Record a defect. The arms fill on their own now; the NUMERATOR has never once been written.**
 
-*Written 2026-09-04 by the session that built it. It assumes you remember nothing, and boot injects only this
-first line — so the first line is the instruction. Every claim below is checkable; check it.*
+*Written 2026-09-04 by the session that made the signal cross. It assumes you remember nothing, and boot
+injects only this first line — so the first line is the instruction. Every claim below is checkable; check it.*
 
-`bin/restart-signal.mjs` is the signal that crosses: the restarting party leaves `.comm/restart/<agent>.json`,
-the next `SessionStart` hook **takes** it (a rename, so exactly one session can), and the ledger classifies on
-it. Gated by A33 and A34, six ledger arms and boot's R11; installed into both field projects; `selftest` and
-`--prove-red` green before and after. **`FINDINGS.md#reboot-signal` carries the design, the defect the arms
-caught inside it an hour old, and what it deliberately does NOT do — read it, do not re-derive.**
+✅ **The crossing works and is no longer open.** `bin/restart-signal.mjs`; the `~/Dev/work` leader armed a note
+as his last act at 20:40:03, his owner relaunched him, and his hook claimed it at 20:44:22 — `prev_session`
+carried, `signal {src: handoff, age_s: 259, ttl_s: 900}`, and his verdict moved from *"the reboot arm is
+UNREACHABLE"* to *"needs 10 starts in each arm"*. All four of his starts say `source: "startup"`, which is the
+whole case for the mechanism. Design, both lapse warnings it took, and the bias below:
+**`FINDINGS.md#reboot-signal`** — read it, do not re-derive.
 
-What is missing is a restart that actually uses it, because **nothing arms it automatically.**
+🔴 **What is open is the other half of the experiment.** Every start is recorded automatically; **a defect is
+recorded by hand, and nobody has ever done it.** Ten reboots and ten cold starts still produce *"no difference
+detected"* if the numerator is 0/10 against 0/10 — the instrument would answer confidently and mean nothing.
+This is the same shape as the arming problem that cost two warnings today: **a workflow nobody performs is
+indistinguishable from a mechanism that does not work.**
 
-- **Here:** write the handoff, then `node bin/restart-signal.mjs arm --agent unnamed --prev-session <this
-  session's id> --by handoff --ttl 900`, then restart. The next boot's `ledger` row must count a reboot that
-  no `/clear` produced. Until one real restart does that, the arm is reachable and empty — which is progress
-  and is not evidence.
-- **In `~/Dev/work`:** its leader is restarted by the owner's hand, so the hand (or the leader, one command
-  before it dies) has to arm it. Ask, do not guess: that project's ledger is the one whose arm was proved
-  unreachable, and it is the only place a real reboot has ever happened.
-- ⚠️ **Do not arm a signal to test the plumbing in a project whose ledger is being scored.** A fixture root
-  costs nothing; a fake reboot in `~/Dev/work` is a control writing into the world it measures
-  (`FINDINGS.md#measurement-traps`).
+- Start with the ones already found: `node bin/ledger.mjs record defect --agent <you> --ref
+  FINDINGS.md#<anchor> --authored-at <iso, with a Z>`. Two were authored in this session — the `Number(null)`
+  coercion and the ENOENT false alarm, both in `#reboot-signal`.
+- ⚠️ **`--authored-at`, never `found_at`.** A defect charged to whoever noticed it flows to the newest
+  session, and reboots manufacture sessions — the arm would collect defects it did not author. The tool
+  refuses an untimed defect unless you say `--authored-unknown` out loud.
+- **Then say so in a `## ▶ NEXT` that asks the next session to keep doing it.** One session recording defects
+  is an anecdote.
 
-**The peer was asked which mechanism he would trust and had not replied when this shipped** (`exchange/
-work-leader/out/2026-09-04-unreachable-arm.md`, sent 18:50). The design chose HIS — an explicit note that
-cannot lie — over pairing a `start` against the previous `handoff`, and kept what his objection was really
-about (an abandoned note poisoning a later start) as an expiry the ledger applies. If his reply argues for
-the other one, it now argues against shipped code with arms.
+⚠️ **The reboot arm samples CLEAN reboots only, and this is not fixable by trying harder.** A session that
+crashes never closes, so it never arms; its restart lands in `cold`. The `~/Dev/work` leader found this hours
+after the mechanism shipped and measured one (a crash cost him **115 609 tokens on the next boot against
+100 725**). The arm is deliberately NOT widened — the ledger names the sub-population every time the arm holds
+anything. Do not "fix" this by arming early and refreshing; that trades a clean semantic for a noisy one.
 
 **2 — Then the reboot trigger.** The consumer's §2.4: *"you re-fetched a file you already read this
 session"*, countable by a hook, not a token threshold. Its confound is theirs, priced at ~30 min; ask rather
@@ -45,8 +48,7 @@ needs a login shell (no `node` on `PATH` otherwise) **and** an answer to the tru
 any new directory while the launch still returns a window id. Both are prerequisites for self-launching
 experts. `FINDINGS.md#hookless-launch` and `#wake-doorbell`.
 
-**Standing test debt from review #4, none of it gated:** `FINDINGS.md#test-debt`. The one to keep in mind:
-**the ledger has never scored a real defect** — its first real `record defect` is the test.
+**Standing test debt from review #4, none of it gated:** `FINDINGS.md#test-debt`.
 
 **Settled 2026-09-04, do not re-litigate — measurements in `DESIGN-autonomy.md` and `FINDINGS.md`:**
 `/clear` mints a new session, costs ~14 MB, returns no RSS · one kitty socket per OS window, and
@@ -145,11 +147,9 @@ the bus, never by absolute path · the doorbell resolves by pid and refuses rath
   `/proc/sys/kernel/random/boot_id`; without both it refuses to record, which is a refusal, not support.
 - **The ledger has never scored a real defect.** Sixteen arms move it on synthetic records; nothing has yet
   been recorded by a hand that was not writing a fixture. Its first real `record defect` is the test.
-- **The restart signal has never crossed a REAL restart.** Every crossing so far is a fixture: A33 through
-  the installed stub, and the module's own arms. Nobody has armed one, been restarted, and watched the
-  ledger count it — so what is proved is that the mechanism works, not that the workflow around it does.
-- **Whether a session can arm a signal on its way out at all.** The armer has to run one command between
-  deciding to restart and being restarted, and in the field that decision belongs to a human hand.
+- **The crossing has happened ONCE**, in one project, armed by one agent, relaunched by one hand
+  (2026-09-04 20:44). It took two lapse warnings to land. Not verified: that it survives an unattended
+  relaunch, that anyone repeats it without being reminded, or that the arm ever reaches ten.
 - **Whether two consumers of one hook stdin work.** The ▶ NEXT depends on the generated stub reading the
   payload and handing it to both the bus and the ledger. It currently uses `stdio: "inherit"` and has never
   been asked to do anything else.
