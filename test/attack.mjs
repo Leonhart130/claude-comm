@@ -32,6 +32,25 @@ mkdirSync(join(root, ".comm", "inbox"), { recursive: true })
 writeFileSync(join(root, "app", "docs", "REVIEW.md"), "# review\n")
 writeFileSync(join(root, "COORDINATION.md"), "# coordination\n")
 writeFileSync(join(root, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app" } }))
+// HERMETIC REGISTRY, set before the first child is spawned so every one inherits it.
+//
+// This suite fires the REAL generated hook stub, and the stub resolves the session pid by
+// walking up to the nearest `claude` ancestor — which, when the suite is run by an agent,
+// is THE OPERATOR'S OWN SESSION. Since 2026-09-04 a session-start also INVALIDATES the
+// entry for that pid before writing, so A18 — which sends a payload with no
+// `transcript_path`, exactly as it always has — silently deleted the live entry for the
+// session running the tests. Measured: the row went from a green tick to
+// "pid 820277 is not in the session registry" with no code change between the two boots.
+//
+// Third occurrence in one day of the same trap, and the worst of the three because
+// invalidation destroys where the earlier two only overwrote. A31 at the end of this file
+// asserts the real registry is untouched, so the fourth occurrence fails a gate instead of
+// being noticed by someone reading a boot report.
+const REAL_REGISTRY = join(process.env.XDG_RUNTIME_DIR || `/tmp/claude-comm-${process.getuid?.() ?? "nouid"}`,
+	"claude-comm", "sessions")
+const realBefore = (() => { try { return readdirSync(REAL_REGISTRY).sort().join(",") } catch { return "<none>" } })()
+process.env.CLAUDE_COMM_RUNTIME = mkdtempSync(join(tmpdir(), "comm-attack-runtime-"))
+
 execFileSync("node", [join(PKG, "install.mjs"), root], { stdio: "pipe" })
 const bus = join(root, ".comm", "bin", "comm.mjs")
 
@@ -1099,6 +1118,19 @@ const POINTER_SOURCES = (() => {
 		home.stdout.trim() === "delta" && foreign.stdout.trim() === "delta",
 		`from its own project: ${JSON.stringify(home.stdout.trim())}; ` +
 		`from another project holding a different agent at the same relative path: ${JSON.stringify(foreign.stdout.trim())} (both must be "delta")`)
+}
+
+// A31 — this suite must not touch the machine's real session registry.
+//
+// Not a property of the bus: a property of the SUITE, and it is here because the trap has
+// now fired three times in one day (FINDINGS.md#measurement-traps). A control that writes
+// into the world it measures is not a control, and the registry is the world the context
+// sensor reads. The listing is captured at the top of this file, before the override.
+{
+	const realAfter = (() => { try { return readdirSync(REAL_REGISTRY).sort().join(",") } catch { return "<none>" } })()
+	check("A31 the suite leaves the machine's real registry untouched",
+		realAfter === realBefore,
+		`${REAL_REGISTRY}: ${realBefore === realAfter ? "unchanged" : `CHANGED\n      before: ${realBefore}\n      after:  ${realAfter}`}`)
 }
 
 console.log(`\n${failed ? `✗ ${failed} adversarial check(s) FAILED` : "✓ all adversarial checks passed"}`)

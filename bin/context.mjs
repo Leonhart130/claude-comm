@@ -257,7 +257,19 @@ function resolveTranscript() {
 		} catch {}
 		return { path: null, how: "hook payload carried no transcript_path" }
 	}
-	const askedPid = Number(opt("--pid", 0))
+	// F2 (review #5). `Number(opt("--pid", 0))` makes NaN and 0 both falsy, so an
+	// unparseable pid fell through to the OWN-SESSION path and answered - a different
+	// session's transcript, exit 0, `guessed:false`. Reached the way it will actually
+	// happen: `--pid $PID` with PID unset makes the shell drop the word, so the next flag
+	// becomes the value. This exact class is already refused for `--budget` here and
+	// gated in bin/ledger.mjs; --pid was the third tool of three and the one the reboot
+	// decision reads. A flag that was WRITTEN must be honoured or refused, never ignored.
+	const pidRaw = opt("--pid", null)
+	if (pidRaw !== null && !/^[1-9]\d*$/.test(pidRaw)) {
+		console.error(`context: --pid must be a positive integer, got ${JSON.stringify(pidRaw)}`)
+		process.exit(2)
+	}
+	const askedPid = Number(pidRaw || 0)
 	if (askedPid) {
 		const r = transcriptOfPid(askedPid)
 		return r.path ? { path: r.path, how: `registry: pid ${askedPid}${r.note}` }
@@ -279,7 +291,16 @@ function resolveTranscript() {
 		.map((f) => ({ f: join(dir, f), m: statSync(join(dir, f)).mtimeMs }))
 		.sort((a, b) => b.m - a.m)
 	if (!files.length) return { path: null, how: `no transcripts for ${process.cwd()}` }
-	return { path: files[0].f, how: files.length > 1 ? `GUESSED (newest of ${files.length} sharing this dir)` : "guessed (only transcript here)" }
+	// F3 (review #5). The second branch used to read "guessed (only transcript here)" in
+	// lowercase, and the machine-readable guard below is `/^GUESSED/` - anchored and case
+	// sensitive - so a one-transcript directory produced a full verdict at exit 0 with
+	// `guessed:false`. R7's fixture writes two transcripts, so the arm built the branch
+	// that was fixed and never entered the one that was not. A freshly created project
+	// directory holds exactly one transcript, and a self-launched expert is precisely the
+	// caller with no `claude` ancestor that reaches this path.
+	return { path: files[0].f, how: files.length > 1
+		? `GUESSED (newest of ${files.length} sharing this dir)`
+		: "GUESSED (the only transcript here, and nothing tied it to this process)" }
 }
 
 function report() {
@@ -453,6 +474,32 @@ function proveRed() {
 			`detached call -> exit ${code}, guessed=${guessed}`)
 	}
 
+	// F3 (review #5). R7's fixture writes TWO transcripts, so it only ever built the
+	// labelled branch. With ONE the label was lowercase, `/^GUESSED/` did not match, and
+	// the tool produced a full verdict at exit 0 with `guessed:false` - R7's own defect
+	// surviving in the branch R7 could not reach. A freshly created project directory
+	// holds exactly one transcript, and a self-launched expert is exactly the caller with
+	// no `claude` ancestor that lands here.
+	{
+		const out = join(dir, "single.out")
+		const work = join(dir, "single"); mkdirSync(work, { recursive: true })
+		const proj = join(dir, "projects3", work.replace(/[/.]/g, "-"))
+		mkdirSync(proj, { recursive: true })
+		writeFileSync(join(proj, "only.jsonl"), JSON.stringify(asst(400_000)) + "\n")
+		spawnSync("setsid", ["--fork", "sh", "-c",
+			`cd ${work} && CLAUDE_COMM_PROJECTS=${join(dir, "projects3")} ${process.execPath} ${fileURLToPath(import.meta.url)} --json > ${out} 2>&1; echo "exit=$?" >> ${out}`],
+			{ encoding: "utf8" })
+		let txt = ""
+		for (let i = 0; i < 40 && !/exit=/.test(txt); i++) {
+			try { txt = readFileSync(out, "utf8") } catch {}
+			if (!/exit=/.test(txt)) spawnSync("sleep", ["0.1"])
+		}
+		const code = (txt.match(/exit=(\d+)/) || [])[1]
+		check("F3 a SINGLE-transcript guess is refused too",
+			code === "3" && /"guessed":true/.test(txt),
+			`one transcript, no claude ancestor -> exit ${code}, guessed=${/"guessed":true/.test(txt)}`)
+	}
+
 	// ---- the registry: pid -> the transcript that pid is writing NOW ----------
 	// FINDINGS.md#clear-blind. The scratch directory names the session a process was
 	// LAUNCHED as, so after a /clear this tool answered from a DEAD session with exit 0 -
@@ -488,6 +535,43 @@ function proveRed() {
 		const missing = read(null, ["--pid", String(me)])
 		check("an unregistered pid REFUSES", missing.exit === 2 && missing.tokens === null,
 			`exit ${missing.exit} - ${String(missing.why).slice(0, 60)}`)
+
+		// F1 (review #5), the best catch the brief named. A `/clear` leaves pid, boot id and
+		// start tick ALL matching, because it is the same process - so an entry whose
+		// refresh did not happen was indistinguishable from a fresh one and the sensor
+		// answered with the DEAD transcript at exit 0. The fix is that `record()` removes
+		// the old entry BEFORE it validates anything, so every failure leaves a miss rather
+		// than a lie. One variable: whether the new start managed to record.
+		{
+			registryRecord({ pid: me, transcript: live, agent: "control", source: "startup" })
+			const fresh = read(null, ["--pid", String(me)])
+			// the new session starts; its hook fires but carries no transcript_path
+			const failed = registryRecord({ pid: me, transcript: "", agent: "control", source: "clear" })
+			const after = read(null, ["--pid", String(me)])
+			check("a start that CANNOT record invalidates the old entry",
+				fresh.tokens === 321_000 && !failed.ok && failed.invalidated === true &&
+				after.exit === 2 && after.tokens === null,
+				`before=${fresh.tokens} -> a start that could not record -> exit ${after.exit}, ` +
+				`tokens=${JSON.stringify(after.tokens)} (a stale answer would be ${fresh.tokens})`)
+		}
+
+		// F2 (review #5). An unparseable or shell-eaten --pid used to fall through to the
+		// own-session path and answer - a DIFFERENT session's number, exit 0, guessed:false.
+		{
+			registryRecord({ pid: me, transcript: live, agent: "control", source: "startup" })
+			const eaten = read(null, ["--pid"])           // the shell dropped the value
+			const junk = read(null, ["--pid", "12x"])
+			const zero = read(null, ["--pid", "0"])
+			// exit 2 AND no verdict at all. An argument this tool could not honour is a
+			// usage error, not missing data, so it takes `--budget`'s idiom: a message on
+			// stderr and nothing on stdout. What must never happen is a NUMBER - which is
+			// what the own-session fall-through produced, for a different session.
+			const noVerdict = (r) => r.exit === 2 && r.tokens == null && !/"state":"(ok|watch|close)"/.test(r.raw || "")
+			check("F2 a --pid that was eaten or unparseable REFUSES",
+				[eaten, junk, zero].every(noVerdict),
+				`--pid <eaten> -> ${eaten.exit}, --pid 12x -> ${junk.exit}, --pid 0 -> ${zero.exit} ` +
+				`(all must be exit 2 with no verdict; the defect answered with the caller's OWN session)`)
+		}
 
 		// REGRESSION GUARD, and the one that matters most. A real session - a process with
 		// a `claude` ancestor - that is not in the registry used to fall through to the

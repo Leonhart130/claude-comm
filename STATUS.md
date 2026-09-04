@@ -55,7 +55,7 @@ silently the day the checkout moves, and a stale copy is a failure `field:*` alr
 | boot | `node bin/boot.mjs` — **12 measured rows**, every gating one demonstrated able to go red; `--fast` (0.28 s) is injected at session start by `.claude/settings.json`, the contract is `CLAUDE.md` |
 | **ledger** | `node bin/ledger.mjs` — the reboot instrument, **built before the mechanism**. Records here AND in the field since 2026-09-04; a field arm is `--root ~/Dev/electio`. Verified in electio itself, not only in a fixture |
 | **sensor** | `node bin/context.mjs` — resolves pid → transcript through `bin/session-registry.mjs` (written by the `SessionStart` hook, keyed on pid + start time + boot id) and **refuses on a miss**. 16 arms. `FINDINGS.md#clear-blind` |
-| reviews | #1, #2, #3 and **#4 (nine findings, three severe, all nine fixed — `REVIEW-adversarial-4.md`, dispositions in `DESIGN-autonomy.md`)** · the electio leader's field reviews |
+| reviews | #1–#4 · **#5, 2026-09-04 — the first launched by the leader itself rather than by the owner. Eight findings, three severe, all eight fixed. F1 was the named best catch and was real: `#clear-blind` reachable THROUGH its own fix, erring toward "reboot". `REVIEW-adversarial-5.md`** · the electio leader's field reviews |
 
 ## ⏭️ OPEN
 1. **🔴 Latency is a mailbox, not an interrupt.** Re-derive with `node test/latency.mjs <log>`; the table is

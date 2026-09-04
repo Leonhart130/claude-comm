@@ -32,7 +32,7 @@
  * A21's import allowlist by design — and stays a short-lived process for exactly the
  * reason the bus does: nothing here lives long enough to leak.
  */
-import { readFileSync, writeFileSync, renameSync, existsSync, readdirSync, statSync, utimesSync, mkdtempSync, mkdirSync, cpSync, rmSync, symlinkSync } from "node:fs"
+import { readFileSync, writeFileSync, renameSync, existsSync, readdirSync, statSync, utimesSync, mkdtempSync, mkdirSync, cpSync, rmSync, symlinkSync, readlinkSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, dirname, resolve, basename } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -173,7 +173,15 @@ if (has("--hook")) {
 	// The ledger needs a subject and this is the only place that resolves one. An off-bus
 	// session is still a session that can author a defect in its first fifteen minutes, so
 	// it is recorded under a name that says exactly what it is rather than dropped.
-	sessionAgent = declared || "unnamed"
+	// F7 (review #5). This was `declared || "unnamed"` - the env var alone - while the
+	// field stub asks the BUS, which also matches a directory against the roster. Two rules
+	// for one name, writing the same two instruments: measured, a session declaring nothing
+	// in ~/Dev/work/HartEdge is `HartEdge` to the stub and would be `unnamed` here. Latent
+	// only because this repo carries no roster; live the moment a self-rebooting leader
+	// runs boot somewhere that does. The bus is the single place identity is resolved, so
+	// this asks it, exactly as the stub does, and keeps the env var as the first authority
+	// because `whoami` gives it precedence too.
+	sessionAgent = declared || askBus(session) || "unnamed"
 	const kitty = (env && env.get("KITTY_LISTEN_ON") || "").match(/kitty-(\d+)/)
 	const where = session ? `/proc/${session}` : "no claude ancestor"
 	const src = payload && payload.source ? ` - started: ${payload.source}` : ""
@@ -262,6 +270,21 @@ if (has("--hook")) {
 	}
 }
 
+/**
+ * The agent name as the BUS resolves it - never a second implementation of the rule.
+ * Silent on every failure: a name is a nicety here, and the ledger records `unnamed`
+ * rather than nothing when it cannot get one.
+ */
+function askBus(sessionPidForCwd) {
+	try {
+		let cwd = ROOT
+		try { cwd = readlinkSync(`/proc/${sessionPidForCwd}/cwd`) } catch {}
+		const r = spawnSync(process.execPath, [join(ROOT, "bin", "comm.mjs"), "whoami", "--agent-root", cwd],
+			{ cwd, encoding: "utf8", timeout: 5000 })
+		return r.status === 0 && String(r.stdout).trim() ? String(r.stdout).trim() : null
+	} catch { return null }
+}
+
 // -- 1c. the session registry: which transcript is THIS pid writing NOW? -----
 /**
  * `bin/context.mjs` used to answer that from the scratch directory a process holds
@@ -283,6 +306,20 @@ if (has("--hook")) {
  *     the same transcript.
  */
 {
+	// F4 (review #5). At `SessionStart` the payload's `transcript_path` is a PROMISE, not
+	// a file: Claude Code creates it afterwards. Measured on two real cold starts, the gap
+	// was 9.1 s and 18.6 s - so the row this project reads at every session start was ⚠ on
+	// every cold start, for a state that is not a defect. That is the "train people to
+	// ignore the row" failure this same file warns about two branches down, and it spends
+	// the --close ack budget that is meant to BE the drift signal. The existence check is
+	// right on the read path and wrong on the write path; `at` is the field that tells them
+	// apart, and until now nothing had ever asked it a question. 120 s is ~6x the largest
+	// gap measured; past it, a missing transcript is a real fault again.
+	const PROMISE_GRACE_MS = 120_000
+	const justPromised = (e) => {
+		const t = Date.parse(e && e.at || "")
+		return Number.isFinite(t) && Date.now() - t < PROMISE_GRACE_MS
+	}
 	let wrote = null
 	if (has("--hook")) {
 		const tp = payload && typeof payload.transcript_path === "string" ? payload.transcript_path : ""
@@ -296,8 +333,10 @@ if (has("--hook")) {
 		} else if (!back.ok || back.transcript !== wrote.transcript) {
 			// The re-read is the whole point: a write nobody read back is a claim.
 			row("registry", WARN, `THE WRITE WAS NOT SEEN BY THE RE-READ (${back.ok ? `it names ${basename(back.transcript)}` : back.why})`)
-		} else if (!existsSync(back.transcript)) {
+		} else if (!existsSync(back.transcript) && !justPromised(back)) {
 			row("registry", WARN, `recorded ${basename(back.transcript)} for pid ${thisPid}, and that file does not exist`)
+		} else if (!existsSync(back.transcript)) {
+			row("registry", OK, `pid ${thisPid} -> ${basename(back.transcript)} (${back.source || "no source"}) - written and re-read - ${where}`)
 		} else {
 			row("registry", OK, `pid ${thisPid} -> ${basename(back.transcript)} (${back.source || "no source"}) - written and re-read - ${where}`)
 		}
@@ -305,7 +344,7 @@ if (has("--hook")) {
 		// Not a session at all: a script, a cron shell, a fixture run. There is nothing
 		// to register, and inventing a warning here would train people to ignore the row.
 		row("registry", OK, "no claude ancestor - not a session, nothing to register")
-	} else if (back.ok && !existsSync(back.transcript)) {
+	} else if (back.ok && !existsSync(back.transcript) && !justPromised(back)) {
 		// The row used to say "bin/context.mjs can resolve this session" on the strength of
 		// a lookup alone - a claim about ANOTHER tool that this one had not checked. When
 		// a stale entry named a file that did not exist, context refused and the row stayed
@@ -658,7 +697,13 @@ if (has("--hook")) {
 		const t0 = Date.now()
 		const g = spawnSync("node", [join(ROOT, "test", "attack.mjs")], { encoding: "utf8" })
 		const out = `${g.stdout || ""}${g.stderr || ""}`
-		const pass = (out.match(/^\s+✓/gm) || []).length
+		// F5 (review #5): `\s` matches a NEWLINE, so under /m the blank line before
+		// test/attack.mjs's summary let `^\s+✓` swallow the banner itself - the row claimed
+		// 31 where the suite ran 30, and that inflated number then propagated into CLAUDE.md
+		// and into an adversarial brief. A counter that counts its own summary is the "two
+		// lists that had to agree" family with a list and a counter. `[^\S\n]` is whitespace
+		// that is not a line break.
+		const pass = (out.match(/^[^\S\n]+✓/gm) || []).length
 		const fails = out.split("\n").filter((l) => /^\s+✗/.test(l))
 		const secs = ((Date.now() - t0) / 1000).toFixed(1)
 		if (g.status === 0 && pass > 0) {
@@ -1126,11 +1171,49 @@ function proveRed() {
 		// "bin/context.mjs can resolve this session" while context refused - a green row
 		// over a dead sensor. Found on a real boot report, not by this suite, which is why
 		// it is now armed.
+		// TWO cases, because F4 (review #5) split them. At SessionStart the transcript is a
+		// PROMISE - measured 9.1 s and 18.6 s behind the hook on real cold starts - so a
+		// FRESH entry naming a file that does not exist yet is correct and must stay green.
+		// An entry past the grace period naming a file that is not there is a dead sensor
+		// and must warn. One variable between them: the entry's age.
+		//
+		// Both readings must come from the SAME live fake-claude process, in one shell
+		// invocation. The first version aged the fake session's entry and then read the row
+		// from a plain boot - whose ancestor is the operator's real session - so it warned
+		// about the wrong pid entirely and the assert failed for a reason unrelated to what
+		// it verifies.
 		rmSync(tp, { force: true })
-		const gone = asSession(join(tmp, "registry-rt2"))
-		assert("registry: an entry whose transcript is GONE warns",
-			gone.level === WARN && /does not exist/.test(gone.text),
-			`transcript deleted, entry intact -> ${LV[gone.level]}: ${gone.text.slice(0, 46)}`)
+		const freshGone = asSession(join(tmp, "registry-rt2"))
+		assert("registry: a FRESH entry whose transcript is not yet there stays green",
+			freshGone.level === OK,
+			`written seconds ago, file absent -> ${LV[freshGone.level]} (a cold start looks exactly like this)`)
+
+		const ager = join(tmp, "age.mjs")
+		writeFileSync(ager, `import { readdirSync, readFileSync, writeFileSync } from "node:fs"\n` +
+			`import { join } from "node:path"\n` +
+			`const d = join(process.argv[2], "claude-comm", "sessions")\n` +
+			`for (const f of readdirSync(d)) {\n` +
+			`  const e = JSON.parse(readFileSync(join(d, f), "utf8"))\n` +
+			`  e.at = new Date(Date.now() - 600000).toISOString()\n` +
+			`  writeFileSync(join(d, f), JSON.stringify(e) + "\\n")\n` +
+			`}\n`)
+		const rt3 = join(tmp, "registry-rt3"), out3 = join(tmp, "registry3.out")
+		const tp3 = join(tmp, "77777777-7777-7777-7777-777777777777.jsonl")
+		writeFileSync(tp3, JSON.stringify({ type: "assistant", message: { usage: { input_tokens: 10 } } }) + "\n")
+		spawnSync(fake, ["-c",
+			`CLAUDE_COMM_RUNTIME=${rt3} ${process.execPath} ${SELFFILE} --json --fast --hook --root ${pkg} --field ${tmp} > /dev/null 2>&1; ` +
+			`rm -f ${tp3}; ${process.execPath} ${ager} ${rt3}; ` +
+			`CLAUDE_COMM_RUNTIME=${rt3} ${process.execPath} ${SELFFILE} --json --fast --root ${pkg} --field ${tmp} > ${out3} 2>&1; echo done`],
+			{ encoding: "utf8", input: JSON.stringify({ source: "startup", transcript_path: tp3 }) })
+		const agedGone = (() => {
+			try {
+				const x = JSON.parse(readFileSync(out3, "utf8")).rows.find((y) => y.label === "registry")
+				return { level: x ? x.level : -1, text: x ? x.text : "" }
+			} catch { return { level: -1, text: "" } }
+		})()
+		assert("registry: an AGED entry whose transcript is GONE warns",
+			agedGone.level === WARN && /is GONE|does not exist/.test(agedGone.text),
+			`same session, entry aged 10 min -> ${LV[agedGone.level]}: ${agedGone.text.slice(0, 52)}`)
 	}
 
 	// The close's own two refusals, which no boot row expresses.
