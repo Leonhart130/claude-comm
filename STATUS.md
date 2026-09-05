@@ -5,64 +5,50 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-**1 — `bin/claim.mjs` is built; the measurement that matters has NOT been made.**
+**1 — A REVIEW IS OUT WITH THE OWNER. Read its result before starting anything.**
 
-*Written 2026-09-05. It assumes you remember nothing; boot injects only this first line, so the first line is
-the instruction. Every claim below is checkable — check it.*
+*Written 2026-09-05 by the session that ordered it, immediately before a declared restart. It assumes you
+remember nothing; boot injects only this first line, so the first line is the instruction.*
 
-Resource claims exist (`FINDINGS.md#claim-file`): eight arms, `A38` in the gate, both failures the design
-named in advance proved red, installed in both field projects, and the boot row names a claim whose holder
-has died. 🔴 **No two real agents have contended through it.** One session took both sides — correctly read
-as one holder refreshing its own claim — so the refusal was shown only against a fabricated holder
-(`--pid 1`), and `--pid` has never carried a real server's pid. **Two live sessions, one port, is the next
-measurement**, and the peer's tree is where it lives — ask him, he offered.
+The owner launched **adversarial review #7** in a separate window on `~/Dev/claude-comm`, against this
+session's ten commits (`git log --oneline c0db349..HEAD`, 2 089 insertions, 11 files). The brief is
+**`BRIEF-adversarial-7.md`** at the repo root — read it, it says what was asked and what was deliberately
+NOT put in scope. The report is expected at **`REVIEW-adversarial-7.md`** (both are gitignored: correspondence,
+not source). **The owner will tell you when it is ready. Do not start item 2 before disposing it.**
 
-⚠️ **And take the lesson before the next tool, not after it:** eight arms were green while `take` recorded the
-pid of a command that exits in milliseconds, so every claim read as a crash one second after being taken. All
-eight wrote fixture records with a pid the test chose; **none took a claim through the CLI and read it back.**
-Arms sharing one fixture idiom share one blind spot. Running the thing for real once is what found it.
+When it lands, dispose it the way review #6 was disposed, and expect the ratio: **#5 and #6 each put five of
+seven findings in the ARMS, not the code**, and this session produced four more defects of its own, three of
+them in detectors. Record every finding in the ledger — `node bin/ledger.mjs record defect --agent unnamed
+--ref REVIEW-adversarial-7.md#F<n> --authored-at <iso with a Z>` — dated by **the commit that authored it**,
+never by when it was found. That convention and its bias are in `FINDINGS.md#review6-disposal`.
 
-**2 — `CLAUDE_COMM_AGENT` is not needed and never was; the residual gap is a wandering cwd.**
+⚠️ **Before touching the ledger, know this:** `boot.mjs --hook` RECORDS A START into the ledger of whatever
+`--root` it is given. That wrote fabricated data into the real instrument twice on 2026-09-05 — once from an
+arm, once from a person at a prompt. Check `node bin/ledger.mjs` before and after any hook experiment. Truth
+as of this close: **6 cold + 4 reboot starts, 11 defects, one agent log (`unnamed.log`).**
 
-`FINDINGS.md#self-identity`: no live session in `~/Dev/work` declares it and `comm who` names them all
-correctly, delivery never used it, and an agent **cannot** set it for itself. What taught the habit was
-boot's own first row calling on-bus sessions off-bus; fixed, `A39` holds three states.
+**2 — `#claim-file` between two REAL agents.** `bin/claim.mjs` shipped today with eight arms and `A38` in the
+gate, but no two live agents have ever contended through it: one session took both sides and the refusal was
+shown only against a fabricated holder (`--pid 1`). The peer has six ports scheduled and offered to run
+controls. Three of them, in his tree, and the third matters most: two agents take the same port; then **kill
+one brutally** — the claim must read `HOLDER IS GONE`, never a lock. `exchange/work-leader/out/2026-09-05-claim-file-construit.md`
+is what he was asked.
 
-🔴 **The one case where it mattered was the owner's own workflow** — a review launched as a second session in
-the leader's folder drains the leader's inbox while the sender is told ✓ delivered
-(`FINDINGS.md#second-session`). Answered with no new mechanism: a **`review` agent** now exists in both field
-rosters, verified end to end. ⚠️ **No real review has run from it yet** — the routing is measured, the
-workflow is not, and only a real review teaches that.
+**3 — No real adversarial review has run from `review/` yet.** A `review` agent now exists in both field
+rosters (`FINDINGS.md#second-session`); the mail routing is measured, the workflow is not. If review #7 was
+launched from `~/Dev/claude-comm` it does not answer this — claude-comm has no roster of its own.
 
-⚠️ **Also open:** a wandering cwd is reported by where it stands; the registry would fix it and the bus may
-not import the registry — read the rejected trade there first.
+**4 — The launcher must resolve the runtime and REFUSE.** `FINDINGS.md#hookless-launch`: the published fix
+said "a login shell" and that is false here — `-i` is the flag that works. Corrected. The rule to build is the
+peer's: resolve `node`/`claude` absolutely before launching and refuse when resolution fails.
 
-**3 — The launcher must resolve the runtime and REFUSE, not trust a shell flag.**
+**5 — The window is untested and my own timestamps are why.** 0 of 11 defects fall inside the 15-minute
+window, against the consumer's "four of five in thirteen minutes" — but each is dated at its commit, the
+upper bound. Do not quote the disagreement as a result.
 
-`FINDINGS.md#hookless-launch` published *"the fix is a login shell"* and it is **false on this box** — nvm is
-loaded from `.zshrc`, which `zsh -l` never reads. Measured 2026-09-05, one flag moved, with a positive
-control: `-l` ABSENT, `-i` finds node. The recorded recipe `zsh -lic` worked by accident of containing `i`.
-Corrected in both documents. **The rule to build is the peer's**: resolve `node` and `claude` to absolute
-paths before launching and refuse when resolution fails — a launcher that cannot find the runtime must not
-return a window id. Answer him on the channel; he has offered to run the control that is still missing,
-namely a REAL self-launched session with `comm who` behind it. Reaching the binary is not being on the bus.
-
-**4 — The field bus was updated on the owner's instruction; the covariate has NOT been observed there.**
-`install.mjs` was run on `~/Dev/electio` (11 files, 2 agents) and `~/Dev/work` (17 files, 5 agents) after this
-session made both stale; `--check` is green on each. ⚠️ **But no field session has started since**, so
-`pending` has never been written by a real field hook — only by this repo's own arms. The first field start
-after this is the measurement; read it before trusting the column.
-
-**5 — The window is untested, and my own timestamps are why.** Eleven defects are recorded — the first this
-ledger has ever had — and **0 of 11 fall inside the 15-minute window**, against the consumer's *"four of five
-in the first thirteen minutes"*. But each is dated at **its commit**, the upper bound of when it was written,
-which pushes every point later. Do not quote the disagreement as a result. `FINDINGS.md#review6-disposal`.
-
-**6 — One red that no code change explains, still unidentified.** `boot.mjs --prove-red` reported
-`✗ 1 boot row(s) could NOT be reddened`, then went green twice on the same tree — including through the
-identical pipeline, which refutes the obvious `head`-closed-the-pipe explanation. The row was never named
-because I had filtered the run through `grep`. **Run gates unfiltered.** If it recurs it is `FINDINGS.md#A20`
-and it is triage-first.
+**6 — One red no code change explains, still unidentified.** `boot --prove-red` reported a row that could not
+be reddened, then went green twice on the same tree. Never named, because the run was filtered through `grep`.
+**Run gates unfiltered.** If it recurs it is `FINDINGS.md#A20` and it is triage-first.
 
 **Standing test debt from review #4, none of it gated:** `FINDINGS.md#test-debt`.
 
