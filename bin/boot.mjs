@@ -261,8 +261,10 @@ if (has("--hook")) {
 		} catch (e) {
 			process.stderr.write(`claude-comm: the restart signal could not be loaded (${(e && e.message) || e}); this start is being recorded as COLD.\n`)
 		}
+		// --pending-auto: the covariate, counted by the ledger itself (one implementation,
+		// not one here and one in the stub). See install.mjs's copy of this call.
 		const r = node(["record", "start", "--agent", sessionAgent, "--source", payload.source,
-			...(sid ? ["--session", sid] : []), "--quiet", ...sig])
+			...(sid ? ["--session", sid] : []), "--quiet", "--pending-auto", ...sig])
 		wrote = { ok: !!r && r.status === 0, sid, why: r ? (r.stderr || "").trim().split("\n")[0] : "spawn failed" }
 	}
 	const q = node(["--json"])
@@ -291,6 +293,25 @@ if (has("--hook")) {
 		if (a.dirUnreadable) bits.push(`⚠ the ledger directory could not be read`)
 		if (a.mislabelled) bits.push(`⚠ ${a.mislabelled} line(s) naming another agent`)
 		if (a.exposureSkew) bits.push(`⚠ the arms' exposure is skewed`)
+		// R6 AGAIN, review #6 F5: `caveats` was added to the ledger, printed under every
+		// verdict by the ledger's own report - and dropped HERE, in the same commit, hours
+		// after the comment above was written about `mislabelled`. A verdict quoted without
+		// its caveat is the sub-population error the caveat exists to prevent: this arm
+		// holds DECLARED restarts only, and a reader who never sees that will read UNKNOWN
+		// or BETTER as a statement about restarts in general.
+		//
+		// It carries the ledger's POINTER, never a re-worded copy of the ledger's sentence -
+		// a second wording here would drift from the one the tool prints, which is how the
+		// two renderings disagreed in the first place. A caveat with no pointer falls back
+		// to its own opening words, so an unpointed caveat cannot vanish silently.
+		//
+		// It does NOT redden the row. A caveat is a qualification of the verdict, not a
+		// fault, and a row that warns at every boot for a permanent condition is the
+		// warning-nobody-reads this file argues against 480 lines below.
+		for (const c of a.caveats || []) {
+			const ptr = [...String(c).matchAll(/((?:FINDINGS|README|STATUS)\.md#[A-Za-z0-9-]+)/g)].map((m) => m[1])
+			bits.push(ptr.length ? `◈ verdict caveat: ${ptr.join(" ")}` : `◈ verdict caveat: ${String(c).slice(0, 60)}…`)
+		}
 		// A note is a restart somebody DECLARED and has not yet performed, and it is the
 		// only state here that expires. Surfaced at boot because the mechanism's first real
 		// use showed nothing anywhere would say so: the ~/Dev/work leader armed one at the
@@ -440,9 +461,21 @@ function askBus(sessionPidForCwd) {
 	const lsFiles = git("ls-files")
 	const tracked = new Set((lsFiles || "").split("\n").filter(Boolean))
 	let gateSrc = "", gateProse = ""
+	const gateStripped = []
 	try {
 		for (const f of readdirSync(join(ROOT, "test"))) {
-			if (f.endsWith(".mjs")) gateProse += readFileSync(join(ROOT, "test", f), "utf8")
+			if (!f.endsWith(".mjs")) continue
+			const t = readFileSync(join(ROOT, "test", f), "utf8")
+			gateProse += t
+			// STRIPPED PER FILE, never over the concatenation. Found 2026-09-05, by this row
+			// going yellow on a commit that touched no document: `/* … */` is matched
+			// non-greedily, and these files carry `/*` inside STRINGS and REGEXES (this very
+			// detector's own `/\/\*[\s\S]*?\*\//g` is one), so the markers do not balance.
+			// Concatenating first let an unclosed `/*` in one file swallow the beginning of
+			// the next, and which text survived depended on readdir order and on edits
+			// elsewhere. The row therefore flipped for a reason foreign to what it measures -
+			// which is how a row gets ignored, and this file says so in four other places.
+			gateStripped.push(t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, ""))
 		}
 	} catch {}
 	// Strip comments before looking for a dependency, in A21's idiom and for its reason:
@@ -451,7 +484,7 @@ function askBus(sessionPidForCwd) {
 	// this project's flagship" in a header comment, and the row went yellow claiming an
 	// undeclared gate dependency that does not exist. A check that fires for a reason
 	// foreign to what it claims is how a row gets ignored.
-	gateSrc = gateProse.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
+	gateSrc = gateStripped.join("\n")
 	const decl = gateProse.match(/\/\/\s*gate-docs:([^\n]*)/)
 	const needed = new Set(decl ? decl[1].trim().split(/[\s,]+/).filter(Boolean) : [])
 	gateDocs = [...needed]
@@ -465,7 +498,21 @@ function askBus(sessionPidForCwd) {
 	const bad = [], undeclared = []
 	for (const f of new Set([...READ_FIRST, ...needed])) {
 		const gated = needed.has(f)
-		if (!gated && gateSrc.includes(f)) undeclared.push(f)
+		// NAMED IN A LINE THAT ALSO NAMES THE PACKAGE ROOT. A bare basename match reported
+		// `A36` reading `join(rootG, ".comm", "README.md")` - a notice this suite GENERATES
+		// into a throwaway fixture - as an undeclared dependency on THIS repo's README.md.
+		// The row then named a document the gate never opens, in the row whose job is to say
+		// which documents the gate opens. A real dependency resolves against PKG, and the
+		// R4 arm's own staged one (`readFileSync(join(PKG, "STATUS.md"))`) still trips it.
+		//
+		// This narrows the drift detector, and the trade is named: a gate that reads a core
+		// document through a path built on an earlier line stays invisible here. That was
+		// already true of this detector (review #3 R4 - "matching an idiom is a style
+		// dependency, always one refactor behind"), the DECLARATION is the mechanism, and
+		// this remains only the drift alarm beside it. A false positive in an alarm read at
+		// every session start costs more than this particular false negative.
+		if (!gated && gateStripped.some((t) => t.split("\n").some((l) => l.includes(f) && /\bPKG\b/.test(l))))
+			undeclared.push(f)
 		if (!existsSync(join(ROOT, f))) bad.push({ f, gated, why: "missing" })
 		else if (lsFiles !== null && !tracked.has(f)) bad.push({ f, gated, why: "untracked" })
 	}
@@ -608,12 +655,29 @@ function askBus(sessionPidForCwd) {
 		// measured is this project's signature defect, and here it was in the row whose whole
 		// job is to report on somebody else's machine. The installer already prints the list;
 		// only this file was throwing it away.
-		// BOTH streams: `install.mjs --check` reports drift on stderr and its green summary on
-		// stdout, and reading only stdout is why the first version of this parse produced an
-		// empty list and fell back to the vaguer wording - a fix that reported the same
-		// nothing in politer words.
-		const drifted = `${chk.stdout || ""}${chk.stderr || ""}`.split("\n")
-			.map((l) => /^ {4}(\S.*)$/.exec(l)).filter(Boolean).map((m) => m[1].trim())
+		// READ THE INSTALLER'S DECLARED LIST, NEVER ITS PROSE. Review #6 F3: this took "any
+		// line indented four spaces, on either stream" to be a drifted filename - and the
+		// git-tracking warning added in the same commit prints its file list, its "… and N
+		// more" line AND its fix command at exactly that indent. Measured: nine names for one
+		// drifted file, five bus files listed as DRIFT beside "bus current (5 files)" in the
+		// same sentence, and `git rm -r --cached .comm/ && echo '.comm/' >> .gitignore`
+		// rendered as a filename. The wording this replaced said only "HOOK DRIFT", which was
+		// vague; this was CONFIDENTLY WRONG, in the row whose whole job is to report on
+		// somebody else's machine. Matching an idiom is a style dependency (review #3 R4,
+		// same lesson, same file); the installer now says what drifted on a marked line.
+		//
+		// NO FALLBACK to the old scrape. A reader that guesses when the structured answer is
+		// absent is the guess, preserved: an installer too old to emit the marker leaves this
+		// empty, and the branch below already has honest wording for a refusal it has not
+		// read. Silence about a list is recoverable; a wrong list is not.
+		let drifted = []
+		const declared = /^claude-comm-drift: (.*)$/m.exec(chk.stdout || "")
+		if (declared) {
+			try {
+				const v = JSON.parse(declared[1])
+				if (Array.isArray(v)) drifted = v.filter((x) => typeof x === "string")
+			} catch { /* an unparseable declaration is no declaration; the row says "refused" */ }
+		}
 		// Checked independently of the installer's own count: the installed bus is the
 		// file the hooks actually execute, and it going stale is a defect this project
 		// has already shipped twice without noticing.
@@ -663,14 +727,22 @@ function askBus(sessionPidForCwd) {
 			// Caught on the first run, by the project that had nothing to report.
 			if (e && e.code !== "ENOENT") noteDirBad = true
 		}
+		// WHAT FAILED IS PART OF THE REPORT. Review #6 F11: a failure of this spawn set
+		// `noteDirBad`, and the row then said "this project's restart notes could not be read
+		// at all" - naming the directory when what had actually failed was asking the ledger.
+		// The two send an operator to different places: one is a permission or a corrupt file
+		// in `.comm/restart/`, the other is a missing or broken `bin/ledger.mjs` in THIS repo,
+		// and only the second is a defect on the machine reading the row.
+		let ledgerUnreachable = false
 		if (noteFiles.length) {
 			try {
 				const led = spawnSync("node", [join(ROOT, "bin", "ledger.mjs"), "--root", p, "--json"],
 					{ encoding: "utf8", timeout: 5000 })
 				notes = JSON.parse(led.stdout).armed.notes || []
-			} catch { noteDirBad = true }
+			} catch { ledgerUnreachable = true }
 		}
-		if (noteDirBad) notes = [{ agent: "?", age_s: null, ttl_s: null, fresh: false, unread: true }]
+		if (noteDirBad) notes = [{ agent: "?", age_s: null, ttl_s: null, fresh: false, unread: "dir" }]
+		else if (ledgerUnreachable) notes = [{ agent: "?", age_s: null, ttl_s: null, fresh: false, unread: "ledger" }]
 		const lapsedNote = notes.some((n) => !n.fresh)
 		const bits = [
 			// An unparsed non-zero exit must not borrow the confident wording of a parsed one:
@@ -683,7 +755,8 @@ function askBus(sessionPidForCwd) {
 				: `bus current (${installed.length} files)`,
 			pending ? `${pending} pending (oldest ${age(Date.now() - oldest)})` : "0 pending",
 			last ? `last delivery ${age(Date.now() - Date.parse(last))} ago` : "no delivery logged",
-			...notes.map((n) => n.unread ? "⚠ this project's restart notes could not be read at all"
+			...notes.map((n) => n.unread === "dir" ? `⚠ ${noteFiles.length} restart note(s) are here and ${join(p, ".comm", "restart")} could not be read`
+				: n.unread === "ledger" ? `⚠ ${noteFiles.length} restart note(s) are here and bin/ledger.mjs could not be asked about them`
 				: n.fresh ? `◷ restart note armed for ${n.agent} (${Math.round((n.age_s || 0) / 60)}m of ${Math.round((n.ttl_s || 0) / 60)}m)`
 				: `⚠ the restart note for ${n.agent} has LAPSED - its next start will score COLD`),
 		]
@@ -778,13 +851,39 @@ function askBus(sessionPidForCwd) {
 	// reason foreign to what it measures, which is how a row gets ignored.
 	const NOT_GATE_INPUTS = new Set(["boot.mjs", "context.mjs"])
 	let gateCode = []
+	// WHAT COULD NOT BE READ IS PART OF THE FINGERPRINT, and part of the row. Review #6 F8
+	// and F9, both raised as "what I did not check" and both real:
+	//
+	//   F8 — a bare `catch {}` around the enumeration. A `bin/` that cannot be listed left
+	//        `gateCode` EMPTY, silently narrowing the fingerprint to install.mjs +
+	//        attack.mjs + docs, while the row went on saying "last green on these bytes".
+	//        The bytes it meant were a third of the ones it named. Same class as R9, and it
+	//        was mine, written in the commit that widened this set to close R1's hole.
+	//   F9 — the per-file `catch {}`. "File deleted" and "file present but unreadable"
+	//        hashed IDENTICALLY, so removing a gate input and locking one produced the same
+	//        print, and the second is the state a broken permission actually leaves.
+	//
+	// Both are fixed the same way, and it is the way this file already fixed R9: an
+	// unreadable input CHANGES the print (so the cached green cannot survive it) and is
+	// NAMED (so nobody has to guess which). The error code goes into the hash, which is what
+	// separates ENOENT from EACCES.
+	let fpBlind = []
 	try {
 		gateCode = readdirSync(join(ROOT, "bin")).filter((f) => f.endsWith(".mjs") && !NOT_GATE_INPUTS.has(f))
 			.sort().map((f) => `bin/${f}`)
-	} catch {}
+	} catch (e) { fpBlind.push(`bin/ could not be listed (${(e && e.code) || "unreadable"})`) }
 	const fp = createHash("sha256")
+	if (fpBlind.length) fp.update(Buffer.from(`\0BLIND:${fpBlind.join("|")}\0`))
 	for (const rel of [...gateCode, "install.mjs", "test/attack.mjs", ...gateDocs]) {
-		try { fp.update(readFileSync(join(ROOT, rel))) } catch {}
+		try { fp.update(readFileSync(join(ROOT, rel))) }
+		catch (e) {
+			const code = (e && e.code) || "ERR"
+			fp.update(Buffer.from(`\0UNREAD:${rel}:${code}\0`))
+			// A gate input that is GONE is a different fact from one that is there and shut,
+			// and only the second is a machine that needs attention. Both change the print;
+			// only the second is worth a sentence.
+			if (code !== "ENOENT") fpBlind.push(`${rel} (${code})`)
+		}
 	}
 	const print = fp.digest("hex").slice(0, 12)
 	const statePath = join(ROOT, ".boot-state.json")
@@ -799,10 +898,15 @@ function askBus(sessionPidForCwd) {
 		// inferring one from the other. UNKNOWN is the honest ceiling for a gate not run.
 		const same = prev && prev.print === print
 		const fresh = prev && Date.now() - Date.parse(prev.at) < 864e5
-		row("gate", !prev || !same || !fresh ? WARN : UNKNOWN,
+		// A fingerprint taken over inputs this process could not read does not get to say
+		// "these bytes". It says which ones it could not see, and it drops to WARN: the
+		// comparison it just made is against a print computed the same blind way, so `same`
+		// is true and means nothing.
+		row("gate", fpBlind.length || !prev || !same || !fresh ? WARN : UNKNOWN,
 			!prev ? "never recorded green - run `node bin/boot.mjs` before touching the bus"
 				: `NOT RUN (--fast) - last green ${age(Date.now() - Date.parse(prev.at))} ago` +
-				  (same ? " on these bytes" : " on DIFFERENT bytes"))
+				  (fpBlind.length ? ` - THE FINGERPRINT IS BLIND to ${fpBlind.join(", ")}, so "these bytes" names less than it sounds like`
+					: same ? " on these bytes" : " on DIFFERENT bytes"))
 	} else {
 		const t0 = Date.now()
 		const g = spawnSync("node", [join(ROOT, "test", "attack.mjs")], { encoding: "utf8" })
@@ -817,13 +921,16 @@ function askBus(sessionPidForCwd) {
 		const fails = out.split("\n").filter((l) => /^\s+✗/.test(l))
 		const secs = ((Date.now() - t0) / 1000).toFixed(1)
 		if (g.status === 0 && pass > 0) {
-			row("gate", OK, `attack ${pass}/${pass} in ${secs}s`)
+			// A green recorded over inputs that could not be read would be a cached green
+			// covering less than the row claims, consulted by every --fast boot afterwards.
+			if (fpBlind.length) row("gate", WARN, `attack ${pass}/${pass} in ${secs}s - but the fingerprint is BLIND to ${fpBlind.join(", ")}; this green is NOT being recorded`)
+			else row("gate", OK, `attack ${pass}/${pass} in ${secs}s`)
 			// MERGE. Review #3 R2: this wrote the object wholesale and erased `sources`,
 			// `lastSource` and `lastSourceAt` - the record that exists to answer whether
 			// /clear reports source "clear", which decides if the reboot loop is buildable.
 			// CLAUDE.md tells every session to run a full boot, so the wipe happened through
 			// documented use, and the file is gitignored so there was no recovery.
-			writeState({ ...(prev || {}), print, at: new Date().toISOString(), head: git("rev-parse", "--short", "HEAD"), pass })
+			if (!fpBlind.length) writeState({ ...(prev || {}), print, at: new Date().toISOString(), head: git("rev-parse", "--short", "HEAD"), pass })
 		} else {
 			// The single inference this tool may draw - and it never suppresses a run.
 			const unchanged = prev && prev.print === print
@@ -1087,6 +1194,53 @@ function proveRed() {
 	const fieldReg = join(proj, ".comm", "bin", "session-registry.mjs")
 	arm("field: an installed INSTRUMENT goes stale", "field:proj", RED, ...swap(fieldReg, (s) => `${s}\n// stale\n`))
 
+	// F3 — the DRIFT list must name what drifted, and NOTHING ELSE.
+	//
+	// Review #6: this row took "any line indented four spaces, on either stream" from
+	// `install --check` to be a drifted filename. The git-tracking warning shipped in the
+	// same commit prints its file list, its "… and N more" line and its fix command at that
+	// indent, so the row reported nine names for one drifted file and rendered
+	// `git rm -r --cached .comm/ && echo '.comm/' >> .gitignore` as a filename.
+	//
+	// The arm above ("an agent's hook drifts") could not see any of it: it compares LEVELS,
+	// and the level was correctly RED the whole time. What was wrong was the SENTENCE. So
+	// this asserts the text, and it stages the two conditions TOGETHER - one real drift, and
+	// the confusable prose present - because either alone is a fixture that cannot fail.
+	//
+	// The POSITIVE CONTROL is the second half: it re-runs the installer directly and requires
+	// the confusable prose to actually be on stderr. Without it, a fixture that quietly
+	// stopped producing the warning would leave this arm green forever while asserting
+	// nothing - the void-probe shape this project keeps finding in its own tests.
+	{
+		const pg = (...a) => execFileSync("git", a, { cwd: proj, stdio: "ignore" })
+		pg("init", "-q"); pg("config", "user.email", "f@f"); pg("config", "user.name", "f")
+		pg("add", "-A", "-f"); pg("commit", "-qm", "live state committed on purpose")
+		const driftedHook = join(proj, "app", ".claude", "comm-hook.mjs")
+		const origHook = readFileSync(driftedHook, "utf8")
+		writeFileSync(driftedHook, `${origHook}\n// drift\n`)
+
+		const chk = spawnSync(process.execPath, [join(pkg, "install.mjs"), proj, "--check"], { encoding: "utf8" })
+		const proseIsThere = /LIVE BUS STATE are committed/.test(chk.stderr || "") && / {4}\.comm\//.test(chk.stderr || "")
+
+		const rowText = (() => { const r = run(true).rows.find((x) => x.label === "field:proj"); return r ? r.text : "" })()
+		// The row joins its bits with " - ", and a FILENAME contains hyphens: the first cut of
+		// this arm split on `[^-]*` and read `comm-hook.mjs` as `comm`, then reported the
+		// truncation as a failure of the code it was testing. Split on the separator, never
+		// on the character it is made of.
+		const list = /DRIFT: (.*?)(?: - |$)/.exec(rowText)
+		const named = list ? list[1].trim().split(",").map((x) => x.trim()).filter(Boolean) : []
+		const onlyTheHook = named.length === 1 && /comm-hook\.mjs$/.test(named[0])
+		const noProse = !/git rm/.test(rowText) && !/config\.json/.test(rowText) && !/… and/.test(rowText)
+
+		writeFileSync(driftedHook, origHook)
+		rmSync(join(proj, ".git"), { recursive: true, force: true })
+
+		if (!(onlyTheHook && noProse && proseIsThere)) failed++
+		console.log(`  ${onlyTheHook && noProse && proseIsThere ? "✓" : "✗"} ${"field: DRIFT names only what drifted".padEnd(34)} ` +
+			`one drifted hook + committed .comm -> DRIFT named ${JSON.stringify(named)}; ` +
+			`prose leaked=${noProse ? "no" : "YES"}; installer really printed the confusable warning=${proseIsThere ? "yes (control armed)" : "NO - THIS ARM PROVED NOTHING"}`)
+	}
+
 	const msg = join(proj, ".comm", "inbox", "app", "0001-x.json")
 	arm("field: mail sits undelivered", "field:proj", WARN,
 		() => writeFileSync(msg, JSON.stringify({ id: "0001-x", to: "app" })),
@@ -1167,6 +1321,42 @@ function proveRed() {
 			`one anchor renamed in FINDINGS.md -> fast=${LV[after]} full=${LV[full]}`)
 	}
 
+	// F8/F9 — an input the fingerprint COULD NOT READ is not the same as one that did not
+	// change. Review #6, both raised as "what I did not check", both mine:
+	//
+	//   F8 — a bare `catch {}` around the `bin/` enumeration silently narrowed the print to
+	//        install.mjs + attack.mjs + docs, while --fast went on saying "on these bytes".
+	//   F9 — the per-file `catch {}` hashed "deleted" and "present but locked" identically.
+	//
+	// R1 above cannot see either: it moves a gate input's CONTENT, and both of these are
+	// about inputs that could not be read at all. One variable each, against a green
+	// recorded over the same tree moments earlier, and the row is restored at the end as the
+	// POSITIVE CONTROL — if the claim does not come back after chmod, something other than
+	// the permission moved it and neither reading means anything.
+	{
+		run(false)   // a green recorded over inputs this process could read
+		const gateRow = () => { const r = run(true).rows.find((x) => x.label === "gate"); return r || { level: -1, text: "" } }
+		const control = gateRow()
+		const binDirF = join(pkg, "bin"), oneInput = join(pkg, "test", "attack.mjs")
+		spawnSync("chmod", ["000", binDirF])
+		const blindDir = gateRow()
+		spawnSync("chmod", ["755", binDirF])
+		spawnSync("chmod", ["000", oneInput])
+		const blindFile = gateRow()
+		spawnSync("chmod", ["644", oneInput])
+		const restored = gateRow()
+
+		const claims = (r) => / on these bytes/.test(r.text)
+		const pass = claims(control) && claims(restored) &&
+			blindDir.level === WARN && /BLIND to bin\//.test(blindDir.text) &&
+			blindFile.level === WARN && /BLIND to test\/attack\.mjs/.test(blindFile.text)
+		assert("F8/F9 an unreadable gate input is never counted as unchanged bytes", pass,
+			`readable -> ${LV[control.level]} ${claims(control) ? '"on these bytes"' : "NO CLAIM (fixture never armed - root ignores chmod?)"}; ` +
+			`bin/ unlistable -> ${LV[blindDir.level]} ${/BLIND to bin\//.test(blindDir.text) ? "names bin/" : "SILENT"}; ` +
+			`one input locked -> ${LV[blindFile.level]} ${/BLIND to test\/attack\.mjs/.test(blindFile.text) ? "names the file" : "SILENT"}; ` +
+			`permissions restored -> ${claims(restored) ? '"on these bytes" again (control)' : "STILL MOVED - something else did this"}`)
+	}
+
 	// R11, 2026-09-04. R1 above proves a gate's DOCUMENT is covered. Its CODE was not: the
 	// print was taken over the bus, the installer and the gate file only, while the suite
 	// has been executing bin/ledger.mjs and bin/session-registry.mjs through the generated
@@ -1204,6 +1394,28 @@ function proveRed() {
 	arm("R4 an undeclared gate dependency", "archive", WARN,
 		...swap(join(pkg, "test", "attack.mjs"), (t) => t.replace(/\/\/ gate-docs:.*/, "// gate-docs:") + '\nconst x = readFileSync(join(PKG, "STATUS.md"))\n'))
 
+	// R4's OTHER DIRECTION, and it is the one that actually fired. A document named in a path
+	// rooted at a FIXTURE is not a dependency on this repo's copy of it: A36 generates a
+	// notice at `<throwaway>/.comm/README.md` and reads it back, and this row announced an
+	// undeclared dependency on THIS repo's README.md — naming a document the gate never
+	// opens, in the row whose job is to say which documents the gate opens.
+	//
+	// It flipped on 2026-09-05 on a commit that touched no document at all, because the
+	// stripping ran over the CONCATENATION of test/*.mjs and the `/*` markers in those files
+	// do not balance (they appear inside strings and regexes), so an edit anywhere moved
+	// which text survived. Both halves are fixed above; without this arm only the half that
+	// likes noise is held, and the narrowing could be reverted with every gate still green.
+	{
+		const [addFixtureRef, undo] = swap(join(pkg, "test", "attack.mjs"),
+			(t) => t + '\nconst y = readFileSync(join(someFixtureRoot, ".comm", "README.md"))\n')
+		addFixtureRef()
+		const lv = level(run(true), "archive")
+		undo()
+		assert("R4b a document named in a FIXTURE path is not a dependency", lv === OK,
+			`a read of <fixture>/.comm/README.md added to the suite -> ${LV[lv]} (must stay ok; ` +
+			`the R4 arm above proves a PKG-rooted one still reddens it)`)
+	}
+
 	arm("R9 this repo's own bus unreadable", "field:proj", RED,
 		...swap(join(pkg, "bin", "comm.mjs"), () => ""))
 
@@ -1235,6 +1447,39 @@ function proveRed() {
 		const lr = hookRows.find((r) => r.label === "ledger")
 		assert("ledger: the row states the write happened", !!lr && /this start recorded/.test(lr.text),
 			`row: ${lr ? lr.text.slice(0, 60) : "absent"}`)
+
+		// F2 — THE SIGNAL HAS TO CROSS **HERE**, not only through the generated stub.
+		//
+		// Review #6: `bin/boot.mjs --hook` is this repository's ONLY recorder - it has no
+		// stub, because it is not a field project - and it did not claim. So the mechanism
+		// was inert in the project that owns it: a note could be armed, the ledger row would
+		// print `◷ a restart note is armed`, and the SAME row would file the start as COLD
+		// in the same sentence. STATUS.md's own ▶ NEXT instructed the next session to arm one
+		// here and restart, which could never have worked.
+		//
+		// The two asserts above cannot notice, and that is the point worth keeping: they fire
+		// the hook with NOTHING ARMED, so they are the control for this arm rather than a
+		// test of it. A33 covers the same crossing through the stub, in a field fixture; this
+		// covers the path this repo actually runs, and the two failed independently once.
+		const rsHere = join(pkg, "bin", "restart-signal.mjs")
+		const noteHere = join(pkg, ".comm", "restart", "unnamed.json")
+		spawnSync(process.execPath, [rsHere, "arm", "--agent", "unnamed", "--root", pkg, "--quiet",
+			"--prev-session", "PREV-BOOT-HOOK", "--ttl", "900", "--by", "prove-red"], { encoding: "utf8" })
+		const armedHere = existsSync(noteHere)
+		spawnSync(process.execPath, [SELFFILE, "--json", "--fast", "--hook", "--root", pkg, "--field", tmp],
+			{ encoding: "utf8", input: JSON.stringify({ source: "startup", transcript_path: "/x/77777777-7777-7777-7777-777777777777.jsonl" }) })
+		let crossedHere = null
+		try {
+			const ls = readFileSync(join(pkg, ".comm", "handoff", "unnamed.log"), "utf8").trim().split("\n")
+			crossedHere = JSON.parse(ls[ls.length - 1])
+		} catch {}
+		const consumedHere = !existsSync(noteHere)
+		assert("F2 a note armed in THIS repo crosses into THIS repo's ledger",
+			armedHere && consumedHere && crossedHere && crossedHere.prev_session === "PREV-BOOT-HOOK" &&
+			crossedHere.signal && crossedHere.signal.src === "prove-red",
+			`note armed=${armedHere}; boot --hook -> prev_session=${crossedHere && crossedHere.prev_session}, ` +
+			`signal=${crossedHere && JSON.stringify(crossedHere.signal)}; note consumed=${consumedHere} ` +
+			`(the two asserts above fire the same hook with nothing armed: that is this arm's control)`)
 
 		// ---- review #4 R3: the FAILING direction of this row, which was never armed ----
 		const hookLevel = (input) => {
@@ -1269,13 +1514,48 @@ function proveRed() {
 
 		// R6. `mislabelled` and `exposureSkew` were computed, exported, rendered by the
 		// ledger and dropped by the row everyone actually reads at session start.
+		//
+		// RENAMED, review #6 F5: this assert was titled "the row carries the ledger's own
+		// caveats" and measured `mislabelled` - it could go red, and it went red for a
+		// different variable than the one in its title, which is the exact failure CLAUDE.md
+		// was amended about on 2026-09-04. `caveats` shipped hours later, was dropped by
+		// this row, and this arm was structurally incapable of noticing. The title now names
+		// the counter it moves, and the caveat half is armed separately below it.
 		writeFileSync(join(hd, "leader.log"), Array.from({ length: 12 }, (_, k) =>
 			JSON.stringify({ v: 1, at: new Date(Date.UTC(2026, 0, k + 1)).toISOString(), event: "start",
 				agent: "SOMEONE-ELSE", session: `s${k}`, source: "startup" })).join("\n") + "\n")
 		const tampered = hookLevel(JSON.stringify({ source: "startup", transcript_path: "/x/44444444-4444-4444-4444-444444444444.jsonl" }))
-		assert("R6 the row carries the ledger's own caveats",
+		assert("R6a the row carries the ledger's mislabelled counter",
 			tampered.level === WARN && /naming another agent/.test(tampered.text),
 			`12 rows naming another agent -> ${LV[tampered.level]}: ${/naming another agent/.test(tampered.text) ? "reported" : "DROPPED"}`)
+		try { rmSync(join(pkg, ".comm", "handoff"), { recursive: true, force: true }) } catch {}
+
+		// R6b — the half that was never armed: the VERDICT CAVEAT. Review #6 F5.
+		//
+		// ONE VARIABLE, and it is the variable the caveat is about: the payload's `source`.
+		// `clear` puts the start in the reboot arm, which is the only condition under which
+		// the ledger emits its sub-population caveat; `startup` leaves that arm empty and the
+		// ledger emits none. The detector is byte-identical across both runs.
+		//
+		// The second half of this assert is the POSITIVE CONTROL, and it is the half that
+		// makes the first half mean anything: it proves the marker is absent when the ledger
+		// has no caveat to report, so a `bits.push("◈ verdict caveat")` hard-wired into the
+		// row - the shape that would pass a presence-only check while carrying nothing -
+		// fails here.
+		const freshHandoff = () => {
+			try { rmSync(hd, { recursive: true, force: true }) } catch {}
+			mkdirSync(hd, { recursive: true })
+		}
+		freshHandoff()
+		const noCaveat = hookLevel(JSON.stringify({ source: "startup", transcript_path: "/x/55555555-5555-5555-5555-555555555555.jsonl" }))
+		freshHandoff()
+		const withCaveat = hookLevel(JSON.stringify({ source: "clear", transcript_path: "/x/66666666-6666-6666-6666-666666666666.jsonl" }))
+		const carried = /◈ verdict caveat: FINDINGS\.md#reboot-signal/.test(withCaveat.text)
+		const quiet = !/verdict caveat/.test(noCaveat.text)
+		assert("R6b the row carries the ledger's verdict caveats",
+			carried && quiet,
+			`a clear start -> caveat ${carried ? "carried with its pointer" : "DROPPED"}; ` +
+			`a startup-only ledger -> ${quiet ? "no caveat printed (control armed)" : "CAVEAT PRINTED WITH NONE TO REPORT"}`)
 		try { rmSync(join(pkg, ".comm", "handoff"), { recursive: true, force: true }) } catch {}
 	}
 

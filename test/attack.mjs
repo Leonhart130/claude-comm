@@ -1112,16 +1112,29 @@ const POINTER_SOURCES = (() => {
 	// commands in the -c string so the shell cannot exec-optimise its argv[0] away.
 	const fakeClaude = join(rootA, "claude")
 	try { symlinkSync("/bin/sh", fakeClaude) } catch {}
+	// THE TWO STREAMS ARE KEPT APART, and the reason is a defect this fixture was hiding.
+	// It redirected `> out 2>&1` and then parsed that file as the hook's stdout - so ANY
+	// diagnostic the stub writes to stderr landed inside the JSON and broke `schemaOK`. The
+	// arm passed for three weeks only because nothing in this particular fixture ever wrote
+	// to stderr: no git repository, so no tracking warning, and a registry write that
+	// succeeds. It went red the moment the stub gained a one-time notice line - a change
+	// that is CORRECT, on the stream diagnostics belong on. A check that merges the streams
+	// and calls the result stdout is this project's signature defect wearing a shell
+	// redirect: it names one thing and measures another.
+	//
+	// Separating them turns an accidental pass into a stated property, asserted below: a
+	// hook may say whatever it likes on stderr and its stdout contract stays intact.
 	const fire = (verb) => {
-		const out = join(rootA, `${verb}.out`)
-		spawnSync(fakeClaude, ["-c", `cd ${join(rootA, "app")} && ${process.execPath} ${stub} ${verb} > ${out} 2>&1; echo done`], {
+		const out = join(rootA, `${verb}.out`), err = join(rootA, `${verb}.err`)
+		spawnSync(fakeClaude, ["-c", `cd ${join(rootA, "app")} && ${process.execPath} ${stub} ${verb} > ${out} 2> ${err}; echo done`], {
 			encoding: "utf8",
 			input: JSON.stringify({ cwd: join(rootA, "app"), source: "startup", transcript_path: tp }),
 			env: { ...process.env, CLAUDE_COMM_RUNTIME: rt },
 		})
-		let stdout = ""
+		let stdout = "", stderr = ""
 		try { stdout = readFileSync(out, "utf8") } catch {}
-		return { stdout }
+		try { stderr = readFileSync(err, "utf8") } catch {}
+		return { stdout, stderr }
 	}
 	// The same hook fired with NO such ancestor - the shape a test suite, or an operator
 	// reproducing a bug, actually produces. It must record nothing at all.
@@ -1175,6 +1188,12 @@ const POINTER_SOURCES = (() => {
 	const startDrained = beforeStart === 1 && mail() === 0
 	let schemaOK = false
 	try { schemaOK = JSON.parse(h.stdout)?.hookSpecificOutput?.hookEventName === "SessionStart" } catch {}
+	// The property the merged redirect could not state: this start DID write a diagnostic to
+	// stderr (the one-time notice, on a project seeing the bus for the first time), and the
+	// stdout the harness parses is unpolluted by it. Without the first half this is a check
+	// that passes on a silent hook and proves nothing - the void-probe shape.
+	const saidSomething = /claude-comm:/.test(h.stderr || "")
+	const streamsSeparate = saidSomething && !/claude-comm:/.test(h.stdout || "")
 	const led = ledgerLog()
 	const ledgerOK = /"event":"start"/.test(led) && /"agent":"app"/.test(led) && /eeeeeeeeeeee/.test(led)
 	let regOK = false
@@ -1185,10 +1204,11 @@ const POINTER_SOURCES = (() => {
 
 	check("A29 the field hook records a start in both instruments, and still delivers",
 		stopDrained && !stopTouchedLedger && stopRegistered && stopIdempotent &&
-		foreignRecordedNothing && startDrained && schemaOK && ledgerOK && regOK,
+		foreignRecordedNothing && startDrained && schemaOK && ledgerOK && regOK && streamsSeparate,
 		`stop: drained=${stopDrained} ledger-untouched=${!stopTouchedLedger} registry-refreshed=${stopRegistered} ` +
 		`no-rewrite-when-unchanged=${stopIdempotent} fired-from-outside-records-nothing=${foreignRecordedNothing}; ` +
-		`session-start: drained=${startDrained} schema=${schemaOK} ledger=${ledgerOK} registry=${regOK}`)
+		`session-start: drained=${startDrained} schema=${schemaOK} ledger=${ledgerOK} registry=${regOK}; ` +
+		`the hook wrote a diagnostic to stderr=${saidSomething} and stdout stayed clean=${streamsSeparate}`)
 }
 
 // A30 — `whoami --agent-root` resolves against THAT agent's project, never the caller's.
@@ -1364,21 +1384,222 @@ const POINTER_SOURCES = (() => {
 	} catch {}
 	const counted = arms && arms.reboot === 1 && arms.cold === 3
 
-	// ARM 4: two sessions starting at the same instant. `rename` is why exactly one of them
-	// can win; a read-then-unlink would hand the same restart to every one of them and the
-	// arm would inflate by however many agents happened to boot together.
+	// ARM 4: eight sessions starting AT THE SAME INSTANT, released by a barrier.
+	//
+	// REBUILT, review #6 F1, because the first version measured nothing. It launched eight
+	// `node` processes with `&` and counted winners — and the reviewer showed that eight
+	// process startups simply do not overlap at the critical read: he replaced `renameSync`
+	// with a GENUINE read-then-unlink and the arm stayed green at one winner. Its whole
+	// discriminating power was "does claim() consume the file at all", which ARM 2 above
+	// already covers. My own mutation ("swap the rename for a copy") left the file in place
+	// and was strictly weaker still.
+	//
+	// So the claimants now synchronise AFTER startup: each imports the module, announces
+	// itself, and spins on a barrier file. The parent releases them only once all eight are
+	// loaded and waiting, which is the only way the critical sections actually overlap.
+	//
+	// AND IT CARRIES THE POSITIVE CONTROL THE OLD ONE LACKED — the reviewer's own table. The
+	// same barrier, the same file, the same counter, driven through a read-then-unlink
+	// reference implemented HERE with a real window between the read and the unlink. It must
+	// produce MORE THAN ONE winner. Without that half, "1 winner" is a number with nothing
+	// to compare it to, which is exactly how this arm passed while proving nothing.
+	//
+	// WHAT THIS STILL DOES NOT PROVE, stated because its absence would be a defect in the
+	// report: with no artificial window, a read-then-unlink also yields one winner — the
+	// critical section is microseconds wide. The control is therefore calibrated on a window
+	// wide enough to make the failure observable. What this forbids is the shipped code
+	// taking a non-atomic path AT ALL; it does not measure how often the narrow version
+	// would lose in the field, and no test on one machine can.
+	const RACERS = 8, BARRIER_MS = 15_000
+	const racer = join(rootS, "racer.mjs")
+	writeFileSync(racer, `
+import { existsSync, writeFileSync, readFileSync, unlinkSync } from "node:fs"
+const [, , mode, rsUrl, root, agent, ready, go, out] = process.argv
+const { claim } = await import(rsUrl)
+writeFileSync(ready, "1")
+const t0 = Date.now()
+while (!existsSync(go)) { if (Date.now() - t0 > ${BARRIER_MS}) break }
+let res
+if (mode === "rename") {
+	res = claim({ root, agent })
+} else {
+	// The mutant, as a reference rather than as an edit to the shipped file: read, hold the
+	// window open, then unlink. This is what property 1 says must never be used here.
+	//
+	// THE READ IS THE MEASUREMENT, and it is separated from the unlink on purpose. The first
+	// cut of this wrapped both in one try, so a claimant whose read SUCCEEDED but whose
+	// unlink lost the race was recorded as having got nothing — and the control reported 1
+	// winner instead of 8, which is the exact failure this whole case exists to catch,
+	// committed in the detector rather than in the code. Measured: 1 of 8 before, 8 of 8
+	// after, same barrier, same window. A naive implementation hands its caller the signal
+	// it read whatever happens to the unlink afterwards; that is what makes it dangerous.
+	const p = root + "/.comm/restart/" + agent + ".json"
+	let txt = null
+	try { txt = readFileSync(p, "utf8") } catch {}
+	if (txt !== null) {
+		const w = Date.now(); while (Date.now() - w < 150) { /* the window */ }
+		try { unlinkSync(p) } catch {}
+	}
+	let parsed = null
+	try { parsed = txt === null ? null : JSON.parse(txt) } catch {}
+	res = { ok: true, signal: parsed }
+}
+writeFileSync(out, JSON.stringify(res && res.signal ? res.signal : null))
+`)
+	const rsUrl = pathToFileURL(rsBin).href
+	/** Release `RACERS` claimants together and count how many came away with the signal. */
+	const barrierRace = (mode) => {
+		const dirR = join(rootS, `race-${mode}`)
+		mkdirSync(dirR, { recursive: true })
+		const go = join(dirR, "GO")
+		const kids = []
+		for (let i = 0; i < RACERS; i++) {
+			kids.push(spawn(process.execPath, [racer, mode, rsUrl, rootS, "app",
+				join(dirR, `ready.${i}`), go, join(dirR, `out.${i}`)], { stdio: "ignore" }))
+		}
+		const waitFor = (fn) => { const t = Date.now(); while (!fn() && Date.now() - t < BARRIER_MS) {} return fn() }
+		const allReady = waitFor(() => readdirSync(dirR).filter((f) => f.startsWith("ready.")).length === RACERS)
+		writeFileSync(go, "1")
+		const allDone = waitFor(() => readdirSync(dirR).filter((f) => f.startsWith("out.")).length === RACERS)
+		for (const k of kids) { try { k.kill() } catch {} }
+		let won = 0
+		for (let i = 0; i < RACERS; i++) {
+			try { if (/RACE-SESSION-ID/.test(readFileSync(join(dirR, `out.${i}`), "utf8"))) won++ } catch {}
+		}
+		return { won, allReady, allDone }
+	}
+
 	armSignal(["--prev-session", "RACE-SESSION-ID", "--ttl", "900", "--by", "race"])
-	const race = spawnSync("/bin/sh", ["-c",
-		`for i in 1 2 3 4 5 6 7 8; do node ${rsBin} claim --agent app --root ${rootS} > ${rootS}/claim.$i 2>&1 & done; ` +
-		`wait; grep -l RACE-SESSION-ID ${rootS}/claim.* 2>/dev/null | wc -l`], { encoding: "utf8" })
-	const winners = Number(String(race.stdout).trim())
+	const shipped = barrierRace("rename")
+	armSignal(["--prev-session", "RACE-SESSION-ID", "--ttl", "900", "--by", "race"])
+	const naive = barrierRace("readthenunlink")
+	// The barrier has to have WORKED, or both numbers are noise. Asserted, not assumed.
+	const barrierOK = shipped.allReady && shipped.allDone && naive.allReady && naive.allDone
+	const winners = shipped.won
+
+	// AND WHAT THE BARRIER STILL CANNOT SEE, measured 2026-09-05 rather than assumed: with
+	// `renameSync` replaced by a WINDOWLESS read-then-unlink in the shipped module, eight
+	// barrier-released claimants still produced ONE winner and the pair above stayed green.
+	// The critical section of a narrow read-then-unlink is too small for eight processes to
+	// land inside, even released together. So the behavioural halves discriminate a WIDE
+	// non-atomic path and not a narrow one, and saying otherwise would be the same overclaim
+	// review #6 F1 caught the first time.
+	//
+	// This is what closes that gap, and its weakness is named too: it reads the SOURCE, so
+	// it is a style dependency and is always one refactor behind (review #3 R4's lesson, in
+	// this same suite). It is kept narrow on purpose — the consumption of `p` must BE the
+	// rename, with no read of that path before it — so a refactor that preserves the
+	// property keeps passing, and only one that reintroduces read-then-unlink fails.
+	const claimSrc = (() => {
+		const m = /export function claim\(([\s\S]*?)\n}/.exec(readFileSync(join(PKG, "bin", "restart-signal.mjs"), "utf8"))
+		return m ? m[1] : null
+	})()
+	const renameAt = claimSrc === null ? -1 : claimSrc.indexOf("renameSync(p, mine)")
+	const beforeRename = claimSrc === null || renameAt < 0 ? "" : claimSrc.slice(0, renameAt)
+	const consumesByRename = renameAt >= 0 &&
+		!/readFileSync\(\s*p\b/.test(beforeRename) && !/copyFileSync\(/.test(beforeRename) &&
+		!/unlinkSync\(\s*p\b/.test(beforeRename) && !/writeFileSync\(\s*mine\b/.test(beforeRename)
 
 	check("A33 a restart crosses into the ledger exactly once, and a stale one not at all",
-		travelled && coldOK && crossed && oneShot && staleStored && counted && winners === 1,
+		travelled && coldOK && crossed && oneShot && staleStored && counted &&
+		barrierOK && winners === 1 && naive.won > 1 && consumesByRename,
 		`installed=${travelled}; unarmed start -> prev_session=${cold && cold.prev_session}; ` +
 		`armed -> prev_session=${hot && hot.prev_session} signal=${hot && JSON.stringify(hot.signal)}; ` +
 		`reused -> ${reused && reused.prev_session}; abandoned signal stored-but-stale=${staleStored}; ` +
-		`arms=${JSON.stringify(arms)} (want reboot 1, cold 3); 8 racing claimers -> ${winners} winner(s)`)
+		`arms=${JSON.stringify(arms)} (want reboot 1, cold 3); ` +
+		`${RACERS} barrier-released claimers through rename -> ${winners} winner(s) (want 1); ` +
+		`the same barrier through a windowed read-then-unlink -> ${naive.won} (want >1: this is the control that ` +
+		`makes "1" mean something); barrier reached and drained=${barrierOK}; ` +
+		`claim() consumes by rename before any read of that path=${consumesByRename}` +
+		`${claimSrc === null ? " (SOURCE DID NOT PARSE)" : ""} ` +
+		`[the race halves cannot separate a WINDOWLESS read-then-unlink - measured, still 1 winner - which is why the line above exists]`)
+}
+
+// A37 — a refusal keeps the evidence, and a failure is never reported as "nothing waiting".
+//
+// Review #6 F6. `claim()` declares four properties and had arms for two. The two without
+// arms were the two that matter when something has gone WRONG, which is the only time
+// anybody reads them: the note that names another agent, and the note the parser cannot
+// read. The first of them was DELETING the note — `unlinkSync` ran before the agent check,
+// so the one branch meaning "somebody wrote here who should not have" destroyed `by`,
+// `by_pid` and the whole file, while the weaker branch beside it carefully set the same
+// bytes aside. The reviewer demonstrated it: exit 65, and `.comm/restart/` empty.
+//
+// ARM 4 is the one that is easy to get wrong in the comfortable direction: a rename that
+// fails for any reason OTHER than ENOENT must not return `{ok:true, signal:null}`. That
+// return means "no restart was signalled" and it is what the ledger files as a COLD start —
+// so a permission failure over a note that is really sitting there becomes a reboot counted
+// in the wrong arm, silently, which is the exact class this whole module exists to remove.
+{
+	const rootR = mkdtempSync(join(tmpdir(), "comm-attack-claim-"))
+	const rs = join(PKG, "bin", "restart-signal.mjs")
+	const dir = join(rootR, ".comm", "restart")
+	mkdirSync(dir, { recursive: true })
+	const claim = (agent) => spawnSync("node", [rs, "claim", "--agent", agent, "--root", rootR], { encoding: "utf8" })
+	const aside = (suffix) => readdirSync(dir).filter((f) => f.includes(suffix))
+
+	// ARM 1 — THE CONTROL, and it is the common case: nothing on disk. Every start this
+	// project has ever recorded took this path, and a module that refuses here would turn
+	// every cold start into an error. It must be silent, successful, and leave no litter.
+	// Exit 3, not 0: the CLI distinguishes "no restart was signalled" from "a restart was
+	// signalled" without anyone parsing JSON, and ARM 4 below turns on exactly that number.
+	const empty = claim("app")
+	const emptyOK = empty.status === 3 && readdirSync(dir).length === 0
+
+	// ARM 2 — the note names ANOTHER AGENT. Refuse, and keep the bytes: the writer's
+	// identity is the only thing that can say who did this, and it lives inside the note.
+	const tamper = '{"v":1,"at":"2026-09-05T09:00:00.000Z","agent":"someone-else","by":"the-writer",' +
+		'"by_pid":4242,"prev_session":"PREV-XYZ","ttl_s":900}'
+	writeFileSync(join(dir, "app.json"), tamper + "\n")
+	const mism = claim("app")
+	const mismFiles = aside(".mismatch.")
+	let mismBytes = ""
+	try { mismBytes = readFileSync(join(dir, mismFiles[0]), "utf8") } catch {}
+	const mismOK = mism.status === 65 && mismFiles.length === 1 &&
+		/someone-else/.test(mismBytes) && /the-writer/.test(mismBytes) && /4242/.test(mismBytes) &&
+		!existsSync(join(dir, "app.json"))
+	for (const f of readdirSync(dir)) rmSync(join(dir, f), { force: true })
+
+	// ARM 3 — bytes the parser cannot read. Already correct when this case was written;
+	// kept as the POSITIVE CONTROL for ARM 2. Both branches mean "something wrote here that
+	// should not have", so if ARM 2 ever regresses to deleting while this one still sets
+	// aside, the pair says so in one line instead of looking like a general failure.
+	writeFileSync(join(dir, "app.json"), "not json at all\n")
+	const corrupt = claim("app")
+	const corruptFiles = aside(".corrupt.")
+	let corruptBytes = ""
+	try { corruptBytes = readFileSync(join(dir, corruptFiles[0]), "utf8") } catch {}
+	const corruptOK = corrupt.status === 65 && corruptFiles.length === 1 && /not json at all/.test(corruptBytes)
+	for (const f of readdirSync(dir)) rmSync(join(dir, f), { force: true })
+
+	// ARM 4 — a claim that FAILS is not a claim that found nothing. One variable: the
+	// directory is made unwritable, so `rename` fails with EACCES over a note that is
+	// genuinely there. `{ok:true, signal:null}` here is the comfortable lie — it is
+	// indistinguishable from ARM 1 downstream, and the ledger would file a real restart as
+	// cold. Root ignores mode bits, so the setup is VERIFIED rather than assumed: if the
+	// note still claims successfully AND is consumed, the fixture never armed and this
+	// reports that instead of passing.
+	writeFileSync(join(dir, "app.json"), '{"v":1,"at":"2026-09-05T09:00:00.000Z","agent":"app","ttl_s":900}\n')
+	spawnSync("chmod", ["500", dir])
+	const denied = claim("app")
+	spawnSync("chmod", ["755", dir])
+	const noteSurvived = existsSync(join(dir, "app.json"))
+	// `!== 0` would NOT discriminate here: exit 3 is non-zero and is precisely the answer
+	// this arm forbids. The refusal is 65, and the JSON body of a "none waiting" answer must
+	// not appear at all.
+	const deniedOK = denied.status === 65 && !/"signal":null/.test(String(denied.stdout)) && noteSurvived
+	const fixtureArmed = noteSurvived   // if the rename had succeeded the note would be gone
+	rmSync(rootR, { recursive: true, force: true })
+
+	check("A37 a refused restart signal keeps its bytes, and a failure never reads as 'none waiting'",
+		emptyOK && mismOK && corruptOK && deniedOK && fixtureArmed,
+		`no note -> exit ${empty.status}, litter=${emptyOK ? "none" : "LEFT BEHIND"}; ` +
+		`note naming another agent -> exit ${mism.status}, set aside=${mismFiles.length}, writer identity ` +
+		`${/the-writer/.test(mismBytes) ? "survived" : "DESTROYED"}; ` +
+		`unparseable -> exit ${corrupt.status}, set aside=${corruptFiles.length} (positive control for the pair); ` +
+		`unwritable dir -> exit ${denied.status} (65=refused, 3=THE LIE "none waiting", 0=claimed), ` +
+		`note still there=${noteSurvived} ` +
+		`${fixtureArmed ? "(fixture armed)" : "(FIXTURE NEVER ARMED - running as root?)"}`)
 }
 
 // A34 — the instrument the experiment is SCORED FROM runs its own arms inside the gate.
@@ -1480,15 +1701,62 @@ const POINTER_SOURCES = (() => {
 	// behavioural check ("today's text has no digits in it") passes for a year and then
 	// someone adds `${age}` — this fails on the commit that adds it.
 	const src = readFileSync(join(PKG, "bin", "exchange-bell.mjs"), "utf8")
-	const tpl = /const TEXT = ([\s\S]*?)\n\nif \(has\("--dry-run"\)\)/.exec(src)
-	const holes = tpl ? [...tpl[1].matchAll(/\$\{([^}]*)\}/g)].map((m) => m[1].trim()) : null
+	// Delimited by the blank line after the expression rather than by whatever statement
+	// happens to follow it. The old delimiter named `if (has("--dry-run"))`, so moving one
+	// statement in that file turned this arm's parse into `null` - a gate that fails for a
+	// reason foreign to what it measures is how a row gets ignored, and a gate that silently
+	// stops parsing is worse than that.
+	const tpl = /const TEXT = ([\s\S]*?)\n\n/.exec(src)
+	const expr = tpl ? tpl[1] : null
+	const holes = expr === null ? null : [...expr.matchAll(/\$\{([^}]*)\}/g)].map((m) => m[1].trim())
 	const onlyPointer = !!holes && holes.length > 0 && holes.every((h) => h === "ref" || h === "inDir")
 
+	// Review #6 F4: `holes` counts `${…}` and NOTHING ELSE. The reviewer appended the
+	// incident's own stale sentence with `+ new Date(...).toISOString() + …` and this arm
+	// stayed green, because a concatenated value has no hole to count. `+`, `String.raw` and
+	// a later `.replace()` were all invisible to the one gate whose title is that this
+	// message carries nothing that can go stale.
+	//
+	// So the expression must be nothing but template-literal chunks joined by `+`: strip the
+	// two permitted holes, reduce every backtick chunk to a token, and require what remains
+	// to be tokens and plus signs. A chunk containing any OTHER `${` fails to reduce, so this
+	// subsumes the hole check rather than replacing it - both are kept, because they fail
+	// with different sentences and a reader needs to know which property broke.
+	const skeleton = expr === null ? null : expr
+		.replace(/\$\{\s*(?:ref|inDir)\s*\}/g, "")
+		.replace(/`(?:[^`\\$]|\\.|\$(?!\{))*`/g, "L")
+	const literalsOnly = skeleton !== null && /^\s*L(?:\s*\+\s*L)*\s*$/.test(skeleton)
+
+	// AND THE SENTENCE, EXECUTED. Everything above reads the source and infers; nothing in
+	// this repository ever rendered the bell, because the text sat below a bus lookup, a
+	// window resolution and a quiet period - none of which exist on a machine running a
+	// gate. `--print-text` renders it with no peer and no kitty (review #6 F4).
+	//
+	// The property is measured on the CARCASS: the rendered sentence with the two permitted
+	// paths removed. What is left must carry no digits at all - a timestamp, a count, a
+	// deadline, an age, every stale thing this tool exists to keep out, is digits - and the
+	// temp directory's own random name cannot cause a false positive because it leaves with
+	// the paths. `carcass.length > 100` is the positive control: an empty render, or one
+	// that had swallowed the whole sentence, would otherwise pass a "no digits" test
+	// trivially, which is the void-probe shape.
+	const printed = spawnSync("node", [join(PKG, "bin", "exchange-bell.mjs"),
+		"--peer", "peer", "--exchange", ex, "--ref", good,
+		"--project", proj, "--agent", "app", "--print-text"], { encoding: "utf8" })
+	const rendered = String(printed.stdout || "").trim()
+	const carcass = rendered.split(good).join("").split(join(ex, "peer", "in")).join("")
+	const spoke = printed.status === 0 && rendered.includes(good) &&
+		rendered.includes(join(ex, "peer", "in")) && carcass.length > 100
+	const nothingCurrent = spoke && !/\d/.test(carcass)
+
 	check("A35 the exchange bell carries a pointer and nothing that can go stale",
-		refusedForRef && gotPastRef && refusedForContainment && refusedUnknownAgent && onlyPointer,
+		refusedForRef && gotPastRef && refusedForContainment && refusedUnknownAgent &&
+		onlyPointer && literalsOnly && nothingCurrent,
 		`dangling ref -> exit ${dangling.status}; the same call with a real ref -> exit ${present.status} (past validation); ` +
 		`ref outside the channel -> exit ${stray.status}; unknown agent -> exit ${wrongAgent.status}; ` +
-		`the message template interpolates ${holes ? JSON.stringify(holes) : "COULD NOT BE PARSED"} (only ref/inDir allowed)`)
+		`the message template interpolates ${holes ? JSON.stringify(holes) : "COULD NOT BE PARSED"} (only ref/inDir allowed); ` +
+		`composed of ${skeleton === null ? "AN EXPRESSION THAT DID NOT PARSE" : JSON.stringify(skeleton.trim())} (literals and + only); ` +
+		`rendered ${spoke ? `${carcass.length} chars beside the two paths` : "NOTHING - the bell never spoke"}, ` +
+		`digits outside them=${/\d/.test(carcass) ? "PRESENT" : "none"}`)
 }
 
 // A36 — live bus state committed to a project's git, and the notice that explains why not.
@@ -1520,6 +1788,12 @@ const POINTER_SOURCES = (() => {
 		env: { ...process.env, CLAUDE_COMM_RUNTIME: join(rootG, "runtime") },
 	})
 	const warned = (r) => /LIVE BUS STATE are committed/.test(r.stderr || "")
+	// A notice is not read because it is there - it is read when somebody says it is not.
+	// The field leader measured that on himself (exchange/field/in/, 2026-09-04), so the hook
+	// names it ONCE. The control needs no extra fixture: the three starts below are the same
+	// stub in the same project, so the first must say it and the later two must not - and a
+	// line repeated every session is the failure, not the fix.
+	const namesNotice = (r) => /this project is on a message bus/.test(r.stderr || "")
 
 	// CONTROL 1: no git at all. A project that is not a repository must be told nothing —
 	// a guard that speaks where there is no possible defect is how a warning gets ignored.
@@ -1559,11 +1833,46 @@ const POINTER_SOURCES = (() => {
 	const noticeOK = /Never commit/.test(notice) && /git rm -r --cached/.test(notice) &&
 		notice.includes(join(PKG, "install.mjs")) && !!fb && existsSync(fb[1].trim())
 
-	check("A36 committed bus state is caught, and the notice that prevents it is installed",
-		!warned(noGit) && !warned(ignored) && warned(tracked) && tellsHow && stillDelivers && noticeOK,
+	// ARM 2 — THE BUS BELOW THE GIT ROOT. Review #6 F7. The guard asked whether `.git` sat
+	// in the project directory; `git ls-files` walks UP, so a bus installed in a
+	// subdirectory of a repository was invisible to it — seven tracked files, guard silent.
+	//
+	// CONTROL 1 above ("no git at all -> silent") is precisely the shape that made the
+	// conflation look correct, and that is why this arm has to exist beside it: both
+	// configurations answer `existsSync(join(root, ".git")) === false`, and only one of them
+	// is a project outside git. The fixture below moves ONE variable against ARM 1 — how
+	// deep the bus sits — and holds the repository and the tracked state identical.
+	const deep = mkdtempSync(join(tmpdir(), "comm-attack-git-deep-"))
+	process.on("exit", () => { try { rmSync(deep, { recursive: true, force: true }) } catch {} })
+	const busRoot = join(deep, "nested")
+	mkdirSync(join(busRoot, "app"), { recursive: true })
+	mkdirSync(join(busRoot, ".comm"), { recursive: true })
+	writeFileSync(join(busRoot, ".comm", "config.json"),
+		JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app" } }))
+	execFileSync("node", [join(PKG, "install.mjs"), busRoot], { stdio: "pipe" })
+	execFileSync("git", ["init", "-q"], { cwd: deep, stdio: "pipe" })
+	// The repository root is `deep`, and there is no `.git` anywhere at or under `busRoot` -
+	// asserted rather than assumed, because if the fixture ever grew one this arm would pass
+	// while testing ARM 1 all over again.
+	const noDotGitAtBus = !existsSync(join(busRoot, ".git"))
+	execFileSync("git", ["add", "-A", "-f"], { cwd: deep, stdio: "pipe" })
+	const deepFire = spawnSync("node", [join(busRoot, "app", ".claude", "comm-hook.mjs"), "session-start"], {
+		cwd: join(busRoot, "app"), encoding: "utf8",
+		input: JSON.stringify({ cwd: join(busRoot, "app"), source: "startup" }),
+		env: { ...process.env, CLAUDE_COMM_RUNTIME: join(deep, "runtime") },
+	})
+	const deepOK = warned(deepFire) && noDotGitAtBus
+
+	const noticeOnce = namesNotice(noGit) && !namesNotice(ignored) && !namesNotice(tracked)
+
+	check("A36 committed bus state is caught wherever the repository root is, and the notice that prevents it is named once",
+		!warned(noGit) && !warned(ignored) && warned(tracked) && tellsHow && stillDelivers &&
+		noticeOK && deepOK && noticeOnce,
 		`no repo -> ${warned(noGit) ? "WARNED (must not)" : "silent"}; repo with the rule -> ${warned(ignored) ? "WARNED (must not)" : "silent"}; ` +
 		`rule removed and .comm added -> ${warned(tracked) ? "warned" : "SILENT (must warn)"}, names the fix=${tellsHow}, mail still drained ${before}->${waiting()} with the schema intact=${stillDelivers}; ` +
-		`notice: ${noticeOK ? "installed, names the update command, and its feedback directory exists" : "MISSING OR INCOMPLETE"}`)
+		`bus one level BELOW the git root (no .git at the bus=${noDotGitAtBus}) -> ${warned(deepFire) ? "warned" : "SILENT (must warn)"}; ` +
+		`notice: ${noticeOK ? "installed, names the update command, and its feedback directory exists" : "MISSING OR INCOMPLETE"}, ` +
+		`named by SessionStart on start 1=${namesNotice(noGit)} and NOT on starts 2-3=${!namesNotice(ignored) && !namesNotice(tracked)} (control: same stub, same project)`)
 }
 
 // A31 — this suite must not touch the machine's real session registry.

@@ -32,9 +32,15 @@
  *    correctable later, re-read over every record ever written — decides. Storing
  *    "this was fresh" here would freeze today's guess into the data (ledger property 1).
  *
- * 3. A SIGNAL IT CANNOT READ IS SET ASIDE, NEVER DROPPED. An unparseable signal means
+ * 3. A SIGNAL THIS FILE REFUSES IS SET ASIDE, NEVER DROPPED. An unparseable signal means
  *    something wrote here that should not have, and a silent `catch {}` would turn that
  *    into a reboot recorded as a cold start — the exact hole this file was built to close.
+ *    Widened 2026-09-05 (review #6 F6) from "cannot read" to "refuses", because the
+ *    property was written about the parser and the WRITER is what it is really about: a
+ *    note whose `agent` disagrees with the filename it was found under is a stronger claim
+ *    that somebody wrote here who should not have, and that branch was deleting it. Both
+ *    refusals now leave the bytes behind — `.corrupt.<ts>` and `.mismatch.<ts>` — and both
+ *    report the path they left them at.
  *
  * 4. AN AGENT NAME BECOMES A FILENAME, so it is contained structurally, not trusted. Same
  *    rule, same regex, same reason as `bin/ledger.mjs`.
@@ -184,13 +190,26 @@ export function claim({ root, agent, now = Date.now(), pid = process.pid }) {
 		try { renameSync(mine, aside) } catch {}
 		return { ok: false, why: `the restart signal was unreadable (${(e && e.message) || e})`, setAside: aside }
 	}
-	try { unlinkSync(mine) } catch { /* consumed either way: the rename already took it */ }
 	// A signal addressed to somebody else must not be honoured just because it was found in
 	// this agent's file. The filename is the address; `agent` inside is the writer's claim
 	// about it, and a disagreement is either tampering or a writer bug.
+	//
+	// CHECKED BEFORE THE UNLINK — review #6 F6. It ran AFTER it, so the one branch that
+	// means "somebody wrote here who should not have" destroyed `by`, `by_pid` and the whole
+	// note, while the weaker branch above — bytes this file merely cannot parse — sets them
+	// aside under `.corrupt.<ts>`. Property 3 is written for the WRITER, not for the parser:
+	// a note that names another agent is a stronger instance of the same thing, and it was
+	// the only case where nothing survived to be looked at. Demonstrated by the reviewer:
+	// claim refused with exit 65 and `.comm/restart/` was empty afterwards.
+	//
+	// The one-shot property is untouched: the rename above already took the file out of the
+	// claimable path, so setting it aside cannot hand it to a second claimer.
 	if (rec.agent && rec.agent !== agent) {
-		return { ok: false, why: `the signal in ${agent}.json names agent ${JSON.stringify(rec.agent)}`, mismatch: true }
+		const aside = `${p}.mismatch.${now}`
+		try { renameSync(mine, aside) } catch {}
+		return { ok: false, why: `the signal in ${agent}.json names agent ${JSON.stringify(rec.agent)}`, mismatch: true, setAside: aside }
 	}
+	try { unlinkSync(mine) } catch { /* consumed either way: the rename already took it */ }
 	return { ok: true, signal: rec, age_s: ageOf(rec, now) }
 }
 

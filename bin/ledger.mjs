@@ -59,7 +59,7 @@
  *    `record defect` therefore REFUSES a defect with no authored time unless the caller
  *    says `--authored-unknown` out loud, and that admission lands in property 3's pool.
  */
-import { readFileSync, writeFileSync, appendFileSync, existsSync, readdirSync, mkdirSync, mkdtempSync, rmSync } from "node:fs"
+import { readFileSync, writeFileSync, appendFileSync, existsSync, readdirSync, statSync, mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { join, dirname, resolve, basename } from "node:path"
 import { tmpdir } from "node:os"
 import { fileURLToPath } from "node:url"
@@ -132,6 +132,27 @@ function ledgerDir() {
 		dir = up
 	}
 	return join(dirname(dirname(fileURLToPath(import.meta.url))), ".comm", "handoff")
+}
+
+/** The project root the ledger is speaking for — `.comm/handoff/` minus its two segments. */
+function rootDir() { return dirname(dirname(ledgerDir())) }
+
+/**
+ * When did anybody last sit down here? Read from the ledger's own records rather than from
+ * a clock, so the covariate below counts what accumulated since the last START and not
+ * since an arbitrary hour. No records yet -> null, and `pendingSince` returns null in turn:
+ * the FIRST start in a project has nothing to be measured against, and inventing 0 for it
+ * would put a fabricated point in the arm this whole file exists to fill.
+ */
+function lastStartMs(dir) {
+	const rd = readRecords(dir, null)
+	let newest = null
+	for (const r of rd.records) {
+		if (r.event !== "start") continue
+		const t = Date.parse(r.at)
+		if (Number.isFinite(t) && (newest === null || t > newest)) newest = t
+	}
+	return newest
 }
 
 // An agent name becomes a FILENAME. It arrives here from a flag rather than from message
@@ -208,6 +229,29 @@ function writeRecord() {
 			const sigTtl = numOrNull("--signal-ttl")
 			rec.signal = sigSrc === null && sigAge === null && sigTtl === null
 				? null : { src: sigSrc, age_s: sigAge, ttl_s: sigTtl }
+			// WHAT WAS WAITING IN FRONT OF THE SESSION WHEN IT OPENED — the covariate the
+			// ~/Dev/work leader's measurement demanded, and the one his measurement KILLED is
+			// not this one. He priced a crashed restart at 115 609 tokens against a declared
+			// one at 116 413: the CLEAN restart cost more, and he named the confound — 246
+			// lines of expert report were sitting on disk waiting for it. The boot turn is
+			// governed by what the session finds in front of it, so without this both arms
+			// measure the luck of the queue.
+			//
+			// My proposal was INBOX DEPTH, and he refuted it with his own session #41: the
+			// mailbox was empty, the covariate would have read 0, and the real queue was a
+			// 246-line report on disk plus a marching-order line. "The session with the
+			// largest queue of my last five boots would have been scored empty" — not a
+			// partial covariate, an ANTICORRELATED one, on the very case that motivated it.
+			// His replacement is what is stored here, and it is his: files in the project
+			// newer than the last recorded start. Measured on his tree before adopting it —
+			// 14 of 891 files, 17 ms.
+			//
+			// PARTIAL, AND LABELLED SO. It cannot see a queue that lives in someone's head,
+			// in a terminal scrollback, or in a file older than the last start that nobody
+			// had got to yet. It is a proxy, it is free, and it is not the thing itself.
+			rec.pending = has("--pending-auto")
+				? pendingSince(rootDir(), lastStartMs(ledgerDir()))
+				: numOrNull("--pending")
 		} else {
 			rec.ref = opt("--ref", null)
 		}
@@ -241,7 +285,12 @@ function writeRecord() {
 // ── the query ──────────────────────────────────────────────────────────────────────
 
 function readRecords(dir, agentFilter) {
-	const out = { records: [], unreadable: 0, unreadableFiles: [], mislabelled: 0, dirUnreadable: false, files: [], dir }
+	// The filter travels WITH the read. Review #6 F10: `analyse()` called `armedNotes(read.dir)`
+	// and there was nowhere for it to learn who had been asked about, so `--agent leader`
+	// answered with every agent's armed notes - a report that names one subject and shows
+	// another's state, which is this project's signature defect in its smallest form.
+	const out = { records: [], unreadable: 0, unreadableFiles: [], mislabelled: 0, dirUnreadable: false, files: [], dir,
+		agent: agentFilter || null }
 	let names = []
 	// R2, second instance: `readdirSync` throwing used to return the same shape as an
 	// empty directory - so an I/O failure was explained to the operator as a sampling
@@ -296,12 +345,61 @@ function readRecords(dir, agentFilter) {
  * as silence is the void-probe shape, and it is precisely the case where something else
  * is writing there.
  */
-function armedNotes(handoffDir) {
+/**
+ * THE COVARIATE: how much was already waiting in front of this session when it opened.
+ *
+ * `--pending-auto` on a `record start`, computed HERE so there is ONE implementation of it
+ * rather than one in bin/boot.mjs and another in the generated stub — the "two lists that
+ * had to agree" family, which this project has now shipped three times.
+ *
+ * Counted against the LAST RECORDED START, not a clock: the question is what accumulated
+ * since anybody last sat down here.
+ *
+ * A TRUNCATED WALK RETURNS null, NEVER A COUNT. A number produced by a walk that stopped
+ * early is smaller than the truth and reads exactly like a quiet project — the comfortable
+ * lie this file refuses everywhere else. Unknown is the honest answer.
+ */
+function pendingSince(root, sinceMs) {
+	if (!Number.isFinite(sinceMs)) return null
+	const SKIP = new Set([".git", ".comm", "node_modules", ".next", "dist", "build", ".venv", "target", ".cache"])
+	const BUDGET = 20_000, MAX_DEPTH = 8
+	let seen = 0, hits = 0, truncated = false, unreadable = 0
+	const walk = (dir, depth) => {
+		if (truncated || depth > MAX_DEPTH) return
+		let entries = []
+		try { entries = readdirSync(dir, { withFileTypes: true }) } catch { return }
+		for (const e of entries) {
+			if (truncated) return
+			if (SKIP.has(e.name) || (e.name.startsWith(".") && e.isDirectory())) continue
+			const p = join(dir, e.name)
+			if (e.isDirectory()) { walk(p, depth + 1); continue }
+			if (++seen > BUDGET) { truncated = true; return }
+			// A FILE THIS COULD NOT STAT MAKES THE COUNT INCOMPLETE, and an incomplete count
+			// here is indistinguishable from a quiet project. Written after this very block
+			// returned a confident `0`: `statSync` was not in the import list above, every
+			// call threw ReferenceError, and a bare `catch {}` turned a broken walk into
+			// "nothing was waiting" — the F9 class, from review #6, re-committed by hand an
+			// hour after fixing it in bin/boot.mjs. The catch now records rather than eats.
+			try { if (statSync(p).mtimeMs > sinceMs) hits++ } catch { unreadable++ }
+		}
+	}
+	walk(resolve(root), 0)
+	return truncated || unreadable ? null : hits
+}
+
+function armedNotes(handoffDir, agentFilter = null) {
 	const out = { notes: [], unreadable: 0 }
 	const dir = join(dirname(handoffDir), "restart")
 	let names = []
 	try { names = readdirSync(dir).filter((f) => f.endsWith(".json")).sort() }
 	catch { return out }
+	// The FILENAME is the address here exactly as it is in restart-signal.mjs, so the filter
+	// applies to it and not to anything inside the file - a note whose `agent` field
+	// disagrees with its filename is tampering, and claim() refuses it; deciding whose note
+	// this is by reading the writer's own claim about it would let that tampering choose
+	// which report it appears in. Filtered BEFORE the read, so another agent's unreadable
+	// note cannot raise this agent's `unreadable` count either.
+	if (agentFilter) names = names.filter((f) => basename(f, ".json") === agentFilter)
 	for (const f of names) {
 		let d = null
 		try { d = JSON.parse(readFileSync(join(dir, f), "utf8")) } catch { out.unreadable++; continue }
@@ -578,7 +676,7 @@ function analyse(read, windowMin) {
 		cold: { withDefect: cTally[0], without: cTally[1], anyTime: anyDefect(coldT), meanExposureMin: expCold },
 		reboot: { withDefect: rTally[0], without: rTally[1], anyTime: anyDefect(rebootT), meanExposureMin: expReboot },
 		lastStart: starts.length ? { agent: starts[starts.length - 1].agent, session: starts[starts.length - 1].session || null, at: starts[starts.length - 1].at } : null,
-		armed: armedNotes(read.dir),
+		armed: armedNotes(read.dir, read.agent),
 		// THE ARM SAMPLES A SUB-POPULATION, and the place to say so is where the verdict is
 		// READ. Found 2026-09-04 by the ~/Dev/work leader, an hour after the mechanism
 		// shipped and minutes after he armed the first real note: *a session that CRASHES
@@ -1181,6 +1279,77 @@ function proveRed() {
 		check("a project with no restart directory reports no notes",
 			none.armed.notes.length === 0 && none.armed.unreadable === 0,
 			`no .comm/restart at all -> notes=${none.armed.notes.length}, unreadable=${none.armed.unreadable}`)
+
+		// 25. WHOSE notes. Review #6 F10: every arm above asked an unfiltered ledger, so
+		//     `armedNotes` could ignore `--agent` entirely - and it did - while all of them
+		//     stayed green. A report that says "leader" at the top and shows another agent's
+		//     armed restart is not a cosmetic error here: an armed note is the one piece of
+		//     state a reader acts on IMMEDIATELY (re-arm it, or restart now), and acting on
+		//     somebody else's is how two agents fight over one restart.
+		//
+		//     ONE VARIABLE, both directions, in ONE fixture holding two notes: the same
+		//     directory answers `--agent leader` with one note and no filter with two. A
+		//     filter that dropped everything would pass a "does not show app" check on its
+		//     own, so the unfiltered read is the positive control that forbids it.
+		const two = join(dir, "note-two-agents")
+		mkdirSync(join(two, ".comm", "handoff"), { recursive: true })
+		mkdirSync(join(two, ".comm", "restart"), { recursive: true })
+		for (const who of ["leader", "app"]) {
+			writeFileSync(join(two, ".comm", "handoff", `${who}.log`), JSON.stringify({ v: 1,
+				at: new Date(Date.UTC(2026, 0, 1)).toISOString(), event: "start", agent: who,
+				session: `s-${who}`, source: "startup" }) + "\n")
+			writeFileSync(join(two, ".comm", "restart", `${who}.json`),
+				JSON.stringify({ ...note(60, 900), agent: who }) + "\n")
+		}
+		const mine = run(two, ["--agent", "leader"])
+		const all = run(two)
+		const mineNames = (mine.armed.notes || []).map((x) => x.agent).sort()
+		const allNames = (all.armed.notes || []).map((x) => x.agent).sort()
+		// 26. THE COVARIATE, and the reason it is not inbox depth. The ~/Dev/work leader
+		//     measured a crashed restart at 115 609 tokens against a declared one at 116 413:
+		//     the CLEAN restart cost MORE, and the confound was 246 lines of report waiting on
+		//     disk. My proposal was inbox depth; he refuted it with his own session #41 - empty
+		//     mailbox, largest real queue of his last five boots - so that covariate would have
+		//     been ANTICORRELATED with the truth on the case that motivated it. This is his
+		//     replacement: files newer than the last recorded start.
+		//
+		//     ONE VARIABLE - a file touched between two starts - and the first start is the
+		//     control in the other direction: it has no previous start to count against, so it
+		//     must be `null` and NEVER 0. A fabricated 0 would put an invented point in the
+		//     arm this whole file exists to fill.
+		//
+		//     An incomplete walk is null too, and that is not decoration: the first version of
+		//     `pendingSince` returned a confident 0 because `statSync` was missing from this
+		//     file's import list and a bare catch ate every ReferenceError. Review #6 F9's
+		//     class, re-committed by hand an hour after being fixed elsewhere.
+		{
+			const cov = join(dir, "covariate")
+			mkdirSync(join(cov, "src"), { recursive: true })
+			mkdirSync(join(cov, ".comm", "handoff"), { recursive: true })
+			writeFileSync(join(cov, "src", "a.txt"), "a\n")
+			const rec = (sess) => spawnSync(process.execPath, [self, "record", "start", "--agent", "leader",
+				"--root", cov, "--source", "startup", "--session", sess, "--pending-auto", "--quiet"], { encoding: "utf8" })
+			const readBack = () => readFileSync(join(cov, ".comm", "handoff", "leader.log"), "utf8")
+				.trim().split("\n").map((l) => JSON.parse(l))
+			rec("first")
+			// mtime resolution is not infinite: the touched file must be provably newer than
+			// the start it is counted against, or this arm measures the clock.
+			const t = Date.now(); while (Date.now() - t < 1100) { /* past one whole second */ }
+			writeFileSync(join(cov, "src", "b.txt"), "b\n")
+			rec("second")
+			const got = readBack()
+			const firstNull = got[0] && got[0].pending === null
+			const secondCounted = got[1] && got[1].pending === 1
+			check("the covariate counts what was waiting, and invents nothing for the first start",
+				firstNull && secondCounted,
+				`first start (no previous to count against) -> ${got[0] && JSON.stringify(got[0].pending)} (want null, never 0); ` +
+				`one file touched, second start -> ${got[1] && JSON.stringify(got[1].pending)} (want 1)`)
+		}
+
+		check("armed notes answer the agent that was asked about",
+			mineNames.length === 1 && mineNames[0] === "leader" && allNames.length === 2,
+			`--agent leader -> ${JSON.stringify(mineNames)} (want ["leader"]); ` +
+			`unfiltered -> ${JSON.stringify(allNames)} (control: both must still be visible)`)
 	}
 
 	console.log(`\n${failed ? `✗ ${failed} ledger propert(y/ies) NOT demonstrated` : "✓ every ledger property demonstrated by a moved variable"}\n`)
