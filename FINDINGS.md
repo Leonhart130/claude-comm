@@ -1289,6 +1289,12 @@ measures ONE guard; the amended row asks a different question, and letting it in
 would demand a second amendment for a reason that no longer exists. The old value — 3 — is recorded here,
 which is where it belongs, rather than in a live counter that will be read as current.
 
+**FIRST REAL READING, 2026-09-05 12:09:55Z:** the adversarial reviewer for #7 was launched in this directory
+and its own SessionStart recorded `pending: 20` — twenty files newer than the previous start, which is this
+session's work sitting in front of it. Written the same afternoon, observed in the wild hours later, by a
+session nobody staged. It is one point and it predicts nothing yet; what it shows is that the field the peer
+asked for is actually being written by a real hook and not only by arms.
+
 ⚠️ **What this does not do:** it does not bound how long "in flight" may last. An agent that runs for hours
 without ending a turn holds its mail for hours and this now says nothing. The age is printed; nothing acts
 on it, and no measurement exists yet for what a normal in-flight age is.

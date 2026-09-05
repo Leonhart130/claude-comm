@@ -25,7 +25,12 @@ never by when it was found. That convention and its bias are in `FINDINGS.md#rev
 ⚠️ **Before touching the ledger, know this:** `boot.mjs --hook` RECORDS A START into the ledger of whatever
 `--root` it is given. That wrote fabricated data into the real instrument twice on 2026-09-05 — once from an
 arm, once from a person at a prompt. Check `node bin/ledger.mjs` before and after any hook experiment. Truth
-as of this close: **6 cold + 4 reboot starts, 11 defects, one agent log (`unnamed.log`).**
+as of this close: **7 cold + 4 reboot starts, 11 defects, one agent log (`unnamed.log`)** — the seventh cold
+start is REAL and is review #7's own session (`0a5ec946`, 12:09:55Z), recorded by its SessionStart hook when
+the owner launched it in this directory. It carries **`pending: 20`, the first real reading the covariate has
+ever produced** — 20 files newer than the previous start, which is this session's own work. A second session
+in this folder is harmless here precisely because claude-comm has no roster: no inbox to share, nothing to
+drain (`FINDINGS.md#second-session`).
 
 **2 — `#claim-file` between two REAL agents.** `bin/claim.mjs` shipped today with eight arms and `A38` in the
 gate, but no two live agents have ever contended through it: one session took both sides and the refusal was
