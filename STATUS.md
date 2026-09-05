@@ -18,9 +18,8 @@ green with the real ledger byte-stable across them.
 
 🔴 **The worst defect keeps being in the newest patch — this session made SEVEN of its own**, six in new
 arms and one in the fix for F2 (a close whose record did not land still printed `✓ CLOSED`). **Attack
-`3939fb3..HEAD` first**: `updateState()`'s callers, `claim.mjs`'s bus lookup on `take` (it spawns now — the
-header said it spawned nothing), `verdict()`'s five states against what `boot.mjs` prints, and the six new
-close arms.
+`3939fb3..HEAD` first**: `updateState()`'s callers, `claim.mjs`'s bus lookup on `take` (it spawns now), and
+`verdict()`'s five states against what `boot.mjs` prints.
 
 🔴 **`#A20`, still unexplained from 2026-09-04**: the `registry` row was green in one boot and WARN in a
 close two seconds later, same fixture. The arms no longer depend on it (they acknowledge every label), but
@@ -49,29 +48,33 @@ note with the bus print it was written for, `.comm/INSTALLED.json`, and **the st
 once per version, that a newer release exists** — a mechanism in place of my noticing. A40/A41/A42, and A42
 re-checks delivery in the same fire.
 
-**3 — `#claim-file` between two REAL agents.** Sharper now: review #7 proved the shipped tool could not
+**3 — 🔴 A file we generate lives under somebody else's automation.** `FINDINGS.md#generated-in-their-tree`:
+their `prettier --write .` reformatted `.claude/comm-hook.mjs` (352 lines) eight minutes after an install,
+and their `lint` is `prettier --check .` — **our file failed THEIR lint.** Fixed for prettier, armed as A43,
+only where a formatter is already configured. **ESLint is the same shape and is not covered.**
+
+**4 — `#claim-file` between two REAL agents.** Sharper now: review #7 proved the shipped tool could not
 detect a collision AT ALL when the agents stand in their own directories — where five of `~/Dev/work`'s six
 live. The arms cover it; two live sessions still have not. The peer's third control is the one that matters:
 kill one holder brutally, and the claim must read HOLDER IS GONE, never a lock
 (`exchange/work-leader/out/2026-09-05-claim-file-construit.md`).
 
-**4 — No real adversarial review has run from `review/` yet.** The agent exists in both field rosters and
-the mail routing is measured; the workflow is not. Review #7 ran from `~/Dev/claude-comm`, which has no
-roster, so it does not answer this.
+**5 — No real adversarial review has run from `review/` yet.** The agent exists in both rosters and the
+routing is measured; the workflow is not. Review #7 ran from `~/Dev/claude-comm`, which has no roster.
 
-**5 — The launcher must resolve the runtime and REFUSE.** `FINDINGS.md#hookless-launch`. The false
-remediation ("a login shell") is corrected in both places that shipped it. The rule to BUILD is the peer's:
-resolve `node`/`claude` absolutely before launching, and refuse when resolution fails.
+**6 — The launcher must resolve the runtime and REFUSE.** `FINDINGS.md#hookless-launch`. The false
+remediation ("a login shell") is corrected where it shipped. The rule to BUILD: resolve `node`/`claude`
+absolutely before launching, and refuse when resolution fails.
 
-**6 — The window is untested and my own timestamps are why.** 0 of 25 defects fall in the 15-minute window
+**7 — The window is untested and my own timestamps are why.** 0 of 25 defects fall in the 15-minute window
 against the consumer's "four of five in thirteen minutes" — but each is dated at its commit, the upper
 bound. Do not quote the disagreement as a result.
 
-**7 — ✅ `#A20` was named this time.** The integrity guard's red was three real sessions starting during an
+**8 — ✅ `#A20` was named this time.** The integrity guard's red was three real sessions starting during an
 11-minute control run, not the suite writing — triaged, then fixed so it attributes instead of accusing
 (`FINDINGS.md#update-signal`). The 2026-09-04 instance is still unidentified. **Run gates unfiltered.**
 
-**8 — 🔴 The restart TTL lapsed on a human TWICE; the clock is the wrong instrument.** The note carries
+**9 — 🔴 The restart TTL lapsed on a human TWICE; the clock is the wrong instrument.** The note carries
 `by_pid`: a restart plausibly happened when the ARMER IS GONE, and plainly has not while it lives —
 `claim.mjs` shipped that (pid, start, boot) test. Try **armer-gone AND not ancient**, TTL as a backstop.
 `classify()` is re-read over every record. Not built.
@@ -118,7 +121,7 @@ now has its ending. `--amended` exists for a guard whose measurement you changed
 
    `take` / `list` / `release`, 16 arms, `A38` in the gate, installed in both field projects, and a boot row
    that names a claim whose holder has **died**. **It advises; it opens nothing, kills nothing, blocks
-   nothing.** 🔴 **Untested between two real agents — ▶ NEXT 3.**
+   nothing.** 🔴 **Untested between two real agents — ▶ NEXT 4.**
 5. **🔴 A session launched outside an interactive shell has NO bus, and says nothing.** `node` lives only
    under nvm, so `kitten @ launch claude` (or cron, or a `.desktop` file) starts a session whose **every hook
    dies** while it looks normal. **A self-launched expert is launched by a program, never by a shell** — the

@@ -1278,9 +1278,18 @@ if (CLOSE) {
 		// forever, in the loudest line of the report - an instruction nobody could discharge,
 		// about a guard that no longer existed (review #7 F10). A row that cannot be
 		// acknowledged again cannot be eroding.
-		const alive = new Set(rows.map((r) => r.label))
-		const eroding = Object.entries(written).filter(([label, n]) => n >= EROSION && alive.has(label))
-		const stale = Object.keys(written).filter((label) => !alive.has(label) && written[label] >= EROSION)
+		// AND ONLY FOR ROWS THIS CLOSE ACTUALLY WAVED PAST. First it was every row ever counted
+		// (a row amended and deleted demanded an amendment forever); then every row this boot
+		// PRODUCES, which is still wrong in the direction that matters, and `field:work` proved
+		// it the same day: acknowledged eight times, right every single time, and resolved on
+		// 2026-09-05 by its owner relaunching the agent — after which the row was GREEN and the
+		// close went on demanding that the guard be amended or deleted. A green row was not
+		// waved past. It cannot be eroding, and the only way to silence it would have been to
+		// misuse `--amended` on a guard that needed no amendment, which corrupts the very
+		// evidence `CLAUDE.md` builds the amendment protocol on.
+		const waved = new Set(open.map((r) => r.label))
+		const eroding = Object.entries(written).filter(([label, n]) => n >= EROSION && waved.has(label))
+		const stale = Object.keys(written).filter((label) => !waved.has(label) && written[label] >= EROSION)
 		if (eroding.length) {
 			lines.push("")
 			lines.push("  🔴 AMEND THE PROTOCOL - these rows are being waved past, not acted on:")
@@ -1290,7 +1299,7 @@ if (CLOSE) {
 				lines.push(`      When you have: node bin/boot.mjs --close --amended ${label}="what it measures now"`)
 			}
 		}
-		if (stale.length) lines.push(`  · ${stale.length} count(s) held for row(s) this boot does not produce (${stale.join(", ")}) - kept as history, not demanded`)
+		if (stale.length) lines.push(`  · ${stale.length} count(s) held as history for row(s) this close did not wave past (${stale.join(", ")}) - a row that is green, or gone, is not eroding`)
 		lines.push("")
 		lines.push(`  ✓ CLOSED at ${head} - the next boot inherits a tree whose every row is green or named.`)
 		}
@@ -2158,15 +2167,25 @@ function proveRed() {
 			writeFileSync(join(pkg, ".boot-state.json"), JSON.stringify(st, null, 2) + "\n")
 			touchStatus()
 			const withGhost = closeRun2(ackAll()).stdout || ""
+			// AND THE CASE THE FIELD PROVED: a row with a high count that is GREEN in this boot.
+			// `tree` warns only because dirty.txt is there; remove it and the same count must
+			// stop demanding anything, because nothing was waved past.
 			rmSync(join(pkg, "dirty.txt"), { force: true })
+			const st2b = stateOf()
+			st2b.ackCounts = { ...(st2b.ackCounts || {}), tree: 9 }
+			writeFileSync(join(pkg, ".boot-state.json"), JSON.stringify(st2b, null, 2) + "\n")
+			touchStatus()
+			const whenGreen = closeRun2(ackAll()).stdout || ""
+			const greenSilent = !/\btree acknowledged \d+x/.test(whenGreen)
 			const ghostSilent = !/a-row-that-was-deleted acknowledged/.test(withGhost) &&
 				/a-row-that-was-deleted/.test(withGhost)   // held as history, and said so
 			assert("close: the erosion count is armed, dischargeable, and does not haunt",
-				demanded && (countsAfter3.tree || 0) >= 3 && cleared && !treeStillDemanded && ghostSilent,
+				demanded && (countsAfter3.tree || 0) >= 3 && cleared && !treeStillDemanded && ghostSilent && greenSilent,
 				`3 closes acking the same rows -> tree=${countsAfter3.tree}, AMEND on the 3rd=${demanded} (not on the 1st: control); ` +
 				`--amended tree -> count cleared and recorded=${cleared}, the next close no longer demands TREE=${!treeStillDemanded}` +
 				`${/AMEND THE PROTOCOL/.test(quiet) ? ` (it still demands, for another row: ${amendLine(quiet)} - correct, that one was not amended)` : ""}; ` +
-				`a count for a row this boot does not produce -> demanded=${/a-row-that-was-deleted acknowledged/.test(withGhost)} (want false), named as history=${/a-row-that-was-deleted/.test(withGhost)}`)
+				`a count for a row this boot does not produce -> demanded=${/a-row-that-was-deleted acknowledged/.test(withGhost)} (want false), named as history=${/a-row-that-was-deleted/.test(withGhost)}; ` +
+				`the same count on a row that is GREEN this close -> demanded=${!greenSilent} (want false: a green row was not waved past)`)
 		}
 
 		// ── a close whose record does not land is not a close ────────────────────────────
