@@ -16,6 +16,20 @@ node <path-to-claude-comm>/install.mjs <your project> --check    # what version 
 Your project records what it has in `.comm/INSTALLED.json`. An update prints only the entries you did not
 already have.
 
+
+## 2026-09-05.2 — bus print `873f43df21ed` — 2026-09-05
+
+- **Your session now tells you when your bus is out of date, and it did not before.** Until today the only
+  thing on this machine that noticed an out-of-date bus was the claude-comm leader's own startup, because it
+  scans neighbouring projects — your own project had no signal at all, so updating depended on somebody
+  remembering. Now, at the start of a session, the hook compares what you have against the source's newest
+  release and prints one line naming the version, what changed, and the exact command to update.
+- **It is said once per version, not once per session.** A line printed at every start is a line nobody
+  reads. If a newer release lands later, it says it again — once.
+- **If it cannot check, it says that too.** A source checkout that has moved or been deleted gets its own
+  sentence, because "I could not check" and "you are up to date" are different answers and only one of them
+  is safe to assume.
+
 ## 2026-09-05.1 — bus print `6cf0dce28c71` — 2026-09-05
 
 - **`claim.mjs` now finds your project instead of your current directory.** It used to create its record of

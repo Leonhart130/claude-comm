@@ -730,8 +730,19 @@ function askBus(sessionPidForCwd) {
 			if (mt > newest) { newest = mt; newestFile = rel }
 		}
 		const stale = newest > doc
-		const nx = txt.match(/^##\s*▶\s*NEXT\b[^\n]*\n([\s\S]*?)(?=^## |\Z)/m)
-		nextText = nx ? nx[1].trim() : ""
+		// SPLIT ON THE HEADING, never a lookahead ending in `\Z`. This read
+		// `(?=^## |\Z)` — and `\Z` is not an anchor in JavaScript, it is the letter Z — so the
+		// match depended entirely on ANOTHER `## ` section existing after this one. Move
+		// `## ▶ NEXT` to the end of STATUS.md, which is an ordinary edit and arguably the
+		// natural place for it, and the whole section becomes invisible: the boot report drops
+		// the handoff line, and `--close` REFUSES with "STATUS.md carries no `## ▶ NEXT`
+		// section" while the section is sitting right there. Confidently wrong about the one
+		// thing the close protocol exists to protect. Found on 2026-09-05 by attacking the
+		// neighbour of the identical bug in install.mjs's changelog parser, an hour after
+		// fixing that one.
+		const sections = txt.split(/^## /m)
+		const nx = sections.find((sec) => /^\s*▶\s*NEXT\b/.test(sec))
+		nextText = nx ? nx.slice(nx.indexOf("\n") + 1).trim() : ""
 		row("status", stale ? WARN : OK,
 			`headed ${stamp}` +
 			(stale ? ` - but ${newestFile} is newer by ${age(newest - doc)}: read it as a claim` : " - newer than the code it describes"))
@@ -1362,11 +1373,25 @@ function proveRed() {
 	// reason (a delete and an overwrite are different shapes and only one changes a name).
 	const REAL_REG = join(process.env.CLAUDE_COMM_RUNTIME || process.env.XDG_RUNTIME_DIR
 		|| `/tmp/claude-comm-${process.getuid?.() ?? "nouid"}`, "claude-comm", "sessions")
+	// ATTRIBUTED, not merely compared (2026-09-05). This joined its entries into one string,
+	// so ANY difference produced the sentence "this suite wrote into the world it measures" —
+	// and this control runs for ELEVEN MINUTES, during which a person opening a Claude session
+	// anywhere on this machine adds an entry. Measured: three real sessions started at
+	// 17:59:57, 18:00:47 and 18:01:15 during one run, and the control named the suite. A check
+	// whose job is attribution must not misattribute: an entry that CHANGED or VANISHED is the
+	// suite, because nothing else rewrites an existing pid's file; an entry that APPEARED is
+	// the suite only if its transcript points inside this fixture.
 	const snapReal = () => {
+		const out = new Map()
 		try {
-			return readdirSync(REAL_REG).sort()
-				.map((f) => `${f}:${createHash("sha256").update(readFileSync(join(REAL_REG, f))).digest("hex").slice(0, 12)}`).join(",")
-		} catch { return "<none>" }
+			for (const f of readdirSync(REAL_REG).sort()) {
+				const raw = readFileSync(join(REAL_REG, f))
+				let transcript = null
+				try { transcript = JSON.parse(raw.toString("utf8")).transcript || null } catch {}
+				out.set(f, { hash: createHash("sha256").update(raw).digest("hex").slice(0, 12), transcript })
+			}
+		} catch {}
+		return out
 	}
 	const realBefore = snapReal()
 	process.env.CLAUDE_COMM_RUNTIME = join(tmp, "runtime")
@@ -1979,6 +2004,28 @@ function proveRed() {
 		assert("close refuses without a stated next move", noNext.status === 1 && /carries no `## ▶ NEXT`/.test(noNext.stdout),
 			`exit=${noNext.status}`)
 
+		// ONE VARIABLE against the arm above: the SAME section, moved to the end of the file.
+		// It must still be found — the section's position is not the property, its presence is.
+		//
+		// WHAT THIS ASSERTS IS THE REFUSAL'S REASON, not the exit code. The first version
+		// demanded exit 0 and failed: the fixture had an unnamed row open, so the close
+		// refused for that — correctly — and the arm reported it as a failure to find a
+		// section it had in fact found. Twice in one day, an arm of mine measuring a
+		// different variable than the one in its title.
+		const nextRe = /^## ▶ NEXT[\s\S]*?(?=^## )/m
+		const moved = orig.replace(nextRe, "").trimEnd() + "\n\n" + (orig.match(nextRe) || [""])[0].trimEnd() + "\n"
+		writeFileSync(st2, moved)
+		const lastSection = closeRun()
+		const reportHasNext = /▶ NEXT, from the last close/.test(lastSection.stdout)
+		const claimedMissing = /carries no `## ▶ NEXT`/.test(lastSection.stdout)
+		writeFileSync(st2, orig)
+		assert("close: the NEXT section is found wherever it sits",
+			!claimedMissing && reportHasNext,
+			`## ▶ NEXT moved to the END of STATUS.md -> ` +
+			`${claimedMissing ? "REFUSED, claiming the section is absent while it is right there" : "found it"}, ` +
+			`report still carries the handoff=${reportHasNext} ` +
+			`(the arm above is the control: with the section actually removed, the close MUST refuse)`)
+
 		writeFileSync(join(pkg, "dirty.txt"), "x\n")
 		const unacked = closeRun()
 		// The rows to name are DERIVED from the fixture's own boot, not listed here. Listed,
@@ -2244,9 +2291,24 @@ function proveRed() {
 			`archive in a directory with no repository -> ${LV[lv]}`)
 	}
 
-	assert("the control leaves the machine's real registry untouched",
-		snapReal() === realBefore,
-		`${REAL_REG}: ${snapReal() === realBefore ? "unchanged" : "CHANGED - this suite wrote into the world it measures"}`)
+	{
+		const realAfter = snapReal()
+		const changed = [], vanished = [], leaked = [], foreign = []
+		for (const [f, v] of realBefore) {
+			if (!realAfter.has(f)) vanished.push(f)
+			else if (realAfter.get(f).hash !== v.hash) changed.push(f)
+		}
+		for (const [f, v] of realAfter) {
+			if (realBefore.has(f)) continue
+			;(v.transcript && v.transcript.startsWith(tmp) ? leaked : foreign).push(f)
+		}
+		const moved = changed.length + vanished.length + leaked.length
+		assert("the control leaves the machine's real registry untouched", moved === 0,
+			`${REAL_REG}: ` +
+			(moved === 0 ? "no entry changed, vanished, or appeared carrying a fixture transcript"
+				: `THIS CONTROL MOVED IT - changed ${JSON.stringify(changed)}, vanished ${JSON.stringify(vanished)}, fixture transcripts ${JSON.stringify(leaked)}`) +
+			(foreign.length ? ` · ${foreign.length} session(s) started on this machine during the run (${foreign.join(", ")}) - the world moving, not this control` : ""))
+	}
 
 	console.log(`\n${failed ? `✗ ${failed} boot row(s) could NOT be reddened - that row is decoration` : "✓ every gating boot row demonstrated able to go red"}\n`)
 	process.exit(failed ? 1 : 0)
