@@ -62,17 +62,12 @@ the RULE with evidence, not this row.
 (`FINDINGS.md#unnamed-collision`). **Check `prev_session` on the newest start:** `7a7503b4-…` means the
 crossing worked; null means it lapsed or somebody else took it, and this start is correctly COLD.
 
-**7 — 🔴 The restart TTL has now lapsed on a human TWICE, and there is a better rule.** First the `~/Dev/work`
-leader's note during a close (15 min); then this session's own, at **38.8 min against a 30 min promise**, while
-the owner launched a review. `FINDINGS.md#reboot-signal` says this is not fixable by choosing a bigger number
-— correct, and two observations say the CLOCK is the wrong instrument.
-**The note already carries `by_pid`.** A restart has plausibly happened when the ARMER'S PROCESS IS GONE, and
-has plainly not when it is still alive; `bin/claim.mjs` shipped the (pid, start time, boot id) liveness test
-today and `bin/session-registry.mjs` exports it. So the rule to try is **armer-gone AND not ancient** — the
-TTL demoted from the test to a backstop against a note abandoned for a day. `classify()` is one function,
-correctable, re-read over every record ever written, which is exactly why it was built that way.
-⚠️ **Not built on purpose:** review #7 was reading this code when the evidence arrived. Do not move the
-instrument under a reviewer. Build it after the review is disposed, with both directions armed.
+**7 — 🔴 The restart TTL lapsed on a human TWICE; the clock is the wrong instrument.** The `~/Dev/work`
+leader's note during a close, then this session's own at **38.8 min against 30**. `#reboot-signal` already
+says a bigger number is not the fix. **The note carries `by_pid`:** a restart plausibly happened when the
+ARMER IS GONE and plainly has not while it lives, and `claim.mjs` shipped that (pid, start, boot) test today.
+Rule to try: **armer-gone AND not ancient**, TTL demoted to a backstop. `classify()` is correctable and
+re-read over every record. ⚠️ **Not built on purpose** — review #7 was reading this code. Build it after.
 
 **Standing test debt from review #4, none of it gated:** `FINDINGS.md#test-debt`.
 
@@ -158,12 +153,6 @@ instrument under a reviewer. Build it after the review is disposed, with both di
 - **The crossing has happened ONCE**, in one project, armed by one agent, relaunched by one hand
   (2026-09-04 20:44). It took two lapse warnings to land. Not verified: that it survives an unattended
   relaunch, that anyone repeats it without being reminded, or that the arm ever reaches ten.
-- **Whether two consumers of one hook stdin work.** The ▶ NEXT depends on the generated stub reading the
-  payload and handing it to both the bus and the ledger. It currently uses `stdio: "inherit"` and has never
-  been asked to do anything else.
-- **How long the wandered-cwd window stays open.** Proved within a single `-p` turn; whether an interactive
-  session's Bash cwd resets between turns is unmeasured. It decides the exposure, not the existence, of the
-  defect. Moot for delivery (identity no longer reads cwd); still governs `whoami`-returns-null, open item 2.
 - **`selftest`'s BEHAVIOUR half is not a gate and never will be** — 3 of 6 runs showed the agent not reading
   the file it was pointed at. That is allowed by design, but it means this bus regularly rings a bell nobody
   answers, and no gate can tell you that happened in production.
