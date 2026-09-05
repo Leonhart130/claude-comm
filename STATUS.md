@@ -50,6 +50,15 @@ upper bound. Do not quote the disagreement as a result.
 be reddened, then went green twice on the same tree. Never named, because the run was filtered through `grep`.
 **Run gates unfiltered.** If it recurs it is `FINDINGS.md#A20` and it is triage-first.
 
+**⚠️ `ackCounts` says `field:work: 3` again — DO NOT AMEND THAT ROW A SECOND TIME.** It was already amended
+today on exactly that signal (`FINDINGS.md#ack-amendment`) and the counter was reset; it climbed straight back
+because the row is now **right**: `db` in `~/Dev/work` genuinely has mail and is not running. What makes it
+un-acknowledgeable-away is not the guard, it is my POSITION — relaunching another project's agent is theirs,
+they were told on the channel, and until they do it the condition correctly persists. **The rule that a
+bypass rate means a failing guard assumes the reader can act.** That assumption does not hold for a row about
+somebody else's tree, and noticing that is worth more than another amendment. If you want to improve
+something here, improve the RULE, with evidence, not this row.
+
 **Standing test debt from review #4, none of it gated:** `FINDINGS.md#test-debt`.
 
 ## Where it stands
