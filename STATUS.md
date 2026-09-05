@@ -32,31 +32,48 @@ two seconds later, in the same fixture. The arms no longer depend on it (they ac
 **the world moved and nobody knows why**. `FINDINGS.md#review7-disposal` names the candidate. Measure it
 before touching that arm again.
 
-**2 — `#claim-file` between two REAL agents.** Sharper now: review #7 proved the shipped tool could not
+**2 — 🔴 NOBODY IN THE FIELD KNOWS THEIR BUS IS OLD. Build the signal, and it touches delivery.**
+
+Shipped 2026-09-05: `install.mjs --add-agent <name>[=<dir>]` (one command sets up an expert: folder,
+roster, hooks, inbox — and it REFUSES to move an existing one, because that strands mail), `CHANGELOG.md`
+written for the field agent, `--release <label>` stamping each note with the **bus print** of the code it
+was written for, and `.comm/INSTALLED.json` recording what a project has. Armed as A40/A41. Both trees are
+on `2026-09-05.1`, print `6cf0dce28c71`.
+
+**What is still missing is the signal itself.** The only thing on this machine that detects an out-of-date
+field bus is MY boot, because I scan sibling projects. A `~/Dev/work` leader gets nothing. So updating
+depends on my noticing, which is a person, not a mechanism — and the owner asked for the opposite.
+
+The fix is one comparison in the generated stub at SessionStart: `.comm/INSTALLED.json`'s print against the
+source checkout's, said ONCE (the `.notice-seen` idiom is already there), never blocking, always exit 0.
+⚠️ **It is on the delivery path**, so `node test/selftest.mjs` and `--prove-red` are required before it
+lands — that is real `claude -p` sessions and minutes, and boot deliberately does not run them.
+
+**3 — `#claim-file` between two REAL agents.** Sharper now: review #7 proved the shipped tool could not
 detect a collision AT ALL when the agents stand in their own directories — where five of `~/Dev/work`'s six
 live. The arms cover it; two live sessions still have not. The peer's third control is the one that matters:
 kill one holder brutally, and the claim must read HOLDER IS GONE, never a lock
 (`exchange/work-leader/out/2026-09-05-claim-file-construit.md`).
 
-**3 — No real adversarial review has run from `review/` yet.** A `review` agent exists in both field
+**4 — No real adversarial review has run from `review/` yet.** A `review` agent exists in both field
 rosters; the mail routing is measured, the workflow is not. Review #7 ran from `~/Dev/claude-comm`, which
 has no roster, so it does not answer this.
 
-**4 — The launcher must resolve the runtime and REFUSE.** `FINDINGS.md#hookless-launch`. The false
+**5 — The launcher must resolve the runtime and REFUSE.** `FINDINGS.md#hookless-launch`. The false
 remediation is now corrected in both places that shipped it (`.claude/settings.json` and the stub the
 installer generates): `-i`, not `-l` — nvm is loaded from `.zshrc`, which a login shell never reads. The
 rule to BUILD is still the peer's: resolve `node`/`claude` absolutely before launching, and refuse when
 resolution fails.
 
-**5 — The window is untested and my own timestamps are why.** 0 of 25 defects fall in the 15-minute
+**6 — The window is untested and my own timestamps are why.** 0 of 25 defects fall in the 15-minute
 window against the consumer's "four of five in thirteen minutes" — but each is dated at its commit, the
 upper bound. Do not quote the disagreement as a result.
 
-**6 — One red no code change explains, still unidentified.** `boot --prove-red` once reported a row that
+**7 — One red no code change explains, still unidentified.** `boot --prove-red` once reported a row that
 could not be reddened, then went green twice on the same tree. Never named, because the run was filtered
 through `grep`. **Run gates unfiltered.** If it recurs it is `FINDINGS.md#A20` and it is triage-first.
 
-**7 — 🔴 The restart TTL lapsed on a human TWICE; the clock is the wrong instrument.** The note carries
+**8 — 🔴 The restart TTL lapsed on a human TWICE; the clock is the wrong instrument.** The note carries
 `by_pid`: a restart plausibly happened when the ARMER IS GONE, and plainly has not while it lives, and
 `claim.mjs` shipped that (pid, start, boot) test. Rule to try: **armer-gone AND not ancient**, TTL demoted
 to a backstop. `classify()` is re-read over every record. Not built.
@@ -103,7 +120,7 @@ running — and what blocks it is my POSITION: relaunching their agent is theirs
 
    `take` / `list` / `release`, 16 arms, `A38` in the gate, installed in both field projects, and a boot row
    that names a claim whose holder has **died**. **It advises; it opens nothing, kills nothing, blocks
-   nothing.** 🔴 **Untested between two real agents — ▶ NEXT 2.**
+   nothing.** 🔴 **Untested between two real agents — ▶ NEXT 3.**
 5. **🔴 A session launched outside an interactive shell has NO bus, and says nothing.** `node` lives only
    under nvm, so `kitten @ launch claude` (or cron, or a `.desktop` file) starts a session whose **every hook
    dies** while it looks normal. **A self-launched expert is launched by a program, never by a shell** — the

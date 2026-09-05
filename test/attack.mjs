@@ -58,12 +58,39 @@ const REAL_REGISTRY = join(process.env.CLAUDE_COMM_RUNTIME || process.env.XDG_RU
 // (A29's shape: delete-then-write leaves the same filename holding a fixture transcript).
 // The overwrite is the shape that already happened once, under the operator's own pid,
 // with a green tick over it. A hash is the same one line.
+// G7, 2026-09-05: it returned a JOINED STRING, so every difference read as one difference and
+// the sentence it produced was "this suite wrote into the world it measures". Measured: three
+// real `claude` sessions started on this machine during an eleven-minute control run, each
+// writing its own entry at SessionStart, and the guard blamed the suite by name. That is this
+// project's signature defect - a check naming something other than what it measured -
+// committed by the check whose whole job is attribution. A map lets the caller tell the three
+// differences apart: an entry that CHANGED or VANISHED is the suite (nothing else touches an
+// existing pid's file), and an entry that APPEARED is only the suite if its transcript points
+// inside the suite's own scratch directory. Otherwise it is a person opening a session.
 const snapshotReal = () => {
+	const out = new Map()
 	try {
-		return readdirSync(REAL_REGISTRY).sort()
-			.map((f) => `${f}:${createHash("sha256").update(readFileSync(join(REAL_REGISTRY, f))).digest("hex").slice(0, 12)}`)
-			.join(",")
-	} catch { return "<none>" }
+		for (const f of readdirSync(REAL_REGISTRY).sort()) {
+			const raw = readFileSync(join(REAL_REGISTRY, f))
+			let transcript = null
+			try { transcript = JSON.parse(raw.toString("utf8")).transcript || null } catch {}
+			out.set(f, { hash: createHash("sha256").update(raw).digest("hex").slice(0, 12), transcript })
+		}
+	} catch {}
+	return out
+}
+/** What moved between two snapshots, split by who could have moved it. */
+const registryDiff = (before, after, ours) => {
+	const changed = [], vanished = [], leaked = [], foreign = []
+	for (const [f, v] of before) {
+		if (!after.has(f)) vanished.push(f)
+		else if (after.get(f).hash !== v.hash) changed.push(f)
+	}
+	for (const [f, v] of after) {
+		if (before.has(f)) continue
+		;(v.transcript && v.transcript.startsWith(ours) ? leaked : foreign).push(f)
+	}
+	return { changed, vanished, leaked, foreign }
 }
 const realBefore = snapshotReal()
 // G5: an aborted suite is the run whose effect on the world is LEAST known, and a check()
@@ -71,10 +98,13 @@ const realBefore = snapshotReal()
 let a31Ran = false
 process.on("exit", () => {
 	if (a31Ran) return
-	const after = snapshotReal()
-	if (after !== realBefore) {
+	const d = registryDiff(realBefore, snapshotReal(), root)
+	// Same attribution as A31: an abort must not accuse the suite of a session somebody
+	// else happened to start while it ran.
+	if (d.changed.length || d.vanished.length || d.leaked.length) {
 		console.log(`\n  ✗ THE SUITE ABORTED AND LEFT THE REAL REGISTRY CHANGED\n      ${REAL_REGISTRY}\n` +
-			`      before: ${realBefore}\n      after:  ${after}`)
+			`      changed: ${JSON.stringify(d.changed)}  vanished: ${JSON.stringify(d.vanished)}  ` +
+			`appeared with a fixture transcript: ${JSON.stringify(d.leaked)}`)
 	}
 })
 process.env.CLAUDE_COMM_RUNTIME = mkdtempSync(join(tmpdir(), "comm-attack-runtime-"))
@@ -931,7 +961,7 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 // showed a gate written with the filename in a const is invisible to that match - boot
 // then reports a RED as a WARN and exits 0 while a clone crashes all 28 checks. Add a
 // document here the moment a gate reads it.
-// gate-docs: FINDINGS.md
+// gate-docs: FINDINGS.md CHANGELOG.md
 //
 // The tools that carry reasoning pointers, ENUMERATED rather than listed.
 //
@@ -2237,6 +2267,79 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		`then leader -> dev: ${/PLAN\.md/.test(delivered) ? "delivered at first start, pointing at the file" : "NOT DELIVERED"}, inbox drained=${drained}`)
 }
 
+// A42 — an agent's own session tells it the bus is out of date, once, without costing a delivery.
+//
+// THE MISSING MECHANISM, and it was missing in the direction that matters. Until 2026-09-05 the
+// only thing on the machine that noticed an out-of-date field bus was the claude-comm leader's
+// boot, because it scans sibling projects — so a project's own agents had no signal, and every
+// update depended on somebody remembering to look. The owner asked for a mechanism instead.
+//
+// It is on the DELIVERY PATH, which is why every arm below re-checks that mail still drains and
+// the stdout contract still holds: a diagnostic that costs a message is worse than no diagnostic.
+// Four states, one variable each, and the marker makes it a line said once per version rather
+// than at every session start — the failure this project keeps finding in its own output.
+{
+	const kit42 = join(root, "kit42")
+	mkdirSync(kit42, { recursive: true })
+	cpSync(join(PKG, "install.mjs"), join(kit42, "install.mjs"))
+	cpSync(join(PKG, "bin"), join(kit42, "bin"), { recursive: true })
+	cpSync(join(PKG, "CHANGELOG.md"), join(kit42, "CHANGELOG.md"))
+	const proj42 = join(root, "proj42")
+	mkdirSync(join(proj42, ".comm"), { recursive: true })
+	mkdirSync(join(proj42, "dev"), { recursive: true })
+	writeFileSync(join(proj42, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", dev: "dev" } }))
+	writeFileSync(join(proj42, "NOTE.md"), "# note\n")
+	spawnSync("node", [join(kit42, "install.mjs"), proj42], { encoding: "utf8" })
+
+	const instP = join(proj42, ".comm", "INSTALLED.json")
+	const setInstalled = (over) => {
+		const cur = JSON.parse(readFileSync(instP, "utf8"))
+		writeFileSync(instP, JSON.stringify({ ...cur, ...over }))
+	}
+	const fire42 = () => spawnSync("node", [join(proj42, "dev", ".claude", "comm-hook.mjs"), "session-start"], {
+		cwd: join(proj42, "dev"), encoding: "utf8",
+		input: JSON.stringify({ cwd: join(proj42, "dev"), source: "startup" }),
+		env: { ...process.env, CLAUDE_COMM_RUNTIME: join(root, "rt42") },
+	})
+	const offers = (r) => /is available/.test(r.stderr || "")
+	const blind = (r) => /could NOT check/.test(r.stderr || "")
+
+	// A. CONTROL: current. A tool that speaks when there is nothing to say trains its reader
+	//    to skip the line that matters.
+	const current = fire42()
+	// B. ONE VARIABLE: the project stands on an older release. It must name the version, the
+	//    notes and the command — with mail waiting, because this runs on the delivery path.
+	setInstalled({ label: "0000-00-00.0" })
+	spawnSync("node", [join(proj42, ".comm", "bin", "comm.mjs"), "send", "dev", "--ref", "../NOTE.md", "--note", "read this"],
+		{ cwd: proj42, encoding: "utf8" })
+	const waiting = readdirSync(join(proj42, ".comm", "inbox", "dev")).filter((f) => f.endsWith(".json")).length
+	const behind = fire42()
+	const drained = readdirSync(join(proj42, ".comm", "inbox", "dev")).filter((f) => f.endsWith(".json")).length === 0
+	let schema42 = false, carried = false
+	try {
+		const out = JSON.parse(behind.stdout)
+		schema42 = out.hookSpecificOutput.hookEventName === "SessionStart"
+		carried = /NOTE\.md/.test(out.hookSpecificOutput.additionalContext)
+	} catch {}
+	// C. The same state again: said once per version, not once per session.
+	const twice42 = fire42()
+	// D. ONE VARIABLE: the source checkout is gone. "I could not check" and "you are current"
+	//    are different answers, and only one of them is safe to assume.
+	setInstalled({ from: join(root, "no-such-checkout") })
+	const gone = fire42()
+
+	check("A42 a session says its bus is out of date, once per version, without costing a delivery",
+		!offers(current) && !blind(current) &&
+		offers(behind) && /install\.mjs/.test(behind.stderr) && /CHANGELOG\.md/.test(behind.stderr) &&
+		waiting === 1 && drained && schema42 && carried &&
+		!offers(twice42) && blind(gone),
+		`current -> ${offers(current) || blind(current) ? "SPOKE (must be silent)" : "silent"}; ` +
+		`a release behind -> ${offers(behind) ? "names the version, the notes and the update command" : "SILENT (must speak)"}; ` +
+		`in the same fire: mail ${waiting} -> ${drained ? 0 : "STUCK"}, stdout schema intact=${schema42}, the message carried=${carried}; ` +
+		`the same start again -> ${!offers(twice42) ? "quiet (said once per version)" : "REPEATED ITSELF"}; ` +
+		`source checkout gone -> ${blind(gone) ? "says it could NOT check" : "SILENT, which reads as up to date"}`)
+}
+
 // A31 — this suite must not touch the machine's real session registry.
 //
 // Not a property of the bus: a property of the SUITE, and it is here because the trap has
@@ -2246,9 +2349,42 @@ process.stdout.write(JSON.stringify({ ops, res }))
 {
 	const realAfter = snapshotReal()
 	a31Ran = true
+
+	// THE ATTRIBUTION'S OWN POSITIVE CONTROL, on synthetic snapshots, because the honest way
+	// to prove this guard still reddens is NOT to write into the real registry to see whether
+	// it notices. Loosening a guard without showing it can still fire is how a control becomes
+	// decoration — CLAUDE.md's amendment, applied to the guard that protects every other
+	// measurement here. Four one-variable cases against one control.
+	const E = (t) => ({ hash: "aaaaaaaaaaaa", transcript: t })
+	const base = new Map([["1.json", E("/home/u/.claude/1.jsonl")]])
+	const cases = {
+		"nothing moved": registryDiff(base, new Map(base), root),
+		"an existing entry overwritten": registryDiff(base, new Map([["1.json", { hash: "bbbbbbbbbbbb", transcript: "/x" }]]), root),
+		"an existing entry deleted": registryDiff(base, new Map(), root),
+		"a new entry with a FIXTURE transcript": registryDiff(base, new Map([...base, ["9.json", E(join(root, "t.jsonl"))]]), root),
+		"a new entry from another session": registryDiff(base, new Map([...base, ["9.json", E("/home/u/.claude/9.jsonl")]]), root),
+	}
+	const blames = (d) => d.changed.length + d.vanished.length + d.leaked.length > 0
+	const attribution =
+		!blames(cases["nothing moved"]) &&
+		blames(cases["an existing entry overwritten"]) &&
+		blames(cases["an existing entry deleted"]) &&
+		blames(cases["a new entry with a FIXTURE transcript"]) &&
+		!blames(cases["a new entry from another session"]) &&
+		cases["a new entry from another session"].foreign.length === 1
+
+	const d = registryDiff(realBefore, realAfter, root)
+	const mine = d.changed.length + d.vanished.length + d.leaked.length
 	check("A31 the suite leaves the machine's real registry untouched",
-		realAfter === realBefore,
-		`${REAL_REGISTRY}: ${realBefore === realAfter ? "unchanged" : `CHANGED\n      before: ${realBefore}\n      after:  ${realAfter}`}`)
+		mine === 0 && attribution,
+		`${REAL_REGISTRY}: ` +
+		(mine === 0
+			? `no entry changed, vanished, or appeared carrying a transcript inside ${root}`
+			: `THE SUITE MOVED IT — changed ${JSON.stringify(d.changed)}, vanished ${JSON.stringify(d.vanished)}, ` +
+			  `appeared with a fixture transcript ${JSON.stringify(d.leaked)}`) +
+		(d.foreign.length ? ` · ${d.foreign.length} session(s) started on this machine during the run (${d.foreign.join(", ")}) — the world moving, not this suite` : "") +
+		` · attribution armed on synthetic snapshots (overwrite/delete/fixture-transcript all blame the suite, ` +
+		`another session's entry does not)=${attribution}`)
 }
 
 console.log(`\n${failed ? `✗ ${failed} adversarial check(s) FAILED` : "✓ all adversarial checks passed"}`)

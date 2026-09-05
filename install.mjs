@@ -313,6 +313,65 @@ try {
 		}
 	} catch { /* a notice must never break a session */ }
 
+	// IS THIS BUS OUT OF DATE, AND DOES ANYONE HERE KNOW? Until 2026-09-05 the answer to the
+	// second half was no. The only thing on the machine that noticed an out-of-date field bus
+	// was the claude-comm leader's own boot, because it scans sibling projects — so a project's
+	// own agents had no signal at all, and updating depended on somebody remembering. The
+	// owner asked for the opposite: *"il faut que l'outil soit facile à mettre à jour chez tous
+	// les agents."* A mechanism, not a person's vigilance.
+	//
+	// It reads two small files and spawns nothing: this project's own \`INSTALLED.json\`, and
+	// the source checkout's CHANGELOG heading. It speaks ONCE PER VERSION — the marker holds
+	// the label it announced, so a new release says it again and an unchanged one never does.
+	// A line printed at every start is a line nobody reads, which is the failure this whole
+	// file keeps finding in its own output.
+	//
+	// EVERY branch is silent-and-harmless on failure except one: a source checkout that cannot
+	// be read AT ALL is reported, because "I could not check" and "you are current" are
+	// different answers and this project's rule is that a probe's silence is not evidence.
+	try {
+		const instP = join(projectRoot, ".comm", "INSTALLED.json")
+		const mark = join(projectRoot, ".comm", ".update-seen")
+		let mine = null
+		try { mine = JSON.parse(readFileSync(instP, "utf8")) } catch {}
+		if (mine && mine.from) {
+			const clog = join(mine.from, "CHANGELOG.md")
+			let head = null
+			try {
+				const first = readFileSync(clog, "utf8").split(/^## /m)[1] || ""
+				const m = /^(\\S+) — bus print \`([0-9a-f]{12})\`/.exec(first)
+				if (m) head = { label: m[1], print: m[2] }
+			} catch {}
+			let said = ""
+			try { said = readFileSync(mark, "utf8").trim() } catch {}
+			if (!head) {
+				// The checkout moved, was deleted, or its changelog is unreadable. Say it once,
+				// keyed on the path, because an update command nobody can run is worth knowing.
+				if (said !== \`missing:\${mine.from}\`) {
+					process.stderr.write(\`claude-comm: this bus is \${mine.label}, and I could NOT check whether it is current — \${clog} is unreadable or gone. That is not the same as being up to date.\\n\`)
+					try { writeFileSync(mark, \`missing:\${mine.from}\\n\`) } catch {}
+				}
+			// KEYED ON THE LABEL, NOT THE PRINT — and the first version keyed on the print,
+			// which was measured saying *"your bus is 2026-09-05.1 and 2026-09-05.1 is
+			// available"*. Two different conditions were being conflated:
+			//   · the source carries a RELEASE this project does not have — the field's
+			//     business, and what this line is for;
+			//   · the source's bytes have moved past its own newest note — the MAINTAINER's
+			//     business, reported by the installer to whoever runs it, and nothing a field
+			//     agent can act on. It is normal for minutes at a time while a fix is written.
+			// Announcing the second as if it were the first is a warning that fires during
+			// ordinary work and names a version you already have.
+			} else if (head.label !== mine.label && said !== head.label) {
+				process.stderr.write(
+					\`claude-comm: this project's bus is \${mine.label} and \${head.label} is available.\\n\` +
+					\`  what changed: \${clog}\\n\` +
+					\`  update:       node \${join(mine.from, "install.mjs")} \${projectRoot}\\n\` +
+					\`  said once for this version, not again.\\n\`)
+				try { writeFileSync(mark, head.label + "\\n") } catch {}
+			}
+		}
+	} catch { /* a version check must never break a session */ }
+
 	// The ledger: the control arm for "did the fifteen minutes after a restart cost us
 	// a defect". It records into THIS project, beside this project's bus, because this
 	// is where the restarts being measured actually happen. Read it back with

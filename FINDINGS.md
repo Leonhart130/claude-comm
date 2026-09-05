@@ -1458,3 +1458,65 @@ starts getting skipped.
   session keeps the settings it loaded; the bus itself is re-executed at every hook fire.
 - **Whether a SessionStart hook's stderr reaches the agent at all** is still unknown — the reviewer could
   not settle it either. F9 removed this repo's dependence on that channel; the generated stub still has one.
+
+
+## `#update-signal` — the field could not tell it was out of date, and the guard that noticed blamed the wrong thing
+
+**2026-09-05, after review #7 was disposed.** The owner asked three questions in plain words — can a leader
+install this for his own experts, is there a clear notice, is there a patch note — and the honest answer to
+all three was *partly*. What follows is what was built and, more usefully, the two defects the building
+produced.
+
+### What was missing was a MECHANISM, and what stood in its place was me
+
+Updating a field project was already one idempotent command, documented in the notice installed in that
+project. What did not exist was any way for that project to KNOW it was behind. The only thing on this
+machine that detected an out-of-date field bus was the claude-comm leader's own boot, because it scans
+sibling projects — so the update depended on a person noticing. `~/Dev/work` going from two experts to five
+is exactly the scale at which that stops working.
+
+Three pieces now: `install.mjs --add-agent <name>[=<dir>]` (folder, roster, hooks, inbox — in that order,
+and it REFUSES to move an existing agent, because an inbox with mail in it stays addressed to the old
+entry), `CHANGELOG.md` written for the field agent rather than for the maintainer, and a line the generated
+stub prints at SessionStart when the project's `.comm/INSTALLED.json` names an older release than the
+source's newest. Armed as A40, A41, A42 — A42 on the delivery path, so it re-checks that mail still drains
+and the hook's stdout contract still holds in the same fire.
+
+### 🔴 The same `\Z` bug, twice, in two files, an hour apart
+
+`install.mjs`'s changelog parser ended its match at `(?=^## |\Z)`. **`\Z` is not an anchor in JavaScript —
+it is the letter Z.** A one-entry changelog therefore parsed as zero entries, which is byte-identical to
+having no changelog at all: no version stamped, no notes printed, and `--release` unable to detect a
+duplicate label. Caught on the first real install.
+
+Then, an hour later, while reading a *filtered* boot report and briefly believing the handoff line had
+broken, I found the identical construction in `bin/boot.mjs:733` — the extractor for `## ▶ NEXT`. There it
+works only because another `## ` section follows in `STATUS.md`. **Move `## ▶ NEXT` to the end of the file —
+an ordinary edit, arguably the natural place for it — and the close REFUSES with "STATUS.md carries no
+`## ▶ NEXT` section" while the section is sitting right there**, and the boot report silently drops the
+handoff. Confidently wrong about the one thing the close protocol exists to protect. Both now split on the
+heading instead, and the second is armed.
+
+*(The filtered report was my own error and worth recording as one: I grepped for `budget|NEXT`, the body
+line contained neither, and I read its absence as a defect. **Run gates unfiltered** is in `CLAUDE.md`
+because of a different incident; this is the second.)*
+
+### 🔴 The integrity guard misattributed the world to the suite
+
+`boot --prove-red` reported `✗ the control leaves the machine's real registry untouched — CHANGED - this
+suite wrote into the world it measures`. Triaged before being believed, per `#A20`: the registry held three
+new entries for pids `1309413`, `1315187`, `1318777`, started at **17:59:57, 18:00:47 and 18:01:15** — real
+`claude` sessions somebody opened during the eleven minutes the control was running. The suite had written
+nothing.
+
+The guard compared a JOINED STRING of the whole directory, so every difference read as one difference and
+produced a sentence naming the suite. **A check whose entire job is attribution, misattributing.** It now
+classifies: an entry that CHANGED or VANISHED is the suite, because nothing else rewrites an existing pid's
+file; an entry that APPEARED is the suite only if its transcript points inside the fixture; anything else is
+reported as the world moving. Both copies fixed — `test/attack.mjs` A31 and boot's own control — including
+the abort path, which had the same sentence.
+
+**And a loosened guard must prove it still fires.** A31 now carries a positive control on SYNTHETIC
+snapshots — overwrite, delete, and a new entry carrying a fixture transcript must all blame the suite; another
+session's entry must not — because the honest way to prove this one reddens is not to write into the real
+registry to see whether it notices.
