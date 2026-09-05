@@ -1252,6 +1252,26 @@ launch. It names the directory first now, because that one survives being forgot
 measured on a fixture; the workflow around it — whether a reviewer that cannot see the leader's inbox still
 has everything it needs — is not.
 
+## `#unnamed-collision` — in a rosterless project every session is the same agent, including for the restart note
+
+**2026-09-05, live while it was written.** The restart signal is keyed by AGENT — `.comm/restart/<agent>.json`
+— and `claude-comm` has no `.comm/config.json`, so every session here resolves to `unnamed`. The adversarial
+reviewer for #7 was launched in this same directory while a restart was being armed for the leader.
+
+⇒ **The note is one-shot and will be claimed by whichever session's `SessionStart` fires next in this
+directory, not by the one it was meant for.** If the reviewer clears, resumes, or a third session opens here,
+that start is recorded as the reboot and the leader's real relaunch lands in `cold`. Same shape as the shared
+inbox (`#second-session`): two sessions, one name, one artifact, and the loser is silent.
+
+It is NOT a defect in `bin/restart-signal.mjs` — the file is doing exactly what it says, and its one-shot
+property is the whole mechanism. It is a consequence of this repository being the only project in the
+framework with **no roster of its own**, which also makes its boot row say "off the bus" truthfully.
+
+**Not fixed, and the cheap fix is suspicious:** giving claude-comm a roster would give it an inbox, a bus and
+a second identity surface, for one line of experimental hygiene. The honest mitigation is the one already
+used — arm LAST, and know that a concurrent session here can take it. Whether the arm was actually claimed by
+the intended session is checkable after the fact: the ledger's `prev_session` names who it succeeded.
+
 ## `#ack-amendment` — the first guard amended by its own bypass rate
 
 **2026-09-05.** `CLAUDE.md` says an acknowledgement count of three prints an instruction to amend the
