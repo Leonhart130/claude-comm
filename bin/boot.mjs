@@ -63,6 +63,19 @@ for (let i = 0; i < ARGV.length; i++) {
 	const eq = ARGV[i + 1].indexOf("=")
 	if (eq > 0) ACKS.set(ARGV[i + 1].slice(0, eq), ARGV[i + 1].slice(eq + 1))
 }
+// --amended <row>="what changed about what it measures", repeatable. THE DISCHARGE FOR THE
+// AMEND INSTRUCTION, and until review #7 F10 there was none: the erosion count was monotone
+// with no reset path anywhere in this file, so the loudest line of the close demanded an
+// amendment that following could not clear. The only way to clear it was a hand-edit of a
+// gitignored file - an unaudited edit to the evidence `CLAUDE.md` names as the authority for
+// changing this protocol. So the reset is a flag, it is recorded with its reason and the
+// head it landed at, and the history stays in the file.
+const AMENDED = new Map()
+for (let i = 0; i < ARGV.length; i++) {
+	if (ARGV[i] !== "--amended" || !ARGV[i + 1]) continue
+	const eq = ARGV[i + 1].indexOf("=")
+	if (eq > 0) AMENDED.set(ARGV[i + 1].slice(0, eq), ARGV[i + 1].slice(eq + 1))
+}
 
 // Four levels, because three forced "not measured" to borrow OK's tick - and OK is a
 // verdict about now while UNKNOWN is the absence of one. Review #3 R1/R5: --fast could
@@ -94,16 +107,34 @@ const git = (...a) => {
  * file - the --hook branch and the gate branch - and both do read-modify-write. A
  * truncating write leaves a window in which a concurrent reader sees a partial file.
  * Review #3 flagged the race as reasoned-about but unmeasured; rename(2) removes the
- * question rather than leaving it open. It does NOT make the read-modify-write pair
- * atomic - two interleaved boots can still lose one update - and that is stated rather
- * than papered over: the record it protects is a counter, and losing a count is
- * recoverable where losing the file is not.
+ * question rather than leaving it open.
+ *
+ * 🔴 WHAT rename(2) DOES NOT FIX, and review #7 F2 measured it in this repository while the
+ * review was being written. The pair is read-modify-write, and the gate branch read `prev`
+ * at the top of the row and wrote it back AFTER the suite - twenty-six seconds later. A
+ * `--close` landing in that window said `✓ CLOSED`, wrote `ackCounts` and `lastClose`, and
+ * the ordinary boot then put back the snapshot it had read before the close existed. The
+ * close happened, said so, and left no trace - and `ackCounts` is the evidence `CLAUDE.md`
+ * makes load-bearing for amending the protocol, while `lastClose` is what the next close
+ * compares STATUS.md's mtime against. Two Claude sessions in one tree is not a corner case:
+ * it is the configuration `bin/claim.mjs` was shipped for, and the reviewer watched
+ * `ackCounts.field:work` go 3 -> 4 -> 5 underneath them.
+ *
+ * So every writer goes through `updateState`, which re-reads the bytes ON DISK immediately
+ * before the write and merges into those, never into a snapshot from earlier in the run.
+ * The remaining window is between that read and the rename - microseconds, not the length
+ * of a gate - and it is still not atomic. Losing a count in that window is recoverable;
+ * losing a close was not.
  */
-function writeState(obj) {
+function updateState(mutate) {
 	try {
 		const sp = join(ROOT, ".boot-state.json")
+		let disk = {}
+		try { disk = JSON.parse(readFileSync(sp, "utf8")) || {} } catch {}
+		const next = mutate(disk)
+		if (!next) return
 		const tmp = `${sp}.tmp-${process.pid}`
-		writeFileSync(tmp, JSON.stringify(obj, null, 2) + "\n")
+		writeFileSync(tmp, JSON.stringify(next, null, 2) + "\n")
 		renameSync(tmp, sp)
 	} catch {}
 }
@@ -128,6 +159,30 @@ if (has("--prove-red")) proveRed()
  */
 let payload = null
 if (has("--hook")) {
+	// 🔴 `--hook` WRITES TWO INSTRUMENTS, and `--root` governs only one of them (review #7
+	// F13). It records a start into the ledger of whatever `--root` it is given — which
+	// STATUS.md and the brief both warned about, twice, after it wrote fabricated data into
+	// the real ledger twice in one day — and it ALSO writes
+	// `$CLAUDE_COMM_RUNTIME/claude-comm/sessions/<pid>.json` for the CALLING process, which
+	// `--root` does not touch at all. That second write always lands on the live machine and
+	// always on the live session, and `bin/context.mjs` is keyed on it: a probe rooted at a
+	// throwaway checkout replaced this session's registry entry with a scratchpad transcript
+	// path while review #7 was being written.
+	//
+	// So a `--hook` aimed at another tree must ALSO have been aimed away from the machine's
+	// registry. That is one env var, the arms already set it, and a person at a prompt gets a
+	// refusal instead of a silently corrupted instrument. Refusing is safe here: the real
+	// SessionStart hook passes no `--root` (see .claude/settings.json), so this branch is
+	// unreachable from it.
+	if (resolve(ROOT) !== resolve(SELF) && !process.env.CLAUDE_COMM_RUNTIME) {
+		const msg = "boot: --hook --root <other tree> writes TWO instruments and --root governs one.\n" +
+			`  · the ledger under ${ROOT} - a start recorded there is real data in that experiment\n` +
+			"  · the machine-global session registry for THIS pid, which --root does not touch\n" +
+			"  Set CLAUDE_COMM_RUNTIME to a throwaway directory first, or drop --root.\n"
+		process.stdout.write(msg)
+		process.stderr.write(msg)
+		process.exit(2)
+	}
 	// R8: readFileSync(0) waits for EOF, so this hangs silently at a terminal. The
 	// SessionStart hook closes the pipe, but `|| true` in settings.json only rewrites an
 	// exit code - it does nothing about a hang, and the 20 s timeout is the harness's
@@ -138,16 +193,13 @@ if (has("--hook")) {
 	}
 	try { payload = JSON.parse(readFileSync(0, "utf8")) } catch { payload = null }
 	if (payload && payload.source) {
-		try {
-			const sp = join(ROOT, ".boot-state.json")
-			let st = {}
-			try { st = JSON.parse(readFileSync(sp, "utf8")) } catch {}
+		updateState((st) => {
 			st.sources = st.sources || {}
 			st.sources[payload.source] = (st.sources[payload.source] || 0) + 1
 			st.lastSource = payload.source
 			st.lastSourceAt = new Date().toISOString()
-			writeFileSync(sp, JSON.stringify(st, null, 2) + "\n")
-		} catch {}
+			return st
+		})
 	}
 }
 
@@ -211,10 +263,28 @@ if (has("--hook")) {
 	// DIRECTORY (the ordinary case, and it is on the bus), and off the bus (no roster match
 	// at all - which is what this repo itself is, having no `.comm/` of its own).
 	const onBus = sessionAgent && sessionAgent !== "unnamed"
-	const how = declared ? `declared "${declared}"`
+	// 🔴 FOUR STATES, NOT THREE — and the fix for the defect above moved it rather than
+	// removed it (review #7 F4). `declared` is the raw environment variable; `sessionAgent`
+	// is what the BUS resolved three lines up, and this branch discarded it again — the same
+	// sentence the comment above says was fixed, now in the present case instead of the
+	// absent one. Measured, one variable, same fixture: `=none` and `=bogus` are REFUSED by
+	// `whoami` (not in the roster) and record as `unnamed` in the ledger, while `=leader` is
+	// honoured — and all three printed the identical `declared "X"` with no mention of the
+	// bus at all. A session that typed a typo is off the bus and was told its declaration
+	// took.
+	//
+	// `none` is not a typo: `comm who` prints it as the documented way to take a session OFF
+	// the bus deliberately, so it is the one refusal that is not a fault.
+	const refused = declared && !onBus
+	const deliberate = declared === "none"
+	const how = declared
+		? (onBus && sessionAgent === declared ? `declared "${declared}" - honoured by the bus`
+			: onBus ? `declared "${declared}" but the bus resolved "${sessionAgent}" - the record follows the bus`
+			: deliberate ? `declared "none" - deliberately OFF the bus (the documented recipe); it receives nothing and records as unnamed`
+			: `declared "${declared}" - REFUSED by the bus: no such agent on this roster, so this session is OFF the bus and records as unnamed`)
 		: onBus ? `"${sessionAgent}" by directory - on the bus, no CLAUDE_COMM_AGENT needed`
 		: "not on any roster here - off the bus"
-	row("session", OK, `${how} (${where})` +
+	row("session", refused && !deliberate ? WARN : OK, `${how} (${where})` +
 		`${kitty ? ` - kitty win ${kitty[1]}` : ""}${src}`)
 }
 
@@ -242,6 +312,8 @@ if (has("--hook")) {
 		catch { return null }
 	}
 	let wrote = null
+	// Review #7 F9: what the muted stderr was trying to say, on its way to the row instead.
+	let signalTrouble = null
 	// R3(a), review #4: this used to require `payload.source` before recording, so a payload
 	// that was empty, unparseable, or simply carried no `source` recorded NOTHING and left
 	// `wrote` null - and the WARN branch was guarded by `wrote && !wrote.ok`, so the row
@@ -273,7 +345,17 @@ if (has("--hook")) {
 			if (existsSync(rs)) {
 				const m = await import(pathToFileURL(rs).href)
 				const c = m.claim({ root: ROOT, agent: sessionAgent })
-				if (!c.ok) process.stderr.write(`claude-comm: a restart signal for ${sessionAgent} could not be claimed (${c.why}); this start is being recorded as COLD.\n`)
+				// 🔴 THE ONLY TWO LINES THIS FILE WROTE TO STDERR WERE THE TWO IT MUTED. Both live
+				// under `--hook`, and `--hook` is invoked by this repo's own SessionStart as
+				// `... --hook 2>/dev/null || true` (review #7 F9). So: a note consumed - renamed,
+				// gone - then not read, the start filed in the WRONG ARM of the experiment the
+				// ledger exists to answer, the row green, and the one sentence that would have
+				// said so discarded by configuration. The ledger row already knows how to carry a
+				// reason; it carries this one now, and stderr keeps its copy for a direct run.
+				if (!c.ok) {
+					signalTrouble = `⚠ A RESTART SIGNAL FOR ${sessionAgent} COULD NOT BE CLAIMED (${c.why}) - this start is recorded as COLD and the note may be consumed`
+					process.stderr.write(`claude-comm: a restart signal for ${sessionAgent} could not be claimed (${c.why}); this start is being recorded as COLD.\n`)
+				}
 				else if (c.signal) {
 					if (c.signal.prev_session) sig.push("--prev-session", String(c.signal.prev_session))
 					sig.push("--signal-src", String(c.signal.by || "unknown"))
@@ -282,6 +364,7 @@ if (has("--hook")) {
 				}
 			}
 		} catch (e) {
+			signalTrouble = `⚠ THE RESTART SIGNAL COULD NOT BE LOADED (${(e && e.message) || e}) - this start is recorded as COLD`
 			process.stderr.write(`claude-comm: the restart signal could not be loaded (${(e && e.message) || e}); this start is being recorded as COLD.\n`)
 		}
 		// --pending-auto: the covariate, counted by the ledger itself (one implementation,
@@ -311,6 +394,7 @@ if (has("--hook")) {
 		// ledger's own report - and dropped by the one rendering anybody reads at session
 		// start. A counter written because "a mismatch is either tampering or a writer bug
 		// and both need to be visible" was visible only in the tool nobody runs daily.
+		if (signalTrouble) bits.push(signalTrouble)
 		if (a.unreadable) bits.push(`⚠ ${a.unreadable} unreadable line(s)`)
 		if (a.unreadableFiles && a.unreadableFiles.length) bits.push(`⚠ ${a.unreadableFiles.length} UNREADABLE LOG FILE(S)`)
 		if (a.dirUnreadable) bits.push(`⚠ the ledger directory could not be read`)
@@ -349,7 +433,7 @@ if (has("--hook")) {
 		if (a.armed && a.armed.unreadable) bits.push(`⚠ ${a.armed.unreadable} restart note(s) the ledger could not read`)
 		const lapsed = ((a.armed && a.armed.notes) || []).some((n) => !n.fresh) || (a.armed && a.armed.unreadable)
 		const bad = a.unreadable || (a.unreadableFiles && a.unreadableFiles.length) || a.dirUnreadable
-			|| a.mislabelled || a.exposureSkew || lapsed
+			|| a.mislabelled || a.exposureSkew || lapsed || signalTrouble
 		if (wrote && !wrote.ok) row("ledger", WARN, `THIS START WAS NOT RECORDED (${wrote.why || "no reason given"}) - ${bits.join(" - ")}`)
 		else if (wrote && seen !== "confirmed") row("ledger", WARN, `THE WRITE WAS NOT SEEN BY THE RE-READ (${seen}) - ${bits.join(" - ")}`)
 		else row("ledger", bad ? WARN : OK, bits.join(" - ") + (wrote ? " - this start recorded and re-read" : ""))
@@ -715,6 +799,9 @@ function askBus(sessionPidForCwd) {
 		// every hook executes, so its absence is the loudest possible staleness.
 		const busStale = !installed.length ? true : uncomparable.length ? null : staleFiles.length > 0
 		let pending = 0, oldest = 0
+		// PER DIRECTORY, because "how much mail" and "whose mail" are different questions and
+		// the row answered the second one from a different source than the first (review #7 F3).
+		const perDir = new Map()
 		const ibx = join(p, ".comm", "inbox")
 		try {
 			for (const a of readdirSync(ibx)) {
@@ -723,6 +810,7 @@ function askBus(sessionPidForCwd) {
 				for (const f of files) {
 					if (!f.endsWith(".json")) continue
 					pending++
+					perDir.set(a, (perDir.get(a) || 0) + 1)
 					const mt = statSync(join(ibx, a, f)).mtimeMs
 					if (!oldest || mt < oldest) oldest = mt
 				}
@@ -786,12 +874,22 @@ function askBus(sessionPidForCwd) {
 		// this project has now shipped three times. One spawn per field project per boot,
 		// which is what the condition is worth: it is silent, it is live, and the sender gets
 		// a success either way.
-		let shared = [], stranded = [], busAnswered = false
+		let shared = [], stranded = [], unaddressable = [], busAnswered = false
 		try {
 			const w = spawnSync("node", [join(p, ".comm", "bin", "comm.mjs"), "who", "--json"],
 				{ cwd: p, encoding: "utf8", timeout: 5000 })
 			const ag = JSON.parse(w.stdout).agents || {}
 			busAnswered = true
+			// 🔴 THE THIRD STATE, and the amendment below created it (review #7 F3). `pending` is
+			// a walk of every directory under .comm/inbox/; `stranded` is computed from the
+			// ROSTER. When those two disagree — an agent renamed or retired while it had mail —
+			// the row took the green branch and made a POSITIVE claim about that mail: "in flight
+			// to a running agent". Nothing will ever drain it: `comm who` does not know the name,
+			// no hook delivers it, and `install --check` reports no drift for the orphaned stub.
+			// One edit of `.comm/config.json` reaches this state, and this session's own notice
+			// tells field agents to make that edit.
+			unaddressable = [...perDir.entries()].filter(([name, n]) => n > 0 && !Object.prototype.hasOwnProperty.call(ag, name))
+				.map(([name, n]) => `${name} (${n})`)
 			shared = Object.entries(ag).filter(([, v]) => ((v && v.pids) || []).length > 1)
 				.map(([name, v]) => `${name} (${v.pids.length})`)
 			// AMENDED 2026-09-05, on the acknowledgement count and not on an opinion. This row
@@ -822,7 +920,9 @@ function askBus(sessionPidForCwd) {
 		if (noteDirBad) notes = [{ agent: "?", age_s: null, ttl_s: null, fresh: false, unread: "dir" }]
 		else if (ledgerUnreachable) notes = [{ agent: "?", age_s: null, ttl_s: null, fresh: false, unread: "ledger" }]
 		const lapsedNote = notes.some((n) => !n.fresh)
-		const deadClaim = claimDirBad || claims.some((c) => c.state === "gone") || shared.length > 0
+		// Anything that is not plainly held is a claim somebody has to look at: a dead holder,
+		// bytes nobody can read, or a record this version cannot judge.
+		const deadClaim = claimDirBad || claims.some((c) => c.state !== "held") || shared.length > 0
 		const bits = [
 			// An unparsed non-zero exit must not borrow the confident wording of a parsed one:
 			// it means the installer refused for a reason this row has not read.
@@ -833,6 +933,7 @@ function askBus(sessionPidForCwd) {
 				: busStale ? `STALE vs repo: ${staleFiles.join(", ")}`
 				: `bus current (${installed.length} files)`,
 			!pending ? "0 pending"
+				: unaddressable.length ? `⚠ ${unaddressable.join(", ")} has mail and IS ON NO ROSTER - nothing will ever deliver it: the bus does not know the name (oldest ${age(Date.now() - oldest)})`
 				: stranded.length ? `⚠ ${stranded.join(", ")} has mail and is NOT RUNNING - it waits for a relaunch (oldest ${age(Date.now() - oldest)})`
 				: busAnswered ? `${pending} pending, in flight to a running agent (oldest ${age(Date.now() - oldest)})`
 				: `${pending} pending (oldest ${age(Date.now() - oldest)}) - the bus could not be asked who is running`,
@@ -841,8 +942,16 @@ function askBus(sessionPidForCwd) {
 			// it is the state a naive claim tool turns into a lock nobody can clear.
 			...(shared.length ? [`⚠ ONE INBOX, TWO SESSIONS: ${shared.join(", ")} - mail goes to whichever ends a turn first, the others never see it, and the sender is told it was delivered`] : []),
 			...(claimDirBad ? [`⚠ ${claimFiles.length} resource claim(s) are here and could not be read`] : []),
-			...(claims.some((c) => c.state === "gone")
-				? [`⚠ CLAIM HELD BY A DEAD PROCESS: ${claims.filter((c) => c.state === "gone").map((c) => c.resource).join(", ")} - a crash, not a stale lock`] : []),
+			// EVERY STATE `claim.mjs read()` CAN RETURN, in ITS words. This reported two of five
+			// and dropped `corrupt`, `unknown` and `unreadable` on the floor (review #7 F8) —
+			// `corrupt` being the one that means something wrote into the claims directory that
+			// should not have, which the tool's own property 3 calls the only evidence of the
+			// writer. And it re-derived the sentence for `gone` from `state` alone, so a claim
+			// the tool had itself predicted would read as gone — `holder: "self"`, warned about
+			// on stderr as it was written — was announced at every session start as a crash
+			// (F14). `note` comes from claim.mjs's one renderer; there is no second wording here.
+			...claims.filter((c) => c.state !== "held" && c.note)
+				.map((c) => `⚠ CLAIM ${c.resource}: ${c.note}`),
 			...(claims.some((c) => c.state === "held")
 				? [`${claims.filter((c) => c.state === "held").length} resource(s) claimed: ${claims.filter((c) => c.state === "held").map((c) => c.resource).join(", ")}`] : []),
 			...notes.map((n) => n.unread === "dir" ? `⚠ ${noteFiles.length} restart note(s) are here and ${join(p, ".comm", "restart")} could not be read`
@@ -852,7 +961,7 @@ function askBus(sessionPidForCwd) {
 		]
 		// `pending` no longer reddens on its own: see the amendment above. What reddens is mail
 		// that is STRANDED, or a bus that could not be asked and so cannot tell the two apart.
-		const mailStuck = pending > 0 && (stranded.length > 0 || !busAnswered)
+		const mailStuck = pending > 0 && (stranded.length > 0 || unaddressable.length > 0 || !busAnswered)
 		row(`field:${name}`, drift || busStale !== false ? RED : mailStuck || lapsedNote || deadClaim ? WARN : OK, bits.join(" - "))
 	}
 }
@@ -1023,7 +1132,9 @@ function askBus(sessionPidForCwd) {
 			// /clear reports source "clear", which decides if the reboot loop is buildable.
 			// CLAUDE.md tells every session to run a full boot, so the wipe happened through
 			// documented use, and the file is gitignored so there was no recovery.
-			if (!fpBlind.length) writeState({ ...(prev || {}), print, at: new Date().toISOString(), head: git("rev-parse", "--short", "HEAD"), pass })
+			// MERGED INTO THE BYTES ON DISK, not into `prev` - `prev` was read before the gate
+			// ran and is up to 26 s old by now (review #7 F2, above).
+			if (!fpBlind.length) updateState((d) => ({ ...d, print, at: new Date().toISOString(), head: git("rev-parse", "--short", "HEAD"), pass }))
 		} else {
 			// The single inference this tool may draw - and it never suppresses a run.
 			const unchanged = prev && prev.print === print
@@ -1066,7 +1177,6 @@ if (CLOSE) {
 	const EROSION = 3
 	let st = {}
 	try { st = JSON.parse(readFileSync(join(ROOT, ".boot-state.json"), "utf8")) } catch {}
-	const counts = st.ackCounts || {}
 
 	// The `close` row describes the state BEFORE this run, and this run is what changes
 	// it - so it reports, it does not block. Blocking on it would make every first close
@@ -1108,25 +1218,52 @@ if (CLOSE) {
 		lines.push("    Fix them, or name each one:  node bin/boot.mjs --close \\")
 		lines.push(`      ${unacked.map((r) => `--ack ${r.label}="why this is acceptable"`).join(" \\\n      ")}`)
 	} else {
-		for (const r of open) {
-			counts[r.label] = (counts[r.label] || 0) + 1
-			lines.push(`  · acknowledged  ${r.label}: ${ACKS.get(r.label)}`)
-		}
+		for (const r of open) lines.push(`  · acknowledged  ${r.label}: ${ACKS.get(r.label)}`)
+		const head = git("rev-parse", "--short", "HEAD")
+		const at = new Date().toISOString()
+		// COUNTED AGAINST THE BYTES ON DISK, not against the snapshot `st` read at the top of
+		// this block: review #7 F2. What the report prints is what was actually written.
+		let written = {}
+		updateState((d) => {
+			const c = { ...(d.ackCounts || {}) }
+			for (const r of open) c[r.label] = (c[r.label] || 0) + 1
+			// THE DISCHARGE (review #7 F10). An amendment zeroes the row it amended and says
+			// so in the file; anything else would leave the instruction unfollowable.
+			const hist = Array.isArray(d.amendments) ? [...d.amendments] : []
+			for (const [label, why] of AMENDED) {
+				hist.push({ row: label, why, at, head, from: c[label] || 0 })
+				delete c[label]
+			}
+			written = c
+			d.ackCounts = c
+			if (hist.length) d.amendments = hist
+			d.lastClose = { at, head, acked: [...ACKS.keys()], amended: [...AMENDED.keys()] }
+			return d
+		})
+		for (const [label, why] of AMENDED)
+			lines.push(`  ⟳ amended       ${label}: ${why} - its erosion count is cleared and the amendment is recorded`)
 		// Amendment evidence. Not a suggestion to think about it - a count.
-		const eroding = Object.entries(counts).filter(([, n]) => n >= EROSION)
+		//
+		// 🔴 ONLY FOR ROWS THIS BOOT ACTUALLY PRODUCED. It read the all-time map, so a row
+		// that had been amended and DELETED went on demanding an amendment at every close,
+		// forever, in the loudest line of the report - an instruction nobody could discharge,
+		// about a guard that no longer existed (review #7 F10). A row that cannot be
+		// acknowledged again cannot be eroding.
+		const alive = new Set(rows.map((r) => r.label))
+		const eroding = Object.entries(written).filter(([label, n]) => n >= EROSION && alive.has(label))
+		const stale = Object.keys(written).filter((label) => !alive.has(label) && written[label] >= EROSION)
 		if (eroding.length) {
 			lines.push("")
 			lines.push("  🔴 AMEND THE PROTOCOL - these rows are being waved past, not acted on:")
 			for (const [label, n] of eroding) {
 				lines.push(`      ${label} acknowledged ${n}x. A row that is defensible every time it is bypassed is`)
 				lines.push(`      already failing. Change what it measures, or delete it. Raising nothing is not a fix.`)
+				lines.push(`      When you have: node bin/boot.mjs --close --amended ${label}="what it measures now"`)
 			}
 		}
-		st.ackCounts = counts
-		st.lastClose = { at: new Date().toISOString(), head: git("rev-parse", "--short", "HEAD"), acked: [...ACKS.keys()] }
-		writeState(st)
+		if (stale.length) lines.push(`  · ${stale.length} count(s) held for row(s) this boot does not produce (${stale.join(", ")}) - kept as history, not demanded`)
 		lines.push("")
-		lines.push(`  ✓ CLOSED at ${st.lastClose.head} - the next boot inherits a tree whose every row is green or named.`)
+		lines.push(`  ✓ CLOSED at ${head} - the next boot inherits a tree whose every row is green or named.`)
 	}
 	if (!closeReport) closeReport = "\n" + lines.join("\n") + "\n"
 }
@@ -1166,10 +1303,8 @@ process.stdout.write(report)
 
 // What this report costs the session it is injected into (R10).
 if (FAST) {
-	let st = {}
-	try { st = JSON.parse(readFileSync(join(ROOT, ".boot-state.json"), "utf8")) } catch {}
-	st.reportBytes = Buffer.byteLength(report)
-	writeState(st)
+	const bytes = Buffer.byteLength(report)
+	updateState((d) => ({ ...d, reportBytes: bytes }))
 }
 process.exit(closeFailed || worst === RED ? 1 : 0)
 
@@ -1840,6 +1975,178 @@ function proveRed() {
 		assert("close refuses an unnamed row, accepts a named one",
 			unacked.status === 1 && /NOT CLOSED/.test(unacked.stdout) && acked.status === 0 && /CLOSED at/.test(acked.stdout),
 			`${openRows.length} open row(s) named [${openRows.map((r) => r.label).join(",")}]: unacked exit=${unacked.status}, acked exit=${acked.status}`)
+	}
+
+	// ══ review #7's arms ══════════════════════════════════════════════════════════════
+	//
+	// Five findings whose common shape is a row, a counter or a guard that nothing here
+	// exercised. Each moves ONE variable against a control built by the same code.
+	{
+		const stateOf = () => { try { return JSON.parse(readFileSync(join(pkg, ".boot-state.json"), "utf8")) } catch { return {} } }
+		const closeRun2 = (extra = []) => spawnSync(process.execPath,
+			[SELFFILE, "--close", "--root", pkg, "--field", tmp, ...extra], { encoding: "utf8" })
+		const touchStatus = () => { const t = new Date(); utimesSync(join(pkg, "STATUS.md"), t, t) }
+
+		// ── F2: a completed --close erased by another session's ordinary boot ────────────
+		//
+		// The gate branch read `.boot-state.json` at the top of its row and wrote it back
+		// AFTER the suite - up to 26 s later - so a close landing in that window said
+		// `✓ CLOSED`, wrote `ackCounts` and `lastClose`, and was then silently replaced by a
+		// snapshot older than itself. Two Claude sessions in one tree is the configuration
+		// bin/claim.mjs was shipped for, and the reviewer watched it happen live.
+		//
+		// The arm carries its own positive control: it is not enough that the concurrent
+		// write survives - the boot must be shown to have written AFTER it, or "survived"
+		// only means "nothing wrote at all".
+		{
+			const sp = join(pkg, ".boot-state.json")
+			const child = spawn(process.execPath, [SELFFILE, "--json", "--root", pkg, "--field", tmp],
+				{ encoding: "utf8", stdio: "ignore" })
+			const done = { exited: false }
+			child.on("exit", () => { done.exited = true })
+			// Land inside the gate, which is the whole width of the window.
+			const t0 = Date.now(); while (Date.now() - t0 < 3000 && !done.exited) {}
+			const midAt = new Date().toISOString()
+			const before = stateOf()
+			writeFileSync(sp, JSON.stringify({ ...before, ackCounts: { "a-concurrent-close": 7 },
+				lastClose: { at: midAt, head: "cafe123", acked: ["a-concurrent-close"] } }, null, 2) + "\n")
+			const t1 = Date.now(); while (Date.now() - t1 < 90_000 && !done.exited) {}
+			const after = stateOf()
+			const bootWroteAfter = after.at && Date.parse(after.at) >= Date.parse(midAt)
+			assert("state: a close written during the gate is not erased",
+				bootWroteAfter && after.ackCounts && after.ackCounts["a-concurrent-close"] === 7 &&
+				after.lastClose && after.lastClose.head === "cafe123",
+				`boot wrote at ${after.at} (after the concurrent write at ${midAt}: ${bootWroteAfter} - the positive control; ` +
+				`false would mean nothing wrote and "survived" proves nothing); ` +
+				`ackCounts=${JSON.stringify(after.ackCounts)} lastClose.head=${after.lastClose && after.lastClose.head} (want 7 / cafe123)`)
+		}
+
+		// ── F10: the erosion counter - no reset, no arm, and it fired for dead rows ──────
+		//
+		// CLAUDE.md makes this count the EVIDENCE for amending the protocol, and it was the
+		// only load-bearing mechanism here with nothing anywhere demonstrating it. Three
+		// properties, in one fixture: it counts, the instruction can be DISCHARGED, and a row
+		// this boot does not produce cannot demand anything.
+		{
+			writeFileSync(join(pkg, "dirty.txt"), "x\n")
+			const openRows = () => run(false).rows.filter((r) => r.label && r.label !== "close" && r.level !== OK)
+			const ackAll = () => openRows().flatMap((r) => ["--ack", `${r.label}=fixture: deliberately ${r.label}`])
+			let outs = []
+			for (let i = 0; i < 3; i++) { touchStatus(); outs.push(closeRun2(ackAll()).stdout || "") }
+			const countsAfter3 = stateOf().ackCounts || {}
+			const demanded = /AMEND THE PROTOCOL/.test(outs[2]) && !/AMEND THE PROTOCOL/.test(outs[0])
+			// THE DISCHARGE. Following the instruction must clear it; before this, the only
+			// way was a hand-edit of a gitignored file - an unaudited edit to the evidence.
+			touchStatus()
+			const amended = closeRun2([...ackAll(), "--amended", "tree=fixture: what it measures now"]).stdout || ""
+			const stAfter = stateOf()
+			const cleared = !(stAfter.ackCounts || {}).tree && (stAfter.amendments || []).some((a) => a.row === "tree")
+			touchStatus()
+			const quiet = closeRun2(ackAll()).stdout || ""
+			// A ROW THAT NO LONGER EXISTS. It read the all-time map, so a row amended and then
+			// DELETED went on demanding an amendment at every close, forever, in the loudest
+			// line of the report - an instruction that following could not discharge.
+			const st = stateOf()
+			st.ackCounts = { ...(st.ackCounts || {}), "a-row-that-was-deleted": 9 }
+			writeFileSync(join(pkg, ".boot-state.json"), JSON.stringify(st, null, 2) + "\n")
+			touchStatus()
+			const withGhost = closeRun2(ackAll()).stdout || ""
+			rmSync(join(pkg, "dirty.txt"), { force: true })
+			const ghostSilent = !/a-row-that-was-deleted acknowledged/.test(withGhost) &&
+				/a-row-that-was-deleted/.test(withGhost)   // held as history, and said so
+			assert("close: the erosion count is armed, dischargeable, and does not haunt",
+				demanded && (countsAfter3.tree || 0) >= 3 && cleared && !/AMEND THE PROTOCOL/.test(quiet) && ghostSilent,
+				`3 closes acking the same rows -> tree=${countsAfter3.tree}, AMEND on the 3rd=${demanded} (not on the 1st: control); ` +
+				`--amended tree -> count cleared and recorded=${cleared}, next close silent=${!/AMEND THE PROTOCOL/.test(quiet)}; ` +
+				`a count for a row this boot does not produce -> demanded=${/a-row-that-was-deleted acknowledged/.test(withGhost)} (want false), named as history=${/a-row-that-was-deleted/.test(withGhost)}`)
+		}
+
+		// ── F3: mail for an agent NO ROSTER accounts for ─────────────────────────────────
+		//
+		// `pending` is a walk of the inbox tree; `stranded` is computed from the roster. When
+		// they disagree the row took the GREEN branch and made a positive claim about that
+		// mail - "in flight to a running agent" - about a message nothing will ever deliver.
+		// ONE VARIABLE against the STRANDED arm above: the agent's entry in config.json.
+		{
+			const cfgPath = join(proj, ".comm", "config.json")
+			const cfg = readFileSync(cfgPath, "utf8")
+			const msg2 = join(proj, ".comm", "inbox", "app", "0009-orphan.json")
+			mkdirSync(dirname(msg2), { recursive: true })
+			writeFileSync(msg2, JSON.stringify({ id: "0009-orphan", to: "app" }))
+			const withRoster = run(true).rows.find((r) => r.label === "field:proj") || { level: -1, text: "" }
+			writeFileSync(cfgPath, JSON.stringify({ leader: "leader", agents: { leader: "." } }))
+			const without = run(true).rows.find((r) => r.label === "field:proj") || { level: -1, text: "" }
+			writeFileSync(cfgPath, cfg)
+			rmSync(msg2, { force: true })
+			assert("field: mail addressed to nobody on the roster",
+				/NOT RUNNING/.test(withRoster.text) && withRoster.level === WARN &&
+				/ON NO ROSTER/.test(without.text) && without.level === WARN,
+				`the same message, agent IN the roster -> ${LV[withRoster.level]} "${(withRoster.text.match(/⚠ [^-]*/) || [""])[0].trim().slice(0, 44)}" (control); ` +
+				`agent removed from config.json -> ${LV[without.level]} ${/ON NO ROSTER/.test(without.text) ? "says it is unaddressable" : `SAID: ${without.text.slice(0, 60)}`}`)
+		}
+
+		// ── F8/F14: every claim state reaches the row, in claim.mjs's own words ──────────
+		//
+		// The row reported two of the five states `read()` returns and dropped `corrupt`,
+		// `unknown` and `unreadable` - and it re-derived the sentence for `gone` from `state`
+		// alone, announcing a claim the tool had itself predicted would read as gone
+		// (`holder: "self"`) as evidence of a crash, at every session start.
+		{
+			const cdir = join(proj, ".comm", "claims")
+			mkdirSync(cdir, { recursive: true })
+			const rowNow = () => run(true).rows.find((r) => r.label === "field:proj") || { level: -1, text: "" }
+			writeFileSync(join(cdir, "port:4173.json"), "not a claim at all\n")
+			writeFileSync(join(cdir, "port:5555.json"), JSON.stringify({ v: 1, at: new Date().toISOString(),
+				resource: "port:5555", by: "db", pid: 4194303, purpose: "pg" }) + "\n")
+			writeFileSync(join(cdir, "port:6000.json"), JSON.stringify({ v: 1, at: new Date().toISOString(),
+				resource: "port:6000", by: "db", pid: 4194303, start: 1, boot: "not-this-boot", holder: "self", purpose: "a short-lived command" }) + "\n")
+			const seen = rowNow()
+			const stillThere = existsSync(join(cdir, "port:4173.json"))
+			rmSync(cdir, { recursive: true, force: true })
+			assert("field: a claim boot cannot read is not silence",
+				seen.level === WARN && /port:4173/.test(seen.text) && /port:5555/.test(seen.text) &&
+				/nothing crashed/.test(seen.text) && stillThere,
+				`corrupt+unknown+self-held planted -> ${LV[seen.level]}; names the corrupt one=${/port:4173/.test(seen.text)}, ` +
+				`the unjudgeable one=${/port:5555/.test(seen.text)}, and says the self-held one is NOT a crash=${/nothing crashed/.test(seen.text)}; ` +
+				`the corrupt file was left where it was by a READ=${stillThere} (a listing that moves files makes the next boot blind)`)
+		}
+
+		// ── F13: --hook writes two instruments and --root governs one ────────────────────
+		//
+		// The ledger damage is confined to the root you name; the registry write is not - it
+		// lands on the machine, on the LIVE session, and bin/context.mjs is keyed on it. A
+		// probe rooted at a throwaway checkout replaced the reviewer's own entry with a
+		// scratchpad transcript path while review #7 was being written.
+		//
+		// THE ARM MUST NOT BE THE DEFECT: CLAUDE_COMM_RUNTIME is what the refusal keys on, so
+		// it is unset for the child - and XDG_RUNTIME_DIR is pointed at a throwaway, so if the
+		// refusal ever fails the damage lands in the fixture rather than on this machine.
+		{
+			const other = join(tmp, "other-tree")
+			mkdirSync(join(other, "bin"), { recursive: true })
+			cpSync(join(pkg, "bin"), join(other, "bin"), { recursive: true })
+			const ledgerOf = (root) => {
+				const r = spawnSync(process.execPath, [join(pkg, "bin", "ledger.mjs"), "--json", "--root", root], { encoding: "utf8" })
+				try { return JSON.parse(r.stdout).starts.cold } catch { return -1 }
+			}
+			const env = { ...process.env, XDG_RUNTIME_DIR: join(tmp, "f13-runtime") }
+			delete env.CLAUDE_COMM_RUNTIME
+			const before13 = ledgerOf(other)
+			const refused = spawnSync(process.execPath, [SELFFILE, "--fast", "--hook", "--json", "--root", other, "--field", tmp],
+				{ encoding: "utf8", env, input: JSON.stringify({ source: "startup", transcript_path: join(tmp, "x.jsonl") }) })
+			const after13 = ledgerOf(other)
+			// POSITIVE CONTROL: the same command with the registry redirected, which is what
+			// the arms and any honest experiment already do. It must NOT be refused.
+			const allowed = spawnSync(process.execPath, [SELFFILE, "--fast", "--hook", "--json", "--root", other, "--field", tmp],
+				{ encoding: "utf8", env: { ...env, CLAUDE_COMM_RUNTIME: join(tmp, "f13-runtime2") },
+				  input: JSON.stringify({ source: "startup", transcript_path: join(tmp, "x.jsonl") }) })
+			assert("hook: --root elsewhere without a redirected registry is refused",
+				refused.status === 2 && /governs one/.test(refused.stdout) && after13 === before13 &&
+				allowed.status === 0 && ledgerOf(other) === before13 + 1,
+				`--hook --root <other> with CLAUDE_COMM_RUNTIME unset -> exit ${refused.status} (want 2), ` +
+				`that tree's ledger ${before13} -> ${after13} (must not move); ` +
+				`positive control, the same call with the registry redirected -> exit ${allowed.status}, ledger -> ${ledgerOf(other)} (want ${before13 + 1})`)
+		}
 	}
 
 	console.log(`\n  session: INFORMATIONAL - reports /proc, has no failing state, is not a gate`)

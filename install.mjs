@@ -232,6 +232,21 @@ try {
 			// SyntaxError, so EVERY hook path in every project exited 1 — the bus dead in exactly
 			// the way its first rule forbids — and the suite reported it as "A5 corrupt config is
 			// inert", a case about something else entirely. Same trap for any escape added here.
+			// 🔴 THE PROBE'S SILENCE IS NOT EVIDENCE (review #7 F7). \`g.status\` was never read,
+			// and every way this probe can fail — a locked .git/index (exit 128), git absent
+			// from PATH (spawn error, stdout null), a safe.directory refusal on a repo owned by
+			// another user, a corrupt object store, the 5 s timeout — produces an EMPTY stdout,
+			// which is byte-identical to the clean answer. Measured on a repository with 8 files
+			// of live bus state genuinely committed: chmod 000 .git/index, and the guard whose
+			// comment called it "the only question with no false positive" went silent. Two rows
+			// away in bin/boot.mjs the same distinction is drawn correctly, between
+			// "install --check refused (exit N)" and a parsed list.
+			if (g.status !== 0 || g.error) {
+				process.stderr.write(
+					\`claude-comm: git could not be asked whether .comm/ is committed here \` +
+					\`(\${g.error ? String(g.error.message || g.error) : \`git ls-files exited \${g.status}\`}). \` +
+					\`This is NOT the same as "nothing is committed" - the question is unanswered.\\n\`)
+			}
 			const tracked = String(g.stdout || "").split("\\n").filter(Boolean)
 			if (tracked.length) {
 				process.stderr.write(
@@ -521,7 +536,8 @@ const hookCommand = (verb) => {
 		`echo "claude-comm: node is NOT on this session PATH, so the bus hooks did not run. ` +
 		`No mail will be delivered at any turn boundary and nothing else will say so. ` +
 		`This session was launched outside an interactive shell (kitten @ launch, a .desktop file, cron); ` +
-		`relaunch it through a login shell."; fi`
+		`relaunch it through an INTERACTIVE shell - zsh -ic, not zsh -lc: on the box this was measured on, ` +
+		`node lives under nvm and nvm is loaded from .zshrc, which a login shell never reads."; fi`
 }
 
 /** Merge our two hooks into a settings object without disturbing anything else. */
@@ -673,6 +689,14 @@ try {
 	}
 	if (gitRoot) {
 		const g = spawnSync("git", ["ls-files", "--", ".comm"], { cwd: ROOT, encoding: "utf8", timeout: 5000 })
+		// The same silent probe as the stub's copy above (review #7 F7), which named only the
+		// stub. A fix applied to one branch and not its neighbour is review #6 F6, and this
+		// file has now been the example twice.
+		if (g.status !== 0 || g.error) {
+			console.error(`\n⚠ claude-comm: git could not be asked whether .comm/ is committed here ` +
+				`(${g.error ? String(g.error.message || g.error) : `git ls-files exited ${g.status}`}).`)
+			console.error(`  That is NOT the same answer as "nothing is committed" - this question is unanswered.`)
+		}
 		const tracked = String(g.stdout || "").split("\n").filter(Boolean)
 		if (tracked.length) {
 			console.error(`\n⚠ claude-comm: ${tracked.length} file(s) of LIVE BUS STATE are committed to this project's git:`)

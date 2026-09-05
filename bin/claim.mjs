@@ -50,13 +50,15 @@
  *    evidence of the writer. Review #6 F6 was this rule applied to one branch and not its
  *    neighbour, so it is stated once here and applied to every refusal.
  *
- * NOT THE BUS. This spawns nothing and imports one sibling; it is a short-lived process
- * over a directory of small files. The file is the artifact; there is no daemon, no
- * transport and nothing to keep in sync.
+ * NOT THE BUS. It imports one sibling and, on `take` only, spawns the bus ONCE to ask who
+ * the caller is — because the alternative was a third rule for identity in a repository
+ * whose stated rule is that there is one (review #7 F11). It is a short-lived process over a
+ * directory of small files. The file is the artifact; there is no daemon, no transport and
+ * nothing to keep in sync.
  */
 
-import { readFileSync, writeFileSync, mkdirSync, readdirSync, renameSync, unlinkSync, existsSync, mkdtempSync, rmSync } from "node:fs"
-import { join, dirname, resolve } from "node:path"
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, renameSync, unlinkSync, existsSync, mkdtempSync, rmSync, chmodSync } from "node:fs"
+import { join, dirname, resolve, sep } from "node:path"
 import { tmpdir } from "node:os"
 import { fileURLToPath } from "node:url"
 import { spawnSync } from "node:child_process"
@@ -129,7 +131,7 @@ function setAside(p, why) {
  * stored, so the rule that decides "gone" can be corrected later and every file ever
  * written is re-read under it (`bin/ledger.mjs` property 1, same reason).
  */
-export function read(root, resource) {
+export function read(root, resource, { mayMove = true } = {}) {
 	const p = claimPath(root, resource)
 	if (!p) return { state: "invalid", path: null }
 	let text
@@ -144,7 +146,13 @@ export function read(root, resource) {
 	let rec = null
 	try { rec = JSON.parse(text) } catch {}
 	if (!rec || typeof rec !== "object" || rec.v !== SCHEMA) {
-		return { state: "corrupt", path: p, setAside: setAside(p, "corrupt"), why: "not a claim this version can read" }
+		// A READ THAT MOVES FILES IS NOT A READ (review #7 F8). `list` is what `bin/boot.mjs`
+		// spawns at every session start of every field project, and it renamed corrupt records
+		// out from under the directory listing that had just gated the spawn - so the row said
+		// nothing, and the second boot could not even see the file to say nothing about. Only
+		// the verbs that must take the path (`take`, `release`) set bytes aside; a reader
+		// reports them where they are.
+		return { state: "corrupt", path: p, setAside: mayMove ? setAside(p, "corrupt") : null, why: "not a claim this version can read" }
 	}
 	return { state: holderState(rec), rec, path: p }
 }
@@ -156,14 +164,48 @@ function allClaims(root) {
 	catch { return [] }
 	return names.map((f) => {
 		const resource = f.slice(0, -5)
-		return { resource, ...read(root, resource) }
+		return { resource, ...read(root, resource, { mayMove: false }) }
 	})
 }
 
 // ── CLI ────────────────────────────────────────────────────────────────────────────────
 
-const ROOT = resolve(opt("--root", process.cwd()))
-const verb = ARGV.find((a) => !a.startsWith("--")) || ""
+/**
+ * WHERE THE CLAIMS DIRECTORY IS — and the first version of this line was
+ * `resolve(opt("--root", process.cwd()))`, which is the defect review #7 F1 measured.
+ *
+ * cwd is where the AGENT stands, not where the project is, and five of the six agents in
+ * `~/Dev/work` live in subdirectories. Each got its own `.comm/claims/` and none could see
+ * the others: three agents, three holders of `port:4173`, three exit-0s, and the leader's
+ * boot counting one. A tool whose entire value is that two agents look at the SAME file may
+ * not choose that file from the caller's cwd.
+ *
+ * The bus has walked UP for `.comm/config.json` since its first commit (`comm.mjs`'s
+ * findRoot) and answers correctly from the very directory that split this. So this walks up
+ * too — from `--root` when given, from cwd otherwise.
+ *
+ * `--root` remains a starting point rather than a licence: `bin/boot.mjs` passes a project
+ * root (found immediately) and the arms below pass a scratch directory that is not a project
+ * at all (honoured as given, because it is explicit). What is refused is the implicit case
+ * with no project above it — creating a claims directory there is how the registry splits
+ * silently, and silence is the whole failure.
+ */
+function findRoot(start) {
+	let dir = resolve(start)
+	for (;;) {
+		if (existsSync(join(dir, ".comm", "config.json"))) return dir
+		const up = dirname(dir)
+		if (up === dir) return null
+		dir = up
+	}
+}
+const ROOT_FLAG = opt("--root", null)
+const ROOT = findRoot(ROOT_FLAG || process.cwd()) || (ROOT_FLAG ? resolve(ROOT_FLAG) : null)
+const requireRoot = () => {
+	if (!ROOT) die(`no project at or above ${process.cwd()} carries .comm/config.json.\n` +
+		`  A claims directory created here would be invisible to every other agent — which is the one\n` +
+		`  thing this tool exists to prevent. cd into the project, or pass --root <project>.`)
+}
 
 /**
  * Positional arguments, with the value-taking flags' values excluded.
@@ -183,6 +225,12 @@ function positional(n) {
 	}
 	return out[n]
 }
+// THE VERB IS A POSITIONAL, resolved by the parser that knows which flags take values.
+// It was `ARGV.find((a) => !a.startsWith("--"))` — the guess the comment above rejects,
+// nine lines from the comment rejecting it (review #7 F12). `claim --root R take x` died
+// with a usage error while `claim take x --root R` worked, and a flag value that happened
+// to read `release` would have dispatched the destructive verb.
+const verb = positional(0) || ""
 
 /**
  * Is this claim held by ME? "Me" is the SESSION, not this command — a second `claim take`
@@ -195,14 +243,72 @@ function isMine(rec) {
 	return rec.pid === process.pid || (sp && rec.pid === sp)
 }
 
+/**
+ * THE ONE RENDERER. `bin/boot.mjs` printed its own sentence for the same record and keyed on
+ * `state` alone, so a claim whose `holder` is `"self"` — the pid of a command that has since
+ * exited, exactly as this tool predicted on stderr when it wrote it — was reported to the
+ * next agent at every session start as `a crash, not a stale lock` (review #7 F14). The
+ * record has carried the field that tells them apart since the day it shipped; no reader
+ * read it. Two readers with two sentences is how they start disagreeing, so there is one,
+ * it is exported, and `list --json` carries its answer to boot rather than boot re-deriving.
+ */
+export function verdict(c) {
+	switch (c.state) {
+		case "held": return { mark: "●", note: "" }
+		case "gone": return c.rec && c.rec.holder === "self"
+			? { mark: "✗", note: "the COMMAND that took this has exited - no session ever held it and nothing crashed; --pid names the process that does" }
+			: { mark: "✗", note: "HOLDER IS GONE: a crash, not a stale lock" }
+		case "corrupt": return { mark: "?", note: c.setAside
+			? `bytes this version cannot read, SET ASIDE at ${c.setAside} - something wrote here that should not have`
+			: `BYTES THIS VERSION CANNOT READ, still at ${c.path} - something wrote here that should not have` }
+		case "unreadable": return { mark: "?", note: `COULD NOT BE READ (${c.why}) - it may be live, and nothing here has touched it` }
+		case "unknown": return { mark: "?", note: "holder CANNOT BE JUDGED (no start time, or written before this machine rebooted)" }
+		case "free": return { mark: "·", note: "not claimed" }
+		default: return { mark: "?", note: c.state }
+	}
+}
+
 function describe(c) {
-	const who = c.rec ? `${c.rec.by || "someone"} (pid ${c.rec.pid})` : "an unreadable record"
+	// A name the bus did not confirm is printed as such: `by` is the one field that tells the
+	// next agent whose terminal to walk to, and review #7 F11 found it reading "unnamed" for
+	// every claim taken in the field's ordinary configuration.
+	const src = c.rec && c.rec.by_source && c.rec.by_source !== "bus" ? ` [name ${c.rec.by_source}, unconfirmed]` : ""
+	const who = c.rec ? `${c.rec.by || "someone"}${src} (pid ${c.rec.pid})` : "an unreadable record"
 	const what = c.rec && c.rec.purpose ? ` for ${JSON.stringify(c.rec.purpose)}` : ""
 	const when = c.rec && c.rec.at ? ` since ${c.rec.at}` : ""
 	return `${who}${what}${when}`
 }
 
+/**
+ * WHOSE NAME GOES IN `by`, and why this file asks the bus instead of answering itself.
+ *
+ * It read `--agent`, then `CLAUDE_COMM_AGENT`, then `"unnamed"` — a THIRD rule for identity
+ * in a repository whose stated rule is that there is one (`CLAUDE.md`: *an agent name comes
+ * from `.comm/config.json`, never from message text*). In the field's normal configuration
+ * nobody exports that variable, so every claim taken by an agent the bus can name perfectly
+ * well recorded `unnamed` (review #7 F11) — in the one field that tells the next agent whose
+ * terminal to walk to.
+ *
+ * So it asks the bus, the same way the generated hook stub does: `comm.mjs whoami
+ * --agent-root <cwd>`. That costs one short-lived spawn on `take` only; `list` and `release`
+ * ask nobody. A `--agent` that CONTRADICTS the bus is refused rather than believed, which is
+ * the rule `comm send` already enforces on `--from` (A6) — identity is not a thing to type.
+ */
+function busName() {
+	const commPath = join(dirname(fileURLToPath(import.meta.url)), "comm.mjs")
+	if (!existsSync(commPath)) return null
+	const r = spawnSync(process.execPath, [commPath, "whoami", "--agent-root", process.cwd()],
+		{ encoding: "utf8", timeout: 5000 })
+	// Exit 1 is "no agent resolves here" and is a legitimate answer, not a failure: this
+	// command is often run from a directory that is on no roster. Either way the fallback
+	// below records WHERE the name came from, so no reader has to assume.
+	if (r.status !== 0) return null
+	const name = String(r.stdout || "").trim()
+	return /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name) ? name : null
+}
+
 function take() {
+	requireRoot()
 	const resource = positional(1)
 	if (!resource) die("take needs a resource name, e.g. `take port:4173 --purpose \"vite dev server\"`")
 	if (!safeResource(resource)) die(`a resource name must match ${RESOURCE_OK} and contain no "..", got ${JSON.stringify(resource)}`)
@@ -223,8 +329,10 @@ function take() {
 	}
 	if (cur.state === "gone") {
 		// THE STATE THIS TOOL EXISTS FOR. Not "the lock expired" — the holder crashed, and
-		// that is a fact worth printing rather than a condition to clear silently.
-		process.stderr.write(`claim: ${resource} was claimed by ${describe(cur)} and that process is GONE — evidence of a crash, not a stale lock. Taking it.\n`)
+		// that is a fact worth printing rather than a condition to clear silently. Unless the
+		// record says `holder: "self"`, in which case nothing crashed: the tool itself wrote a
+		// claim held by a command it knew would exit (review #7 F14). Same renderer as `list`.
+		process.stderr.write(`claim: ${resource} was claimed by ${describe(cur)} — ${verdict(cur).note}. Taking it.\n`)
 	}
 	if (cur.state === "unknown") {
 		process.stderr.write(`claim: ${resource} carries a record whose holder cannot be judged (no start time or written before a reboot). Taking it, and saying so rather than guessing either way.\n`)
@@ -265,9 +373,30 @@ function take() {
 		process.stderr.write(`claim: no agent session could be resolved, so this claim is held by the pid of this command (${holderPid}) and will read as GONE as soon as it exits. Pass --pid <n> for the process that actually holds ${resource}.\n`)
 	}
 
+	const declaredName = opt("--agent", null)
+	const declaredEnv = (process.env.CLAUDE_COMM_AGENT || "").trim() || null
+	const asked = busName()
+	if (declaredName && asked && declaredName !== asked)
+		die(`--agent ${JSON.stringify(declaredName)}, but the bus says this directory is ${JSON.stringify(asked)} — a claim's name is asked, never typed`)
+	// A NAME THE BUS WAS ASKED ABOUT AND REFUSED is not the same as a name nobody could
+	// check, and writing the first as if it were the second is review #7 F4's defect — the
+	// declared-but-refused state read as honoured — reproduced one file over. `comm.mjs`
+	// answers nothing for a CLAUDE_COMM_AGENT that is not in the roster (a typo, or a
+	// deliberate off-bus declaration), so when a bus is present here and still could not
+	// name us, the record says so and so does stderr.
+	const busIsHere = !!(ROOT && existsSync(join(ROOT, ".comm", "config.json")))
+	const typed = declaredName || declaredEnv
+	const by = asked || typed || "unnamed"
+	const by_source = asked ? "bus"
+		: !typed ? "none"
+		: busIsHere ? "refused-by-bus"
+		: declaredName ? "flag" : "env"
+	if (by_source === "refused-by-bus" && !has("--quiet"))
+		process.stderr.write(`claim: the bus in ${ROOT} does not know ${JSON.stringify(by)}, so this claim records a name it REFUSED rather than one it confirmed. The next reader is told.\n`)
+
 	const rec = {
 		v: SCHEMA, at: new Date().toISOString(), resource,
-		by: opt("--agent", process.env.CLAUDE_COMM_AGENT || "unnamed"),
+		by, by_source,
 		pid: holderPid, start: startTimeOf(holderPid), boot: bootId(), holder: holderKind,
 		purpose,
 	}
@@ -282,22 +411,37 @@ function take() {
 }
 
 function list() {
-	const cs = allClaims(ROOT)
+	requireRoot()
+	// `who` and `note` travel in the JSON so that bin/boot.mjs, the reader that prints this at
+	// every session start, renders THIS answer instead of deriving a second one from `state`.
+	const cs = allClaims(ROOT).map((c) => ({ ...c, ...verdict(c), who: describe(c) }))
 	if (has("--json")) { process.stdout.write(JSON.stringify({ root: ROOT, claims: cs }) + "\n"); return }
 	if (!cs.length) { process.stdout.write(`no claims in ${claimsDir(ROOT)}\n`); return }
-	for (const c of cs) {
-		const mark = c.state === "held" ? "●" : c.state === "gone" ? "✗" : "?"
-		const tail = c.state === "held" ? "" : c.state === "gone" ? "  <- HOLDER IS GONE: a crash, not a lock" : `  <- ${c.state}`
-		process.stdout.write(`  ${mark} ${c.resource.padEnd(20)} ${describe(c)}${tail}\n`)
-	}
+	for (const c of cs) process.stdout.write(`  ${c.mark} ${c.resource.padEnd(20)} ${c.who}${c.note ? `  <- ${c.note}` : ""}\n`)
 }
 
 function release() {
+	requireRoot()
 	const resource = positional(1)
 	if (!resource) die("release needs a resource name")
 	if (!safeResource(resource)) die(`a resource name must match ${RESOURCE_OK}, got ${JSON.stringify(resource)}`)
 	const cur = read(ROOT, resource)
 	if (cur.state === "free") { process.stdout.write(`${resource} was not claimed\n`); process.exit(0) }
+	// PROPERTY 3, IN THE BRANCH IT WAS MISSING FROM. `take` refuses to overwrite bytes it
+	// cannot read; `release` unlinked them — and because the record was unreadable, `isMine`
+	// was false, `state` was never "held", and the --force this file calls its one destructive
+	// act was never asked for either (review #7 F6). Review #6 F6 was this same rule applied
+	// to one branch and not its neighbour, in the file whose header cites review #6 F6.
+	if (cur.state === "unreadable")
+		die(`${cur.path} could not be read (${cur.why}) — refusing to delete a claim that may be live. Move it aside by hand if you mean to.`, EX_IO)
+	if (cur.state === "corrupt") {
+		// read() has already moved the bytes; there is nothing left to unlink, and printing
+		// "released" would claim an action nobody took on a claim nobody could read.
+		process.stdout.write(`${resource} carried bytes this version cannot read; they were SET ASIDE at ${cur.setAside} and the resource is now free\n`)
+		process.exit(0)
+	}
+	if (cur.state === "unknown" && !has("--force"))
+		die(`${resource} carries a record whose holder cannot be judged (no start time, or written before this machine rebooted) — it may be live, and deleting it destroys the only evidence of who wrote it. --force if you mean it.`, EX_HELD)
 	// Releasing SOMEBODY ELSE's live claim is the one destructive thing here, so it is the
 	// one thing that needs saying out loud rather than doing quietly.
 	if (cur.state === "held" && !isMine(cur.rec) && !has("--force"))
@@ -411,6 +555,146 @@ function proveRed() {
 	check("a claim for an already-dead --pid is refused, not written",
 		deadPid.status !== 0 && !existsSync(join(claimsDir(dir), "port:5174.json")),
 		`exit ${deadPid.status} (want non-zero), file written=${existsSync(join(claimsDir(dir), "port:5174.json"))}`)
+
+	// ── the arms review #7 found missing, and one of them found the headline ──────────
+	//
+	// Arms 1-8 all pass `--root <tmpdir>` explicitly, so not one of them ever exercised root
+	// RESOLUTION — the same fixture blind spot that hid the pid defect, one layer out: the
+	// arms chose the root the way they had chosen the pid. Everything below runs the CLI the
+	// way an agent does, from a cwd, with no --root at all.
+
+	// Two directories that ARE one project, and two that are not: the deviation is the
+	// positive control, and it is what the old code did to every project.
+	const proj = join(dir, "proj")
+	mkdirSync(join(proj, ".comm"), { recursive: true })
+	mkdirSync(join(proj, "app"), { recursive: true })
+	mkdirSync(join(proj, "api"), { recursive: true })
+	writeFileSync(join(proj, ".comm", "config.json"),
+		JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app", api: "api" } }))
+	const runIn = (cwd, args, env) => spawnSync(process.execPath, [self, ...args],
+		{ cwd, encoding: "utf8", env: { ...process.env, ...(env || {}) } })
+	const claimJsons = (under) => {
+		const out = []
+		const walk = (d) => {
+			for (const e of readdirSync(d, { withFileTypes: true })) {
+				const q = join(d, e.name)
+				if (e.isDirectory()) walk(q)
+				else if (e.name.endsWith(".json") && dirname(q).endsWith(`${sep}claims`)) out.push(q)
+			}
+		}
+		try { walk(under) } catch {}
+		return out
+	}
+
+	// 9. THE HEADLINE (review #7 F1). Two agents standing in two subdirectories of ONE
+	//    project must contend. The first holder is this suite's own pid — alive, and not the
+	//    session — so the second take is somebody else's claim rather than a refresh.
+	const a9first = runIn(join(proj, "app"), ["take", "port:4173", "--purpose", "vite dev server", "--pid", String(process.pid), "--quiet"])
+	const a9second = runIn(join(proj, "api"), ["take", "port:4173", "--purpose", "mine too", "--quiet"])
+	const a9files = claimJsons(proj)
+	check("two agents in one project's subdirectories CONTEND",
+		a9first.status === 0 && a9second.status === EX_HELD && a9files.length === 1,
+		`app/ take exit ${a9first.status}, api/ take exit ${a9second.status} (want ${EX_HELD}), ` +
+		`claim files under the project: ${a9files.length} (want 1) -> ${a9files.map((f) => f.slice(proj.length + 1)).join(", ") || "none"}`)
+
+	//    POSITIVE CONTROL for 9: the same two commands where the two directories really are
+	//    two projects. Two files, two exit-0s — the shape the assertion above forbids, proving
+	//    it is not vacuous. This is exactly what the shipped tool did for ONE project.
+	const two = join(dir, "two")
+	for (const sub of ["a", "b"]) {
+		mkdirSync(join(two, sub, ".comm"), { recursive: true })
+		writeFileSync(join(two, sub, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: "." } }))
+	}
+	const c1 = runIn(join(two, "a"), ["take", "port:4173", "--purpose", "x", "--pid", String(process.pid), "--quiet"])
+	const c2 = runIn(join(two, "b"), ["take", "port:4173", "--purpose", "y", "--pid", String(process.pid), "--quiet"])
+	const cFiles = claimJsons(two)
+	check("  positive control: two real projects do NOT contend",
+		c1.status === 0 && c2.status === 0 && cFiles.length === 2,
+		`exits ${c1.status}/${c2.status} (want 0/0), claim files: ${cFiles.length} (want 2) - the arm above can see this shape`)
+
+	// 10. Nowhere is not a project. Creating `.comm/claims/` in an arbitrary directory is the
+	//     silent split itself, so the answer is a refusal that says where to stand.
+	const nowhere = mkdtempSync(join(tmpdir(), "comm-claim-nowhere-"))
+	process.on("exit", () => { try { rmSync(nowhere, { recursive: true, force: true }) } catch {} })
+	const orphan = runIn(nowhere, ["take", "port:4173", "--purpose", "nowhere", "--quiet"])
+	const madeDir = existsSync(join(nowhere, ".comm"))
+	const explicit = runIn(nowhere, ["take", "port:4173", "--purpose", "explicit", "--root", nowhere, "--quiet"])
+	check("no project above cwd REFUSES, and an explicit --root still works",
+		orphan.status !== 0 && !madeDir && /config\.json/.test(orphan.stderr) && explicit.status === 0,
+		`implicit exit ${orphan.status} (want non-zero), created .comm/=${madeDir} (want false); ` +
+		`positive control --root exit ${explicit.status} (want 0)`)
+
+	// 11. Property 3 in `release` (review #7 F6): zero of arms 1-8 exercised release at all,
+	//     and it destroyed the bytes `take` refuses to touch.
+	const rel = join(claimsDir(dir), "port:4178.json")
+	write("port:4178", base({ resource: "port:4178" }))
+	let chmodWorked = true
+	try { chmodSync(rel, 0o000); readFileSync(rel, "utf8"); chmodWorked = false } catch {}
+	const relBad = run(["release", "port:4178"])
+	const survived = existsSync(rel)
+	try { chmodSync(rel, 0o644) } catch {}
+	const relOk = run(["release", "port:4178", "--force"])
+	check("release REFUSES bytes it cannot read, and still releases bytes it can",
+		chmodWorked && relBad.status !== 0 && survived && relOk.status === 0 && !existsSync(rel),
+		chmodWorked
+			? `unreadable: exit ${relBad.status} (want non-zero), file survived=${survived}; readable: exit ${relOk.status}, removed=${!existsSync(rel)}`
+			: "SKIPPED-AS-FAILURE: chmod 000 was still readable (running as root?), so this arm proved nothing")
+
+	// 12. A `holder: "self"` claim is a prediction this tool MADE and warned about on stderr;
+	//     reporting it back as evidence of a crash is a false alarm at every session start
+	//     (review #7 F14). One variable: the `holder` field, same dead pid, same everything.
+	write("port:4179", base({ resource: "port:4179", pid: 4194303, start: 1, holder: "self" }))
+	write("port:4180", base({ resource: "port:4180", pid: 4194303, start: 1, holder: "session" }))
+	const listed = run(["list"]).stdout
+	const selfLine = listed.split("\n").find((l) => l.includes("port:4179")) || ""
+	const sessLine = listed.split("\n").find((l) => l.includes("port:4180")) || ""
+	check("a dead SELF-held claim is not reported as a crash",
+		/nothing crashed/.test(selfLine) && !/a crash/.test(selfLine) && /a crash/.test(sessLine),
+		`holder:"self" -> ${JSON.stringify(selfLine.trim().slice(-60))}; ` +
+		`positive control holder:"session" says crash=${/a crash/.test(sessLine)}`)
+
+	// 13. The verb is a positional, not the first token that is not a flag (review #7 F12).
+	//     Two shapes the old resolver got wrong: a flag BEFORE the verb, and a flag value that
+	//     happens to spell the destructive verb.
+	const flagFirst = run(["--purpose", "dev", "take", "port:4181"])
+	const valueIsAVerb = run(["take", "port:4182", "--purpose", "release", "--quiet"])
+	check("the verb survives a leading flag and a value that spells one",
+		flagFirst.status === 0 && existsSync(join(claimsDir(dir), "port:4181.json")) &&
+		valueIsAVerb.status === 0 && existsSync(join(claimsDir(dir), "port:4182.json")),
+		`--purpose dev take ... -> exit ${flagFirst.status}, written=${existsSync(join(claimsDir(dir), "port:4181.json"))}; ` +
+		`--purpose release -> exit ${valueIsAVerb.status}, written=${existsSync(join(claimsDir(dir), "port:4182.json"))} (a release dispatch would have unlinked it)`)
+
+	// 14. The name is ASKED, not typed (review #7 F11). In the field's ordinary configuration
+	//     nobody exports CLAUDE_COMM_AGENT, so `by` read `unnamed` for every claim taken by an
+	//     agent the bus can name exactly — in the one field that tells the next agent whose
+	//     terminal to walk to. Three states, one variable each.
+	const askedTake = runIn(join(proj, "app"), ["take", "port:5555", "--purpose", "asked", "--pid", String(process.pid), "--quiet"])
+	const recOf = (root, r) => { try { return JSON.parse(readFileSync(join(claimsDir(root), `${r}.json`), "utf8")) } catch { return null } }
+	const askedRec = recOf(proj, "port:5555")
+	check("`by` is the bus's answer where the bus can answer",
+		askedTake.status === 0 && askedRec && askedRec.by === "app" && askedRec.by_source === "bus",
+		`in proj/app -> by=${askedRec && askedRec.by} source=${askedRec && askedRec.by_source} (want app/bus; the shipped version recorded "unnamed" here)`)
+
+	//     ONE VARIABLE: a declaration the roster does not contain. `comm.mjs whoami` refuses
+	//     it — which is the bus REFUSING a name, not a bus that could not be reached — and a
+	//     record that stored it as if it were a name would be F4's defect one file over.
+	const lieTake = runIn(join(proj, "api"), ["take", "port:5556", "--purpose", "lying", "--pid", String(process.pid)],
+		{ CLAUDE_COMM_AGENT: "a-lie" })
+	const lieRec = recOf(proj, "port:5556")
+	check("a name the bus REFUSED is recorded as refused, and said out loud",
+		lieRec && lieRec.by_source === "refused-by-bus" && /does not know/.test(lieTake.stderr),
+		`CLAUDE_COMM_AGENT=a-lie in proj/api -> source=${lieRec && lieRec.by_source} (want refused-by-bus), stderr warned=${/does not know/.test(lieTake.stderr)}`)
+
+	//     POSITIVE CONTROL: the same lie where there is no bus to refuse it. Nothing was
+	//     asked, so nothing was refused, and the record says `env` — a different answer from
+	//     the same environment, which is what proves the arm above is measuring the bus.
+	const noBus = runIn(dir, ["take", "port:5557", "--purpose", "off the bus", "--root", dir, "--quiet"], { CLAUDE_COMM_AGENT: "a-lie" })
+	const noBusRec = recOf(dir, "port:5557")
+	const forged = runIn(join(proj, "app"), ["take", "port:5558", "--purpose", "typed", "--agent", "leader", "--quiet"])
+	check("  positive control: off the bus it is `env`, and a contradicting --agent is refused",
+		noBus.status === 0 && noBusRec && noBusRec.by === "a-lie" && noBusRec.by_source === "env" && forged.status !== 0,
+		`no config.json above -> by=${noBusRec && noBusRec.by} source=${noBusRec && noBusRec.by_source} (want a-lie/env); ` +
+		`--agent leader while the bus says app -> exit ${forged.status} (want non-zero)`)
 
 	console.log(`\n${failed ? `✗ ${failed} claim propert(y/ies) NOT demonstrated` : "✓ every claim property demonstrated by a moved variable"}\n`)
 	process.exit(failed ? 1 : 0)
