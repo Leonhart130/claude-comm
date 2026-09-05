@@ -861,6 +861,36 @@ for (const [id, relPath] of Object.entries(cfg.agents)) {
 		continue
 	}
 
+	// KEEP THE PROJECT'S FORMATTER OFF THE FILE WE GENERATE — the same argument as the
+	// .gitignore rule below, and it was not theoretical for one day. Measured 2026-09-05:
+	// `HartEdge-admin` ran `prettier --write .`, which rewrote `.claude/comm-hook.mjs` — 352
+	// lines, double quotes to single, semicolons added — eight minutes after an install. The
+	// file says GENERATED, do not edit, on its first line; a formatter does not read English.
+	//
+	// TWO THINGS BREAK, and the second is theirs, not ours: our drift check reports the agent
+	// out of date forever (re-installing restores it, until the next format), and THEIR
+	// `lint` script is `prettier --check .`, so a file we put in their tree fails their lint.
+	//
+	// Only where a formatter is actually configured, and only for the two paths we write. A
+	// project with no prettier config gets nothing: creating formatter configuration in
+	// somebody's repository because we happen to have an opinion is not this installer's
+	// business.
+	const prettierHere = ["prettier.config.js", "prettier.config.mjs", ".prettierrc", ".prettierrc.json", ".prettierrc.js"]
+		.some((f) => existsSync(join(agentRoot, f))) || existsSync(join(agentRoot, ".prettierignore"))
+	if (prettierHere) {
+		const piPath = join(agentRoot, ".prettierignore")
+		const pi = existsSync(piPath) ? readFileSync(piPath, "utf8") : ""
+		const wanted = [".claude/comm-hook.mjs", ".claude/settings.json"].filter((l) => !pi.split("\n").some((x) => x.trim() === l))
+		if (wanted.length) {
+			if (CHECK) results.drift.push(piPath)
+			else {
+				writeFileSync(piPath, (pi ? pi.replace(/\n*$/, "\n") + "\n" : "") +
+					"# claude-comm writes these; formatting them makes them drift and fails `prettier --check`\n" + wanted.join("\n") + "\n")
+				results.wrote.push(piPath)
+			}
+		} else results.ok.push(piPath)
+	}
+
 	if (!CHECK) mkdirSync(join(commDir, "inbox", id), { recursive: true })
 }
 

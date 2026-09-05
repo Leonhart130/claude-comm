@@ -2340,6 +2340,56 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		`source checkout gone -> ${blind(gone) ? "says it could NOT check" : "SILENT, which reads as up to date"}`)
 }
 
+// A43 — the project's own formatter must not rewrite the file we generate.
+//
+// Measured in the field on 2026-09-05, eight minutes after an install: `HartEdge-admin` ran
+// `prettier --write .`, which reformatted `.claude/comm-hook.mjs` — 352 lines, double quotes to
+// single, semicolons added. The file's first line says GENERATED, do not edit; a formatter does
+// not read English. Two things break, and the second is theirs rather than ours: our drift check
+// reports that agent out of date forever, and their `lint` script is `prettier --check .`, so a
+// file we put in their tree fails their lint.
+//
+// The rule is the .gitignore rule's twin, and its limit is the point: ONLY where a formatter is
+// already configured, and only for the two paths we write. Creating formatter configuration in
+// somebody's repository because we have an opinion is not this installer's business — so the
+// control here is a project with no prettier config, which must be left alone.
+{
+	const root43 = mkdtempSync(join(tmpdir(), "comm-attack-fmt-"))
+	process.on("exit", () => { try { rmSync(root43, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(root43, ".comm"), { recursive: true })
+	mkdirSync(join(root43, "styled"), { recursive: true })
+	mkdirSync(join(root43, "plain"), { recursive: true })
+	writeFileSync(join(root43, ".comm", "config.json"),
+		JSON.stringify({ leader: "leader", agents: { leader: ".", styled: "styled", plain: "plain" } }))
+	// ONE VARIABLE between the two agents: whether a formatter is configured there.
+	writeFileSync(join(root43, "styled", "prettier.config.js"), "export default {}\n")
+	writeFileSync(join(root43, "styled", ".prettierignore"), "build/\n")
+
+	const run43 = (args = []) => spawnSync("node", [join(PKG, "install.mjs"), root43, ...args], { encoding: "utf8" })
+	run43()
+	const piPath = join(root43, "styled", ".prettierignore")
+	const pi = readFileSync(piPath, "utf8")
+	const listed = ["\.claude/comm-hook\.mjs", "\.claude/settings\.json"].every((l) => new RegExp(`^${l}$`, "m").test(pi))
+	const kept = /^build\/$/m.test(pi)
+	const plainUntouched = !existsSync(join(root43, "plain", ".prettierignore"))
+
+	// Idempotent: a second install must not append the lines again.
+	run43()
+	const once = (readFileSync(piPath, "utf8").match(/\.claude\/comm-hook\.mjs/g) || []).length === 1
+
+	// And --check must SEE the missing rule rather than call the project current.
+	writeFileSync(piPath, "build/\n")
+	const chk43 = run43(["--check"])
+	const seesIt = chk43.status === 1 && /\.prettierignore/.test(chk43.stdout + chk43.stderr)
+
+	check("A43 a configured formatter is told to leave the generated files alone",
+		listed && kept && plainUntouched && once && seesIt,
+		`agent with a prettier config -> both generated paths ignored=${listed}, its own entries kept=${kept}; ` +
+		`control, an agent with NO formatter configured -> no .prettierignore created=${plainUntouched}; ` +
+		`installed twice -> the rule appears once=${once}; ` +
+		`rule removed -> --check exit ${chk43.status} and names the file=${seesIt} (silence here is a project whose lint we broke)`)
+}
+
 // A31 — this suite must not touch the machine's real session registry.
 //
 // Not a property of the bus: a property of the SUITE, and it is here because the trap has
