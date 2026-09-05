@@ -4,6 +4,7 @@
  *
  *   node bin/exchange-bell.mjs --peer work-leader --ref exchange/work-leader/out/X.md
  *   node bin/exchange-bell.mjs --peer work-leader --ref ... --dry-run
+ *   node bin/exchange-bell.mjs --peer work-leader --ref ... --print-text   the sentence, nothing else
  *
  * WHY THIS EXISTS, and it is not "because ringing by hand is tedious".
  *
@@ -101,6 +102,26 @@ if (inside.startsWith("..") || isAbsolute(inside)) die(`--ref must be a file ins
 if (!existsSync(ref)) die(`--ref does not exist: ${ref}. A bell for a file that is not there is worse than no bell`)
 try { if (!statSync(ref).isFile()) die(`--ref is not a file: ${ref}`) } catch { die(`--ref cannot be read: ${ref}`) }
 
+// THE TEXT. Fixed, except for the path. Read the header: everything that is not a pointer
+// is something that can be true when it is composed and false when it is read.
+//
+// MOVED UP HERE, review #6 F4. It sat below the bus lookup, the window resolution and the
+// quiet period, so the sentence could only be produced on a machine with the peer's leader
+// actually running under kitty - which is no machine the gate ever runs on. The result was
+// that NOTHING EXECUTED THE BELL: A35 read this file's source, counted `${…}` holes and
+// called that the property, so a value appended with `+` - `+ new Date().toISOString()` -
+// was invisible to the one gate whose entire title is that this message carries nothing
+// that can go stale. It depends on `ref` and `inDir` and on nothing else, which is the
+// whole claim, so it belongs at the first point where both are known.
+const TEXT = `[claude-comm] cross-project doorbell. A file is waiting for you and the file is the artifact — ` +
+	`this is only the bell: ${ref} — nothing in this message is computed or current except that path, so read the file. ` +
+	`Reply as a file in ${inDir} (this channel is a file exchange, not a bus).`
+
+// Render without ringing. No peer, no bus, no kitty, no quiet period - the sentence, on
+// stdout, so a gate can read what would have been sent instead of reading the source and
+// inferring it.
+if (has("--print-text")) { process.stdout.write(TEXT + "\n"); process.exit(0) }
+
 // The peer's pid comes from THEIR bus, asked rather than reimplemented. A second
 // implementation of "which claude process is which agent" has already disagreed with the
 // first twice in this project (wake.mjs, rule 2).
@@ -133,12 +154,6 @@ if (sinceMs < QUIET_MS && !has("--force")) {
 	process.stdout.write(`rung ${Math.round(sinceMs / 1000)}s ago (quiet period ${QUIET_MS / 1000}s) — not ringing. --force overrides.\n`)
 	process.exit(3)
 }
-
-// THE TEXT. Fixed, except for the path. Read the header: everything that is not a pointer
-// is something that can be true when it is composed and false when it is read.
-const TEXT = `[claude-comm] cross-project doorbell. A file is waiting for you and the file is the artifact — ` +
-	`this is only the bell: ${ref} — nothing in this message is computed or current except that path, so read the file. ` +
-	`Reply as a file in ${inDir} (this channel is a file exchange, not a bus).`
 
 if (has("--dry-run")) {
 	process.stdout.write(`would ring ${agent} (pid ${target.pid}) in window ${target.r.win.id} on ${target.r.win.sock} — ${target.r.how}\n  ${TEXT}\n`)

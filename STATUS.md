@@ -1,79 +1,49 @@
-# STATUS — claude-comm, 2026-09-04 (sessions 4–12)
+# STATUS — claude-comm, 2026-09-05 (sessions 4–13)
 
 Design and gates are in `README.md`; **this file is only what is OPEN.** Keep it short — when it grows,
 fold the settled parts into the README.
 
 ## ▶ NEXT
 
-**1 — Dispose review #6: five findings OPEN, and recording them is the numerator this ledger never had.**
+**1 — `#claim-file`: the peer's condition is met, and I did not build it.**
 
-*Written 2026-09-04 by the session that took the review. It assumes you remember nothing, and boot injects only
-this first line — so the first line is the instruction. Every claim below is checkable; check it.*
+*Written 2026-09-05. It assumes you remember nothing; boot injects only this first line, so the first line is
+the instruction. Every claim below is checkable — check it.*
 
-**`REVIEW-adversarial-6.md` is the full record — read it, do not re-derive.** Seven findings on that day's own
-code; **five were about the ARMS, not the code**, the same ratio as review #5. Disposition so far:
+`exchange/work-leader/in/REPLY-2026-09-04-covariate.md` §1 lists **three agents and six ports, scheduled, not
+hypothetical** (PostgREST 54331, GoTrue 54332, dev 5174/5175, preview 4174/4175). My own stated trigger —
+*a third agent starting a dev server* — is therefore already met. The design is `FINDINGS.md#claim-file`.
+Two hand-written warnings now exist instead of one lock (his `notes/REGISTRE-DES-PORTS.md`, my `.comm/README.md`
+line); that is not progress. **Build the file, not the trigger.**
 
-- ✅ **F2 — the restart signal was INERT in this repo.** The claim lived only in the generated stub, and this
-  project has no stub: its hook is `boot.mjs --hook`. A note could be armed, the row would PRINT it and file
-  the start as COLD in the same sentence — and the ▶ NEXT told the next session to do exactly that. Fixed and
-  verified by hand. 🔴 **NOT ARMED**, and the existing arm cannot notice because it never arms a note.
-- ✅ **F1 — the prose in `#reboot-signal` is corrected.** A33 proves the note is *consumed*, not that
-  consumption is *atomic*; a genuine read-then-unlink passes it green. 🔴 The arm still needs a real barrier.
-- 🔴 **F3** the `DRIFT:` list names files that did not drift, including a shell command · **F4** A35 misses
-  concatenation and nothing ever executes the bell · **F5** boot drops the ledger's `caveats` — R6's defect
-  re-created in the commit that added the field · **F6** a tampered note is deleted, against the file's own
-  Property 3 · **F7** the git guard is blind below the git root. Plus four more he raised without staging,
-  including a bare `catch {}` that silently narrows the gate fingerprint.
+**2 — The launcher must resolve the runtime and REFUSE, not trust a shell flag.**
 
-**Then record them.** Every start is recorded automatically; **a defect is recorded by hand and nobody ever
-has.** Ten reboots against ten cold starts still produce *"no difference detected"* if the numerator is 0/10
-against 0/10. These findings are the first real material:
-`node bin/ledger.mjs record defect --agent unnamed --ref REVIEW-adversarial-6.md --authored-at <iso with a Z>`.
-⚠️ **`--authored-at`, never found_at:** a defect charged to whoever noticed it flows to the newest session, and
-reboots manufacture sessions. The tool refuses an untimed defect unless you say `--authored-unknown` out loud.
+`FINDINGS.md#hookless-launch` published *"the fix is a login shell"* and it is **false on this box** — nvm is
+loaded from `.zshrc`, which `zsh -l` never reads. Measured 2026-09-05, one flag moved, with a positive
+control: `-l` ABSENT, `-i` finds node. The recorded recipe `zsh -lic` worked by accident of containing `i`.
+Corrected in both documents. **The rule to build is the peer's**: resolve `node` and `claude` to absolute
+paths before launching and refuse when resolution fails — a launcher that cannot find the runtime must not
+return a window id. Answer him on the channel; he has offered to run the control that is still missing,
+namely a REAL self-launched session with `comm who` behind it. Reaching the binary is not being on the bus.
 
-⚠️ **The arm also needs a covariate the peer measured and I have not built.** A crashed restart cost 115 609
-tokens, a *declared* one 116 413 — the clean one cost MORE, and he named the confound: 246 lines of report
-were waiting. **The boot turn is governed by what the session finds in front of it**, so without recording
-pending work at start both arms measure the luck of the queue. Cheap partial proxy: inbox depth at start,
-which the hook already knows. Label it partial. `exchange/work-leader/out/2026-09-04-covariate.md`.
+**3 — The field bus was updated on the owner's instruction; the covariate has NOT been observed there.**
+`install.mjs` was run on `~/Dev/electio` (11 files, 2 agents) and `~/Dev/work` (17 files, 5 agents) after this
+session made both stale; `--check` is green on each. ⚠️ **But no field session has started since**, so
+`pending` has never been written by a real field hook — only by this repo's own arms. The first field start
+after this is the measurement; read it before trusting the column.
 
-**The field answered the notice the day it shipped** — `exchange/field/in/`'s first file ever
-(`work-leader-2026-09-04-premiere-lecture-notice.md`). Two items change plans: the notice covers MAIL and says
-nothing about **resources two agents in one tree contend over** (he found three of his apps on port 4173), and
-🔴 *"a notice is not read because it is there — it is read when someone says it is not"* ⇒ **`SessionStart`
-should NAME it once.** Also: his `.comm/` is ignored by **his** line, not the installer's, so that control
-proves his rule exists, not that install places one.
+**4 — The window is untested, and my own timestamps are why.** Eleven defects are recorded — the first this
+ledger has ever had — and **0 of 11 fall inside the 15-minute window**, against the consumer's *"four of five
+in the first thirteen minutes"*. But each is dated at **its commit**, the upper bound of when it was written,
+which pushes every point later. Do not quote the disagreement as a result. `FINDINGS.md#review6-disposal`.
 
-⚠️ **Launch tomorrow's reviewer in a SEPARATE WINDOW.** A `general-purpose` subagent does not inherit the
-conversation, but it inherits the brief — and the brief is mine. Ask the owner.
-
-**2 — Then the reboot trigger.** The consumer's §2.4: *"you re-fetched a file you already read this
-session"*, countable by a hook, not a token threshold. Its confound is theirs, priced at ~30 min; ask rather
-than guess. **Do not build it before 1** — a trigger whose effect the instrument cannot classify is a feature
-with no ledger, which is this project's own definition of a hobby.
-
-**3 — The other half of `#hookless-launch`, now with a second failure beside it.** A self-launched agent
-needs a login shell (no `node` on `PATH` otherwise) **and** an answer to the trust prompt, which kills it in
-any new directory while the launch still returns a window id. Both are prerequisites for self-launching
-experts. `FINDINGS.md#hookless-launch` and `#wake-doorbell`.
+**5 — One red that no code change explains, still unidentified.** `boot.mjs --prove-red` reported
+`✗ 1 boot row(s) could NOT be reddened`, then went green twice on the same tree — including through the
+identical pipeline, which refutes the obvious `head`-closed-the-pipe explanation. The row was never named
+because I had filtered the run through `grep`. **Run gates unfiltered.** If it recurs it is `FINDINGS.md#A20`
+and it is triage-first.
 
 **Standing test debt from review #4, none of it gated:** `FINDINGS.md#test-debt`.
-
-**Every field project carries its own notice** at `.comm/README.md` — what `.comm/` is, why never to commit
-it, the commands, how to update, and where to send feedback (`exchange/field/in/`, which boot watches). A
-`SessionStart` guard asks whether anything under `.comm/` is *tracked*, because a notice is a promise.
-`FINDINGS.md#field-notice`, including the escape bug that killed every hook while it was being added.
-
-**Telling a peer is one command, and must be that one:** `node bin/exchange-bell.mjs --peer work-leader
---ref <file in their out/>`. Boot's `channel:` row tells only *me* when they write; three hand-rung bells
-produced one quoting a number two re-arms stale. `FINDINGS.md#exchange-bell`.
-
-**Settled 2026-09-04, do not re-litigate — measurements in `DESIGN-autonomy.md` and `FINDINGS.md`:**
-`/clear` mints a new session, costs ~14 MB, returns no RSS · one kitty socket per OS window, and
-`kitten @ launch --type=os-window` stays in the SAME process · pid → transcript comes from the registry, a
-miss REFUSES, and a hook records only for a session inside its own project · the instruments travel beside
-the bus, never by absolute path · the doorbell resolves by pid and refuses rather than hoping.
 
 ## Where it stands
 
@@ -84,9 +54,9 @@ the bus, never by absolute path · the doorbell resolves by pid and refuses rath
 | **electio** | in real daily use — 26 real deliveries, both directions |
 | gates | `attack` (deterministic, every case armed) · `ledger --prove-red`, now run INSIDE it · `selftest` (real sessions, not gated by boot) · `context` and `boot` controls. **Counts live in boot's output, never here** |
 | boot | `node bin/boot.mjs` — every gating row armed; `--fast` is injected at session start, contract in `CLAUDE.md` |
-| **ledger** | `node bin/ledger.mjs` — the reboot instrument, **built before the mechanism**, which now exists (`restart-signal.mjs`). Records here AND in the field; a field arm is `--root ~/Dev/electio`. Its own arms run inside `attack` as A34 |
+| **ledger** | `node bin/ledger.mjs` — the reboot instrument. Records here AND in the field; a field arm is `--root ~/Dev/electio`. Its own arms run inside `attack` as A34. **11 defects recorded, its first**; each start now stores `pending`, the peer's covariate (files newer than the last start), never the inbox depth I proposed — his session #41 had an empty mailbox and the largest real queue of his last five boots |
 | **sensor** | `node bin/context.mjs` — pid → transcript through `bin/session-registry.mjs` (the `SessionStart` hook writes it, keyed on pid + start time + boot id); **refuses on a miss**. `FINDINGS.md#clear-blind` |
-| reviews | #1–#5 dispositioned · **#6 is OPEN — `REVIEW-adversarial-6.md`, see ▶ NEXT.** #5's amendment is in `CLAUDE.md`: *a gate that CAN redden is not yet one that reddens for the property in its own title* — **#6 hit that ratio again, 5 of 7** |
+| reviews | #1–#6 **all dispositioned**. #6's eleven findings are fixed and armed (`FINDINGS.md#review6-disposal`); F8–F11 were numbered on 2026-09-05 so each could carry a resolvable `--ref`. #5's amendment stands in `CLAUDE.md`: *a gate that CAN redden is not yet one that reddens for the property in its own title* — **the disposal itself produced four more defects, three of them in detectors** |
 
 ## ⏭️ OPEN
 1. **🔴 Latency is a mailbox, not an interrupt.** Re-derive with `node test/latency.mjs <log>`; never
@@ -119,7 +89,9 @@ the bus, never by absolute path · the doorbell resolves by pid and refuses rath
    dies** while it looks normal. **A self-launched expert is launched by a program, never by a shell** — the
    shape that would have made the whole autonomy program measure nothing. `FINDINGS.md#hookless-launch`.
    ✅ Half-fixed: the hook now says so out loud, still exiting 0. 🔴 Open: it warns, it does not make such a
-   session work. The fix is a login shell, and that covers only launchers this framework owns.
+   session work. 🔴 The published fix said "a login shell" and that is FALSE on this box — nvm is loaded from
+   `.zshrc`, which `zsh -l` never reads. `-i` is the flag that works; the recorded recipe `zsh -lic` worked by
+   accident of containing it. The rule to build is to resolve `node`/`claude` absolutely and REFUSE.
 
 6. **🔴 The autonomy mandate — self-launching experts, a self-rebooting leader.** Given 2026-09-04.
    **Everything settled about it lives in [`DESIGN-autonomy.md`](DESIGN-autonomy.md)** — the four verified

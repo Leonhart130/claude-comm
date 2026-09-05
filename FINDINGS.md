@@ -594,11 +594,46 @@ receive no mail, record nothing in either instrument, and look completely normal
 this project keeps finding, at the level of the whole agent rather than one call. Every measurement about
 delivery, latency and lifecycle taken on a hand-opened terminal would simply not transfer.
 
+### 🔴 CORRECTED 2026-09-05: the fix was written as "a login shell" and that is FALSE here
+
+The `~/Dev/work` leader was told to use window-launching for his own work, applied what this section said,
+and measured it failing. He is right, and the reproduction on this machine is two commands:
+
+```sh
+grep -n nvm ~/.zshrc        # 114-115: NVM_DIR, then . "$NVM_DIR/nvm.sh"
+ls ~/.zprofile ~/.zlogin    # neither exists
+```
+
+**nvm is loaded from `.zshrc`, which a LOGIN shell never reads** — `zsh -l` sources `.zprofile`/`.zlogin`,
+and there are none. Only an INTERACTIVE shell sources `.zshrc`. Measured with one flag moved, and with a
+positive control so that ABSENT means absent rather than a broken probe:
+
+| launcher | `command -v node` |
+| --- | --- |
+| `zsh -c` | **ABSENT** |
+| `zsh -l -c` — *what this section told people to do* | **ABSENT** |
+| `zsh -i -c` | `/home/leonh/.config/nvm/versions/node/v24.18.0/bin/node` |
+| `zsh -lic` — *the recipe as actually recorded* | same, **and it works because of the `i`** |
+| control: `zsh -c 'command -v ls'` | `/bin/ls` — the probe can find things |
+
+⇒ **The RECIPE was right and the EXPLANATION was wrong**, which is this project's signature defect in its
+most expensive form: the recorded command carries `-lic` and works, the prose credits `-l`, and a reader who
+applies the prose gets a launch that **returns a window id and looks like it succeeded** while every hook in
+it is dead. He named the cost exactly: *"whoever applies your fix gets the failure the fix was meant to
+remove, plus the conviction of having repaired it."*
+
 ### The fix, in two halves
 
-1. **Launch through a login shell.** `kitten @ launch --type=os-window --keep-focus --cwd <dir> zsh -lic claude`
-   — measured to recover node from a bare environment. This is the recipe for self-launch, recorded in
+1. **Launch through an INTERACTIVE shell** — `-i` is the flag that does the work; `-l` is inert on this box
+   and is kept only because `-lic` is what was measured end to end.
+   `kitten @ launch --type=os-window --keep-focus --cwd <dir> zsh -lic claude`. Recorded in
    `DESIGN-autonomy.md`.
+
+   🔴 **And this is a per-workstation rule, not a framework rule** — his objection, and it is correct: it
+   depends on what a particular `.zshrc` happens to load. **The rule to build instead is his: the launcher
+   RESOLVES `node` and `claude` to absolute paths before launching and REFUSES when resolution fails** —
+   the same shape as the doorbell, which resolves by pid and refuses rather than hoping (`#wake-doorbell`
+   rule 1). A launcher that cannot find the runtime must not return a window id.
 2. **Make the failure loud**, because the launcher is not always ours. The `SessionStart` hook command now
    tests for node first and, when it is absent, prints one line saying the session has no bus, no ledger and
    no registry entry. It still exits 0 — a broken bus must never break a session — so the change is a
@@ -608,6 +643,11 @@ delivery, latency and lifecycle taken on a hand-opened terminal would simply not
 
 ⚠️ **What this does NOT do:** it does not make a node-less session work. It makes one impossible to mistake
 for a working one. The working fix is the launch recipe, and it only covers launchers this framework owns.
+
+⚠️ **And what is still unmeasured, in his words rather than mine:** *"the green in case 3 is a green on the
+`PATH`, not on the hooks."* Nobody has started a REAL self-launched session and then run `comm who` against
+it, or watched `.boot-state.json` increment. Reaching the binary is not being on the bus. He has the
+workstation and has offered to run that control.
 
 ## `#test-debt` — inherited from review #4, covered by no gate
 
@@ -987,3 +1027,79 @@ file is the artifact; no transport, no daemon. Three properties, each of which i
 
 **Deliberately not next.** A second collision would outrank the current plan; a near-miss does not.
 
+
+## `#review6-disposal` — disposing review #6, and the four defects the disposal itself produced
+
+**2026-09-05.** All eleven findings of `REVIEW-adversarial-6.md` are fixed and armed (F8–F11 were numbered
+that day, when they were recorded; they were prose bullets before). What is written here is only what the
+review did **not** already say — the measurements taken during the disposal, including the ones that went
+against me.
+
+### The ledger has a numerator now, and it says the opposite of what the window expects
+
+Eleven defects recorded, timed by **the commit that authored each**. Ten attributed, one unattributable
+(`F9`, authored 09:42:38Z on 2026-09-04, before this ledger's first start — property 3's pool, exercised for
+the first time by real data). All ten attributed defects land in **one session**, `f7fa6ab9`, a `clear`
+start, so they fill the **reboot** arm.
+
+⚠️ **Where those eleven `--ref` pointers lead:** `REVIEW-*.md` is gitignored (`.gitignore:30`) and so is
+`.comm/`, so the records and the document they point at are both machine-local and travel together. A clone
+has neither. That is consistent rather than broken, but a session reading these refs on another box will not
+find the file, and should be told so here rather than discover it.
+
+🔴 **Zero of ten fall inside the 15-minute window.** The consumer's finding — the reason the window is 15
+minutes — was *"four of five defects authored in the first thirteen minutes"*. This repository's own first
+batch was authored 35 minutes to 2 h 43 into its session.
+
+⚠️ **And the measurement is biased in exactly that direction, by construction.** A commit timestamp is the
+**upper bound** of the interval in which the code was written: a defect authored at minute 8 and committed at
+minute 95 is recorded at minute 95. So the disagreement with the consumer is *not yet evidence* — it is one
+sample, from a different kind of session (tool-building, not leading), scored by a rule that pushes every
+defect later. The honest reading is that the numerator exists and the window has not been tested.
+
+### The disposal produced four defects of its own, three of them in the detectors
+
+Same ratio as reviews #5 and #6, in work whose whole purpose was to fix that ratio.
+
+1. 🔴 **A29 merged the two streams and called the result stdout.** Its fixture redirected `> out 2>&1` and
+   parsed that file as the hook's stdout, so **any** diagnostic on stderr broke `schemaOK`. It had passed for
+   weeks only because nothing in that particular fixture ever wrote to stderr — no git repository, and a
+   registry write that succeeds. It went red the moment the stub gained a correct one-line notice. Fixed by
+   separating the streams, and the property it was hiding is now stated: *a hook may say what it likes on
+   stderr and its stdout contract stays intact*.
+2. 🔴 **The archive row's drift detector flipped on a commit that touched no document.** Two causes, both
+   real. It stripped comments over the **concatenation** of `test/*.mjs`, and `/*` appears inside strings and
+   regexes in those files — including in the detector's own source — so the markers do not balance and an
+   unclosed one swallows the next file. Which text survived depended on readdir order and on edits elsewhere.
+   And it matched a **basename anywhere**, so `A36` reading `<throwaway-fixture>/.comm/README.md` — a notice
+   the suite generates itself — was reported as an undeclared dependency on this repo's `README.md`. The row
+   whose job is to say which documents the gate opens named one it never opens. Stripped per file now, and a
+   reference counts only when its line also names `PKG`; `R4b` holds the direction that fired.
+3. 🔴 **The barrier race's detector wrapped the read and the unlink in one `try`.** Its positive control
+   reported **1** winner where the truth was **8**: seven claimants had read the note successfully and only
+   their *unlink* lost the race, and the catch overwrote the successful read. The failure this case exists to
+   detect, committed inside the case. Measured 1-of-8 before, 8-of-8 after, same barrier, same window.
+4. ⚠️ **The `DRIFT:` arm split a filename on `-`.** `comm-hook.mjs` read as `comm`, and the arm reported its
+   own truncation as a failure of the code under test. Split on the separator, never on the character it is
+   made of.
+
+### `#A20` again: one red that no code change explains, and it is not resolved
+
+`bin/boot.mjs --prove-red` reported `✗ 1 boot row(s) could NOT be reddened` on one run, then **green twice**
+on the same tree — once through the identical shell pipeline, which refutes the obvious explanation that
+`| head -20` had closed the pipe. **The failing row was never identified**, because the run was filtered
+through `grep -E 'R6|FAIL|PASS|red|green'` and the row's own line did not match. The summary line did.
+
+⇒ Two things are owed here and neither is done: the row is unknown, and the reason is that **I filtered a
+gate's output and destroyed the only evidence that would have named it.** Run the gates unfiltered; a suite's
+output is the measurement, not the noise around it. If this recurs, it is `#A20` and it is triage-first.
+
+### What the review's own arms could not be made to do
+
+🔴 **A33's race halves cannot separate a WINDOWLESS read-then-unlink from `rename`.** Measured, not assumed:
+with `renameSync` replaced by a genuine windowless read-then-unlink in the shipped module, eight
+barrier-released claimants still produced **one** winner and the pair stayed green. The barrier is real — the
+same barrier through a read-then-unlink with a 150 ms window hands the note to **all eight** — but the narrow
+critical section is too small for eight processes to land inside. That gap is closed by a **structural** half
+(`claim()` must consume by `renameSync` before any read of that path), whose own weakness is named where it
+is written: it reads source, so it is one refactor behind, and the declaration is the mechanism.
