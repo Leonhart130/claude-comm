@@ -1329,3 +1329,12 @@ Still unverified, still true, and no longer worth a line in the file every boot 
   victim's name — clean by construction in exactly the cases it would need to catch. `id_src` separates the
   two now, on new rows only; the 37 historical rows stay unauditable. Review #1's finding 6, one level up.
 - **The `-restored` duplicate id** in electio's log, unexplained across three reviews now.
+
+### Moved out of STATUS.md on 2026-09-05 (second pass), when tier 0 hit its cap again
+
+- **Whether two consumers of one hook stdin work.** The ▶ NEXT depends on the generated stub reading the
+  payload and handing it to both the bus and the ledger. It currently uses `stdio: "inherit"` and has never
+  been asked to do anything else.
+- **How long the wandered-cwd window stays open.** Proved within a single `-p` turn; whether an interactive
+  session's Bash cwd resets between turns is unmeasured. It decides the exposure, not the existence, of the
+  defect. Moot for delivery (identity no longer reads cwd); still governs `whoami`-returns-null, open item 2.
