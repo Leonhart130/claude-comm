@@ -10,13 +10,12 @@ fold the settled parts into the README.
 *Written 2026-09-05. It assumes you remember nothing; boot injects only this first line, so the first line is
 the instruction. Every claim below is checkable — check it.*
 
-Resource claims exist (`FINDINGS.md#claim-file`): eight arms, `A38` runs them in the gate, both failures the
-design named in advance proved red, installed into both field projects, and the boot row names a claim whose
-holder has died. 🔴 **But no two real agents have ever contended through it.** The demonstration used one
-session on both sides — correctly treated as one holder refreshing its own claim — so the refusal was shown
-only against a fabricated holder (`--pid 1`), and `--pid` has never carried a real dev server's pid.
-**Two live sessions in one tree, one port, is the next measurement.** The peer has six ports scheduled and has
-offered to run controls; ask him rather than staging it here, because his tree is where the collision lives.
+Resource claims exist (`FINDINGS.md#claim-file`): eight arms, `A38` in the gate, both failures the design
+named in advance proved red, installed in both field projects, and the boot row names a claim whose holder
+has died. 🔴 **No two real agents have contended through it.** One session took both sides — correctly read
+as one holder refreshing its own claim — so the refusal was shown only against a fabricated holder
+(`--pid 1`), and `--pid` has never carried a real server's pid. **Two live sessions, one port, is the next
+measurement**, and the peer's tree is where it lives — ask him, he offered.
 
 ⚠️ **And take the lesson before the next tool, not after it:** eight arms were green while `take` recorded the
 pid of a command that exits in milliseconds, so every claim read as a crash one second after being taken. All
@@ -29,18 +28,14 @@ Arms sharing one fixture idiom share one blind spot. Running the thing for real 
 correctly, delivery never used it, and an agent **cannot** set it for itself. What taught the habit was
 boot's own first row calling on-bus sessions off-bus; fixed, `A39` holds three states.
 
-🔴 **The one case where it still mattered is the owner's own workflow** — an adversarial review launched as a
-second session **in the leader's folder**, which drains the leader's inbox while the sender is told ✓
-delivered (`FINDINGS.md#second-session`). Answered without new mechanism: a **`review` agent** was added to
-the rosters of `~/Dev/work` and `~/Dev/electio` on 2026-09-05, dirs created, installer re-run, old configs
-backed up beside them. Verified end to end in the real project — `review → leader` with nothing typed, the
-leader's mail untouched, the test message and its ref removed afterwards.
-⚠️ **NOT verified: no real review has been run from `review/` yet.** The mail routing is measured; whether a
-reviewer that cannot see the leader's inbox still has everything it needs is not. That is the next thing to
-learn, and only a real review teaches it.
+🔴 **The one case where it mattered was the owner's own workflow** — a review launched as a second session in
+the leader's folder drains the leader's inbox while the sender is told ✓ delivered
+(`FINDINGS.md#second-session`). Answered with no new mechanism: a **`review` agent** now exists in both field
+rosters, verified end to end. ⚠️ **No real review has run from it yet** — the routing is measured, the
+workflow is not, and only a real review teaches that.
 
-⚠️ **Also still open:** a session whose cwd wanders after start is reported by where it stands. The registry
-would fix it and the bus may not import the registry — read the rejected trade in that section first.
+⚠️ **Also open:** a wandering cwd is reported by where it stands; the registry would fix it and the bus may
+not import the registry — read the rejected trade there first.
 
 **3 — The launcher must resolve the runtime and REFUSE, not trust a shell flag.**
 
@@ -146,8 +141,8 @@ and it is triage-first.
   Every path is wrapped, so the worst case is a missed prune, not a lost entry. Not measured.
 - **Anything about the registry off this machine.** It reads `/proc/<pid>/stat` and
   `/proc/sys/kernel/random/boot_id`; without both it refuses to record, which is a refusal, not support.
-- **The ledger has never scored a real defect.** Sixteen arms move it on synthetic records; nothing has yet
-  been recorded by a hand that was not writing a fixture. Its first real `record defect` is the test.
+- **The ledger's 11 defects are all from ONE session and NONE fell in the 15-minute window** —
+  and they are dated at their commit, the upper bound. `FINDINGS.md#review6-disposal`.
 - **The git guard has never fired outside a fixture.** Both field projects were clean when it shipped, and
   the one agent who read the notice did not stage a case where it should fire.
 - **The crossing has happened ONCE**, in one project, armed by one agent, relaunched by one hand
@@ -156,11 +151,6 @@ and it is triage-first.
 - **Whether two consumers of one hook stdin work.** The ▶ NEXT depends on the generated stub reading the
   payload and handing it to both the bus and the ledger. It currently uses `stdio: "inherit"` and has never
   been asked to do anything else.
-- **Whether finding 1 ever actually ate mail in electio.** Unanswerable, and not for the reason this file
-  gave for three sessions: the log DOES record who drained (`to_agent`, since the first commit), but it
-  records the **resolved** name, and every theft class here works by making the thief resolve to the
-  victim's name — clean by construction in exactly the cases it would need to catch. `id_src` separates the
-  two now, on new rows only; the 37 historical rows stay unauditable. Review #1's finding 6, one level up.
 - **How long the wandered-cwd window stays open.** Proved within a single `-p` turn; whether an interactive
   session's Bash cwd resets between turns is unmeasured. It decides the exposure, not the existence, of the
   defect. Moot for delivery (identity no longer reads cwd); still governs `whoami`-returns-null, open item 2.
@@ -168,7 +158,6 @@ and it is triage-first.
   the file it was pointed at. That is allowed by design, but it means this bus regularly rings a bell nobody
   answers, and no gate can tell you that happened in production.
 - **Anything non-Linux**: `comm who` reads `/proc` and degrades to "not running" everywhere else.
-- **The `-restored` duplicate id** in electio's log, unexplained across three reviews now.
 - Two older standing caveats were moved to `FINDINGS.md#test-debt` when this file hit its cap: A8's partial
   mutations, and behaviour mid-TOOL-CALL. Cut from here, not retracted.
 

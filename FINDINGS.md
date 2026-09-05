@@ -1292,3 +1292,14 @@ which is where it belongs, rather than in a live counter that will be read as cu
 ⚠️ **What this does not do:** it does not bound how long "in flight" may last. An agent that runs for hours
 without ending a turn holds its mail for hours and this now says nothing. The age is printed; nothing acts
 on it, and no measurement exists yet for what a normal in-flight age is.
+
+### Moved out of STATUS.md on 2026-09-05, when tier 0 hit its cap
+
+Still unverified, still true, and no longer worth a line in the file every boot pays for:
+
+- **Whether finding 1 ever actually ate mail in electio.** Unanswerable, and not for the reason this file
+  gave for three sessions: the log DOES record who drained (`to_agent`, since the first commit), but it
+  records the **resolved** name, and every theft class here works by making the thief resolve to the
+  victim's name — clean by construction in exactly the cases it would need to catch. `id_src` separates the
+  two now, on new rows only; the 37 historical rows stay unauditable. Review #1's finding 6, one level up.
+- **The `-restored` duplicate id** in electio's log, unexplained across three reviews now.
