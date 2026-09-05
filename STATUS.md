@@ -5,16 +5,23 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-**1 — `#claim-file`: the peer's condition is met, and I did not build it.**
+**1 — `bin/claim.mjs` is built; the measurement that matters has NOT been made.**
 
 *Written 2026-09-05. It assumes you remember nothing; boot injects only this first line, so the first line is
 the instruction. Every claim below is checkable — check it.*
 
-`exchange/work-leader/in/REPLY-2026-09-04-covariate.md` §1 lists **three agents and six ports, scheduled, not
-hypothetical** (PostgREST 54331, GoTrue 54332, dev 5174/5175, preview 4174/4175). My own stated trigger —
-*a third agent starting a dev server* — is therefore already met. The design is `FINDINGS.md#claim-file`.
-Two hand-written warnings now exist instead of one lock (his `notes/REGISTRE-DES-PORTS.md`, my `.comm/README.md`
-line); that is not progress. **Build the file, not the trigger.**
+Resource claims exist (`FINDINGS.md#claim-file`): eight arms, `A38` runs them in the gate, both failures the
+design named in advance proved red, installed into both field projects, and the boot row names a claim whose
+holder has died. 🔴 **But no two real agents have ever contended through it.** The demonstration used one
+session on both sides — correctly treated as one holder refreshing its own claim — so the refusal was shown
+only against a fabricated holder (`--pid 1`), and `--pid` has never carried a real dev server's pid.
+**Two live sessions in one tree, one port, is the next measurement.** The peer has six ports scheduled and has
+offered to run controls; ask him rather than staging it here, because his tree is where the collision lives.
+
+⚠️ **And take the lesson before the next tool, not after it:** eight arms were green while `take` recorded the
+pid of a command that exits in milliseconds, so every claim read as a crash one second after being taken. All
+eight wrote fixture records with a pid the test chose; **none took a claim through the CLI and read it back.**
+Arms sharing one fixture idiom share one blind spot. Running the thing for real once is what found it.
 
 **2 — The launcher must resolve the runtime and REFUSE, not trust a shell flag.**
 
@@ -49,7 +56,7 @@ and it is triage-first.
 
 | | state |
 | --- | --- |
-| toolkit | `bin/comm.mjs` · `session-registry.mjs` · `ledger.mjs` · `restart-signal.mjs` · `wake.mjs` · `exchange-bell.mjs` · `context.mjs` · `boot.mjs` · `install.mjs` · `test/` — no dependencies |
+| toolkit | `bin/comm.mjs` · `session-registry.mjs` · `ledger.mjs` · `restart-signal.mjs` · `claim.mjs` · `wake.mjs` · `exchange-bell.mjs` · `context.mjs` · `boot.mjs` · `install.mjs` · `test/` — no dependencies |
 | repo | an `origin` exists (`Leonhart130/claude-comm`). **The push is the leader's call** — delegated 2026-09-05, along with installing into field trees. The previous line here said the owner decides, and quoting a stale sentence about my own authority back at him cost a round-trip |
 | **electio** | in real daily use — 26 real deliveries, both directions |
 | gates | `attack` (deterministic, every case armed) · `ledger --prove-red`, now run INSIDE it · `selftest` (real sessions, not gated by boot) · `context` and `boot` controls. **Counts live in boot's output, never here** |
@@ -73,17 +80,17 @@ and it is triage-first.
    re-measured. The wake does not deliver — it only makes a turn happen — so "mailbox, never an interrupt"
    is unchanged.
 
-4. **🔴 Holding a machine resource is not an event anybody publishes.** Two agents in **one** project root
-   collided over a port and killed each other's servers, 2026-09-04. **The failure is not transport, which is
-   why a bigger bus would not have prevented it** — both had a hub and still could not see each other,
-   because *nothing in this tool has ever had a concept of a thing an agent is holding.* Verified, not
-   assumed: `bin/comm.mjs` has no notion of a port, a lock or a server; its only "claim" is a sender's
-   identity. Full incident and the peer's reply: `HISTORY.md`, "The port collision".
+4. **🟢 Holding a machine resource is written down now** — `bin/claim.mjs`. Two agents in **one** project
+   root collided over a port on 2026-09-04 and killed each other's servers. **The failure was never
+   transport**, which is why a bigger bus would not have prevented it: both had a hub and neither could see
+   the other, because nothing here had a concept of a thing an agent is HOLDING. What made it expensive is
+   the peer's measurement — *each read the result as a broken test rather than a port conflict*, so both
+   searched in the wrong place, separately. `HISTORY.md`, "The port collision".
 
-   ⭐ **The fix is designed and deliberately NOT next: a claim file** (`FINDINGS.md#claim-file`). A second
-   COLLISION outranks the current plan; a near-miss does not. 🔴 **The count is now three:** a near-miss, then
-   **three of his apps on port 4173**, and two new experts holding 4174/4175 *written, never started*.
-
+   Shipped 2026-09-05: `take` / `list` / `release`, eight arms, `A38` in the gate, installed into both field
+   projects, and a boot row that names a claim whose holder has **died** — a crash, not a stale lock, because
+   nothing here expires. **It advises; it opens nothing, kills nothing, blocks nothing.**
+   🔴 **Untested between two real agents — see ▶ NEXT 1**, and that is the whole remaining question.
 5. **🔴 A session launched outside an interactive shell has NO bus, and says nothing.** `node` lives only
    under nvm, so `kitten @ launch claude` (or cron, or a `.desktop` file) starts a session whose **every hook
    dies** while it looks normal. **A self-launched expert is launched by a program, never by a shell** — the

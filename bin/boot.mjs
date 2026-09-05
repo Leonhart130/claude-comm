@@ -741,9 +741,31 @@ function askBus(sessionPidForCwd) {
 				notes = JSON.parse(led.stdout).armed.notes || []
 			} catch { ledgerUnreachable = true }
 		}
+		// WHAT THIS PROJECT'S AGENTS ARE HOLDING. The port collision (`FINDINGS.md#claim-file`)
+		// happened between two agents in ONE tree, and the peer's own written port registry
+		// carries the defect he named himself: *"it only catches the agents that read it."* A
+		// tool somebody has to remember to type is that same registry with a JSON extension.
+		// So boot asks, at the one moment every agent is guaranteed to be looking.
+		//
+		// SPAWNED ONLY WHEN THERE IS SOMETHING TO ASK ABOUT - the identical shape as the
+		// restart notes above, and for the identical reason: a project that has never claimed
+		// anything must pay one directory listing and print nothing. A row that appears in
+		// every project every session is a row nobody reads.
+		let claims = [], claimDirBad = false
+		let claimFiles = []
+		try { claimFiles = readdirSync(join(p, ".comm", "claims")).filter((f) => f.endsWith(".json")) }
+		catch (e) { if (e && e.code !== "ENOENT") claimDirBad = true }
+		if (claimFiles.length) {
+			try {
+				const cl = spawnSync("node", [join(ROOT, "bin", "claim.mjs"), "list", "--json", "--root", p],
+					{ encoding: "utf8", timeout: 5000 })
+				claims = JSON.parse(cl.stdout).claims || []
+			} catch { claimDirBad = true }
+		}
 		if (noteDirBad) notes = [{ agent: "?", age_s: null, ttl_s: null, fresh: false, unread: "dir" }]
 		else if (ledgerUnreachable) notes = [{ agent: "?", age_s: null, ttl_s: null, fresh: false, unread: "ledger" }]
 		const lapsedNote = notes.some((n) => !n.fresh)
+		const deadClaim = claimDirBad || claims.some((c) => c.state === "gone")
 		const bits = [
 			// An unparsed non-zero exit must not borrow the confident wording of a parsed one:
 			// it means the installer refused for a reason this row has not read.
@@ -755,12 +777,19 @@ function askBus(sessionPidForCwd) {
 				: `bus current (${installed.length} files)`,
 			pending ? `${pending} pending (oldest ${age(Date.now() - oldest)})` : "0 pending",
 			last ? `last delivery ${age(Date.now() - Date.parse(last))} ago` : "no delivery logged",
+			// Held is information; a holder that is GONE is a crash somebody should see, and
+			// it is the state a naive claim tool turns into a lock nobody can clear.
+			...(claimDirBad ? [`⚠ ${claimFiles.length} resource claim(s) are here and could not be read`] : []),
+			...(claims.some((c) => c.state === "gone")
+				? [`⚠ CLAIM HELD BY A DEAD PROCESS: ${claims.filter((c) => c.state === "gone").map((c) => c.resource).join(", ")} - a crash, not a stale lock`] : []),
+			...(claims.some((c) => c.state === "held")
+				? [`${claims.filter((c) => c.state === "held").length} resource(s) claimed: ${claims.filter((c) => c.state === "held").map((c) => c.resource).join(", ")}`] : []),
 			...notes.map((n) => n.unread === "dir" ? `⚠ ${noteFiles.length} restart note(s) are here and ${join(p, ".comm", "restart")} could not be read`
 				: n.unread === "ledger" ? `⚠ ${noteFiles.length} restart note(s) are here and bin/ledger.mjs could not be asked about them`
 				: n.fresh ? `◷ restart note armed for ${n.agent} (${Math.round((n.age_s || 0) / 60)}m of ${Math.round((n.ttl_s || 0) / 60)}m)`
 				: `⚠ the restart note for ${n.agent} has LAPSED - its next start will score COLD`),
 		]
-		row(`field:${name}`, drift || busStale !== false ? RED : pending || lapsedNote ? WARN : OK, bits.join(" - "))
+		row(`field:${name}`, drift || busStale !== false ? RED : pending || lapsedNote || deadClaim ? WARN : OK, bits.join(" - "))
 	}
 }
 

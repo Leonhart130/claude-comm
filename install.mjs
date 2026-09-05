@@ -368,8 +368,18 @@ const NOTICE = (here, root) => [
 	"without either being told. Reported from `~/Dev/work` on 2026-09-04, and it is worth the line because",
 	"of HOW it fails: three of that project's applications declared port `4173`, and two agents started in",
 	"parallel would have killed each other's server while each read the result as *a broken test, not a",
-	"port conflict* — so both would have searched in the wrong place, separately. Say which port or socket",
-	"you are holding, in a file, the way you would say anything else here.",
+	"port conflict* — so both would have searched in the wrong place, separately.",
+	"",
+	"```",
+	"node .comm/bin/claim.mjs take port:4173 --purpose \"vite dev server\" [--pid <the server's pid>]",
+	"node .comm/bin/claim.mjs list          who is holding what, and whose holder has died",
+	"node .comm/bin/claim.mjs release port:4173",
+	"```",
+	"",
+	"It **advises**: it opens nothing, kills nothing and blocks nothing — a mutex every agent can delete is a",
+	"promise the filesystem does not make. What it buys is that a collision is one command away from being",
+	"diagnosable instead of looking like a broken test, and your `SessionStart` says so without being asked.",
+	"A claim whose holder has died reads as **a crash, not a stale lock** — nothing expires here.",
 	"",
 	"## 🔴 Never commit `.comm/` — it is live state, not source",
 	"",
@@ -551,7 +561,11 @@ write(join(commDir, "bin", "comm.mjs"), busSrc, results)
 // checkout moves, and breaks it silently — hooks exit 0 by design. A copy can go
 // stale instead, which is a failure this project already detects: `field:*` compares
 // the installed files against this repo's and reddens on any difference.
-for (const f of ["session-registry.mjs", "ledger.mjs", "wake.mjs", "restart-signal.mjs"]) {
+// `claim.mjs` travels because the collision it makes diagnosable happens in FIELD projects,
+// between two agents in one tree - a copy that lived only in claude-comm would have been
+// present at none of it. It imports `session-registry.mjs`, which is already on this list
+// and must stay above it for that reason.
+for (const f of ["session-registry.mjs", "ledger.mjs", "wake.mjs", "restart-signal.mjs", "claim.mjs"]) {
 	write(join(commDir, "bin", f), readFileSync(join(HERE, "bin", f), "utf8"), results)
 }
 

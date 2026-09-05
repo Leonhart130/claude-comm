@@ -1025,7 +1025,36 @@ file is the artifact; no transport, no daemon. Three properties, each of which i
 - **It ships with a gate proved able to go red on a claim left by a dead process** — the one state where a
   naive implementation silently blocks everybody forever.
 
-**Deliberately not next.** A second collision would outrank the current plan; a near-miss does not.
+### 🟢 BUILT 2026-09-05 — `bin/claim.mjs`, and what reality found that eight arms did not
+
+*"Deliberately not next"* stood until the peer's `REPLY-2026-09-04-covariate.md` §1 listed **three agents and
+six ports as scheduled** (PostgREST 54331, GoTrue 54332, dev 5174/5175, preview 4174/4175). That is the
+condition this section itself named — a third agent starting a dev server — so the line was superseded by his
+table, not by impatience.
+
+Three properties, eight arms, each moving one variable; `A38` runs them inside the gate and asserts the
+installer carries the file, because the collision happens in FIELD projects and a tool that lived only here
+would have been present at none of it. Both failures the design named in advance are proved red: identity as
+pid alone (a recycled pid reading as a live holder) reddens only arm 4, and a dead holder that still blocks
+reddens only arm 3.
+
+🔴 **And then running it for real found a defect all six original arms were green over.** `take` recorded
+`process.pid` — **the pid of a CLI that exits milliseconds later** — so every claim read as
+`HELD BY A DEAD PROCESS: a crash` within one second of being taken, and the boot row said so about a resource
+nobody had crashed on. Every arm had WRITTEN a fixture record with a pid the test chose; **not one had taken a
+claim through the CLI and read it back.** The holder is now `--pid` when given, else the session resolved by
+`bin/session-registry.mjs`'s single implementation, else the CLI's own pid with `holder: "self"` recorded and
+a warning that it will read as gone. Arm 7 is the round trip, and it is the only arm the original defect
+reddens — the other six stay green, which is exactly the picture that existed while it was live.
+
+⇒ **The lesson is not "write more arms". It is that eight arms sharing one fixture idiom share one blind
+spot**, and the cheapest thing that does not share it is running the tool against a real project once.
+
+⚠️ **What is NOT verified:** no two real agents have contended through it. The demonstration used one session
+taking both sides, which the tool correctly treated as one holder refreshing its own claim — the refusal was
+shown only against a fabricated second holder (`--pid 1`). **Two live sessions in one tree is the measurement
+that matters and it has not been made.** Nor has anything been claimed by a real dev server: `--pid` has never
+carried a server's pid outside a fixture.
 
 
 ## `#review6-disposal` — disposing review #6, and the four defects the disposal itself produced
