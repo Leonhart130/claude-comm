@@ -1205,3 +1205,44 @@ hand-copies the bus alone and died with `ERR_MODULE_NOT_FOUND`.
 
 ⚠️ **So the residual gap is open and named:** a session that changes directory after start is reported by
 where it stands, not by what it is. Nobody has measured how often that happens.
+
+## `#second-session` — a reviewer in the leader's folder eats the leader's mail
+
+**2026-09-05.** The owner runs adversarial reviews as a second session **in the same directory** as the
+leader, and asked for a reviewer that can talk to the leader *without disturbing it and without being taken
+for it*. `#self-identity` had just established that the identity variable is unnecessary — and this is the
+one case where that answer does not hold, so it is recorded separately rather than as a footnote.
+
+**Two sessions in one folder are one agent by construction:** the hook lives at `<folder>/.claude/`, both
+sessions load it, both drain the same inbox. Measured on a fixture, one variable moved — where the second
+session's turn ends:
+
+| | leader's waiting mail |
+| --- | --- |
+| a turn ends in the **leader's** folder | **1 → 0** — taken, and `send` had already reported ✓ delivered |
+| the same turn ends in `review/`, a registered agent | **1 → 1** — untouched |
+| `review` sends to the leader, no variable set | `✓ review → leader`, held for the leader |
+| `whoami` from `review/` | `review` |
+
+⇒ **The answer needs no new mechanism: give the second session its own directory in the roster.** It keeps
+its own inbox, is never mistaken for the leader, writes to the leader with nothing typed at launch, and the
+framework's own rule — identity is location — does the work.
+
+🔴 **`CLAUDE_COMM_AGENT=none` is NOT that answer**, and it looks like it is. An off-bus session receives
+nothing *and cannot send*: `✗ cannot tell which agent you are`. Mute in both directions, which is not
+"present but quiet".
+
+### The defect this turned up
+
+**`comm who` has warned about a shared inbox since A17. `bin/boot.mjs`'s field row was silent about it** —
+`hooks in sync - bus current - 0 pending` over a project with two live sessions on one inbox. The tool
+computed the one condition that *silently loses mail*, and the row a leader reads about other people's
+projects dropped it. Review #6 F5's defect, third instance. The row now carries it, asked of the bus rather
+than re-derived, and it is armed with two live fixture sessions.
+
+And `who`'s own advice named only the environment variable, which is the fix that must be retyped at every
+launch. It names the directory first now, because that one survives being forgotten.
+
+⚠️ **Not verified:** no real adversarial review has been run from its own directory yet. The routing is
+measured on a fixture; the workflow around it — whether a reviewer that cannot see the leader's inbox still
+has everything it needs — is not.

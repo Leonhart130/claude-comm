@@ -36,7 +36,7 @@ import { readFileSync, writeFileSync, renameSync, existsSync, readdirSync, statS
 import { tmpdir } from "node:os"
 import { join, dirname, resolve, basename } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
-import { execFileSync, spawnSync } from "node:child_process"
+import { execFileSync, spawnSync, spawn } from "node:child_process"
 import { createHash } from "node:crypto"
 import { record as registryRecord, lookup as registryLookup, registryDir, sessionPid } from "./session-registry.mjs"
 
@@ -774,6 +774,26 @@ function askBus(sessionPidForCwd) {
 		// restart notes above, and for the identical reason: a project that has never claimed
 		// anything must pay one directory listing and print nothing. A row that appears in
 		// every project every session is a row nobody reads.
+		// TWO SESSIONS ON ONE INBOX IS MAIL LOSS, and the bus already computes it. Measured
+		// 2026-09-05: `comm who` says "2 SESSIONS SHARE THIS INBOX - mail is drained by
+		// whichever ends a turn FIRST, the others never see it, and the sender is still told
+		// it was delivered", and THIS row said `hooks in sync - 0 pending` about the same
+		// state. The tool computed it and the row everyone reads dropped it - review #6 F5's
+		// defect, in the row whose whole job is to report on somebody else's machine.
+		//
+		// Asked of the BUS rather than re-derived here: `liveAgents` is one implementation of
+		// "which claude process is which agent" and a second copy in this file is the shape
+		// this project has now shipped three times. One spawn per field project per boot,
+		// which is what the condition is worth: it is silent, it is live, and the sender gets
+		// a success either way.
+		let shared = []
+		try {
+			const w = spawnSync("node", [join(p, ".comm", "bin", "comm.mjs"), "who", "--json"],
+				{ cwd: p, encoding: "utf8", timeout: 5000 })
+			const ag = JSON.parse(w.stdout).agents || {}
+			shared = Object.entries(ag).filter(([, v]) => ((v && v.pids) || []).length > 1)
+				.map(([name, v]) => `${name} (${v.pids.length})`)
+		} catch { /* the bus not answering is already the DRIFT/STALE half of this row */ }
 		let claims = [], claimDirBad = false
 		let claimFiles = []
 		try { claimFiles = readdirSync(join(p, ".comm", "claims")).filter((f) => f.endsWith(".json")) }
@@ -788,7 +808,7 @@ function askBus(sessionPidForCwd) {
 		if (noteDirBad) notes = [{ agent: "?", age_s: null, ttl_s: null, fresh: false, unread: "dir" }]
 		else if (ledgerUnreachable) notes = [{ agent: "?", age_s: null, ttl_s: null, fresh: false, unread: "ledger" }]
 		const lapsedNote = notes.some((n) => !n.fresh)
-		const deadClaim = claimDirBad || claims.some((c) => c.state === "gone")
+		const deadClaim = claimDirBad || claims.some((c) => c.state === "gone") || shared.length > 0
 		const bits = [
 			// An unparsed non-zero exit must not borrow the confident wording of a parsed one:
 			// it means the installer refused for a reason this row has not read.
@@ -802,6 +822,7 @@ function askBus(sessionPidForCwd) {
 			last ? `last delivery ${age(Date.now() - Date.parse(last))} ago` : "no delivery logged",
 			// Held is information; a holder that is GONE is a crash somebody should see, and
 			// it is the state a naive claim tool turns into a lock nobody can clear.
+			...(shared.length ? [`⚠ ONE INBOX, TWO SESSIONS: ${shared.join(", ")} - mail goes to whichever ends a turn first, the others never see it, and the sender is told it was delivered`] : []),
 			...(claimDirBad ? [`⚠ ${claimFiles.length} resource claim(s) are here and could not be read`] : []),
 			...(claims.some((c) => c.state === "gone")
 				? [`⚠ CLAIM HELD BY A DEAD PROCESS: ${claims.filter((c) => c.state === "gone").map((c) => c.resource).join(", ")} - a crash, not a stale lock`] : []),
@@ -1291,6 +1312,32 @@ function proveRed() {
 		console.log(`  ${onlyTheHook && noProse && proseIsThere ? "✓" : "✗"} ${"field: DRIFT names only what drifted".padEnd(34)} ` +
 			`one drifted hook + committed .comm -> DRIFT named ${JSON.stringify(named)}; ` +
 			`prose leaked=${noProse ? "no" : "YES"}; installer really printed the confusable warning=${proseIsThere ? "yes (control armed)" : "NO - THIS ARM PROVED NOTHING"}`)
+	}
+
+	// TWO SESSIONS ON ONE INBOX. `comm who` has warned about this since A17; THIS row said
+	// "hooks in sync - 0 pending" about the identical state, so the one condition that loses
+	// mail was invisible in the report a leader reads about other people's projects.
+	//
+	// ONE VARIABLE: a second live session in the same agent directory. Two `sh` processes
+	// named `claude` - the fixture idiom this suite already uses, with two commands in the
+	// -c string so the shell cannot exec-optimise its argv[0] away and take the name with it.
+	{
+		const fakeC = join(proj, "claude")
+		try { symlinkSync("/bin/sh", fakeC) } catch {}
+		let kids = []
+		arm("field: two sessions on one inbox", "field:proj", WARN,
+			() => {
+				for (let i = 0; i < 2; i++) kids.push(spawn(fakeC, ["-c", "sleep 30; :"], { cwd: proj, stdio: "ignore" }))
+				// /proc has to have caught up before the row is computed, or this arm measures
+				// the scheduler. Bounded, and it CHECKS rather than sleeping blind.
+				const t0 = Date.now()
+				while (Date.now() - t0 < 4000) {
+					let seen = 0
+					for (const k of kids) { try { if (existsSync(`/proc/${k.pid}`)) seen++ } catch {} }
+					if (seen === kids.length) break
+				}
+			},
+			() => { for (const k of kids) { try { k.kill("SIGKILL") } catch {} } kids = [] })
 	}
 
 	const msg = join(proj, ".comm", "inbox", "app", "0001-x.json")
