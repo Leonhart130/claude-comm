@@ -64,6 +64,13 @@ bypass rate means a failing guard assumes the reader can act.** That assumption 
 somebody else's tree, and noticing that is worth more than another amendment. If you want to improve
 something here, improve the RULE, with evidence, not this row.
 
+**⚠️ A restart note was armed as the last act of 2026-09-05 for `unnamed`, TTL 1800 s.** In this rosterless
+repo every session is `unnamed`, and review #7's session was running in this directory at the time — so the
+note goes to whichever `SessionStart` fires FIRST here, not necessarily the intended relaunch
+(`FINDINGS.md#unnamed-collision`). **Check `prev_session` on the newest start:** if it names
+`7a7503b4-a92c-474e-ad73-85bc21f54e05`, the crossing worked and this start is a genuine reboot. If it is
+null, the note was taken by somebody else or lapsed, and this start is correctly COLD — do not re-file it.
+
 **Standing test debt from review #4, none of it gated:** `FINDINGS.md#test-debt`.
 
 ## Where it stands
