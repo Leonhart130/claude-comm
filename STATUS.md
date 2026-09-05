@@ -62,6 +62,18 @@ the RULE with evidence, not this row.
 (`FINDINGS.md#unnamed-collision`). **Check `prev_session` on the newest start:** `7a7503b4-…` means the
 crossing worked; null means it lapsed or somebody else took it, and this start is correctly COLD.
 
+**7 — 🔴 The restart TTL has now lapsed on a human TWICE, and there is a better rule.** First the `~/Dev/work`
+leader's note during a close (15 min); then this session's own, at **38.8 min against a 30 min promise**, while
+the owner launched a review. `FINDINGS.md#reboot-signal` says this is not fixable by choosing a bigger number
+— correct, and two observations say the CLOCK is the wrong instrument.
+**The note already carries `by_pid`.** A restart has plausibly happened when the ARMER'S PROCESS IS GONE, and
+has plainly not when it is still alive; `bin/claim.mjs` shipped the (pid, start time, boot id) liveness test
+today and `bin/session-registry.mjs` exports it. So the rule to try is **armer-gone AND not ancient** — the
+TTL demoted from the test to a backstop against a note abandoned for a day. `classify()` is one function,
+correctable, re-read over every record ever written, which is exactly why it was built that way.
+⚠️ **Not built on purpose:** review #7 was reading this code when the evidence arrived. Do not move the
+instrument under a reviewer. Build it after the review is disposed, with both directions armed.
+
 **Standing test debt from review #4, none of it gated:** `FINDINGS.md#test-debt`.
 
 ## Where it stands
