@@ -27,9 +27,20 @@ Arms sharing one fixture idiom share one blind spot. Running the thing for real 
 
 `FINDINGS.md#self-identity`: no live session in `~/Dev/work` declares it and `comm who` names them all
 correctly, delivery never used it, and an agent **cannot** set it for itself. What taught the habit was
-boot's own first row calling on-bus sessions off-bus; fixed, `A39` holds three states. ⚠️ **Still open:** a
-session whose cwd wanders after start is reported by where it stands. The registry would fix it and the bus
-may not import the registry — read the rejected trade there before rebuilding it.
+boot's own first row calling on-bus sessions off-bus; fixed, `A39` holds three states.
+
+🔴 **The one case where it still mattered is the owner's own workflow** — an adversarial review launched as a
+second session **in the leader's folder**, which drains the leader's inbox while the sender is told ✓
+delivered (`FINDINGS.md#second-session`). Answered without new mechanism: a **`review` agent** was added to
+the rosters of `~/Dev/work` and `~/Dev/electio` on 2026-09-05, dirs created, installer re-run, old configs
+backed up beside them. Verified end to end in the real project — `review → leader` with nothing typed, the
+leader's mail untouched, the test message and its ref removed afterwards.
+⚠️ **NOT verified: no real review has been run from `review/` yet.** The mail routing is measured; whether a
+reviewer that cannot see the leader's inbox still has everything it needs is not. That is the next thing to
+learn, and only a real review teaches it.
+
+⚠️ **Also still open:** a session whose cwd wanders after start is reported by where it stands. The registry
+would fix it and the bus may not import the registry — read the rejected trade in that section first.
 
 **3 — The launcher must resolve the runtime and REFUSE, not trust a shell flag.**
 
