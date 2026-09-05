@@ -1485,20 +1485,92 @@ writeFileSync(out, JSON.stringify(res && res.signal ? res.signal : null))
 	// non-atomic path and not a narrow one, and saying otherwise would be the same overclaim
 	// review #6 F1 caught the first time.
 	//
-	// This is what closes that gap, and its weakness is named too: it reads the SOURCE, so
-	// it is a style dependency and is always one refactor behind (review #3 R4's lesson, in
-	// this same suite). It is kept narrow on purpose — the consumption of `p` must BE the
-	// rename, with no read of that path before it — so a refactor that preserves the
-	// property keeps passing, and only one that reintroduces read-then-unlink fails.
-	const claimSrc = (() => {
-		const m = /export function claim\(([\s\S]*?)\n}/.exec(readFileSync(join(PKG, "bin", "restart-signal.mjs"), "utf8"))
-		return m ? m[1] : null
-	})()
-	const renameAt = claimSrc === null ? -1 : claimSrc.indexOf("renameSync(p, mine)")
-	const beforeRename = claimSrc === null || renameAt < 0 ? "" : claimSrc.slice(0, renameAt)
-	const consumesByRename = renameAt >= 0 &&
-		!/readFileSync\(\s*p\b/.test(beforeRename) && !/copyFileSync\(/.test(beforeRename) &&
-		!/unlinkSync\(\s*p\b/.test(beforeRename) && !/writeFileSync\(\s*mine\b/.test(beforeRename)
+	// WHAT CLOSES THAT GAP, and the first version of it was measuring the wrong thing.
+	//
+	// It read the SOURCE and asserted that nothing touched `p` BEFORE the literal
+	// `renameSync(p, mine)` in the text. Review #7 F5 broke it in both directions with one
+	// fixture each:
+	//
+	//   · FALSE NEGATIVE — a resilience refactor that catches EXDEV (`.comm/` on another
+	//     filesystem is not exotic) and falls back to read-then-unlink inside the CATCH sits
+	//     AFTER the rename in text order and BEFORE it in execution order. The suite printed
+	//     `consumes by rename before any read of that path=true` over a genuinely racy module.
+	//   · FALSE POSITIVE — renaming the local `mine` to `taken`, byte-for-byte equivalent,
+	//     turned the whole suite red.
+	//
+	// "Before any read" is a claim about TEXT order and the property is about EXECUTION
+	// order, and those two separate in the one place a refactor is most likely to touch. So
+	// this now MEASURES execution order: `node:fs` is instrumented in a child, the module is
+	// imported after the patch (`syncBuiltinESMExports` makes the patch reach an ESM named
+	// import of a builtin), and every operation that touches the note's own path is recorded
+	// in the order it happened. A variable rename is invisible to it; the catch-branch
+	// fallback is not.
+	//
+	// THREE RUNS, because two of them are the controls:
+	//   A. the shipped module, nothing faulted — the note must be consumed by exactly ONE
+	//      operation on that path, and it must be the rename. (This is also the proof that
+	//      the instrumentation is live: zero recorded operations would mean the patch never
+	//      reached the module, and the arm would go red rather than quietly pass.)
+	//   B. the shipped module with `renameSync` throwing EXDEV — when the atomic consume
+	//      cannot be performed, NOTHING else may consume the note: no read, no unlink, no
+	//      copy, and the bytes stay on disk.
+	//   C. THE POSITIVE CONTROL: the same probe against a copy of the module carrying exactly
+	//      the fallback F5 described. It must be SEEN as non-atomic. Without C, "no read
+	//      observed" is a number with nothing to compare it against — which is how the text
+	//      check passed while proving nothing.
+	const probe = join(rootS, "consume-probe.mjs")
+	writeFileSync(probe, `
+import { createRequire, syncBuiltinESMExports } from "node:module"
+const [, , rsUrl, root, agent, mode, ] = process.argv
+const require = createRequire(import.meta.url)
+const fs = require("fs")
+const ops = []
+for (const name of ["renameSync", "readFileSync", "unlinkSync", "copyFileSync", "writeFileSync"]) {
+	const real = fs[name]
+	fs[name] = (...a) => {
+		ops.push({ op: name, args: a.filter((x) => typeof x === "string") })
+		if (name === "renameSync" && mode === "exdev") { const e = new Error("EXDEV: cross-device link not permitted"); e.code = "EXDEV"; throw e }
+		return real.apply(fs, a)
+	}
+}
+syncBuiltinESMExports()
+const m = await import(rsUrl)
+let res = null
+try { res = m.claim({ root, agent }) } catch (e) { res = { threw: String((e && e.message) || e) } }
+process.stdout.write(JSON.stringify({ ops, res }))
+`)
+	const notePath = join(rootS, ".comm", "restart", "atomic.json")
+	const armNote = () => writeFileSync(notePath, JSON.stringify({ v: 1, agent: "atomic", prev_session: "P",
+		at: new Date().toISOString(), ttl_s: 900, by: "attack", by_pid: process.pid }) + "\n")
+	const probeRun = (url, mode) => {
+		armNote()
+		const r = spawnSync("node", [probe, url, rootS, "atomic", mode], { encoding: "utf8" })
+		let out = null
+		try { out = JSON.parse(r.stdout) } catch {}
+		const touched = out ? out.ops.filter((o) => o.args.includes(notePath)).map((o) => o.op) : null
+		return { touched, res: out && out.res, survived: existsSync(notePath) }
+	}
+	const shippedUrl = pathToFileURL(join(PKG, "bin", "restart-signal.mjs")).href
+	// The defective copy is DERIVED from the shipped source, so it cannot silently stop being
+	// a variant of it: if the catch block is no longer where this expects, `patched` is false
+	// and the control fails loudly instead of vanishing.
+	const shippedSrc = readFileSync(join(PKG, "bin", "restart-signal.mjs"), "utf8")
+	const defectiveSrc = shippedSrc.replace(
+		/if \(e && e\.code === "ENOENT"\) return \{ ok: true, signal: null \}\n\t\treturn \{ ok: false, why: \(e && e\.message\) \|\| String\(e\) \}/,
+		'if (e && e.code === "ENOENT") return { ok: true, signal: null }\n\t\ttry { const t = readFileSync(p, "utf8"); unlinkSync(p); writeFileSync(mine, t) }\n\t\tcatch { return { ok: false, why: (e && e.message) || String(e) } }')
+	const patched = defectiveSrc !== shippedSrc
+	const defectivePath = join(rootS, "defective-restart-signal.mjs")
+	writeFileSync(defectivePath, defectiveSrc)
+
+	const runA = probeRun(shippedUrl, "plain")
+	const runB = probeRun(shippedUrl, "exdev")
+	const runC = probeRun(pathToFileURL(defectivePath).href, "exdev")
+	const nonAtomic = (t) => !!t && (t.includes("readFileSync") || t.includes("unlinkSync") || t.includes("copyFileSync"))
+	const consumesByRename =
+		JSON.stringify(runA.touched) === JSON.stringify(["renameSync"]) &&
+		JSON.stringify(runB.touched) === JSON.stringify(["renameSync"]) && runB.survived &&
+		runB.res && runB.res.ok === false &&
+		patched && nonAtomic(runC.touched)
 
 	check("A33 a restart crosses into the ledger exactly once, and a stale one not at all",
 		travelled && coldOK && crossed && oneShot && staleStored && counted &&
@@ -1510,8 +1582,11 @@ writeFileSync(out, JSON.stringify(res && res.signal ? res.signal : null))
 		`${RACERS} barrier-released claimers through rename -> ${winners} winner(s) (want 1); ` +
 		`the same barrier through a windowed read-then-unlink -> ${naive.won} (want >1: this is the control that ` +
 		`makes "1" mean something); barrier reached and drained=${barrierOK}; ` +
-		`claim() consumes by rename before any read of that path=${consumesByRename}` +
-		`${claimSrc === null ? " (SOURCE DID NOT PARSE)" : ""} ` +
+		`claim() consumes the note by ONE atomic operation, measured by instrumenting node:fs: ` +
+		`plain -> ${JSON.stringify(runA.touched)} (want ["renameSync"], and an empty list would mean the probe never reached the module); ` +
+		`rename faulted EXDEV -> ${JSON.stringify(runB.touched)} ok=${runB.res && runB.res.ok} note survived=${runB.survived}; ` +
+		`POSITIVE CONTROL, the read-then-unlink fallback in the catch -> ${JSON.stringify(runC.touched)} ` +
+		`(derived from the shipped source, substitution applied=${patched}); verdict=${consumesByRename} ` +
 		`[the race halves cannot separate a WINDOWLESS read-then-unlink - measured, still 1 winner - which is why the line above exists]`)
 }
 
@@ -1679,21 +1754,42 @@ writeFileSync(out, JSON.stringify(res && res.signal ? res.signal : null))
 			`cd ${cwd} && ${process.execPath} ${join(checkout, "bin", "boot.mjs")} --fast --hook --json ` +
 			`--root ${checkout} --field ${join(rootB, "nofield")} < ${payloadB}`],
 			{ encoding: "utf8", env: { ...process.env, CLAUDE_COMM_RUNTIME: join(rootB, "rt"), ...env } })
-		try { return (JSON.parse(r.stdout).rows.find((x) => x.label === "session") || {}).text || "" } catch { return "" }
+		try {
+			const row = JSON.parse(r.stdout).rows.find((x) => x.label === "session") || {}
+			return { text: row.text || "", level: row.level }
+		} catch { return { text: "", level: -1 } }
 	}
 	const bare = sessionRow({ CLAUDE_COMM_AGENT: "" }, join(rootB, "db"))
 	const declaredNone = sessionRow({ CLAUDE_COMM_AGENT: "none" }, join(rootB, "db"))
 	const noRoster = sessionRow({ CLAUDE_COMM_AGENT: "" }, rootB.startsWith("/tmp") ? tmpdir() : "/tmp")
+	// FOUR STATES, NOT THREE (review #7 F4). `=bogus` and `=leader` are DIFFERENT WORLDS —
+	// one is refused by the bus and records as `unnamed`, the other is honoured — and this
+	// arm asserted `/declared "none"/`, a substring byte-identical in both, while calling it
+	// "the override still wins". It passed on a row that could not express the property in
+	// the check's own title, which is the amendment in CLAUDE.md, committed by the arm that
+	// amendment was written for.
+	const declaredBogus = sessionRow({ CLAUDE_COMM_AGENT: "bogus" }, join(rootB, "db"))
+	const declaredReal = sessionRow({ CLAUDE_COMM_AGENT: "leader" }, join(rootB, "db"))
 
-	const bareNames = /"db" by directory/.test(bare) && !/off the bus/.test(bare)
-	const overrideWins = /declared "none"/.test(declaredNone)
-	const controlHolds = /off the bus/.test(noRoster) && !/by directory/.test(noRoster)
+	const bareNames = /"db" by directory/.test(bare.text) && !/off the bus/.test(bare.text)
+	// `none` is the DOCUMENTED way to leave the bus (`comm who` prints the recipe), so it is
+	// a refusal that is not a fault: it must say off the bus, and it must not warn.
+	const noneIsDeliberate = /declared "none"/.test(declaredNone.text) && /OFF the bus/i.test(declaredNone.text) && declaredNone.level === 0
+	// A typo is the same refusal with none of the intent, and the operator does not know.
+	const bogusIsRefused = /REFUSED/.test(declaredBogus.text) && /unnamed/.test(declaredBogus.text) && declaredBogus.level === 2
+	const realIsHonoured = /honoured/.test(declaredReal.text) && !/REFUSED/.test(declaredReal.text) && declaredReal.level === 0
+	// THE ASSERTION THE OLD ARM COULD NOT MAKE: the two declarations do not render alike.
+	const distinguishable = declaredBogus.text !== declaredReal.text
+	const controlHolds = /off the bus/.test(noRoster.text) && !/by directory/.test(noRoster.text)
 
 	check("A39 the session row reports the identity the bus resolved, not the variable",
-		bareNames && overrideWins && controlHolds,
-		`no variable, cwd in the agent's directory -> ${bareNames ? "named db, on the bus" : `WRONG: ${bare.slice(0, 70)}`}; ` +
-		`CLAUDE_COMM_AGENT=none -> ${overrideWins ? "declared none (the override still wins)" : `WRONG: ${declaredNone.slice(0, 50)}`}; ` +
-		`control, a session in no roster -> ${controlHolds ? "still off the bus" : `WRONG: ${noRoster.slice(0, 50)}`}`)
+		bareNames && noneIsDeliberate && bogusIsRefused && realIsHonoured && distinguishable && controlHolds,
+		`no variable, cwd in the agent's directory -> ${bareNames ? "named db, on the bus" : `WRONG: ${bare.text.slice(0, 70)}`}; ` +
+		`=none -> ${noneIsDeliberate ? "deliberately off the bus, no warning" : `WRONG: lvl ${declaredNone.level} ${declaredNone.text.slice(0, 60)}`}; ` +
+		`=bogus -> ${bogusIsRefused ? "REFUSED by the bus, warns, says it records as unnamed" : `WRONG: lvl ${declaredBogus.level} ${declaredBogus.text.slice(0, 60)}`}; ` +
+		`=leader -> ${realIsHonoured ? "honoured by the bus" : `WRONG: lvl ${declaredReal.level} ${declaredReal.text.slice(0, 60)}`}; ` +
+		`refused and honoured render differently=${distinguishable} (the old arm's substring was identical for both); ` +
+		`control, a session in no roster -> ${controlHolds ? "still off the bus" : `WRONG: ${noRoster.text.slice(0, 50)}`}`)
 }
 
 // A38 — the claim tool's own arms run in the gate, and it is INSTALLED where the collision is.
@@ -1970,16 +2066,50 @@ writeFileSync(out, JSON.stringify(res && res.signal ? res.signal : null))
 	})
 	const deepOK = warned(deepFire) && noDotGitAtBus
 
+	// ARM 3 — A GIT THAT CANNOT ANSWER (review #7 F7). `g.status` was never read, and every
+	// way this probe fails gives an EMPTY stdout, which is byte-identical to the clean
+	// answer: a locked `.git/index` (exit 128), git absent from PATH (spawn error), a
+	// `safe.directory` refusal on a repo owned by another user, a corrupt object store, the
+	// timeout. The guard's own comment called it "the only question with no false positive".
+	//
+	// ONE VARIABLE against the `tracked` arm above: the SAME repository, the SAME committed
+	// bus state, only the probe's ability to answer moved. `warned(tracked)` immediately
+	// above is the positive control, and it is re-run at the end to prove the fixture came
+	// back — if it does not, something other than the permission moved this row.
+	const unanswered = (r) => /could not be asked whether \.comm\/ is committed/.test(r.stderr || "")
+	const gitIndex = join(rootG, ".git", "index")
+	let lockWorked = true
+	spawnSync("chmod", ["000", gitIndex])
+	try { readFileSync(gitIndex); lockWorked = false } catch {}
+	const locked = fire()
+	spawnSync("chmod", ["644", gitIndex])
+	// git absent entirely: node is invoked by absolute path so that the CHILD loses git
+	// without losing its interpreter.
+	const noGitBinary = spawnSync(process.execPath, [stub, "session-start"], {
+		cwd: join(rootG, "app"), encoding: "utf8",
+		input: JSON.stringify({ cwd: join(rootG, "app"), source: "startup" }),
+		env: { ...process.env, PATH: "/nonexistent", CLAUDE_COMM_RUNTIME: join(rootG, "runtime") },
+	})
+	const restored = fire()
+	const probeSpeaks = lockWorked && unanswered(locked) && !warned(locked) &&
+		unanswered(noGitBinary) && warned(restored)
+
 	const noticeOnce = namesNotice(noGit) && !namesNotice(ignored) && !namesNotice(tracked)
 
 	check("A36 committed bus state is caught wherever the repository root is, and the notice that prevents it is named once",
 		!warned(noGit) && !warned(ignored) && warned(tracked) && tellsHow && stillDelivers &&
-		noticeOK && deepOK && noticeOnce,
+		noticeOK && deepOK && noticeOnce && probeSpeaks,
 		`no repo -> ${warned(noGit) ? "WARNED (must not)" : "silent"}; repo with the rule -> ${warned(ignored) ? "WARNED (must not)" : "silent"}; ` +
 		`rule removed and .comm added -> ${warned(tracked) ? "warned" : "SILENT (must warn)"}, names the fix=${tellsHow}, mail still drained ${before}->${waiting()} with the schema intact=${stillDelivers}; ` +
 		`bus one level BELOW the git root (no .git at the bus=${noDotGitAtBus}) -> ${warned(deepFire) ? "warned" : "SILENT (must warn)"}; ` +
 		`notice: ${noticeOK ? "installed, names the update command, and its feedback directory exists" : "MISSING OR INCOMPLETE"}, ` +
-		`named by SessionStart on start 1=${namesNotice(noGit)} and NOT on starts 2-3=${!namesNotice(ignored) && !namesNotice(tracked)} (control: same stub, same project)`)
+		`named by SessionStart on start 1=${namesNotice(noGit)} and NOT on starts 2-3=${!namesNotice(ignored) && !namesNotice(tracked)} (control: same stub, same project); ` +
+		`a probe that CANNOT answer says so instead of saying "clean": ` +
+		(lockWorked
+			? `.git/index unreadable -> ${unanswered(locked) ? "named the exit code" : "SILENT (must speak)"}, ` +
+			  `git off PATH -> ${unanswered(noGitBinary) ? "named the spawn error" : "SILENT (must speak)"}, ` +
+			  `permissions restored -> ${warned(restored) ? "warns again (control)" : "STILL SILENT - something else did this"}`
+			: "NOT ARMED: chmod 000 was still readable (running as root?), so this half proved nothing"))
 }
 
 // A31 — this suite must not touch the machine's real session registry.

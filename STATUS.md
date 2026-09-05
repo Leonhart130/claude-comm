@@ -5,69 +5,80 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-**1 — A REVIEW IS OUT WITH THE OWNER. Read its result before starting anything.**
+**1 — REVIEW #7 IS HALF DISPOSED. The code is fixed and armed; the RECORD is not written.**
 
-*Written 2026-09-05 by the session that ordered it, immediately before a declared restart. It assumes you
-remember nothing; boot injects only this first line, so the first line is the instruction.*
+*Written 2026-09-05 mid-disposal, at the owner's request to pause. `REVIEW-adversarial-7.md` (gitignored,
+14 findings) is the report — read it first.*
 
-The owner launched **adversarial review #7** in a separate window on `~/Dev/claude-comm`, against this
-session's ten commits (`git log --oneline c0db349..HEAD`, 2 089 insertions, 11 files). The brief is
-**`BRIEF-adversarial-7.md`** at the repo root — read it, it says what was asked and what was deliberately
-NOT put in scope. The report is expected at **`REVIEW-adversarial-7.md`** (both are gitignored: correspondence,
-not source). **The owner will tell you when it is ready. Do not start item 2 before disposing it.**
+⚠️ **The 14 defects are ALREADY in the ledger**, dated by the commit that authored each. Do not record them
+again: `node bin/ledger.mjs` must read **25 defects — 22 attributed + 3 unattributable**. If it reads 39,
+somebody double-recorded.
 
-When it lands, dispose it the way review #6 was disposed, and expect the ratio: **#5 and #6 each put five of
-seven findings in the ARMS, not the code**, and this session produced four more defects of its own, three of
-them in detectors. Record every finding in the ledger — `node bin/ledger.mjs record defect --agent unnamed
---ref REVIEW-adversarial-7.md#F<n> --authored-at <iso with a Z>` — dated by **the commit that authored it**,
-never by when it was found. That convention and its bias are in `FINDINGS.md#review6-disposal`.
+**FIXED AND ARMED** (every one with a positive control; the arm is named beside it):
+- **F1 F6 F11 F12 F14 — `bin/claim.mjs`**, 16 arms in `--prove-red`. The root WALKS UP for
+  `.comm/config.json` and refuses when there is none (the headline: three agents in one project, three
+  private claims directories, no contention); `release` applies property 3 to every refusal, not one
+  branch; `by` is asked of the bus and a name it REFUSED is recorded as refused; the verb is a positional;
+  one exported `verdict()` that boot prints instead of deriving a second sentence; reading moves nothing.
+- **F5 — A33.** The source-TEXT check is gone. `test/attack.mjs` instruments `node:fs` in a child and
+  measures EXECUTION order; its positive control is the read-then-unlink fallback, derived from the shipped
+  source so it cannot silently stop being a variant of it.
+- **F4 — A39.** Four states. `=bogus` (refused, off the bus, records as `unnamed`, now WARN) no longer
+  renders identically to `=leader` (honoured).
+- **F7 — both git guards** (the stub's and the installer's own): a probe that could not answer says so.
+  Armed in A36, two failure modes, permissions-restored control.
+- **F2 F3 F8 F9 F10 F13 — `bin/boot.mjs`.** `updateState()` merges into the bytes on DISK (a close landing
+  in the gate's 26 s window was being erased); mail for an agent on no roster has its own warning; every
+  claim state reaches the row; the restart-signal alarm travels in the LEDGER ROW, because this repo's own
+  SessionStart sends boot's stderr to `/dev/null`; the erosion counter speaks only for rows this boot
+  produced and `--close --amended <row>="what it measures now"` DISCHARGES it; `--hook --root <other tree>`
+  is refused unless `CLAUDE_COMM_RUNTIME` was redirected too.
 
-⚠️ **Before touching the ledger, know this:** `boot.mjs --hook` RECORDS A START into the ledger of whatever
-`--root` it is given. That wrote fabricated data into the real instrument twice on 2026-09-05 — once from an
-arm, once from a person at a prompt. Check `node bin/ledger.mjs` before and after any hook experiment. Truth at
-this close: **7 cold + 4 reboot, 11 defects, one log (`unnamed.log`)** — the 7th cold start is REAL, review
-#7's own session (`0a5ec946`), carrying **`pending: 20`, the covariate's first real reading**.
+**NOT DONE — in this order:**
+  **a.** `node bin/boot.mjs --prove-red` was running when the pause was called and **its result was never
+  read**. Run it UNFILTERED, read every line, then `ledger --prove-red` and `context --prove-red`.
+  `node test/attack.mjs` was 40/40 green after A33/A36/A39 were rewritten.
+  **b.** 🔴 **Both field trees are STALE and their rows are RED**: `.comm/bin/claim.mjs` drifted the moment
+  the fix landed. `node install.mjs ~/Dev/work` and `node install.mjs ~/Dev/electio` — the install is mine
+  to do, and it must not happen before (a) is green.
+  **c.** `FINDINGS.md` has **no `#review7-disposal` section**. Nothing above exists outside the code and
+  this paragraph, and the convention (`#review6-disposal`) is to write what the review did NOT already say —
+  including the measurements that went against me.
+  **d.** Then answer the reviewer: the peer asked for `#claim-file` between two REAL agents (item 2 below),
+  and F1 means the tool could not have contended before today.
 
-**2 — `#claim-file` between two REAL agents.** `bin/claim.mjs` shipped today with eight arms and `A38` in the
-gate, but no two live agents have ever contended through it: one session took both sides and the refusal was
-shown only against a fabricated holder (`--pid 1`). The peer has six ports scheduled and offered to run
-controls. Three of them, in his tree, and the third matters most: two agents take the same port; then **kill
-one brutally** — the claim must read `HOLDER IS GONE`, never a lock. `exchange/work-leader/out/2026-09-05-claim-file-construit.md`
-is what he was asked.
+**2 — `#claim-file` between two REAL agents.** Sharper now: review #7 proved the shipped tool could not
+detect a collision AT ALL when the agents stand in their own directories — where five of `~/Dev/work`'s six
+live. The arms cover it; two live sessions still have not. The peer's third control is the one that matters:
+kill one holder brutally, and the claim must read HOLDER IS GONE, never a lock
+(`exchange/work-leader/out/2026-09-05-claim-file-construit.md`).
 
-**3 — No real adversarial review has run from `review/` yet.** A `review` agent now exists in both field
-rosters (`FINDINGS.md#second-session`); the mail routing is measured, the workflow is not. If review #7 was
-launched from `~/Dev/claude-comm` it does not answer this — claude-comm has no roster of its own.
+**3 — No real adversarial review has run from `review/` yet.** A `review` agent exists in both field
+rosters; the mail routing is measured, the workflow is not. Review #7 ran from `~/Dev/claude-comm`, which
+has no roster, so it does not answer this.
 
-**4 — The launcher must resolve the runtime and REFUSE.** `FINDINGS.md#hookless-launch`: the published fix
-said "a login shell" and that is false here — `-i` is the flag that works. Corrected. The rule to build is the
-peer's: resolve `node`/`claude` absolutely before launching and refuse when resolution fails.
+**4 — The launcher must resolve the runtime and REFUSE.** `FINDINGS.md#hookless-launch`. The false
+remediation is now corrected in both places that shipped it (`.claude/settings.json` and the stub the
+installer generates): `-i`, not `-l` — nvm is loaded from `.zshrc`, which a login shell never reads. The
+rule to BUILD is still the peer's: resolve `node`/`claude` absolutely before launching, and refuse when
+resolution fails.
 
-**5 — The window is untested and my own timestamps are why.** 0 of 11 defects fall inside the 15-minute
-window, against the consumer's "four of five in thirteen minutes" — but each is dated at its commit, the
+**5 — The window is untested and my own timestamps are why.** 0 of 25 defects fall in the 15-minute
+window against the consumer's "four of five in thirteen minutes" — but each is dated at its commit, the
 upper bound. Do not quote the disagreement as a result.
 
-**6 — One red no code change explains, still unidentified.** `boot --prove-red` reported a row that could not
-be reddened, then went green twice on the same tree. Never named, because the run was filtered through `grep`.
-**Run gates unfiltered.** If it recurs it is `FINDINGS.md#A20` and it is triage-first.
+**6 — One red no code change explains, still unidentified.** `boot --prove-red` once reported a row that
+could not be reddened, then went green twice on the same tree. Never named, because the run was filtered
+through `grep`. **Run gates unfiltered.** If it recurs it is `FINDINGS.md#A20` and it is triage-first.
 
-**⚠️ `ackCounts: field:work = 3` again — DO NOT AMEND THAT ROW.** It was amended today on exactly that signal
-(`FINDINGS.md#ack-amendment`) and the counter reset; it climbed back because the row is **right** — `db` has
-mail and is not running. What blocks resolution is my POSITION, not the guard: relaunching their agent is
-theirs. **The bypass-rate rule assumes the reader can act**, and that fails for another tree's row. Improve
-the RULE with evidence, not this row.
+**7 — 🔴 The restart TTL lapsed on a human TWICE; the clock is the wrong instrument.** The note carries
+`by_pid`: a restart plausibly happened when the ARMER IS GONE, and plainly has not while it lives, and
+`claim.mjs` shipped that (pid, start, boot) test. Rule to try: **armer-gone AND not ancient**, TTL demoted
+to a backstop. `classify()` is re-read over every record. Not built.
 
-**⚠️ A restart note was armed last on 2026-09-05 for `unnamed`, TTL 1800 s** — and every session here is
-`unnamed`, with review #7 running in this directory, so it goes to whichever `SessionStart` fires first
-(`FINDINGS.md#unnamed-collision`). **Check `prev_session` on the newest start:** `7a7503b4-…` means the
-crossing worked; null means it lapsed or somebody else took it, and this start is correctly COLD.
-
-**7 — 🔴 The restart TTL lapsed on a human TWICE; the clock is the wrong instrument.** The `~/Dev/work`
-leader's note during a close, then this session's own at **38.8 min against 30**. `#reboot-signal` already
-says a bigger number is not the fix. **The note carries `by_pid`:** a restart plausibly happened when the
-ARMER IS GONE and plainly has not while it lives, and `claim.mjs` shipped that (pid, start, boot) test today.
-Rule to try: **armer-gone AND not ancient**, TTL demoted to a backstop. `classify()` is correctable and
-re-read over every record. ⚠️ **Not built on purpose** — review #7 was reading this code. Build it after.
+⚠️ **`ackCounts: field:work` — DO NOT AMEND THAT ROW.** `--amended` now exists: it is for a guard whose
+measurement you changed, never for one that is inconvenient. That row is right — `db` has mail and is not
+running — and what blocks it is my POSITION: relaunching their agent is theirs.
 
 **Standing test debt from review #4, none of it gated:** `FINDINGS.md#test-debt`.
 
