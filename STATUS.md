@@ -16,38 +16,38 @@ All fourteen fixed and armed; both field trees reinstalled; every control green 
 `boot --prove-red` **49 arms**, `attack` 40/40, `claim --prove-red` 16/16, `ledger` and `context` controls
 green with the real ledger byte-stable across them.
 
-🔴 **Three consecutive sessions found their worst defect inside the previous session's patch, and this
-session found FOUR inside its own** — three in the new arms, one in the fix for F2 itself (a close whose
-record did not land still printed `✓ CLOSED`). **So the first place to attack is `3939fb3..HEAD`**, and
-specifically: `updateState()`'s callers, `claim.mjs`'s bus lookup on `take` (it spawns now — the header
-said it spawned nothing), `verdict()`'s five states against what `boot.mjs` prints, and the six new close
-arms, which are the slowest thing in the repository.
+🔴 **The worst defect keeps being in the newest patch — this session made SEVEN of its own**, six in new
+arms and one in the fix for F2 (a close whose record did not land still printed `✓ CLOSED`). **Attack
+`3939fb3..HEAD` first**: `updateState()`'s callers, `claim.mjs`'s bus lookup on `take` (it spawns now — the
+header said it spawned nothing), `verdict()`'s five states against what `boot.mjs` prints, and the six new
+close arms.
 
-⚠️ **`boot --prove-red` now costs ~11 minutes, up from ~5**, because six new arms are closes and a close
-runs the whole gate. An eleven-minute control is one that starts being skipped. If it grows again, the
-answer is a cheaper close fixture, never a thinner control.
+🔴 **`#A20`, still unexplained from 2026-09-04**: the `registry` row was green in one boot and WARN in a
+close two seconds later, same fixture. The arms no longer depend on it (they acknowledge every label), but
+**the world moved and nobody knows why**. `FINDINGS.md#review7-disposal` names the candidate.
 
-🔴 **`#A20` recurred and is NOT explained**: the `registry` row was green in one boot and WARN in a close
-two seconds later, in the same fixture. The arms no longer depend on it (they acknowledge every label), but
-**the world moved and nobody knows why**. `FINDINGS.md#review7-disposal` names the candidate. Measure it
-before touching that arm again.
+**2 — 🔴 THE BOOT CONTROL DID NOT COMPLETE TODAY. Run it first, unfiltered, on a quiet machine.**
 
-**2 — 🔴 NOBODY IN THE FIELD KNOWS THEIR BUS IS OLD. Build the signal, and it touches delivery.**
+`node bin/boot.mjs --prove-red` was **killed twice by the kernel's out-of-memory watchdog**, two thirds
+through, with six Claude sessions live (14 Gi total, ~1.2 Gi free). Not a failure and not a pass — an
+absence, and the only control that did not finish.
 
-Shipped 2026-09-05: `install.mjs --add-agent <name>[=<dir>]` (one command sets up an expert: folder,
-roster, hooks, inbox — and it REFUSES to move an existing one, because that strands mail), `CHANGELOG.md`
-written for the field agent, `--release <label>` stamping each note with the **bus print** of the code it
-was written for, and `.comm/INSTALLED.json` recording what a project has. Armed as A40/A41. Both trees are
-on `2026-09-05.1`, print `6cf0dce28c71`.
+What DID pass: `attack` **43/43** · `selftest` **and** `--prove-red` with real sessions (the stub changed,
+so delivery was re-measured end to end) · `claim` 16/16 · `ledger` and `context`. Filtered runs
+(`--only close`, `--only registry`) passed today's new arms. **A filtered run is not a green control, and
+the summary says so.**
 
-**What is still missing is the signal itself.** The only thing on this machine that detects an out-of-date
-field bus is MY boot, because I scan sibling projects. A `~/Dev/work` leader gets nothing. So updating
-depends on my noticing, which is a person, not a mechanism — and the owner asked for the opposite.
+🔴 **The control is now too heavy for the machine it runs on.** ~11 minutes, and its six close arms each run
+a full gate in a fixture. `--only <substring>` was added today so a subset can run at all, but it filters
+`arm()` and `assert()` — the hand-rolled blocks still do their work before their assertion, so it cuts
+output more than runtime. **Making it runnable is a real job, not a tidy-up**: a control that cannot be run
+is not a strict control, it is an absent one.
 
-The fix is one comparison in the generated stub at SessionStart: `.comm/INSTALLED.json`'s print against the
-source checkout's, said ONCE (the `.notice-seen` idiom is already there), never blocking, always exit 0.
-⚠️ **It is on the delivery path**, so `node test/selftest.mjs` and `--prove-red` are required before it
-lands — that is real `claude -p` sessions and minutes, and boot deliberately does not run them.
+**Shipped and installed while it stood at that** (both trees on `2026-09-05.2`, print `873f43df21ed`):
+`--add-agent <name>[=<dir>]`, `CHANGELOG.md` written for the field agent, `--release <label>` stamping each
+note with the bus print it was written for, `.comm/INSTALLED.json`, and **the stub telling its own agent,
+once per version, that a newer release exists** — a mechanism in place of my noticing. A40/A41/A42, and A42
+re-checks delivery in the same fire.
 
 **3 — `#claim-file` between two REAL agents.** Sharper now: review #7 proved the shipped tool could not
 detect a collision AT ALL when the agents stand in their own directories — where five of `~/Dev/work`'s six
@@ -55,32 +55,30 @@ live. The arms cover it; two live sessions still have not. The peer's third cont
 kill one holder brutally, and the claim must read HOLDER IS GONE, never a lock
 (`exchange/work-leader/out/2026-09-05-claim-file-construit.md`).
 
-**4 — No real adversarial review has run from `review/` yet.** A `review` agent exists in both field
-rosters; the mail routing is measured, the workflow is not. Review #7 ran from `~/Dev/claude-comm`, which
-has no roster, so it does not answer this.
+**4 — No real adversarial review has run from `review/` yet.** The agent exists in both field rosters and
+the mail routing is measured; the workflow is not. Review #7 ran from `~/Dev/claude-comm`, which has no
+roster, so it does not answer this.
 
 **5 — The launcher must resolve the runtime and REFUSE.** `FINDINGS.md#hookless-launch`. The false
-remediation is now corrected in both places that shipped it (`.claude/settings.json` and the stub the
-installer generates): `-i`, not `-l` — nvm is loaded from `.zshrc`, which a login shell never reads. The
-rule to BUILD is still the peer's: resolve `node`/`claude` absolutely before launching, and refuse when
-resolution fails.
+remediation ("a login shell") is corrected in both places that shipped it. The rule to BUILD is the peer's:
+resolve `node`/`claude` absolutely before launching, and refuse when resolution fails.
 
-**6 — The window is untested and my own timestamps are why.** 0 of 25 defects fall in the 15-minute
-window against the consumer's "four of five in thirteen minutes" — but each is dated at its commit, the
-upper bound. Do not quote the disagreement as a result.
+**6 — The window is untested and my own timestamps are why.** 0 of 25 defects fall in the 15-minute window
+against the consumer's "four of five in thirteen minutes" — but each is dated at its commit, the upper
+bound. Do not quote the disagreement as a result.
 
-**7 — One red no code change explains, still unidentified.** `boot --prove-red` once reported a row that
-could not be reddened, then went green twice on the same tree. Never named, because the run was filtered
-through `grep`. **Run gates unfiltered.** If it recurs it is `FINDINGS.md#A20` and it is triage-first.
+**7 — ✅ `#A20` was named this time.** The integrity guard's red was three real sessions starting during an
+11-minute control run, not the suite writing — triaged, then fixed so it attributes instead of accusing
+(`FINDINGS.md#update-signal`). The 2026-09-04 instance is still unidentified. **Run gates unfiltered.**
 
 **8 — 🔴 The restart TTL lapsed on a human TWICE; the clock is the wrong instrument.** The note carries
-`by_pid`: a restart plausibly happened when the ARMER IS GONE, and plainly has not while it lives, and
-`claim.mjs` shipped that (pid, start, boot) test. Rule to try: **armer-gone AND not ancient**, TTL demoted
-to a backstop. `classify()` is re-read over every record. Not built.
+`by_pid`: a restart plausibly happened when the ARMER IS GONE, and plainly has not while it lives —
+`claim.mjs` shipped that (pid, start, boot) test. Try **armer-gone AND not ancient**, TTL as a backstop.
+`classify()` is re-read over every record. Not built.
 
-⚠️ **`ackCounts: field:work` — DO NOT AMEND THAT ROW.** `--amended` now exists: it is for a guard whose
-measurement you changed, never for one that is inconvenient. That row is right — `db` has mail and is not
-running — and what blocks it is my POSITION: relaunching their agent is theirs.
+✅ **`field:work` resolved itself 2026-09-05**: `db` was relaunched by its owner and its 2 messages drained.
+The row was right for 8 acknowledgements and the guard needed no amendment — `FINDINGS.md#ack-amendment`
+now has its ending. `--amended` exists for a guard whose measurement you changed, never for an inconvenient one.
 
 **Standing test debt from review #4, none of it gated:** `FINDINGS.md#test-debt`.
 

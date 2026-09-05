@@ -1429,11 +1429,24 @@ function proveRed() {
 	const LV = { "-1": "absent", 0: "ok", 1: "unknown", 2: "warn", 3: "RED" }
 
 	let failed = 0
+	// `--only <substring>` — RUN ONE PART OF THE CONTROL WHEN THE WHOLE WILL NOT RUN.
+	//
+	// Added 2026-09-05 after this control was KILLED TWICE by the kernel's out-of-memory
+	// watchdog, two thirds of the way through, with six Claude sessions live on the machine.
+	// It takes ~11 minutes and its six close arms each run a full gate in a fixture, so it is
+	// now heavy enough that a busy machine cannot finish it — and a control that cannot be run
+	// is not a strict control, it is an absent one. This does NOT make a subset a pass: the
+	// summary counts what was skipped, so a filtered run can never be quoted as a green control.
+	const ONLY = opt("--only", null)
+	let skipped = 0
+	const selected = (name) => { if (!ONLY || name.includes(ONLY)) return true; skipped++; return false }
 	const assert = (name, pass, detail) => {
+		if (!selected(name)) return
 		if (!pass) failed++
 		console.log(`  ${pass ? "✓" : "✗"} ${name.padEnd(34)} ${detail}`)
 	}
 	const arm = (name, label, want, apply, revert, fast = true) => {
+		if (!selected(name)) return
 		const before = level(run(fast), label)
 		apply()
 		const after = level(run(fast), label)
@@ -1507,8 +1520,11 @@ function proveRed() {
 		writeFileSync(driftedHook, origHook)
 		rmSync(join(proj, ".git"), { recursive: true, force: true })
 
-		if (!(onlyTheHook && noProse && proseIsThere)) failed++
-		console.log(`  ${onlyTheHook && noProse && proseIsThere ? "✓" : "✗"} ${"field: DRIFT names only what drifted".padEnd(34)} ` +
+		// Through `assert`, like every other check here. It hand-rolled its own ✓/✗ line, which
+		// meant a second definition of what a check looks like — and when `--only` was added it
+		// was the one check the filter could not see. It always did count (`failed++`), so this
+		// is uniformity, not a hole.
+		assert("field: DRIFT names only what drifted", onlyTheHook && noProse && proseIsThere,
 			`one drifted hook + committed .comm -> DRIFT named ${JSON.stringify(named)}; ` +
 			`prose leaked=${noProse ? "no" : "YES"}; installer really printed the confusable warning=${proseIsThere ? "yes (control armed)" : "NO - THIS ARM PROVED NOTHING"}`)
 	}
@@ -2310,6 +2326,8 @@ function proveRed() {
 			(foreign.length ? ` · ${foreign.length} session(s) started on this machine during the run (${foreign.join(", ")}) - the world moving, not this control` : ""))
 	}
 
-	console.log(`\n${failed ? `✗ ${failed} boot row(s) could NOT be reddened - that row is decoration` : "✓ every gating boot row demonstrated able to go red"}\n`)
+	console.log(`\n${failed ? `✗ ${failed} boot row(s) could NOT be reddened - that row is decoration`
+		: skipped ? `✓ every arm matching ${JSON.stringify(ONLY)} passed - ⚠ ${skipped} SKIPPED: a filtered run is NOT a green control`
+		: "✓ every gating boot row demonstrated able to go red"}\n`)
 	process.exit(failed ? 1 : 0)
 }
