@@ -5,27 +5,7 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-**1 — REVIEW #7 IS DISPOSED. Attack what it produced, not what it fixed.**
-
-*`REVIEW-adversarial-7.md` (gitignored, 14 findings) is the report; `FINDINGS.md#review7-disposal` is what
-the disposal measured, including against itself. The 14 defects are ALREADY in the ledger, dated by the
-commit that authored each — `node bin/ledger.mjs` must read **25 defects (22 attributed + 3 unattributable)**.
-If it reads 39, somebody recorded them twice.*
-
-All fourteen fixed and armed; both field trees reinstalled; every control green in the same tree:
-`boot --prove-red` **49 arms**, `attack` 40/40, `claim --prove-red` 16/16, `ledger` and `context` controls
-green with the real ledger byte-stable across them.
-
-🔴 **The worst defect keeps being in the newest patch — this session made SEVEN of its own**, six in new
-arms and one in the fix for F2 (a close whose record did not land still printed `✓ CLOSED`). **Attack
-`3939fb3..HEAD` first**: `updateState()`'s callers, `claim.mjs`'s bus lookup on `take` (it spawns now), and
-`verdict()`'s five states against what `boot.mjs` prints.
-
-🔴 **`#A20`, still unexplained from 2026-09-04**: the `registry` row was green in one boot and WARN in a
-close two seconds later, same fixture. The arms no longer depend on it (they acknowledge every label), but
-**the world moved and nobody knows why**. `FINDINGS.md#review7-disposal` names the candidate.
-
-**2 — 🔴 THE BOOT CONTROL DID NOT COMPLETE TODAY. Run it first, unfiltered, on a quiet machine.**
+**1 — 🔴 THE BOOT CONTROL DID NOT COMPLETE. Run it FIRST, unfiltered, on a quiet machine.**
 
 `node bin/boot.mjs --prove-red` was **killed twice by the kernel's out-of-memory watchdog**, two thirds
 through, with six Claude sessions live (14 Gi total, ~1.2 Gi free). Not a failure and not a pass — an
@@ -47,6 +27,26 @@ is not a strict control, it is an absent one.
 note with the bus print it was written for, `.comm/INSTALLED.json`, and **the stub telling its own agent,
 once per version, that a newer release exists** — a mechanism in place of my noticing. A40/A41/A42, and A42
 re-checks delivery in the same fire.
+
+**2 — REVIEW #7 IS DISPOSED. Attack what it produced, not what it fixed.**
+
+*`REVIEW-adversarial-7.md` (gitignored, 14 findings) is the report; `FINDINGS.md#review7-disposal` is what
+the disposal measured, including against itself. The 14 defects are ALREADY in the ledger, dated by the
+commit that authored each — `node bin/ledger.mjs` must read **25 defects (22 attributed + 3 unattributable)**.
+If it reads 39, somebody recorded them twice.*
+
+All fourteen fixed and armed; both field trees reinstalled; every control green in the same tree:
+`boot --prove-red` **49 arms**, `attack` 40/40, `claim --prove-red` 16/16, `ledger` and `context` controls
+green with the real ledger byte-stable across them.
+
+🔴 **The worst defect keeps being in the newest patch — this session made SEVEN of its own**, six in new
+arms and one in the fix for F2 (a close whose record did not land still printed `✓ CLOSED`). **Attack
+`3939fb3..HEAD` first**: `updateState()`'s callers, `claim.mjs`'s bus lookup on `take` (it spawns now), and
+`verdict()`'s five states against what `boot.mjs` prints.
+
+🔴 **`#A20`, still unexplained from 2026-09-04**: the `registry` row was green in one boot and WARN in a
+close two seconds later, same fixture. The arms no longer depend on it (they acknowledge every label), but
+**the world moved and nobody knows why**. `FINDINGS.md#review7-disposal` names the candidate.
 
 **3 — 🔴 A file we generate lives under somebody else's automation.** `FINDINGS.md#generated-in-their-tree`:
 their `prettier --write .` reformatted `.claude/comm-hook.mjs` (352 lines) eight minutes after an install,
