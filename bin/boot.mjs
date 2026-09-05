@@ -190,8 +190,31 @@ if (has("--hook")) {
 	const kitty = (env && env.get("KITTY_LISTEN_ON") || "").match(/kitty-(\d+)/)
 	const where = session ? `/proc/${session}` : "no claude ancestor"
 	const src = payload && payload.source ? ` - started: ${payload.source}` : ""
-	row("session", OK,
-		`${declared ? `declared "${declared}"` : "no CLAUDE_COMM_AGENT - off the bus"} (${where})` +
+	// THE ROW REPORTS WHAT THE BUS RESOLVED, not whether an environment variable was typed.
+	//
+	// Found 2026-09-05, from the owner asking whether agents could set `CLAUDE_COMM_AGENT`
+	// themselves. Measured first, and the measurement made the question moot: NOT ONE live
+	// session in `~/Dev/work` declares it, and `comm who` names all of them correctly - by
+	// directory, which is what `whoami` falls back to and what delivery has always anchored
+	// on. The variable was never needed for the ordinary case.
+	//
+	// 🔴 But this row said it was. Three lines above, `askBus` resolves the identity the way
+	// the field stub does - and this line THREW THAT ANSWER AWAY and printed
+	// "no CLAUDE_COMM_AGENT - off the bus" whenever the variable was absent. So a `db` agent
+	// that is on the bus, receiving mail and recording as `db` in both instruments, was told
+	// by the most-read line of the most-read report that it was off the bus. That is this
+	// project's signature defect - a row naming something other than what it measured - sat
+	// in the first row of its own boot protocol, and it is the reason a person types the
+	// variable at every launch: the tool told them to.
+	//
+	// Three states, and they are genuinely different: DECLARED (someone overrode it), by
+	// DIRECTORY (the ordinary case, and it is on the bus), and off the bus (no roster match
+	// at all - which is what this repo itself is, having no `.comm/` of its own).
+	const onBus = sessionAgent && sessionAgent !== "unnamed"
+	const how = declared ? `declared "${declared}"`
+		: onBus ? `"${sessionAgent}" by directory - on the bus, no CLAUDE_COMM_AGENT needed`
+		: "not on any roster here - off the bus"
+	row("session", OK, `${how} (${where})` +
 		`${kitty ? ` - kitty win ${kitty[1]}` : ""}${src}`)
 }
 
