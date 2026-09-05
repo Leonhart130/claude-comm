@@ -2112,6 +2112,131 @@ process.stdout.write(JSON.stringify({ ops, res }))
 			: "NOT ARMED: chmod 000 was still readable (running as root?), so this half proved nothing"))
 }
 
+// A40 — a project can say which version of the bus it has, and an update says what it brings.
+//
+// Asked for by the owner on 2026-09-05: *"il faut que l'outil soit facile à mettre à jour chez
+// tous les agents, avec une notice claire et un patch note."* Before this there was no version
+// anywhere and no changelog at all, so no field agent could tell this morning's bus from last
+// month's, and an update said only how many files it wrote.
+//
+// TWO ANSWERS THAT MUST NOT BE ONE. "Am I current?" is a PRINT over the shipped bytes and
+// cannot drift. "What changed?" is a hand-written note and can — so the note carries the print
+// it was written for, and a bus whose bytes no longer match its newest note is reported as
+// exactly that. Every half below is armed, and the parser has its own arm because its first
+// version returned zero entries in silence (`\Z` is not an anchor in JavaScript), which is
+// indistinguishable from having no history at all.
+{
+	const kit = join(root, "kit")
+	mkdirSync(kit, { recursive: true })
+	cpSync(join(PKG, "install.mjs"), join(kit, "install.mjs"))
+	cpSync(join(PKG, "bin"), join(kit, "bin"), { recursive: true })
+	const clog = join(kit, "CHANGELOG.md")
+	// An entry whose print CANNOT match the shipped bytes: this is what "you are behind" is.
+	writeFileSync(clog, "# notes\n\n## old.1 — bus print `000000000000` — 2026-01-01\n\n- the old one\n")
+	const kitInstall = (args) => spawnSync("node", [join(kit, "install.mjs"), ...args], { encoding: "utf8" })
+
+	// `--release` stamps the CURRENT bytes, and refuses a label that says nothing new.
+	const rel = kitInstall(["--release", "new.2"])
+	// The print is written INSIDE backticks - that is the format the parser keys on, so the
+	// arm must assert the same shape the reader requires, not a looser one.
+	const stamped = /bus print `[0-9a-f]{12}`/.test(readFileSync(clog, "utf8").split("## new.2")[1] || "")
+	writeFileSync(clog, readFileSync(clog, "utf8")
+		.replace("- WRITE WHAT CHANGED FOR THE AGENT READING THIS, not what changed in the code.", "- THE SENTENCE A FIELD AGENT MUST SEE"))
+	const dup = kitInstall(["--release", "new.2"])
+	const sameBytes = kitInstall(["--release", "new.3"])
+
+	// A project, installed fresh: it records what it got, and says nothing about history.
+	const proj40 = join(root, "proj40")
+	mkdirSync(join(proj40, ".comm"), { recursive: true })
+	writeFileSync(join(proj40, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: "." } }))
+	const first = kitInstall([proj40])
+	const recorded = (() => { try { return JSON.parse(readFileSync(join(proj40, ".comm", "INSTALLED.json"), "utf8")) } catch { return null } })()
+
+	// ONE VARIABLE: the same project, standing on the older label. The update must name what
+	// it brings, and nothing it already had.
+	writeFileSync(join(proj40, ".comm", "INSTALLED.json"), JSON.stringify({ label: "old.1", print: "000000000000" }))
+	const upgrade = kitInstall([proj40])
+	// POSITIVE CONTROL: run it again, now current. The same command must go quiet.
+	const again = kitInstall([proj40])
+
+	// A BUS THAT CHANGED WITH NOTHING SAID ABOUT IT.
+	writeFileSync(join(kit, "bin", "comm.mjs"), readFileSync(join(kit, "bin", "comm.mjs"), "utf8") + "\n// one byte\n")
+	const silentChange = kitInstall([proj40])
+
+	// THE PARSER'S OWN ARM: a changelog that exists and yields nothing must SAY so.
+	writeFileSync(clog, "# notes\n\n## broken — no print here at all\n\n- nothing parseable\n")
+	const blind = kitInstall([proj40])
+
+	check("A40 a project knows its bus version, and an update says what it brings",
+		rel.status === 0 && stamped && dup.status === 2 && sameBytes.status === 2 &&
+		recorded && recorded.label === "new.2" && !/what changed since/.test(first.stdout) &&
+		/what changed since old\.1/.test(upgrade.stdout) && /THE SENTENCE A FIELD AGENT MUST SEE/.test(upgrade.stdout) &&
+		!/what changed since/.test(again.stdout) &&
+		/bus has CHANGED since the last note/.test(silentChange.stdout) &&
+		/no entry could be parsed/.test(blind.stderr),
+		`--release stamps the shipped print=${stamped}, refuses a duplicate label=${dup.status === 2}, ` +
+		`refuses a note for unchanged bytes=${sameBytes.status === 2}; ` +
+		`fresh install records ${recorded && recorded.label} and prints no history=${!/what changed since/.test(first.stdout)}; ` +
+		`a project on old.1 -> ${/what changed since old\.1/.test(upgrade.stdout) ? "told what it gains, in the note's own words" : "SAID NOTHING"}; ` +
+		`positive control, the same command when current -> ${!/what changed since/.test(again.stdout) ? "quiet" : "REPEATED ITSELF"}; ` +
+		`one byte changed in the bus with no new note -> ${/bus has CHANGED since the last note/.test(silentChange.stdout) ? "reported" : "SILENT"}; ` +
+		`an unparseable changelog -> ${/no entry could be parsed/.test(blind.stderr) ? "says it is BLIND, not quiet" : "PASSED AS EMPTY HISTORY"}`)
+}
+
+// A41 — a leader sets up a new expert in one command, and cannot strand mail doing it.
+//
+// `~/Dev/work` went from two experts to five, each one costing three manual steps: edit a JSON
+// roster by hand, remember to re-run the installer, create the directory. The middle step is
+// the one that gets forgotten; the first is the one that is dangerous, because an agent RENAMED
+// in that file while it has mail leaves that mail addressed to a name no hook will deliver to
+// (review #7 F3). This command does all three in the right order and REFUSES the rename.
+{
+	const proj41 = join(root, "proj41")
+	mkdirSync(join(proj41, ".comm"), { recursive: true })
+	writeFileSync(join(proj41, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: "." } }))
+	const inst = (args) => spawnSync("node", [join(PKG, "install.mjs"), proj41, ...args], { encoding: "utf8" })
+
+	const added = inst(["--add-agent", "dev"])
+	const roster = () => { try { return JSON.parse(readFileSync(join(proj41, ".comm", "config.json"), "utf8")).agents } catch { return {} } }
+	const gotEverything = roster().dev === "dev" &&
+		existsSync(join(proj41, "dev", ".claude", "comm-hook.mjs")) &&
+		existsSync(join(proj41, "dev", ".claude", "settings.json")) &&
+		existsSync(join(proj41, ".comm", "inbox", "dev"))
+
+	// Idempotent when it agrees; every other shape refused, and the roster untouched by each.
+	const rosterBefore = JSON.stringify(roster())
+	const twice = inst(["--add-agent", "dev"])
+	const moved = inst(["--add-agent", "dev=elsewhere"])
+	const badName = inst(["--add-agent", "../evil"])
+	const outside = inst(["--add-agent", `x=${tmpdir()}`])
+	const withCheck = inst(["--check", "--add-agent", "y"])
+	const rosterUntouched = JSON.stringify(roster()) === rosterBefore
+
+	// THE PROOF THAT MATTERS: the new expert can be written to, and reads it at its first start.
+	writeFileSync(join(proj41, "PLAN.md"), "# your scope\n")
+	const sent = spawnSync("node", [join(proj41, ".comm", "bin", "comm.mjs"), "send", "dev", "--ref", "../PLAN.md", "--note", "your scope"],
+		{ cwd: proj41, encoding: "utf8" })
+	const start = spawnSync("node", [join(proj41, "dev", ".claude", "comm-hook.mjs"), "session-start"], {
+		cwd: join(proj41, "dev"), encoding: "utf8",
+		input: JSON.stringify({ cwd: join(proj41, "dev"), source: "startup" }),
+		env: { ...process.env, CLAUDE_COMM_RUNTIME: join(root, "rt41") },
+	})
+	let delivered = ""
+	try { delivered = JSON.parse(start.stdout).hookSpecificOutput.additionalContext } catch {}
+	const drained = existsSync(join(proj41, ".comm", "inbox", "dev")) &&
+		readdirSync(join(proj41, ".comm", "inbox", "dev")).filter((f) => f.endsWith(".json")).length === 0
+
+	check("A41 one command sets up a new expert, and it receives mail at its first start",
+		added.status === 0 && gotEverything && twice.status === 0 &&
+		moved.status === 2 && badName.status === 2 && outside.status === 2 && withCheck.status === 2 &&
+		rosterUntouched && sent.status === 0 && /PLAN\.md/.test(delivered) && drained,
+		`--add-agent dev -> roster, folder, hook, settings, inbox all present=${gotEverything}; ` +
+		`the same again -> exit ${twice.status} (idempotent); moving an existing agent -> ${moved.status} (want 2); ` +
+		`"../evil" -> ${badName.status}; a directory outside the project -> ${outside.status}; with --check -> ${withCheck.status}; ` +
+		`roster unchanged by all four refusals=${rosterUntouched}; ` +
+		`then leader -> dev: ${/PLAN\.md/.test(delivered) ? "delivered at first start, pointing at the file" : "NOT DELIVERED"}, inbox drained=${drained}`)
+}
+
 // A31 — this suite must not touch the machine's real session registry.
 //
 // Not a property of the bus: a property of the SUITE, and it is here because the trap has
