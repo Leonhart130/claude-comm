@@ -132,11 +132,19 @@ function updateState(mutate) {
 		let disk = {}
 		try { disk = JSON.parse(readFileSync(sp, "utf8")) || {} } catch {}
 		const next = mutate(disk)
-		if (!next) return
+		if (!next) return false
 		const tmp = `${sp}.tmp-${process.pid}`
 		writeFileSync(tmp, JSON.stringify(next, null, 2) + "\n")
 		renameSync(tmp, sp)
-	} catch {}
+		return true
+	} catch { return false }
+	// IT REPORTS. The first version of this function swallowed its failures the way
+	// `writeState` did, and for the hook and the report-size record that is right - a broken
+	// instrument may not break a session. For the CLOSE it is not: the close's whole output
+	// is a promise that the next boot inherits a recorded state, and a `✓ CLOSED` printed
+	// over a write that did not land is the silent-instrument-reading-as-a-quiet-world shape
+	// this repository keeps finding in its own rows. Found by re-reading the fix for review
+	// #7 F2 rather than by any arm, which is why an arm now exists below.
 }
 
 let statusText = ""
@@ -1224,7 +1232,7 @@ if (CLOSE) {
 		// COUNTED AGAINST THE BYTES ON DISK, not against the snapshot `st` read at the top of
 		// this block: review #7 F2. What the report prints is what was actually written.
 		let written = {}
-		updateState((d) => {
+		const recorded = updateState((d) => {
 			const c = { ...(d.ackCounts || {}) }
 			for (const r of open) c[r.label] = (c[r.label] || 0) + 1
 			// THE DISCHARGE (review #7 F10). An amendment zeroes the row it amended and says
@@ -1240,6 +1248,13 @@ if (CLOSE) {
 			d.lastClose = { at, head, acked: [...ACKS.keys()], amended: [...AMENDED.keys()] }
 			return d
 		})
+		if (!recorded) {
+			closeFailed = true
+			lines.length = 0
+			lines.push("  ✗ NOT CLOSED - .boot-state.json could not be written.")
+			lines.push("    The acknowledgements and the close timestamp did not land, so the next boot would")
+			lines.push("    inherit no record of this close at all. Fix the file, then close again.")
+		} else {
 		for (const [label, why] of AMENDED)
 			lines.push(`  ⟳ amended       ${label}: ${why} - its erosion count is cleared and the amendment is recorded`)
 		// Amendment evidence. Not a suggestion to think about it - a count.
@@ -1264,6 +1279,7 @@ if (CLOSE) {
 		if (stale.length) lines.push(`  · ${stale.length} count(s) held for row(s) this boot does not produce (${stale.join(", ")}) - kept as history, not demanded`)
 		lines.push("")
 		lines.push(`  ✓ CLOSED at ${head} - the next boot inherits a tree whose every row is green or named.`)
+		}
 	}
 	if (!closeReport) closeReport = "\n" + lines.join("\n") + "\n"
 }
@@ -1970,7 +1986,14 @@ function proveRed() {
 		// carelessly. This is also what an operator actually does: read the report, name
 		// what it names.
 		const openRows = run(false).rows.filter((r) => r.label && r.label !== "close" && r.level !== OK)
-		const acked = closeRun(openRows.flatMap((r) => ["--ack", `${r.label}=fixture: deliberately ${r.label}`]))
+		// ACK EVERY LABEL, not only the ones that were open a moment ago. A close runs its OWN
+		// boot, and this arm assumed two boots seconds apart produce the same levels. They do
+		// not: measured 2026-09-05, `registry` was green in the boot this list came from and
+		// WARN in the close that followed, and the arm failed for a row it had never been about.
+		// An acknowledgement for a row that turns out to be green costs nothing - the close only
+		// counts the ones it actually waved past.
+		const allRows = run(false).rows.filter((r) => r.label && r.label !== "close")
+		const acked = closeRun(allRows.flatMap((r) => ["--ack", `${r.label}=fixture: deliberately ${r.label}`]))
 		rmSync(join(pkg, "dirty.txt"), { force: true })
 		assert("close refuses an unnamed row, accepts a named one",
 			unacked.status === 1 && /NOT CLOSED/.test(unacked.stdout) && acked.status === 0 && /CLOSED at/.test(acked.stdout),
@@ -2040,7 +2063,7 @@ function proveRed() {
 			{ const st0 = stateOf(); st0.ackCounts = {}; writeFileSync(join(pkg, ".boot-state.json"), JSON.stringify(st0, null, 2) + "\n") }
 			// ONE full boot for the ack list, reused: `run(false)` runs the gate, and calling it
 			// per close cost four extra suite runs for a list that cannot change.
-			const acks = run(false).rows.filter((r) => r.label && r.label !== "close" && r.level !== OK)
+			const acks = run(false).rows.filter((r) => r.label && r.label !== "close")
 				.flatMap((r) => ["--ack", `${r.label}=fixture: deliberately ${r.label}`])
 			const ackAll = () => acks
 			const amendLine = (out) => (out.split("\n").find((l) => /acknowledged \d+x/.test(l)) || "").trim()
@@ -2055,7 +2078,12 @@ function proveRed() {
 			const stAfter = stateOf()
 			const cleared = !(stAfter.ackCounts || {}).tree && (stAfter.amendments || []).some((a) => a.row === "tree")
 			touchStatus()
+			// AN AMENDMENT DISCHARGES THE ROW IT NAMES, and only that row. The first version of
+			// this arm demanded that the next close print no AMEND block at all - and failed,
+			// correctly, because `registry` was ALSO being acked in this fixture and had reached
+			// five. "Silence" was never the property; "this row stops demanding" is.
 			const quiet = closeRun2(ackAll()).stdout || ""
+			const treeStillDemanded = /\btree acknowledged \d+x/.test(quiet)
 			// A ROW THAT NO LONGER EXISTS. It read the all-time map, so a row amended and then
 			// DELETED went on demanding an amendment at every close, forever, in the loudest
 			// line of the report - an instruction that following could not discharge.
@@ -2068,11 +2096,39 @@ function proveRed() {
 			const ghostSilent = !/a-row-that-was-deleted acknowledged/.test(withGhost) &&
 				/a-row-that-was-deleted/.test(withGhost)   // held as history, and said so
 			assert("close: the erosion count is armed, dischargeable, and does not haunt",
-				demanded && (countsAfter3.tree || 0) >= 3 && cleared && !/AMEND THE PROTOCOL/.test(quiet) && ghostSilent,
+				demanded && (countsAfter3.tree || 0) >= 3 && cleared && !treeStillDemanded && ghostSilent,
 				`3 closes acking the same rows -> tree=${countsAfter3.tree}, AMEND on the 3rd=${demanded} (not on the 1st: control); ` +
-				`--amended tree -> count cleared and recorded=${cleared}, next close silent=${!/AMEND THE PROTOCOL/.test(quiet)}` +
-				`${/AMEND THE PROTOCOL/.test(quiet) ? ` (it demanded: ${amendLine(quiet)})` : ""}; ` +
+				`--amended tree -> count cleared and recorded=${cleared}, the next close no longer demands TREE=${!treeStillDemanded}` +
+				`${/AMEND THE PROTOCOL/.test(quiet) ? ` (it still demands, for another row: ${amendLine(quiet)} - correct, that one was not amended)` : ""}; ` +
 				`a count for a row this boot does not produce -> demanded=${/a-row-that-was-deleted acknowledged/.test(withGhost)} (want false), named as history=${/a-row-that-was-deleted/.test(withGhost)}`)
+		}
+
+		// ── a close whose record does not land is not a close ────────────────────────────
+		//
+		// Not one of review #7's fourteen: found by re-reading the fix for F2. `updateState`
+		// inherited `writeState`'s silent catch, so a close whose write failed printed
+		// `✓ CLOSED`, exited 0, and left the acknowledgements it had just counted nowhere.
+		// ONE VARIABLE: the state file replaced by a directory, so the rename cannot land.
+		{
+			const sp = join(pkg, ".boot-state.json")
+			const saved = (() => { try { return readFileSync(sp, "utf8") } catch { return null } })()
+			const acks2 = run(false).rows.filter((r) => r.label && r.label !== "close")
+				.flatMap((r) => ["--ack", `${r.label}=fixture: deliberately ${r.label}`])
+			rmSync(sp, { force: true })
+			mkdirSync(sp, { recursive: true })
+			writeFileSync(join(sp, "in-the-way"), "x\n")
+			touchStatus()
+			const blocked = closeRun2(acks2)
+			rmSync(sp, { recursive: true, force: true })
+			if (saved !== null) writeFileSync(sp, saved)
+			touchStatus()
+			const control = closeRun2(acks2)
+			assert("close: a record that does not land is not a close",
+				blocked.status === 1 && /NOT CLOSED/.test(blocked.stdout) && !/✓ CLOSED/.test(blocked.stdout) &&
+				control.status === 0 && /✓ CLOSED/.test(control.stdout),
+				`.boot-state.json replaced by a directory -> exit ${blocked.status}, ` +
+				`${/NOT CLOSED/.test(blocked.stdout) ? "refused and said why" : `WRONG: ${(blocked.stdout || "").slice(-70).trim()}`}; ` +
+				`positive control, the file restored -> exit ${control.status} ${/✓ CLOSED/.test(control.stdout) ? "CLOSED" : "STILL REFUSING - the fixture did not come back"}`)
 		}
 
 		// ── F3: mail for an agent NO ROSTER accounts for ─────────────────────────────────
