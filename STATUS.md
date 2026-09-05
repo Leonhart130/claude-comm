@@ -175,5 +175,9 @@ instances now** — the fifth, 2026-09-05, were an ARM and then the OPERATOR: `A
 6 cold becoming 15), and staging the same row by hand added five more under an agent this repo does not have.
 Anything that runs a real hook path writes wherever that path writes, and the ledger's root has no test seam.
 
+**Acknowledgements amend the protocol** (`FINDINGS.md#ack-amendment`): the count hit three on `field:work`
+and the row was rewritten on that evidence — mail to a *running* agent is the bus working; mail for one that
+is *not* waits for a relaunch and nothing else says so. First time the mechanism fired on itself.
+
 **Findings live in the code**, at the point they apply — *a rule whose cost you cannot see is a rule someone
 will simplify away.*

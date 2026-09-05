@@ -786,13 +786,27 @@ function askBus(sessionPidForCwd) {
 		// this project has now shipped three times. One spawn per field project per boot,
 		// which is what the condition is worth: it is silent, it is live, and the sender gets
 		// a success either way.
-		let shared = []
+		let shared = [], stranded = [], busAnswered = false
 		try {
 			const w = spawnSync("node", [join(p, ".comm", "bin", "comm.mjs"), "who", "--json"],
 				{ cwd: p, encoding: "utf8", timeout: 5000 })
 			const ag = JSON.parse(w.stdout).agents || {}
+			busAnswered = true
 			shared = Object.entries(ag).filter(([, v]) => ((v && v.pids) || []).length > 1)
 				.map(([name, v]) => `${name} (${v.pids.length})`)
+			// AMENDED 2026-09-05, on the acknowledgement count and not on an opinion. This row
+			// reddened on ANY pending mail, and `field:work` was acknowledged THREE times in one
+			// day with the identical sentence: their leader wrote to their `db`, `db` is running,
+			// it drains at its next turn boundary. CLAUDE.md's rule is that a guard defensible
+			// every time it is bypassed is already failing and the RATE is the signal.
+			//
+			// Mail in flight to a RUNNING agent is the bus working. Mail for an agent that is
+			// NOT running waits until somebody relaunches it, and nothing else says so — that is
+			// the half worth a warning, and it is the half the old row buried by warning about
+			// both. Split with the answer the bus already gave for the shared-inbox check above;
+			// no second spawn, and no second definition of "running".
+			stranded = Object.entries(ag).filter(([, v]) => (v && v.pending) > 0 && !((v && v.pids) || []).length)
+				.map(([name, v]) => `${name} (${v.pending})`)
 		} catch { /* the bus not answering is already the DRIFT/STALE half of this row */ }
 		let claims = [], claimDirBad = false
 		let claimFiles = []
@@ -818,7 +832,10 @@ function askBus(sessionPidForCwd) {
 				: !installed.length ? "NOTHING INSTALLED in .comm/bin"
 				: busStale ? `STALE vs repo: ${staleFiles.join(", ")}`
 				: `bus current (${installed.length} files)`,
-			pending ? `${pending} pending (oldest ${age(Date.now() - oldest)})` : "0 pending",
+			!pending ? "0 pending"
+				: stranded.length ? `⚠ ${stranded.join(", ")} has mail and is NOT RUNNING - it waits for a relaunch (oldest ${age(Date.now() - oldest)})`
+				: busAnswered ? `${pending} pending, in flight to a running agent (oldest ${age(Date.now() - oldest)})`
+				: `${pending} pending (oldest ${age(Date.now() - oldest)}) - the bus could not be asked who is running`,
 			last ? `last delivery ${age(Date.now() - Date.parse(last))} ago` : "no delivery logged",
 			// Held is information; a holder that is GONE is a crash somebody should see, and
 			// it is the state a naive claim tool turns into a lock nobody can clear.
@@ -833,7 +850,10 @@ function askBus(sessionPidForCwd) {
 				: n.fresh ? `◷ restart note armed for ${n.agent} (${Math.round((n.age_s || 0) / 60)}m of ${Math.round((n.ttl_s || 0) / 60)}m)`
 				: `⚠ the restart note for ${n.agent} has LAPSED - its next start will score COLD`),
 		]
-		row(`field:${name}`, drift || busStale !== false ? RED : pending || lapsedNote || deadClaim ? WARN : OK, bits.join(" - "))
+		// `pending` no longer reddens on its own: see the amendment above. What reddens is mail
+		// that is STRANDED, or a bus that could not be asked and so cannot tell the two apart.
+		const mailStuck = pending > 0 && (stranded.length > 0 || !busAnswered)
+		row(`field:${name}`, drift || busStale !== false ? RED : mailStuck || lapsedNote || deadClaim ? WARN : OK, bits.join(" - "))
 	}
 }
 
@@ -1341,9 +1361,39 @@ function proveRed() {
 	}
 
 	const msg = join(proj, ".comm", "inbox", "app", "0001-x.json")
-	arm("field: mail sits undelivered", "field:proj", WARN,
+	arm("field: mail STRANDED on an agent that is not running", "field:proj", WARN,
 		() => writeFileSync(msg, JSON.stringify({ id: "0001-x", to: "app" })),
 		() => rmSync(msg, { force: true }))
+
+	// THE OTHER DIRECTION, and it is the amendment's whole point. This row used to redden on
+	// ANY pending mail, and `field:work` was acknowledged THREE times in one day with the
+	// same sentence - their leader wrote to their `db`, `db` is running, it drains at its
+	// next turn. CLAUDE.md: a guard defensible every time it is bypassed is already failing,
+	// and the rate is the signal. So mail IN FLIGHT to a live agent must leave the row green,
+	// and only the arm above may redden it.
+	//
+	// ONE VARIABLE against that arm: the same message, the same inbox, and a live session in
+	// the recipient's directory. Without this half the amendment could be reverted and every
+	// gate would stay green.
+	{
+		const fakeD = join(proj, "claude")
+		try { symlinkSync("/bin/sh", fakeD) } catch {}
+		let kid = null
+		const settle = () => { const t0 = Date.now(); while (Date.now() - t0 < 4000) { try { if (kid && existsSync(`/proc/${kid.pid}`)) break } catch {} } }
+		writeFileSync(msg, JSON.stringify({ id: "0001-x", to: "app" }))
+		kid = spawn(fakeD, ["-c", "sleep 30; :"], { cwd: join(proj, "app"), stdio: "ignore" })
+		settle()
+		const withLive = level(run(true), "field:proj")
+		try { kid.kill("SIGKILL") } catch {}
+		// The recipient is gone again: the SAME pending message must now redden, which is what
+		// proves the green above came from the session and not from the row going quiet.
+		const t0 = Date.now(); while (Date.now() - t0 < 2000) { if (!existsSync(`/proc/${kid.pid}`)) break }
+		const withoutLive = level(run(true), "field:proj")
+		rmSync(msg, { force: true })
+		assert("field: mail in flight to a RUNNING agent does not redden the row",
+			withLive === OK && withoutLive === WARN,
+			`same message, recipient live -> ${LV[withLive]} (must stay ok); recipient gone -> ${LV[withoutLive]} (must warn)`)
+	}
 
 	const scratch = join(pkg, "uncommitted.txt")
 	arm("tree: work left uncommitted", "tree", WARN,

@@ -1251,3 +1251,44 @@ launch. It names the directory first now, because that one survives being forgot
 ⚠️ **Not verified:** no real adversarial review has been run from its own directory yet. The routing is
 measured on a fixture; the workflow around it — whether a reviewer that cannot see the leader's inbox still
 has everything it needs — is not.
+
+## `#ack-amendment` — the first guard amended by its own bypass rate
+
+**2026-09-05.** `CLAUDE.md` says an acknowledgement count of three prints an instruction to amend the
+protocol, *"because a guard defensible every time it is bypassed is already failing and the rate is the
+signal"*, and that an amendment needs **evidence, not an opinion, landing as a gated change with an arm**.
+This is the first time that fired. The evidence is the three acknowledgements themselves:
+
+```
+ackCounts: { "field:work": 3, "tree": 2, ... }
+```
+
+All three said the same thing in different words: *their leader wrote to their `db`, `db` is running, it
+drains at its next turn boundary.* The row reddened on **any** pending mail — including a message delivered
+four seconds earlier to a live agent. That is not a defect on anybody's machine; it is the bus working.
+
+**The amendment splits what the row was conflating**, using the answer the bus had already given for the
+shared-inbox check in the same block — no second spawn, and no second definition of "running":
+
+| state | before | after |
+| --- | --- | --- |
+| mail in flight to a **running** agent | ⚠ | ✓ `in flight to a running agent` |
+| mail for an agent that is **not running** | ⚠ | ⚠ `has mail and is NOT RUNNING - it waits for a relaunch` |
+| pending, and the bus could not be asked | ⚠ | ⚠ and says it could not tell the two apart |
+
+The second row is the one worth waking someone for: **nothing else says that mail is waiting on a relaunch.**
+The old row buried it by warning about both, which is how the acknowledgements started.
+
+Armed in both directions, and the second arm carries the control that makes the first mean anything: the
+same message, the same inbox, one live session in the recipient's directory → the row stays green; kill that
+session → the *same* message reddens it. Without that half the amendment could be reverted with every gate
+still green.
+
+**The counter was reset to 0 for that row when the amendment landed, and that is deliberate.** A bypass rate
+measures ONE guard; the amended row asks a different question, and letting it inherit the old row's debt
+would demand a second amendment for a reason that no longer exists. The old value — 3 — is recorded here,
+which is where it belongs, rather than in a live counter that will be read as current.
+
+⚠️ **What this does not do:** it does not bound how long "in flight" may last. An agent that runs for hours
+without ending a turn holds its mail for hours and this now says nothing. The age is printed; nothing acts
+on it, and no measurement exists yet for what a normal in-flight age is.
