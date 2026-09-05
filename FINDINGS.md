@@ -689,8 +689,13 @@ So the arm wrote fabricated starts into the ledger it is part of: the real log w
 answer. Caught by reading the boot report and noticing a count that had no business moving. The seven records
 were removed and the arm now builds a throwaway copy of `bin/` and roots boot there.
 
-⇒ **The rule has a corollary worth writing down:** an arm that *runs a real hook path* writes wherever that
-path writes. `CLAUDE_COMM_RUNTIME` was already the seam for the registry and `--field` for the field scan;
+**And a sixth, the same afternoon, by hand.** Staging the three session-row states meant running
+`boot.mjs --hook --root <this repository>` from a shell — which recorded five more fabricated starts, under a
+`db.log` for an agent this repo does not have. The ARM was isolated by then; the operator was not. Both were
+found the same way: a count in the boot report moved with no reason to.
+
+⇒ **The rule has a corollary worth writing down:** anything that *runs a real hook path* writes wherever that
+path writes — an arm, or a person at a prompt. `CLAUDE_COMM_RUNTIME` was already the seam for the registry and `--field` for the field scan;
 the LEDGER's root had no seam, so nothing stopped the write and nothing announced it.
 
 ## `#tier0-calibration` — the tier-0 cap counts bytes; here is what a byte is worth
