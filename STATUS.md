@@ -24,13 +24,9 @@ never by when it was found. That convention and its bias are in `FINDINGS.md#rev
 
 ⚠️ **Before touching the ledger, know this:** `boot.mjs --hook` RECORDS A START into the ledger of whatever
 `--root` it is given. That wrote fabricated data into the real instrument twice on 2026-09-05 — once from an
-arm, once from a person at a prompt. Check `node bin/ledger.mjs` before and after any hook experiment. Truth
-as of this close: **7 cold + 4 reboot starts, 11 defects, one agent log (`unnamed.log`)** — the seventh cold
-start is REAL and is review #7's own session (`0a5ec946`, 12:09:55Z), recorded by its SessionStart hook when
-the owner launched it in this directory. It carries **`pending: 20`, the first real reading the covariate has
-ever produced** — 20 files newer than the previous start, which is this session's own work. A second session
-in this folder is harmless here precisely because claude-comm has no roster: no inbox to share, nothing to
-drain (`FINDINGS.md#second-session`).
+arm, once from a person at a prompt. Check `node bin/ledger.mjs` before and after any hook experiment. Truth at
+this close: **7 cold + 4 reboot, 11 defects, one log (`unnamed.log`)** — the 7th cold start is REAL, review
+#7's own session (`0a5ec946`), carrying **`pending: 20`, the covariate's first real reading**.
 
 **2 — `#claim-file` between two REAL agents.** `bin/claim.mjs` shipped today with eight arms and `A38` in the
 gate, but no two live agents have ever contended through it: one session took both sides and the refusal was
@@ -55,21 +51,16 @@ upper bound. Do not quote the disagreement as a result.
 be reddened, then went green twice on the same tree. Never named, because the run was filtered through `grep`.
 **Run gates unfiltered.** If it recurs it is `FINDINGS.md#A20` and it is triage-first.
 
-**⚠️ `ackCounts` says `field:work: 3` again — DO NOT AMEND THAT ROW A SECOND TIME.** It was already amended
-today on exactly that signal (`FINDINGS.md#ack-amendment`) and the counter was reset; it climbed straight back
-because the row is now **right**: `db` in `~/Dev/work` genuinely has mail and is not running. What makes it
-un-acknowledgeable-away is not the guard, it is my POSITION — relaunching another project's agent is theirs,
-they were told on the channel, and until they do it the condition correctly persists. **The rule that a
-bypass rate means a failing guard assumes the reader can act.** That assumption does not hold for a row about
-somebody else's tree, and noticing that is worth more than another amendment. If you want to improve
-something here, improve the RULE, with evidence, not this row.
+**⚠️ `ackCounts: field:work = 3` again — DO NOT AMEND THAT ROW.** It was amended today on exactly that signal
+(`FINDINGS.md#ack-amendment`) and the counter reset; it climbed back because the row is **right** — `db` has
+mail and is not running. What blocks resolution is my POSITION, not the guard: relaunching their agent is
+theirs. **The bypass-rate rule assumes the reader can act**, and that fails for another tree's row. Improve
+the RULE with evidence, not this row.
 
-**⚠️ A restart note was armed as the last act of 2026-09-05 for `unnamed`, TTL 1800 s.** In this rosterless
-repo every session is `unnamed`, and review #7's session was running in this directory at the time — so the
-note goes to whichever `SessionStart` fires FIRST here, not necessarily the intended relaunch
-(`FINDINGS.md#unnamed-collision`). **Check `prev_session` on the newest start:** if it names
-`7a7503b4-a92c-474e-ad73-85bc21f54e05`, the crossing worked and this start is a genuine reboot. If it is
-null, the note was taken by somebody else or lapsed, and this start is correctly COLD — do not re-file it.
+**⚠️ A restart note was armed last on 2026-09-05 for `unnamed`, TTL 1800 s** — and every session here is
+`unnamed`, with review #7 running in this directory, so it goes to whichever `SessionStart` fires first
+(`FINDINGS.md#unnamed-collision`). **Check `prev_session` on the newest start:** `7a7503b4-…` means the
+crossing worked; null means it lapsed or somebody else took it, and this start is correctly COLD.
 
 **Standing test debt from review #4, none of it gated:** `FINDINGS.md#test-debt`.
 
