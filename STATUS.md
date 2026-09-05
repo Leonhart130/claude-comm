@@ -170,8 +170,10 @@ and it is triage-first.
 ## Two conventions that erode silently
 
 **Measurement traps** (`FINDINGS.md#measurement-traps`): a control that does not travel the same code as the
-arms validates nothing, and one that writes into the world it measures is not a control at all. **Four
-instances now** — the fourth was this session, by hand, in a sandbox run with no runtime isolation.
+arms validates nothing, and one that writes into the world it measures is not a control at all. **Five
+instances now** — the fifth, 2026-09-05, was an ARM: `A39` ran `boot --hook` against this repository and wrote
+**seven fabricated session starts into the real ledger**, 6 cold becoming 15. An arm that runs a real hook path
+writes wherever that path writes, and the ledger's root had no test seam.
 
 **Findings live in the code**, at the point they apply — *a rule whose cost you cannot see is a rule someone
 will simplify away.*
