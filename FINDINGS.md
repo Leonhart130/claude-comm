@@ -1338,3 +1338,87 @@ Still unverified, still true, and no longer worth a line in the file every boot 
 - **How long the wandered-cwd window stays open.** Proved within a single `-p` turn; whether an interactive
   session's Bash cwd resets between turns is unmeasured. It decides the exposure, not the existence, of the
   defect. Moot for delivery (identity no longer reads cwd); still governs `whoami`-returns-null, open item 2.
+
+## `#review7-disposal` — disposing review #7, and the defect the disposal made before it shipped
+
+**2026-09-05.** Fourteen findings, all fixed and armed in `3939fb3`. What is written here is only what the
+review did **not** already say: the measurements taken during the disposal, including the ones against me.
+
+### The ratio inverted, and the reviewer's explanation is the right one
+
+Reviews #5 and #6 each put five of seven findings in the ARMS. #7 put two of fourteen there (F5, and the arm
+half of F4), one more in a missing arm (F10), and eleven in shipped code. The reviewer's reading — *"today
+shipped more NEW code than usual, and new code outruns its arms"* — is supported by the attribution: **six of
+the fourteen were authored by one commit**, `d928d1c`, the commit that shipped `bin/claim.mjs` with eight
+arms of its own. Eight arms, six defects, all in one file, all found within three hours by somebody who ran
+it instead of reading it.
+
+### What the arms could not see, stated as the one sentence that covers all six
+
+**Every one of `claim.mjs`'s eight arms passed `--root <tmpdir>` explicitly, so not one of them ever
+exercised root resolution.** That is the same shape as the pid defect it was written to prevent — *the arms
+chose the root exactly as they had chosen the pid* — and it is a property of the fixture IDIOM, which is the
+one thing a fixture cannot check about itself. The new arms 9–14 run the CLI from a **cwd**, with no
+`--root` at all, which is how an agent runs it.
+
+### The ledger's numbers after recording, and what they still do not say
+
+`25 defects — 22 attributed + 3 unattributable`. Two of the fourteen (F2 at `186988f`, F10 at `b11b806`)
+were authored **before this ledger's first start**, so they joined `F9`'s pool: property 3 exercised by real
+data for the second time. **Still 0 of 25 inside the 15-minute window**, and the bias named in
+`#review6-disposal` is unchanged — every defect is dated at its commit, which is the upper bound of when it
+was written. The window has still not been tested.
+
+### 🔴 The disposal made F4's defect again, one file over, and its own new arm caught it
+
+`claim.mjs`'s `by` now comes from the bus. The first version fell back to `CLAUDE_COMM_AGENT` whenever the
+bus did not answer — and `comm.mjs whoami` **refuses** a declaration that is not in the roster, which is not
+the same thing as a bus that could not be reached. So a name the bus had actively REFUSED would have been
+recorded as if nobody had been able to check it: **F4's defect, reproduced in the fix for F11, in the same
+hour F4 was fixed.** It was caught by arm 14, which had been written to assert the opposite property and
+failed on `source=env` where it wanted `source=bus`. The record now distinguishes `bus`, `refused-by-bus`,
+`flag`, `env` and `none`, and `describe()` prints the provenance to the next reader.
+
+### A33 measures execution order now, and here is the table
+
+The old check read the SOURCE and asserted nothing touched `p` before the literal `renameSync(p, mine)`.
+The replacement instruments `node:fs` in a child (`syncBuiltinESMExports` makes a patched builtin reach an
+ESM named import) and records every operation on the note's own path, in the order it happened:
+
+| run | ops on the note | result |
+| --- | --- | --- |
+| shipped module | `[renameSync]` | claimed |
+| shipped, `renameSync` faulted `EXDEV` | `[renameSync]` | **refuses**, note still on disk |
+| the read-then-unlink fallback in the catch | `[renameSync, readFileSync, unlinkSync]` | **succeeds** — the racy path |
+
+The third row is the positive control and it is **derived from the shipped source**, so it cannot silently
+stop being a variant of it: if the substitution no longer applies, the arm fails loudly. A variable rename —
+which reddened the old check — is invisible to this one.
+
+### 🔴 A correction written only in a document does not reach the field
+
+`FINDINGS.md` and `STATUS.md` have said since this morning that *"a login shell"* is the wrong remediation
+for the hookless launch — `-i` is the flag that works, because nvm is loaded from `.zshrc`, which `zsh -l`
+never reads. **Both places that SHIP that sentence still said the wrong thing**: `.claude/settings.json`, and
+the message `install.mjs` bakes into every generated stub in every field project. Corrected in both. The
+lesson is not about shells: a fix recorded in prose while the code keeps emitting the old advice is a fix
+that exists only for the person who wrote it.
+
+### The budget row is coupled to how broken the field is
+
+Tier 0 went 84 % → 88 % during this session **while `STATUS.md` got smaller**. The injected boot report grew
+by 558 B because both field rows now enumerate every drifted file, and a drift list is unbounded. So the cap
+that protects every future session's context is partly a function of the field's state, and a genuinely
+broken field could push tier 0 over its cap on its own. Named, not fixed.
+
+### What this disposal did NOT verify
+
+- **`node bin/boot.mjs --prove-red` was still running when the session was paused**, and its result was
+  never read. `node test/attack.mjs` was 40/40 green with the rewritten A33/A36/A39; `claim --prove-red` is
+  16/16. The other two controls were not re-run.
+- **`test/selftest.mjs` was not run**, so no real session has executed the corrected stub — the same gap the
+  reviewer named. The stub's git guard and its notice are covered at fixture level only.
+- **Neither field tree has been reinstalled**, so every field agent is still running the `claim.mjs` that
+  cannot see a collision, and both field rows are RED on drift until that is done.
+- **Whether a SessionStart hook's stderr reaches the agent at all** is still unknown — the reviewer could
+  not settle it either. F9 removed this repo's dependence on that channel; the generated stub still has one.

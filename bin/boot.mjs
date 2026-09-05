@@ -2002,15 +2002,18 @@ function proveRed() {
 			const sp = join(pkg, ".boot-state.json")
 			const child = spawn(process.execPath, [SELFFILE, "--json", "--root", pkg, "--field", tmp],
 				{ encoding: "utf8", stdio: "ignore" })
-			const done = { exited: false }
-			child.on("exit", () => { done.exited = true })
+			// POLLED THROUGH /proc, NOT THROUGH `child.on("exit")`. A busy-wait blocks the event
+			// loop, so the exit callback cannot run inside it and the loop would always spend its
+			// whole timeout - the first version of this arm sat for 93 s per run and called it
+			// waiting. The filesystem answers a blocked process; a callback does not.
+			const alive = () => existsSync(`/proc/${child.pid}`)
 			// Land inside the gate, which is the whole width of the window.
-			const t0 = Date.now(); while (Date.now() - t0 < 3000 && !done.exited) {}
+			const t0 = Date.now(); while (Date.now() - t0 < 3000 && alive()) {}
 			const midAt = new Date().toISOString()
 			const before = stateOf()
 			writeFileSync(sp, JSON.stringify({ ...before, ackCounts: { "a-concurrent-close": 7 },
 				lastClose: { at: midAt, head: "cafe123", acked: ["a-concurrent-close"] } }, null, 2) + "\n")
-			const t1 = Date.now(); while (Date.now() - t1 < 90_000 && !done.exited) {}
+			const t1 = Date.now(); while (Date.now() - t1 < 90_000 && alive()) {}
 			const after = stateOf()
 			const bootWroteAfter = after.at && Date.parse(after.at) >= Date.parse(midAt)
 			assert("state: a close written during the gate is not erased",
@@ -2029,8 +2032,18 @@ function proveRed() {
 		// this boot does not produce cannot demand anything.
 		{
 			writeFileSync(join(pkg, "dirty.txt"), "x\n")
-			const openRows = () => run(false).rows.filter((r) => r.label && r.label !== "close" && r.level !== OK)
-			const ackAll = () => openRows().flatMap((r) => ["--ack", `${r.label}=fixture: deliberately ${r.label}`])
+			// A CLEAN SLATE, because the property is the counter's behaviour and not the
+			// fixture's history: every close above this one acked whatever was open and wrote a
+			// count for it, so without this the arm measures rows it never touched. (Measured:
+			// it did, and the "silent after the amendment" half failed for a row this arm had
+			// never named.)
+			{ const st0 = stateOf(); st0.ackCounts = {}; writeFileSync(join(pkg, ".boot-state.json"), JSON.stringify(st0, null, 2) + "\n") }
+			// ONE full boot for the ack list, reused: `run(false)` runs the gate, and calling it
+			// per close cost four extra suite runs for a list that cannot change.
+			const acks = run(false).rows.filter((r) => r.label && r.label !== "close" && r.level !== OK)
+				.flatMap((r) => ["--ack", `${r.label}=fixture: deliberately ${r.label}`])
+			const ackAll = () => acks
+			const amendLine = (out) => (out.split("\n").find((l) => /acknowledged \d+x/.test(l)) || "").trim()
 			let outs = []
 			for (let i = 0; i < 3; i++) { touchStatus(); outs.push(closeRun2(ackAll()).stdout || "") }
 			const countsAfter3 = stateOf().ackCounts || {}
@@ -2057,7 +2070,8 @@ function proveRed() {
 			assert("close: the erosion count is armed, dischargeable, and does not haunt",
 				demanded && (countsAfter3.tree || 0) >= 3 && cleared && !/AMEND THE PROTOCOL/.test(quiet) && ghostSilent,
 				`3 closes acking the same rows -> tree=${countsAfter3.tree}, AMEND on the 3rd=${demanded} (not on the 1st: control); ` +
-				`--amended tree -> count cleared and recorded=${cleared}, next close silent=${!/AMEND THE PROTOCOL/.test(quiet)}; ` +
+				`--amended tree -> count cleared and recorded=${cleared}, next close silent=${!/AMEND THE PROTOCOL/.test(quiet)}` +
+				`${/AMEND THE PROTOCOL/.test(quiet) ? ` (it demanded: ${amendLine(quiet)})` : ""}; ` +
 				`a count for a row this boot does not produce -> demanded=${/a-row-that-was-deleted acknowledged/.test(withGhost)} (want false), named as history=${/a-row-that-was-deleted/.test(withGhost)}`)
 		}
 
@@ -2141,11 +2155,16 @@ function proveRed() {
 				{ encoding: "utf8", env: { ...env, CLAUDE_COMM_RUNTIME: join(tmp, "f13-runtime2") },
 				  input: JSON.stringify({ source: "startup", transcript_path: join(tmp, "x.jsonl") }) })
 			assert("hook: --root elsewhere without a redirected registry is refused",
+				// NOT `status === 0`: a boot's exit code reports its ROWS, and a bare checkout in a
+				// temp directory has red ones. The property is that the call was not REFUSED and
+				// the start landed - measured, the first version of this arm demanded exit 0 and
+				// failed on a healthy refusal-free run, which is an arm asserting a different
+				// variable than the one in its title.
 				refused.status === 2 && /governs one/.test(refused.stdout) && after13 === before13 &&
-				allowed.status === 0 && ledgerOf(other) === before13 + 1,
+				allowed.status !== 2 && ledgerOf(other) === before13 + 1,
 				`--hook --root <other> with CLAUDE_COMM_RUNTIME unset -> exit ${refused.status} (want 2), ` +
 				`that tree's ledger ${before13} -> ${after13} (must not move); ` +
-				`positive control, the same call with the registry redirected -> exit ${allowed.status}, ledger -> ${ledgerOf(other)} (want ${before13 + 1})`)
+				`positive control, the same call with the registry redirected -> exit ${allowed.status} (any but 2), ledger -> ${ledgerOf(other)} (want ${before13 + 1})`)
 		}
 	}
 
