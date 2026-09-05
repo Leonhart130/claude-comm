@@ -23,7 +23,15 @@ pid of a command that exits in milliseconds, so every claim read as a crash one 
 eight wrote fixture records with a pid the test chose; **none took a claim through the CLI and read it back.**
 Arms sharing one fixture idiom share one blind spot. Running the thing for real once is what found it.
 
-**2 — The launcher must resolve the runtime and REFUSE, not trust a shell flag.**
+**2 — `CLAUDE_COMM_AGENT` is not needed and never was; the residual gap is a wandering cwd.**
+
+`FINDINGS.md#self-identity`: no live session in `~/Dev/work` declares it and `comm who` names them all
+correctly, delivery never used it, and an agent **cannot** set it for itself. What taught the habit was
+boot's own first row calling on-bus sessions off-bus; fixed, `A39` holds three states. ⚠️ **Still open:** a
+session whose cwd wanders after start is reported by where it stands. The registry would fix it and the bus
+may not import the registry — read the rejected trade there before rebuilding it.
+
+**3 — The launcher must resolve the runtime and REFUSE, not trust a shell flag.**
 
 `FINDINGS.md#hookless-launch` published *"the fix is a login shell"* and it is **false on this box** — nvm is
 loaded from `.zshrc`, which `zsh -l` never reads. Measured 2026-09-05, one flag moved, with a positive
@@ -33,18 +41,18 @@ paths before launching and refuse when resolution fails — a launcher that cann
 return a window id. Answer him on the channel; he has offered to run the control that is still missing,
 namely a REAL self-launched session with `comm who` behind it. Reaching the binary is not being on the bus.
 
-**3 — The field bus was updated on the owner's instruction; the covariate has NOT been observed there.**
+**4 — The field bus was updated on the owner's instruction; the covariate has NOT been observed there.**
 `install.mjs` was run on `~/Dev/electio` (11 files, 2 agents) and `~/Dev/work` (17 files, 5 agents) after this
 session made both stale; `--check` is green on each. ⚠️ **But no field session has started since**, so
 `pending` has never been written by a real field hook — only by this repo's own arms. The first field start
 after this is the measurement; read it before trusting the column.
 
-**4 — The window is untested, and my own timestamps are why.** Eleven defects are recorded — the first this
+**5 — The window is untested, and my own timestamps are why.** Eleven defects are recorded — the first this
 ledger has ever had — and **0 of 11 fall inside the 15-minute window**, against the consumer's *"four of five
 in the first thirteen minutes"*. But each is dated at **its commit**, the upper bound of when it was written,
 which pushes every point later. Do not quote the disagreement as a result. `FINDINGS.md#review6-disposal`.
 
-**5 — One red that no code change explains, still unidentified.** `boot.mjs --prove-red` reported
+**6 — One red that no code change explains, still unidentified.** `boot.mjs --prove-red` reported
 `✗ 1 boot row(s) could NOT be reddened`, then went green twice on the same tree — including through the
 identical pipeline, which refutes the obvious `head`-closed-the-pipe explanation. The row was never named
 because I had filtered the run through `grep`. **Run gates unfiltered.** If it recurs it is `FINDINGS.md#A20`

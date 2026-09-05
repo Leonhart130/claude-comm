@@ -682,6 +682,17 @@ which is indistinguishable from a clean result. Its positive control passed *bec
 path and so never travelled the broken path.* **A control that does not go through the same code as the arms
 validates nothing.** Both reviewers hit a version of this in the same session and recorded it.
 
+**A third, 2026-09-05, and it was mine, in an arm written to fix a different row.** `A39` ran
+`boot.mjs --hook --root <this repository>` three times per gate run — and `--hook` **records a session start**.
+So the arm wrote fabricated starts into the ledger it is part of: the real log went from 6 cold starts to 15,
+**seven of them invented by the case**, sitting in the denominator of the question this project exists to
+answer. Caught by reading the boot report and noticing a count that had no business moving. The seven records
+were removed and the arm now builds a throwaway copy of `bin/` and roots boot there.
+
+⇒ **The rule has a corollary worth writing down:** an arm that *runs a real hook path* writes wherever that
+path writes. `CLAUDE_COMM_RUNTIME` was already the seam for the registry and `--field` for the field scan;
+the LEDGER's root had no seam, so nothing stopped the write and nothing announced it.
+
 ## `#tier0-calibration` — the tier-0 cap counts bytes; here is what a byte is worth
 
 Prompted 2026-09-04 by the `~/Dev/work` leader, who found the same class of defect in his own instrument and
@@ -1132,3 +1143,65 @@ same barrier through a read-then-unlink with a 150 ms window hands the note to *
 critical section is too small for eight processes to land inside. That gap is closed by a **structural** half
 (`claim()` must consume by `renameSync` before any read of that path), whose own weakness is named where it
 is written: it reads source, so it is one refactor behind, and the declaration is the mechanism.
+
+## `#self-identity` — the variable was never needed, and the boot row is why people type it
+
+**2026-09-05.** The owner asked whether agents could set `CLAUDE_COMM_AGENT` for themselves instead of him
+typing it at every launch. Two measurements answered it, and the second one made the first moot.
+
+### 1. A process cannot declare itself through that channel — measured, not reasoned
+
+`comm who` identifies live sessions by reading **`/proc/<pid>/environ` of other processes**. A process's own
+assignment does not reach it:
+
+| | |
+| --- | --- |
+| `process.env.CLAUDE_COMM_AGENT = "leader"` | `"leader"` |
+| `/proc/self/environ` immediately after | **empty — the scanner sees nothing** |
+
+⇒ *"the agent exports the variable itself"* is not a feature that was missing; it is **structurally
+impossible** through the channel the scanner reads. Same fact the bus already records for its own reason:
+reading our own env would report a session as declared while every real scanner sees nothing.
+
+### 2. 🔴 And it was never needed, because identity already resolves without it
+
+Measured on the three live sessions in `~/Dev/work`, mid-work, none of them staged for this:
+
+| pid | `CLAUDE_COMM_AGENT` | cwd | `comm who` says |
+| --- | --- | --- | --- |
+| 61733 | **none** | `~/Dev/work` | `leader` ✓ |
+| 303652 | **none** | `~/Dev/work/db` | `db` ✓ |
+| 307719 | **none** | *(exited between measurements)* | `leader` ✓ |
+
+**Not one declared anything.** `whoami` falls back to the directory, and **delivery never used the variable
+at all** — it anchors on the hook stub's location, which is CLAUDE.md's rule for identity. The variable does
+exactly two things that the directory cannot: `=none`, and naming a session whose cwd is not its agent's.
+
+### 3. 🔴 So why does anyone type it? Because the first row of the boot report said to
+
+`bin/boot.mjs` resolved the identity through the bus — `askBus`, the same call the field stub makes — and
+then **threw that answer away**, printing `no CLAUDE_COMM_AGENT - off the bus` whenever the variable was
+absent. An agent on the bus, receiving mail, recording under its own name in both instruments, was told by
+the most-read line of the most-read report that it was off the bus.
+
+This project's signature defect — *a row that names something other than what it measured* — sitting in the
+first row of its own boot protocol, and the one row every session reads before anything else. **A tool that
+misreports a state also teaches the habit that appears to fix it.** Three states now, and they differ:
+`declared "X"` · `"X" by directory - on the bus, no CLAUDE_COMM_AGENT needed` · `not on any roster here`.
+`A39` holds all three with the no-roster control, and reddens on the old wording alone.
+
+### What was designed, costed, and REJECTED
+
+Making `comm who` read the identity from the session registry — which the hook already writes from the stub's
+location, keyed on (pid, start time, boot id) — would also fix the residual case: a session whose **cwd
+wandered** after start still reports by cwd today.
+
+**Not done, and the reason is a trade this project should not make.** It requires the bus to import
+`./session-registry.mjs`, which A21's allowlist forbids for a reason — and a static import that fails when
+the sibling is absent kills `bin/comm.mjs` **entirely**, including `send` and `hook stop`. That is a
+DELIVERY failure bought with a REPORTING fix, against the bus's own first rule that a broken bus must never
+break a session. Reached the point of being written and reverted; the fixture that caught it is `A12`, which
+hand-copies the bus alone and died with `ERR_MODULE_NOT_FOUND`.
+
+⚠️ **So the residual gap is open and named:** a session that changes directory after start is reported by
+where it stands, not by what it is. Nobody has measured how often that happens.

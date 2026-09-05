@@ -15,7 +15,7 @@
  * directives? Measuring the wrong thing produced a confident, plausible, wrong
  * result, which is this project's signature failure mode.
  */
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync, statSync, symlinkSync } from "node:fs"
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync, statSync, symlinkSync, cpSync } from "node:fs"
 import { join } from "node:path"
 import { execFileSync, spawnSync, spawn } from "node:child_process"
 import { createHash } from "node:crypto"
@@ -1628,6 +1628,72 @@ writeFileSync(out, JSON.stringify(res && res.signal ? res.signal : null))
 		g.status === 0 && passed >= 30,
 		`bin/ledger.mjs --prove-red -> exit ${g.status}, ${passed} arm(s) demonstrated (want >=30) in ${((Date.now() - t0) / 1000).toFixed(1)}s` +
 		(g.status === 0 ? "" : `\n      ${out.split("\n").filter((l) => /✗/.test(l)).join("\n      ")}`))
+}
+
+// A39 — the boot row says who the BUS resolved, not whether a variable was typed.
+//
+// The owner asked whether agents could set `CLAUDE_COMM_AGENT` themselves. The measurement
+// that answered it also made it moot: **not one live session in `~/Dev/work` declares the
+// variable**, and `comm who` names every one of them correctly, by directory — which is what
+// `whoami` falls back to and what delivery has always anchored on (the hook stub's location).
+//
+// 🔴 But `bin/boot.mjs`'s FIRST row said otherwise. It resolved the identity through the bus
+// three lines earlier and then threw that answer away, printing "no CLAUDE_COMM_AGENT - off
+// the bus" whenever the variable was absent. An agent on the bus, receiving mail, recording
+// under its own name in both instruments, was told by the most-read line of the most-read
+// report that it was off the bus — and that is a plausible reason a person types the variable
+// at every launch: the tool told them to.
+//
+// ONE VARIABLE: the environment. Same fixture, same cwd, same payload, three runs. The third
+// is the control that keeps the first honest — a session in no roster at all must STILL say
+// off the bus, or this row would just have stopped saying it.
+{
+	const rootB = mkdtempSync(join(tmpdir(), "comm-attack-selfid-"))
+	process.on("exit", () => { try { rmSync(rootB, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(rootB, "db"), { recursive: true })
+	mkdirSync(join(rootB, ".comm"), { recursive: true })
+	writeFileSync(join(rootB, ".comm", "config.json"),
+		JSON.stringify({ leader: "leader", agents: { leader: ".", db: "db" } }))
+	execFileSync("node", [join(PKG, "install.mjs"), rootB], { stdio: "pipe" })
+	const tpB = join(rootB, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee.jsonl")
+	writeFileSync(tpB, "\n")
+	const payloadB = join(rootB, "payload.json")
+	writeFileSync(payloadB, JSON.stringify({ cwd: join(rootB, "db"), source: "startup", transcript_path: tpB }))
+	const fakeB = join(rootB, "claude")
+	try { symlinkSync("/bin/sh", fakeB) } catch {}
+	// `--root` is a CHECKOUT (boot needs its own bin/), and it is a THROWAWAY COPY of one,
+	// never this repository. `boot --hook` RECORDS A SESSION START into its root's ledger, so
+	// pointing it at PKG made this arm write real starts into the very experiment it is part
+	// of — measured: the ledger went from 6 cold starts to 15, seven of them fabricated by
+	// this case, in the denominator of the question this project exists to answer. That is
+	// `FINDINGS.md#measurement-traps` — *a control that writes into the world it measures is
+	// not a control* — committed by the arm added to fix a different row.
+	//
+	// The identity still comes from the SESSION's cwd, which is what `askBus` reads. Getting
+	// THAT backwards was the first attempt here and reported "ledger did not answer".
+	const checkout = join(rootB, "checkout")
+	mkdirSync(checkout, { recursive: true })
+	cpSync(join(PKG, "bin"), join(checkout, "bin"), { recursive: true })
+	const sessionRow = (env, cwd) => {
+		const r = spawnSync(fakeB, ["-c",
+			`cd ${cwd} && ${process.execPath} ${join(checkout, "bin", "boot.mjs")} --fast --hook --json ` +
+			`--root ${checkout} --field ${join(rootB, "nofield")} < ${payloadB}`],
+			{ encoding: "utf8", env: { ...process.env, CLAUDE_COMM_RUNTIME: join(rootB, "rt"), ...env } })
+		try { return (JSON.parse(r.stdout).rows.find((x) => x.label === "session") || {}).text || "" } catch { return "" }
+	}
+	const bare = sessionRow({ CLAUDE_COMM_AGENT: "" }, join(rootB, "db"))
+	const declaredNone = sessionRow({ CLAUDE_COMM_AGENT: "none" }, join(rootB, "db"))
+	const noRoster = sessionRow({ CLAUDE_COMM_AGENT: "" }, rootB.startsWith("/tmp") ? tmpdir() : "/tmp")
+
+	const bareNames = /"db" by directory/.test(bare) && !/off the bus/.test(bare)
+	const overrideWins = /declared "none"/.test(declaredNone)
+	const controlHolds = /off the bus/.test(noRoster) && !/by directory/.test(noRoster)
+
+	check("A39 the session row reports the identity the bus resolved, not the variable",
+		bareNames && overrideWins && controlHolds,
+		`no variable, cwd in the agent's directory -> ${bareNames ? "named db, on the bus" : `WRONG: ${bare.slice(0, 70)}`}; ` +
+		`CLAUDE_COMM_AGENT=none -> ${overrideWins ? "declared none (the override still wins)" : `WRONG: ${declaredNone.slice(0, 50)}`}; ` +
+		`control, a session in no roster -> ${controlHolds ? "still off the bus" : `WRONG: ${noRoster.slice(0, 50)}`}`)
 }
 
 // A38 — the claim tool's own arms run in the gate, and it is INSTALLED where the collision is.
