@@ -1411,14 +1411,50 @@ by 558 B because both field rows now enumerate every drifted file, and a drift l
 that protects every future session's context is partly a function of the field's state, and a genuinely
 broken field could push tier 0 over its cap on its own. Named, not fixed.
 
+### 🔴 The fix for F2 shipped the defect F2 is about, in the branch that matters most
+
+`updateState()` inherited `writeState`'s silent `catch {}`. For the hook and the report-size record that is
+correct — a broken instrument may not break a session — but the CLOSE writes its acknowledgements through
+it, and a close whose write failed printed **`✓ CLOSED`, exited 0, and left the counts nowhere**. That is
+the same sentence F2 is about (a close that happened, said so, and left no trace), reintroduced by its own
+fix, in the one caller whose entire output is a promise that the record landed. Found by re-reading, not by
+an arm; a close that cannot record itself now REFUSES, and the arm replaces `.boot-state.json` with a
+directory so the rename cannot land.
+
+### `#A20` again, and this time it was named: two boots seconds apart do not agree
+
+`boot --prove-red` run 2 failed an arm that had passed in run 1 with no change to the code it tests:
+*close refuses an unnamed row, accepts a named one — acked exit=1*. The arm derived its acknowledgement
+list from one full boot and handed it to a close that runs **its own** boot; between the two, the
+`registry` row moved from green to WARN. So the close correctly refused a row nobody had named, and the arm
+reported it as a failure of the close protocol.
+
+Two things follow, and only the first is fixed. The arms now acknowledge **every** row label rather than
+the ones that happened to be open three seconds earlier — an ack for a green row costs nothing, because the
+close only counts what it actually waved past. **What is NOT explained is why the registry row moved.** It
+is the same shape as `#A20`: a gate that reddens with no code change is reporting a change in the world.
+The candidate is that the fixture's redirected `CLAUDE_COMM_RUNTIME` accumulates entries written by the
+`--hook` arms that run before it, so the row's answer depends on how far through the suite it is asked.
+Not measured. If it recurs, measure it before touching the arm again.
+
+### What the disposal cost the control
+
+`boot --prove-red` went from **~5 minutes to ~11**. Six of the new arms are closes, and a `--close` runs
+the full gate by design, so each one costs a whole attack suite. Two waste was removed once measured (a
+per-close `run(false)` for a list that cannot change, and a busy-wait that could never observe the exit
+callback it was waiting on), and what remains is the honest price of arming the close protocol. It is worth
+naming because the control is run before every delivery change, and an eleven-minute control is one that
+starts getting skipped.
+
 ### What this disposal did NOT verify
 
-- **`node bin/boot.mjs --prove-red` was still running when the session was paused**, and its result was
-  never read. `node test/attack.mjs` was 40/40 green with the rewritten A33/A36/A39; `claim --prove-red` is
-  16/16. The other two controls were not re-run.
+- All four controls are green as of the disposal's last run: `boot --prove-red` **48 arms**,
+  `attack` 40/40, `claim --prove-red` 16/16, `ledger --prove-red` and `context --prove-red` both green,
+  with the real ledger verified byte-stable across them.
 - **`test/selftest.mjs` was not run**, so no real session has executed the corrected stub — the same gap the
   reviewer named. The stub's git guard and its notice are covered at fixture level only.
-- **Neither field tree has been reinstalled**, so every field agent is still running the `claim.mjs` that
-  cannot see a collision, and both field rows are RED on drift until that is done.
+- **Both field trees were reinstalled** (`14 file(s) in sync across 3 agents`, `20 across 6`) — but
+  `install --check` compares bytes, and **no field agent has yet RUN the corrected claim.mjs**. A running
+  session keeps the settings it loaded; the bus itself is re-executed at every hook fire.
 - **Whether a SessionStart hook's stderr reaches the agent at all** is still unknown — the reviewer could
   not settle it either. F9 removed this repo's dependence on that channel; the generated stub still has one.

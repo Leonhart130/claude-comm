@@ -5,47 +5,32 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-**1 — REVIEW #7 IS HALF DISPOSED. The code is fixed and armed; the RECORD is not written.**
+**1 — REVIEW #7 IS DISPOSED. Attack what it produced, not what it fixed.**
 
-*Written 2026-09-05 mid-disposal, at the owner's request to pause. `REVIEW-adversarial-7.md` (gitignored,
-14 findings) is the report — read it first.*
+*`REVIEW-adversarial-7.md` (gitignored, 14 findings) is the report; `FINDINGS.md#review7-disposal` is what
+the disposal measured, including against itself. The 14 defects are ALREADY in the ledger, dated by the
+commit that authored each — `node bin/ledger.mjs` must read **25 defects (22 attributed + 3 unattributable)**.
+If it reads 39, somebody recorded them twice.*
 
-⚠️ **The 14 defects are ALREADY in the ledger**, dated by the commit that authored each. Do not record them
-again: `node bin/ledger.mjs` must read **25 defects — 22 attributed + 3 unattributable**. If it reads 39,
-somebody double-recorded.
+All fourteen fixed and armed; both field trees reinstalled; every control green in the same tree:
+`boot --prove-red` **49 arms**, `attack` 40/40, `claim --prove-red` 16/16, `ledger` and `context` controls
+green with the real ledger byte-stable across them.
 
-**FIXED AND ARMED** (every one with a positive control; the arm is named beside it):
-- **F1 F6 F11 F12 F14 — `bin/claim.mjs`**, 16 arms in `--prove-red`. The root WALKS UP for
-  `.comm/config.json` and refuses when there is none (the headline: three agents in one project, three
-  private claims directories, no contention); `release` applies property 3 to every refusal, not one
-  branch; `by` is asked of the bus and a name it REFUSED is recorded as refused; the verb is a positional;
-  one exported `verdict()` that boot prints instead of deriving a second sentence; reading moves nothing.
-- **F5 — A33.** The source-TEXT check is gone. `test/attack.mjs` instruments `node:fs` in a child and
-  measures EXECUTION order; its positive control is the read-then-unlink fallback, derived from the shipped
-  source so it cannot silently stop being a variant of it.
-- **F4 — A39.** Four states. `=bogus` (refused, off the bus, records as `unnamed`, now WARN) no longer
-  renders identically to `=leader` (honoured).
-- **F7 — both git guards** (the stub's and the installer's own): a probe that could not answer says so.
-  Armed in A36, two failure modes, permissions-restored control.
-- **F2 F3 F8 F9 F10 F13 — `bin/boot.mjs`.** `updateState()` merges into the bytes on DISK (a close landing
-  in the gate's 26 s window was being erased); mail for an agent on no roster has its own warning; every
-  claim state reaches the row; the restart-signal alarm travels in the LEDGER ROW, because this repo's own
-  SessionStart sends boot's stderr to `/dev/null`; the erosion counter speaks only for rows this boot
-  produced and `--close --amended <row>="what it measures now"` DISCHARGES it; `--hook --root <other tree>`
-  is refused unless `CLAUDE_COMM_RUNTIME` was redirected too.
+🔴 **Three consecutive sessions found their worst defect inside the previous session's patch, and this
+session found FOUR inside its own** — three in the new arms, one in the fix for F2 itself (a close whose
+record did not land still printed `✓ CLOSED`). **So the first place to attack is `3939fb3..HEAD`**, and
+specifically: `updateState()`'s callers, `claim.mjs`'s bus lookup on `take` (it spawns now — the header
+said it spawned nothing), `verdict()`'s five states against what `boot.mjs` prints, and the six new close
+arms, which are the slowest thing in the repository.
 
-**NOT DONE — in this order:**
-  **a.** `node bin/boot.mjs --prove-red` was running when the pause was called and **its result was never
-  read**. Run it UNFILTERED, read every line, then `ledger --prove-red` and `context --prove-red`.
-  `node test/attack.mjs` was 40/40 green after A33/A36/A39 were rewritten.
-  **b.** 🔴 **Both field trees are STALE and their rows are RED**: `.comm/bin/claim.mjs` drifted the moment
-  the fix landed. `node install.mjs ~/Dev/work` and `node install.mjs ~/Dev/electio` — the install is mine
-  to do, and it must not happen before (a) is green.
-  **c.** `FINDINGS.md` has **no `#review7-disposal` section**. Nothing above exists outside the code and
-  this paragraph, and the convention (`#review6-disposal`) is to write what the review did NOT already say —
-  including the measurements that went against me.
-  **d.** Then answer the reviewer: the peer asked for `#claim-file` between two REAL agents (item 2 below),
-  and F1 means the tool could not have contended before today.
+⚠️ **`boot --prove-red` now costs ~11 minutes, up from ~5**, because six new arms are closes and a close
+runs the whole gate. An eleven-minute control is one that starts being skipped. If it grows again, the
+answer is a cheaper close fixture, never a thinner control.
+
+🔴 **`#A20` recurred and is NOT explained**: the `registry` row was green in one boot and WARN in a close
+two seconds later, in the same fixture. The arms no longer depend on it (they acknowledge every label), but
+**the world moved and nobody knows why**. `FINDINGS.md#review7-disposal` names the candidate. Measure it
+before touching that arm again.
 
 **2 — `#claim-file` between two REAL agents.** Sharper now: review #7 proved the shipped tool could not
 detect a collision AT ALL when the agents stand in their own directories — where five of `~/Dev/work`'s six
@@ -112,15 +97,13 @@ running — and what blocks it is my POSITION: relaunching their agent is theirs
 
 4. **🟢 Holding a machine resource is written down now** — `bin/claim.mjs`. Two agents in **one** project
    root collided over a port on 2026-09-04 and killed each other's servers. **The failure was never
-   transport**, which is why a bigger bus would not have prevented it: both had a hub and neither could see
-   the other, because nothing here had a concept of a thing an agent is HOLDING. What made it expensive is
-   the peer's measurement — *each read the result as a broken test rather than a port conflict*, so both
-   searched in the wrong place, separately. `HISTORY.md`, "The port collision".
+   transport**: both had a hub and neither could see the other, because nothing here had a concept of a
+   thing an agent is HOLDING. What made it expensive is the peer's measurement — *each read the result as a
+   broken test rather than a port conflict*. `HISTORY.md`, "The port collision".
 
-   Shipped 2026-09-05: `take` / `list` / `release`, eight arms, `A38` in the gate, installed into both field
-   projects, and a boot row that names a claim whose holder has **died** — a crash, not a stale lock, because
-   nothing here expires. **It advises; it opens nothing, kills nothing, blocks nothing.**
-   🔴 **Untested between two real agents — see ▶ NEXT 1**, and that is the whole remaining question.
+   `take` / `list` / `release`, 16 arms, `A38` in the gate, installed in both field projects, and a boot row
+   that names a claim whose holder has **died**. **It advises; it opens nothing, kills nothing, blocks
+   nothing.** 🔴 **Untested between two real agents — ▶ NEXT 2.**
 5. **🔴 A session launched outside an interactive shell has NO bus, and says nothing.** `node` lives only
    under nvm, so `kitten @ launch claude` (or cron, or a `.desktop` file) starts a session whose **every hook
    dies** while it looks normal. **A self-launched expert is launched by a program, never by a shell** — the
