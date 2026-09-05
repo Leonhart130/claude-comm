@@ -693,10 +693,20 @@ function dispatch(root, cfg, me, cmd, rest) {
 				console.log(`\n  ⚠ ${shared.map(([id, v]) => `'${id}' has ${v.length} live sessions`).join("; ")}.`)
 				console.log(`    Mail is drained by whichever ends a turn FIRST — the others never see it,`)
 				console.log(`    and the sender is still told it was delivered.`)
-				console.log(`    Fix: launch each session with an explicit identity, e.g.`)
+				// TWO FIXES, and the durable one is FIRST. Identity here comes from where a
+				// session stands, so a second agent with its own directory needs nothing typed
+				// at launch and keeps its own inbox — measured 2026-09-05: a turn ended in the
+				// leader's folder took the leader's mail (1 -> 0), the same turn ended in the
+				// reviewer's folder left it (1 -> 1), and the reviewer could still write to the
+				// leader with no variable at all. The env var stays because it is the only
+				// per-session channel when two sessions must share one directory.
 				const pad = Math.max(cfg.leader.length, 4)
+				console.log(`    Fix, and the first one needs nothing typed at launch:`)
+				console.log(`      give the second session its OWN directory and add it to .comm/config.json,`)
+				console.log(`      then start it there — it keeps its own inbox and can still write to '${cfg.leader}'.`)
+				console.log(`    Or declare identity per session, which is the only way when the directory is shared:`)
 				console.log(`      CLAUDE_COMM_AGENT=${String(cfg.leader).padEnd(pad)} claude   # the one that should get the mail`)
-				console.log(`      CLAUDE_COMM_AGENT=${"none".padEnd(pad)} claude   # a session that is not on the bus`)
+				console.log(`      CLAUDE_COMM_AGENT=${"none".padEnd(pad)} claude   # off the bus: receives nothing AND cannot send`)
 			}
 			const corrupt = existsSync(join(root, ".comm", "corrupt")) ? readdirSync(join(root, ".comm", "corrupt")).length : 0
 			if (corrupt) console.log(`\n  ⚠ ${corrupt} corrupt message file(s) in .comm/corrupt/`)
