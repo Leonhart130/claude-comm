@@ -609,7 +609,10 @@ function askBus(sessionPidForCwd) {
 	// Not "what is read at boot" - "what this repo cannot afford to lose". HISTORY.md is
 	// tier 2 and deliberately unread at boot, but losing it loses how every closed
 	// decision was reached, which is the same failure the *.md ignore rule already caused.
-	const READ_FIRST = ["CLAUDE.md", "README.md", "STATUS.md", "FINDINGS.md", "HISTORY.md", "DESIGN-autonomy.md"]
+	// CHANGELOG.md joined this list on 2026-09-05: it is the only record of what a FIELD
+	// project gained at each update, it is read by `install.mjs` rather than by a person
+	// only, and an untracked one would be lost with the machine that holds it.
+	const READ_FIRST = ["CLAUDE.md", "README.md", "STATUS.md", "FINDINGS.md", "HISTORY.md", "DESIGN-autonomy.md", "CHANGELOG.md"]
 	const bad = [], undeclared = []
 	for (const f of new Set([...READ_FIRST, ...needed])) {
 		const gated = needed.has(f)
@@ -1369,7 +1372,7 @@ function proveRed() {
 	process.env.CLAUDE_COMM_RUNTIME = join(tmp, "runtime")
 
 	mkdirSync(pkg)
-	for (const e of ["bin", "install.mjs", "test", "CLAUDE.md", "README.md", "FINDINGS.md", "STATUS.md", "HISTORY.md", "DESIGN-autonomy.md"]) {
+	for (const e of ["bin", "install.mjs", "test", "CLAUDE.md", "README.md", "FINDINGS.md", "STATUS.md", "HISTORY.md", "DESIGN-autonomy.md", "CHANGELOG.md"]) {
 		if (existsSync(join(SELF, e))) cpSync(join(SELF, e), join(pkg, e), { recursive: true })
 	}
 	const g = (...a) => execFileSync("git", a, { cwd: pkg, stdio: "ignore" })
