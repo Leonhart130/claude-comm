@@ -62,6 +62,14 @@ const BOOT_ID = (() => {
 })()
 
 /**
+ * Exported so `bin/claim.mjs` can key a holder on (pid, start time, boot id) without a
+ * second copy of this constant. It is the same value for the same reason: "ticks since
+ * boot" is only comparable within one boot, and a claim that survived a reboot must not be
+ * matched against a fresh process that happens to share both other fields.
+ */
+export function bootId() { return BOOT_ID }
+
+/**
  * `CLAUDE_COMM_RUNTIME` is a TEST SEAM and nothing else: the negative controls must build
  * their own registry rather than write into the machine's, exactly as `CLAUDE_COMM_PROJECTS`
  * does for transcripts. The `/tmp` fallback keeps the tool usable where `XDG_RUNTIME_DIR`

@@ -1630,6 +1630,47 @@ writeFileSync(out, JSON.stringify(res && res.signal ? res.signal : null))
 		(g.status === 0 ? "" : `\n      ${out.split("\n").filter((l) => /✗/.test(l)).join("\n      ")}`))
 }
 
+// A38 — the claim tool's own arms run in the gate, and it is INSTALLED where the collision is.
+//
+// Same argument as A34, applied to the newest instrument: `bin/claim.mjs` answers "is
+// somebody holding this port", and arms that only run when a person types them are arms
+// that stop running. The two failures it must never commit are both silent — a recycled pid
+// reading as a live holder, and a dead holder blocking everybody forever — so neither would
+// surface in use until it had already cost somebody a morning.
+//
+// THE SECOND HALF IS THE ONE THAT MATTERS HERE. The collision this exists to make
+// diagnosable happened in a FIELD project, between two agents in one tree; a claim tool
+// that lives only in this repository would have been present at none of it. So this also
+// asserts the installer carries it, which is the "two lists that had to agree" trap
+// (`75bf440`) pointed at the file added today.
+{
+	const t0 = Date.now()
+	const g = spawnSync("node", [join(PKG, "bin", "claim.mjs"), "--prove-red"], { encoding: "utf8" })
+	const out = `${g.stdout || ""}${g.stderr || ""}`
+	const passed = (out.match(/^[^\S\n]+✓/gm) || []).length
+
+	// Installed, not merely shipped in this checkout. A29's fixture is a full install, so
+	// the honest question is whether a field project's `.comm/bin/` actually has the file.
+	const rootC = mkdtempSync(join(tmpdir(), "comm-attack-claim-install-"))
+	process.on("exit", () => { try { rmSync(rootC, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(rootC, "app"), { recursive: true })
+	mkdirSync(join(rootC, ".comm"), { recursive: true })
+	writeFileSync(join(rootC, ".comm", "config.json"),
+		JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app" } }))
+	execFileSync("node", [join(PKG, "install.mjs"), rootC], { stdio: "pipe" })
+	const installed = existsSync(join(rootC, ".comm", "bin", "claim.mjs"))
+	// And it must WORK from there, not merely be present: a copy that cannot resolve its
+	// sibling import is a file the field has and cannot run. One take, in that project.
+	const fromField = spawnSync("node", [join(rootC, ".comm", "bin", "claim.mjs"),
+		"take", "port:4173", "--purpose", "gate", "--root", rootC, "--quiet"], { encoding: "utf8" })
+
+	check("A38 the claim tool's arms run in the gate, and the field gets a working copy",
+		g.status === 0 && passed >= 8 && installed && fromField.status === 0,
+		`bin/claim.mjs --prove-red -> exit ${g.status}, ${passed} arm(s) demonstrated (want >=8) in ${((Date.now() - t0) / 1000).toFixed(1)}s; ` +
+		`installed into a field project=${installed}; a take THROUGH the installed copy -> exit ${fromField.status}` +
+		(g.status === 0 ? "" : `\n      ${out.split("\n").filter((l) => /✗/.test(l)).join("\n      ")}`))
+}
+
 // A35 — the exchange bell carries a POINTER, and cannot carry anything that goes stale.
 //
 // `exchange/` is a file exchange, not a bus: boot tells ME when a peer has written and
