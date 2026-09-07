@@ -1,89 +1,95 @@
-# STATUS — claude-comm, 2026-09-05 (sessions 4–13)
+# STATUS — claude-comm, 2026-09-07 (sessions 4–14)
 
 Design and gates are in `README.md`; **this file is only what is OPEN.** Keep it short — when it grows,
 fold the settled parts into the README.
 
 ## ▶ NEXT
 
-**1 — 🔴 THE BOOT CONTROL DID NOT COMPLETE. Run it FIRST, unfiltered, on a quiet machine.**
+**1 — 🔴 RUN THE FULL CONTROL FIRST, AND CAP IT. It is not heavy; the machine was full.**
 
-`node bin/boot.mjs --prove-red` was **killed twice by the kernel's out-of-memory watchdog**, two thirds
-through, with six Claude sessions live (14 Gi total, ~1.2 Gi free). Not a failure and not a pass — an
-absence, and the only control that did not finish.
+```sh
+systemd-run --user --scope -p MemoryMax=4G -p MemoryHigh=3500M node bin/boot.mjs --prove-red
+```
 
-What DID pass: `attack` **43/43** · `selftest` **and** `--prove-red` with real sessions (the stub changed,
-so delivery was re-measured end to end) · `claim` 16/16 · `ledger` and `context`. Filtered runs
-(`--only close`, `--only registry`) passed today's new arms. **A filtered run is not a green control, and
-the summary says so.**
+It **completed 2026-09-07 for the first time since 09-05** — 48 green, 1 red — because the cap makes the
+kernel's choice in advance and lands it on the control instead of one of the owner's sessions.
 
-🔴 **The control is now too heavy for the machine it runs on.** ~11 minutes, and its six close arms each run
-a full gate in a fixture. `--only <substring>` was added today so a subset can run at all, but it filters
-`arm()` and `assert()` — the hand-rolled blocks still do their work before their assertion, so it cuts
-output more than runtime. **Making it runnable is a real job, not a tidy-up**: a control that cannot be run
-is not a strict control, it is an absent one.
+🔴 **The line this file carried — "too heavy for the machine it runs on" — is FALSE, and the work item drawn
+from it was misdirected.** Peak of the whole control, children included: **164 MiB** of a 4096 MiB cap
+(`memory.peak`, a kernel high-water mark, not a sample). `FINDINGS.md#control-weight`.
+**What is real is the TIME**: 12 minutes, which is why it went unrun for two days. ⚠️ `--only <substring>`
+does not fix that — `--only close` ran **13 min 38 s**, longer than the unfiltered suite, before being killed.
 
-**Shipped and installed while it stood at that** (both trees on `2026-09-05.2`, print `873f43df21ed`):
-`--add-agent <name>[=<dir>]`, `CHANGELOG.md` written for the field agent, `--release <label>` stamping each
-note with the bus print it was written for, `.comm/INSTALLED.json`, and **the stub telling its own agent,
-once per version, that a newer release exists** — a mechanism in place of my noticing. A40/A41/A42, and A42
-re-checks delivery in the same fire.
+**2 — 🔴 THE RED ARM WAS THE ARM — root cause found, fix NOT yet seen in a full run.**
 
-**2 — REVIEW #7 IS DISPOSED. Attack what it produced, not what it fixed.**
+It claimed the close still demands an amendment for a row gone GREEN. It does not: reproduced in a clean
+clone with `ackCounts.tree=9`, the count is *held as history* and the close succeeds.
 
-*`REVIEW-adversarial-7.md` (gitignored, 14 findings) is the report; `FINDINGS.md#review7-disposal` is what
-the disposal measured, including against itself. The 14 defects are ALREADY in the ledger, dated by the
-commit that authored each — `node bin/ledger.mjs` must read **25 defects (22 attributed + 3 unattributable)**.
-If it reads 39, somebody recorded them twice.*
+**Root cause was not an arm at all: `.gitignore` was missing from the files copied into the fixture.** In
+the real repo `.boot-state.json` is ignored; in the fixture it was untracked and unignored, and every close
+writes one — so `tree` was yellow for the whole close block and the erosion demand was CORRECT. Fixed by
+copying `.gitignore`, plus a precondition guard (`treeWasGreen`) so a drifting fixture says so instead of
+accusing the code. `FINDINGS.md#erosion-arm`.
 
-All fourteen fixed and armed; both field trees reinstalled; every control green in the same tree:
-`boot --prove-red` **49 arms**, `attack` 40/40, `claim --prove-red` 16/16, `ledger` and `context` controls
-green with the real ledger byte-stable across them.
+🔴 **`node test/attack.mjs` is green, but `--prove-red` has NOT completed since these fixes** — the last two
+attempts were killed by the harness's low-memory watchdog after 16 arms (machine pressure, not the control:
+`attack.mjs` peaks at 124 MiB, the whole control at 165). **A full capped run is job one.**
 
-🔴 **The worst defect keeps being in the newest patch — this session made SEVEN of its own**, six in new
-arms and one in the fix for F2 (a close whose record did not land still printed `✓ CLOSED`). **Attack
-`3939fb3..HEAD` first**: `updateState()`'s callers, `claim.mjs`'s bus lookup on `take` (it spawns now), and
-`verdict()`'s five states against what `boot.mjs` prints.
+**3 — 🔴 THE AUTONOMY MANDATE MOVED, AND HIT A WALL NOBODY HAD SEEN.**
 
-🔴 **`#A20`, still unexplained from 2026-09-04**: the `registry` row was green in one boot and WARN in a
-close two seconds later, same fixture. The arms no longer depend on it (they acknowledge every label), but
-**the world moved and nobody knows why**. `FINDINGS.md#review7-disposal` names the candidate.
+`bin/launch.mjs` is built and shipped to both field trees: it resolves `node` (`process.execPath`, absolute
+by construction) and `claude`, **builds** the child's `PATH` instead of inheriting kitty's, and REFUSES with
+no window id when it cannot. **A46** runs node out of the built PATH, with kitty's own `/usr/bin:/bin` as the
+positive control. Witness: `● expert running (pid 650028)`, registry entry carrying `agent: expert` from
+`--env`. `FINDINGS.md#launch-refuses`.
 
-**3 — 🔴 A file we generate lives under somebody else's automation.** `FINDINGS.md#generated-in-their-tree`:
-their `prettier --write .` reformatted `.claude/comm-hook.mjs` (352 lines) eight minutes after an install,
-and their `lint` is `prettier --check .` — **our file failed THEIR lint.** Fixed for prettier, armed as A43,
-only where a formatter is already configured. **ESLint is the same shape and is not covered.**
+🔴 **THE WALL: a session launched into a directory Claude Code has never seen stops at its trust prompt and
+waits for a human.** `DESIGN-autonomy.md` does not mention it. ⇒ **a self-launching expert can only be born
+in an ALREADY-TRUSTED directory.**
 
-**4 — `#claim-file` between two REAL agents.** Sharper now: review #7 proved the shipped tool could not
-detect a collision AT ALL when the agents stand in their own directories — where five of `~/Dev/work`'s six
-live. The arms cover it; two live sessions still have not. The peer's third control is the one that matters:
-kill one holder brutally, and the claim must read HOLDER IS GONE, never a lock
-(`exchange/work-leader/out/2026-09-05-claim-file-construit.md`).
+⚠️ **NOT ESTABLISHED, and the opposite was nearly recorded:** whether a program can answer that prompt.
+`kitten @ send-key` returned **exit 0 having done nothing** — the silent-discard trap, now measured for
+`send-key` too. The owner answered it three minutes later; the registry timestamp says so. **Gate every
+kitty send on a verified effect, never on its exit code.**
+⭐ An empty registry after a launch reads *exactly* like a dead hook. It was a dialog box. Only reading the
+window's text told them apart.
 
-**5 — No real adversarial review has run from `review/` yet.** The agent exists in both rosters and the
-routing is measured; the workflow is not. Review #7 ran from `~/Dev/claude-comm`, which has no roster.
+**4 — The field's two requests are answered and SHIPPED** (`FINDINGS.md#ref-base`, `#stale-ref`, A44/A45).
+A `--ref` names its base on the refusal **and** on the success — the silent case (same filename at root and
+in the spoke) is refused by nothing and used to print back what the sender typed. 🔴 **I built the limiter
+the requester warned me about** while fixing his report: staleness computed after the queue write compared
+the file against its own timestamp and warned on every send. Caught by running it, not reading it.
 
-**6 — The launcher must resolve the runtime and REFUSE.** `FINDINGS.md#hookless-launch`. The false
-remediation ("a login shell") is corrected where it shipped. The rule to BUILD: resolve `node`/`claude`
-absolutely before launching, and refuse when resolution fails.
+**5 — 🔴 NEW, from the field 2026-09-07: `who` reports TWO states and there are THREE.**
+`exchange/work-leader/in/2026-09-07-who-ne-distingue-pas-au-prompt-…md`. A session AT THE PROMPT takes no
+turn, so it never gets its mail — and `who` calls it `running` like a session at work. Measured cost: four
+agents at the prompt, `who` green, **nothing delivered for 2 h 30**. OPEN 1 with a name and a victim.
 
-**7 — The window is untested and my own timestamps are why.** 0 of 25 defects fall in the 15-minute window
-against the consumer's "four of five in thirteen minutes" — but each is dated at its commit, the upper
-bound. Do not quote the disagreement as a result.
+⭐ **His second-order point is stronger:** with the state unexposed every agent invents a proxy, and a proxy
+errs in the comfortable direction — his read a false IDLE for an agent reading without writing.
 
-**8 — ✅ `#A20` was named this time.** The integrity guard's red was three real sessions starting during an
-11-minute control run, not the suite writing — triaged, then fixed so it attributes instead of accusing
-(`FINDINGS.md#update-signal`). The 2026-09-04 instance is still unidentified. **Run gates unfiltered.**
+🟢 **The signal EXISTS and discriminates — measured across 7 live sessions 2026-09-07:** the mtime of the
+session's transcript, via the registry. `leader` 5 s (mid-turn) · `db` 2 636 s · `HartEdge` 2 954 s (at the
+prompt). A session that reads and measures still writes its transcript — which is the case that fooled him.
+🔴 **Not built, and one constraint decides how:** `bin/comm.mjs` is at **94 % of its A22 cap**
+(45 026 B of 48 000). CLAUDE.md is explicit that the fix for that row is to split or cut, never to raise —
+so this lands as a split, not as more code in `comm.mjs`. And it must expose the MEASUREMENT
+(`idle 44m`), not a claim about the session's inner state: a long single tool call is quiet too.
 
-**9 — 🔴 The restart TTL lapsed on a human TWICE; the clock is the wrong instrument.** The note carries
-`by_pid`: a restart plausibly happened when the ARMER IS GONE, and plainly has not while it lives —
-`claim.mjs` shipped that (pid, start, boot) test. Try **armer-gone AND not ancient**, TTL as a backstop.
-`classify()` is re-read over every record. Not built.
-
-✅ **`field:work` resolved itself 2026-09-05**: `db` was relaunched by its owner and its 2 messages drained.
-The row was right for 8 acknowledgements and the guard needed no amendment — `FINDINGS.md#ack-amendment`
-now has its ending. `--amended` exists for a guard whose measurement you changed, never for an inconvenient one.
-
-**Standing test debt from review #4, none of it gated:** `FINDINGS.md#test-debt`.
+**Carried forward, unchanged and still open:**
+- **ESLint is uncovered.** A43 stops a configured *prettier* from rewriting our generated files; ESLint is
+  the same shape and is not armed. `FINDINGS.md#generated-in-their-tree`.
+- **`#claim-file` between two REAL agents.** The arms cover it; two live sessions still have not. The one
+  that matters: two agents take a port, then **kill one brutally** — it must read HOLDER IS GONE, never a
+  lock. Asked of the peer 2026-09-05 and again today; unanswered.
+- **No real adversarial review has ever run from `review/`.** The routing is measured; the workflow is not.
+- **The 15-minute window is untested and my own timestamps are why.** 0 of 25 defects fall in it, but each is
+  dated at its commit — the upper bound. Not a result.
+- **The restart TTL lapsed on a human TWICE; the clock is the wrong instrument.** Try armer-gone AND not
+  ancient, TTL as a backstop. `claim.mjs` already ships the (pid, start, boot) test. Not built.
+- **Standing test debt from review #4, none of it gated:** `FINDINGS.md#test-debt`.
+- **`#A20` from 2026-09-04 is still unexplained.** The 09-05 instance was triaged and fixed
+  (`#update-signal`); the original is not. **Run gates unfiltered.**
 
 ## Where it stands
 
@@ -108,75 +114,66 @@ now has its ending. `--amended` exists for a guard whose measurement you changed
 2. **`--reply-to <id>` (threading).** Field-requested, then field-deprioritised: it adds identity surface
    while the substance already lives in the file.
 
-3. ✅ **Phase 2 — the wake is BUILT** and verified against a real agent (`bin/wake.mjs`; A32, armed both
-   ways; `FINDINGS.md#wake-doorbell`). 🔴 **Still open:** item 1's latency table predates it and has not been
-   re-measured. The wake does not deliver — it only makes a turn happen — so "mailbox, never an interrupt"
-   is unchanged.
+3. ✅ **The wake is BUILT** (`bin/wake.mjs`, A32, `FINDINGS.md#wake-doorbell`). 🔴 Item 1's latency table
+   predates it and has not been re-measured. The wake does not deliver — it makes a turn happen.
 
 4. **🟢 Holding a machine resource is written down now** — `bin/claim.mjs`. Two agents in **one** project
    root collided over a port on 2026-09-04 and killed each other's servers. **The failure was never
    transport**: both had a hub and neither could see the other, because nothing here had a concept of a
-   thing an agent is HOLDING. What made it expensive is the peer's measurement — *each read the result as a
-   broken test rather than a port conflict*. `HISTORY.md`, "The port collision".
+   thing an agent is HOLDING. The expensive part was the peer reading the result as a broken test rather
+   than a port conflict. `HISTORY.md`, "The port collision".
 
-   `take` / `list` / `release`, 16 arms, `A38` in the gate, installed in both field projects, and a boot row
-   that names a claim whose holder has **died**. **It advises; it opens nothing, kills nothing, blocks
-   nothing.** 🔴 **Untested between two real agents — ▶ NEXT 4.**
+   `take` / `list` / `release`, 16 arms, `A38`, installed in both field projects, and a boot row that names
+   a claim whose holder has **died**. The resource name is **free text, not port-specific** — an external
+   shared thing (a rate-limit window, a staging database) is claimable today, and the field did not know
+   that. **It advises; it opens nothing, kills nothing, blocks nothing.**
+   🔴 **Untested between two real agents — ▶ NEXT, carried.** ⚠️ Claims live in one project's `.comm/`, so a
+   resource shared ACROSS projects is visible to nobody.
+
 5. **🔴 A session launched outside an interactive shell has NO bus, and says nothing.** `node` lives only
    under nvm, so `kitten @ launch claude` (or cron, or a `.desktop` file) starts a session whose **every hook
    dies** while it looks normal. **A self-launched expert is launched by a program, never by a shell** — the
    shape that would have made the whole autonomy program measure nothing. `FINDINGS.md#hookless-launch`.
-   ✅ Half-fixed: the hook now says so out loud, still exiting 0. 🔴 Open: it warns, it does not make such a
-   session work. 🔴 The published fix said "a login shell" and that is FALSE on this box — nvm is loaded from
-   `.zshrc`, which `zsh -l` never reads. `-i` is the flag that works; the recorded recipe `zsh -lic` worked by
-   accident of containing it. The rule to build is to resolve `node`/`claude` absolutely and REFUSE.
+   ✅ **BUILT 2026-09-07 — `bin/launch.mjs`, shipped to both field trees.** It resolves `node`/`claude`
+   absolutely, BUILDS the child's `PATH` rather than inheriting kitty's, and REFUSES with no window id when
+   it cannot. Witness obtained. A46. `FINDINGS.md#launch-refuses`.
+   🔴 **Open, and new:** the trust prompt stops an unattended launch in any directory Claude has not seen —
+   see ▶ NEXT 3. The published "a login shell" wording is corrected everywhere it shipped; the field
+   leader's phrasing is the right one: *a shell that loads the user profile*.
 
 6. **🔴 The autonomy mandate — self-launching experts, a self-rebooting leader.** Given 2026-09-04.
-   **Everything settled about it lives in [`DESIGN-autonomy.md`](DESIGN-autonomy.md)** — the four verified
-   mechanisms, the RAM measurements, the consumer's reply and the review #4 dispositions. Do not re-derive
-   any of it here; this entry carries only what is still OPEN.
+   **Everything settled lives in [`DESIGN-autonomy.md`](DESIGN-autonomy.md)** — the four verified mechanisms,
+   the RAM measurements, the consumer's reply, the review #4 dispositions. Do not re-derive any of it here.
 
-   **The two findings that shape it:** the consumer's defects are **BOOT defects, not crowding defects** —
-   four of five authored in the first thirteen minutes at 35–42 % of peak — so the design effort belongs in
-   the fifteen minutes AFTER a restart. And the handoff carries a **sha256 read manifest**, never prose: a
-   rebooted session re-reads only what MOVED.
+   **The two findings that shape it:** the consumer's defects are **BOOT defects, not crowding defects**
+   (four of five authored in the first thirteen minutes at 35–42 % of peak), so the design effort belongs in
+   the fifteen minutes AFTER a restart. And the handoff carries a **sha256 read manifest**, never prose.
 
-   ✅ **The instrument was built first** (`node bin/ledger.mjs`), review #4 is answered in full, and the
-   signal that makes its reboot arm reachable now exists (`bin/restart-signal.mjs`, `#reboot-signal`).
-   🔴 **What is open is the ▶ NEXT above**: a real restart that arms it, then the trigger.
+   ✅ The instrument (`bin/ledger.mjs`), review #4's answer, the restart signal, and now **the launcher**
+   all exist. 🔴 **What is open is ▶ NEXT 3**: the trust prompt, whether a program can answer it, then a real
+   restart that arms the reboot arm, then the trigger.
 
 ## ⚠️ What was NOT verified
 
+- **`--release` is verified by hand, not gated** (`FINDINGS.md#release-roundtrip`): `install.mjs` writes to
+  its own checkout, and a fixture would have to relocate `HERE`. That test seam does not exist.
 - **Whether the pid→transcript descriptor returns after a cleared session takes a turn**
   (`FINDINGS.md#clear-blind`). MOOT for the sensor now, still unmeasured — it decides whether the sensor's
   "session CLEARED" note is permanent or transient.
 - **What happens to the entry when a session is `resume`d or `compact`ed.** Both fire `SessionStart` with a
   source this repo has never seen, so whether they carry a `transcript_path` at all is unknown. A payload
   without one leaves the previous entry standing, which is the safe direction and is not the same as correct.
-- **Two SessionStarts writing at the same instant.** Per-pid files remove the read-modify-write race that
-  `.boot-state.json` still has, but `prune` reads the directory while another session may be writing into it.
-  Every path is wrapped, so the worst case is a missed prune, not a lost entry. Not measured.
-- **Anything about the registry off this machine.** It reads `/proc/<pid>/stat` and
-  `/proc/sys/kernel/random/boot_id`; without both it refuses to record, which is a refusal, not support.
 - **The ledger's 11 defects are all from ONE session and NONE fell in the 15-minute window** —
   and they are dated at their commit, the upper bound. `FINDINGS.md#review6-disposal`.
 - **The git guard has never fired outside a fixture.** Both field projects were clean when it shipped, and
   the one agent who read the notice did not stage a case where it should fire.
-- **The crossing has happened ONCE**, in one project, armed by one agent, relaunched by one hand
-  (2026-09-04 20:44). It took two lapse warnings to land. Not verified: that it survives an unattended
-  relaunch, that anyone repeats it without being reminded, or that the arm ever reaches ten.
+- **The crossing has happened ONCE**, one project, one agent, one hand (2026-09-04 20:44), after two lapse
+  warnings. Unverified: that it survives an unattended relaunch, that anyone repeats it, that the arm reaches ten.
 - **`selftest`'s BEHAVIOUR half is not a gate and never will be** — 3 of 6 runs showed the agent not reading
-  the file it was pointed at. That is allowed by design, but it means this bus regularly rings a bell nobody
-  answers, and no gate can tell you that happened in production.
+  the file it was pointed at. This bus regularly rings a bell nobody answers, and no gate sees it.
 - **Anything non-Linux**: `comm who` reads `/proc` and degrades to "not running" everywhere else.
 - Two older standing caveats were moved to `FINDINGS.md#test-debt` when this file hit its cap: A8's partial
   mutations, and behaviour mid-TOOL-CALL. Cut from here, not retracted.
-
-- **Whether Claude Code enforces `"timeout": 20` on a SessionStart hook.** `--hook` refuses a TTY, but a pipe
-  that never closes still blocks and `|| true` cannot touch a hang. The harness's promise, not mine.
-- **`.boot-state.json` under concurrent writers.** Writes are atomic (rename), so no reader sees a partial
-  file — but two interleaved read-modify-writes can lose one update. It holds a counter, so a lost count is
-  recoverable. Not measured.
 
 ## Two conventions that erode silently
 

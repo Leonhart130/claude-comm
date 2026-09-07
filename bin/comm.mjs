@@ -154,6 +154,27 @@ const safeRef = (s) => String(s ?? "").replace(/[\u0000-\u001f\u007f-\u009f]+/g,
 // both sides mean by `docs/REVIEW.md`.
 const subjectOf = (cfg, from, to) => (from === cfg.leader ? to : from)
 
+// The BASE a --ref resolves against: the SPOKE's directory, whoever sends. This was
+// already true and already written down -- in the comment above, at the point it
+// applies, exactly as this project's doctrine prescribes. It still cost two agents a
+// day: on 2026-09-06 and 2026-09-07 the two ends of ONE bus each wrote a rule into
+// their own charter from the same tool -- the leader "a ref is relative to the
+// RECIPIENT", the spoke "relative to THIS repo" -- each true on its own side and
+// false on the other. The rule is not sayable as "relative to X"; it is only sayable
+// as "relative to the SPOKE". A rule documented where its users never look is not
+// documented, so the TOOL says it now, at the refusal AND at the success.
+// FINDINGS.md#ref-base
+function refBase(cfg, from, to) {
+	const subject = subjectOf(cfg, from, to)
+	return { subject, dir: cfg.agents[subject] ?? "." }
+}
+
+// One line, printed only when there IS something to disambiguate. A project whose
+// agents all sit at the root has base "." and gets nothing: a notice that fires for
+// everybody is noise, and noise is how a real signal gets skipped.
+const baseNote = (b) => b.dir === "." ? "" :
+	`  base: ${b.dir}/ — a ref resolves against the '${b.subject}' spoke, whoever sends\n`
+
 /**
  * Resolve + confine a ref. `../COORDINATION.md` from an expert is legitimate and
  * common; `../../../../etc/shadow` is not, and pointing another agent outside the
@@ -170,11 +191,11 @@ function resolveRef(root, cfg, from, to, ref) {
 	}
 	if (ref.length > MAX_REF) throw new Error(`--ref is ${ref.length} chars, over the ${MAX_REF} limit — that is not a path`)
 	if (ref.startsWith("/")) throw new Error(`--ref must be relative to the subject repo, not absolute: ${ref}`)
-	const subjDir = cfg.agents[subjectOf(cfg, from, to)] ?? "."
+	const subjDir = refBase(cfg, from, to).dir
 	const abs = resolve(root, subjDir, ref)
 	const base = resolve(root)
 	if (abs !== base && !abs.startsWith(base + sep)) {
-		throw new Error(`--ref escapes the project root and was refused: ${ref}`)
+		throw new Error(`--ref escapes the project root and was refused: ${ref}\n` + baseNote(refBase(cfg, from, to)))
 	}
 	return relative(base, abs) // e.g. "selflo-seller/docs/REVIEW.md"
 }
@@ -188,6 +209,50 @@ function refForRecipient(root, cfg, msg) {
 	const recvDir = cfg.agents[msg.to] ?? "."
 	const rel = relative(resolve(root, recvDir), resolve(root, msg.refPath))
 	return rel || msg.refPath
+}
+
+/**
+ * When did `from` last message `to`? BOTH the recipient's pending inbox and the
+ * delivered log: the log is only written at DELIVERY, so a message still sitting in
+ * an inbox -- which is the field's own case, an agent that was not running -- would
+ * otherwise not count and every second message would look like a first.
+ */
+function lastSentTs(root, from, to) {
+	let last = null
+	const bump = (ts) => { if (ts && (!last || ts > last)) last = ts }
+	const dir = inboxDir(root, to)
+	if (existsSync(dir)) for (const f of readdirSync(dir).filter((f) => f.endsWith(".json"))) {
+		try { const m = JSON.parse(readFileSync(join(dir, f), "utf8")); if (m.from === from) bump(m.ts) } catch {}
+	}
+	const log = join(root, ".comm", "log.jsonl")
+	if (existsSync(log)) for (const line of readFileSync(log, "utf8").split("\n")) {
+		if (!line) continue
+		try { const m = JSON.parse(line); if (m.from === from && m.to === to) bump(m.ts) } catch {}
+	}
+	return last
+}
+
+/**
+ * A pointer at a file you did not write FOR THIS MESSAGE. Asked for by the ~/Dev/work
+ * leader on 2026-09-06, from a defect he committed himself: the note carried the
+ * substance, `--ref` pointed at a file holding YESTERDAY's verdict, and the bus
+ * transported it without a word. The recipient would have opened something it had
+ * already read and hunted for what was meant.
+ *
+ * A WARNING, never a refusal: "re-read what I already sent you" is legitimate, and
+ * refusing it would push senders to --force, which turns off the file-exists rule too.
+ * Computed PER RECIPIENT, so re-pointing one file at a second agent says nothing.
+ *
+ * 🔴 His negative control is THE arm (test/attack.mjs A45): a ref that was just
+ * modified must produce NO warning. Without that, this is a limiter that fires for
+ * everyone and passes every test it is given.
+ */
+function staleRef(root, from, to, refPath) {
+	const last = lastSentTs(root, from, to)
+	if (!last) return null // first message to this agent: nothing to be stale against
+	let mtime
+	try { mtime = statSync(join(root, refPath)).mtime.toISOString() } catch { return null }
+	return mtime <= last ? { file: refPath, since: last } : null
 }
 
 // ── sending ─────────────────────────────────────────────────────────────────
@@ -219,10 +284,12 @@ function send(root, cfg, { from, to, kind, ref, note, force = false }) {
 	if (!force && !existsSync(join(root, refPath))) {
 		throw new Error(
 			`--ref points at a file that does not exist: ${refPath}\n` +
+			baseNote(refBase(cfg, from, to)) +
 			`  Check the path, or pass --force if you are about to create it.`
 		)
 	}
 
+	const stale = force ? null : staleRef(root, from, to, refPath)
 	const id = `${new Date().toISOString().replace(/[:.]/g, "-")}-${randomBytes(3).toString("hex")}`
 	const msg = { id, from, to, kind, ref, refPath, note: sanitizeNote(note), ts: new Date().toISOString() }
 
@@ -232,6 +299,14 @@ function send(root, cfg, { from, to, kind, ref, note, force = false }) {
 	const tmp = join(dir, `.${id}.tmp`)
 	writeFileSync(tmp, JSON.stringify(msg, null, 2))
 	renameSync(tmp, join(dir, `${id}.json`))
+	// Attached AFTER the queue write, and armed that way (A45): this warning is the
+	// SENDER's business and must never travel into the recipient's message file.
+	// 🔴 COMPUTED BEFORE IT, and that is not a detail: computed here, lastSentTs finds
+	// the message THIS call just queued, compares the file against its own timestamp,
+	// and warns on every send forever — the limiter that fires for everyone and passes
+	// every test, which is the exact failure the agent who asked for this named in his
+	// request. Measured on the first run of the fix, not reasoned about.
+	if (stale) msg.staleRef = stale
 	return msg
 }
 
@@ -531,6 +606,20 @@ function dispatch(root, cfg, me, cmd, rest) {
 			const m = send(root, cfg, { from, to, kind: arg(rest, "kind", from === cfg.leader ? "nudge" : "done"), ref: arg(rest, "ref"), note: arg(rest, "note"), force: rest.includes("--force") })
 			const live = liveAgents(root, cfg)[to]
 			console.log(`✓ ${m.from} → ${m.to}  [${m.kind}]  they will read: ${refForRecipient(root, cfg, m)}`)
+			// The SILENT case, and the reason the refusal alone was not enough: type
+			// `LEAD.md` with a LEAD.md at the root and another in the spoke, and the send
+			// SUCCEEDS against the spoke's copy while printing back the name you typed.
+			// FINDINGS.md#A9 fixed this for the recipient; nobody had fixed it for the
+			// sender. Printed only when the resolved path DIFFERS from what was typed --
+			// which is its own negative control.
+			if (m.refPath !== m.ref) {
+				const b = refBase(cfg, m.from, m.to)
+				console.log(`  ↳ resolved: ${m.refPath}   (base: ${b.dir}/ — the '${b.subject}' spoke, whoever sends)`)
+			}
+			if (m.staleRef) {
+				console.log(`  ⚠️ ${m.staleRef.file} has not changed since your last message to '${m.to}' (${m.staleRef.since})`)
+				console.log(`     — pointing at content they have already read? The substance belongs in the file, not the note.`)
+			}
 			if (m.note !== sanitizeNote(arg(rest, "note"))) console.log(`  note was flattened/truncated to ${MAX_NOTE} chars — the substance belongs in ${m.ref}`)
 			console.log(live?.length
 				? `  '${to}' is running (pid ${live.map((l) => l.pid).join(", ")}) — delivered when its current turn ends.`

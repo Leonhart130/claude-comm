@@ -15,7 +15,7 @@
  * directives? Measuring the wrong thing produced a confident, plausible, wrong
  * result, which is this project's signature failure mode.
  */
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync, statSync, symlinkSync, cpSync } from "node:fs"
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync, statSync, symlinkSync, cpSync, utimesSync } from "node:fs"
 import { join } from "node:path"
 import { execFileSync, spawnSync, spawn } from "node:child_process"
 import { createHash } from "node:crypto"
@@ -81,16 +81,24 @@ const snapshotReal = () => {
 }
 /** What moved between two snapshots, split by who could have moved it. */
 const registryDiff = (before, after, ours) => {
-	const changed = [], vanished = [], leaked = [], foreign = []
+	const changed = [], vanished = [], leaked = [], foreign = [], departed = []
 	for (const [f, v] of before) {
-		if (!after.has(f)) vanished.push(f)
+		// An entry that went away while its process DIED is attrition, not damage: no suite
+		// here can kill a live session, and on a busy machine an owner restarts windows while
+		// a long run is in flight. The converse stays damage and is still reported — an entry
+		// removed while its pid LIVES is this suite deleting somebody's registry.
+		// The same split the boot control makes. FINDINGS.md#A20
+		if (!after.has(f)) {
+			const pid = Number(String(f).replace(/\.json$/, ""))
+			;(Number.isFinite(pid) && existsSync(`/proc/${pid}`) ? vanished : departed).push(f)
+		}
 		else if (after.get(f).hash !== v.hash) changed.push(f)
 	}
 	for (const [f, v] of after) {
 		if (before.has(f)) continue
 		;(v.transcript && v.transcript.startsWith(ours) ? leaked : foreign).push(f)
 	}
-	return { changed, vanished, leaked, foreign }
+	return { changed, vanished, leaked, foreign, departed }
 }
 const realBefore = snapshotReal()
 // G5: an aborted suite is the run whose effect on the world is LEAST known, and a check()
@@ -2435,6 +2443,174 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		(d.foreign.length ? ` · ${d.foreign.length} session(s) started on this machine during the run (${d.foreign.join(", ")}) — the world moving, not this suite` : "") +
 		` · attribution armed on synthetic snapshots (overwrite/delete/fixture-transcript all blame the suite, ` +
 		`another session's entry does not)=${attribution}`)
+}
+
+// A44 — a --ref names the BASE it resolved against, at the REFUSAL and at the SUCCESS.
+//
+// Measured in the field on 2026-09-06 and 2026-09-07 by the two ends of one bus. Both
+// agents wrote a rule into their own charter after measuring, and the two rules
+// CONTRADICT: the leader's "a ref is relative to the recipient" and the spoke's
+// "relative to this repo" are each true on one side and false on the other. The base
+// is always the SPOKE's directory, whoever sends -- and that was already written in a
+// comment at the point it applies, where neither of its users ever looked.
+//
+// 🔴 The half that makes this arm worth more than the request that produced it: naming
+// the base only in the REFUSAL would not have caught the case that costs the most. When
+// a file of the same name exists at BOTH the root and the spoke, nothing is refused --
+// the send succeeds against the spoke's copy and prints back the name the sender typed.
+// That is FINDINGS.md#A9 (a pointer resolving silently to the wrong file is worse than
+// one that errors) on the SENDER's side, and A9 only ever fixed the recipient's.
+{
+	const r44 = mkdtempSync(join(tmpdir(), "comm-attack-base-"))
+	process.on("exit", () => { try { rmSync(r44, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(r44, ".comm"), { recursive: true })
+	mkdirSync(join(r44, "db"), { recursive: true })
+	writeFileSync(join(r44, ".comm", "config.json"),
+		JSON.stringify({ leader: "leader", agents: { leader: ".", db: "db" } }))
+	writeFileSync(join(r44, "LEAD.md"), "the ROOT copy\n")
+	writeFileSync(join(r44, "db", "LEAD.md"), "the SPOKE copy\n")
+	const c44 = (args, cwd = r44) => spawnSync("node", [join(PKG, "bin", "comm.mjs"), ...args], { cwd, encoding: "utf8" })
+
+	// ① the refusal, reproducing the field's own command verbatim
+	const miss = c44(["send", "db", "--from", "leader", "--ref", "db/LEAD.md", "--note", "x"])
+	const missNames = miss.status !== 0 && /base: db\/ /.test(miss.stdout + miss.stderr)
+
+	// ② THE SILENT ONE — succeeds, and must say which of the two LEAD.md it chose
+	const ok = c44(["send", "db", "--from", "leader", "--ref", "LEAD.md", "--note", "x"])
+	const okNames = ok.status === 0 && /↳ resolved: db\/LEAD\.md/.test(ok.stdout) && /base: db\//.test(ok.stdout)
+
+	// ③ CONTROL, one variable moved: the SPOKE SITS AT THE ROOT, so the resolved path
+	// IS what was typed and there is nothing to disambiguate. The line must be absent.
+	// Without this the arm passes for a tool that prints the notice unconditionally,
+	// and a notice that fires for everybody is how a real signal gets skipped.
+	const r44c = mkdtempSync(join(tmpdir(), "comm-attack-base-ctl-"))
+	process.on("exit", () => { try { rmSync(r44c, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(r44c, ".comm"), { recursive: true })
+	writeFileSync(join(r44c, ".comm", "config.json"),
+		JSON.stringify({ leader: "leader", agents: { leader: ".", pair: "." } }))
+	writeFileSync(join(r44c, "SHARED.md"), "x\n")
+	const ctl = spawnSync("node", [join(PKG, "bin", "comm.mjs"), "send", "pair", "--from", "leader", "--ref", "SHARED.md", "--note", "x"],
+		{ cwd: r44c, encoding: "utf8" })
+	const ctlQuiet = ctl.status === 0 && !/↳ resolved/.test(ctl.stdout) && !/base:/.test(ctl.stdout)
+
+	check("A44 a --ref names the base it resolved against, on the refusal AND on the silent success",
+		missNames && okNames && ctlQuiet,
+		`refusal names the base=${missNames}; ` +
+		`the SILENT case (LEAD.md at root AND in the spoke, so nothing is refused) names db/LEAD.md=${okNames}; ` +
+		`control, a spoke sitting at the root so the resolved path IS what was typed -> no base line=${ctlQuiet} ` +
+		`(a notice printed unconditionally would pass the first two and be noise)`)
+}
+
+// A45 — a --ref at a file you did not write FOR THIS MESSAGE is warned about, and the
+// warning never reaches the recipient.
+//
+// Asked for by the ~/Dev/work leader on 2026-09-06, from a defect he committed himself:
+// the substance went in the --note, the --ref pointed at a file holding the previous
+// day's verdict, and the bus carried it without a word. He also specified the control,
+// and it is the one that matters -- a ref just modified must produce NO warning, or
+// this is a limiter that fires for everyone and passes every test it is given.
+{
+	const r45 = mkdtempSync(join(tmpdir(), "comm-attack-stale-"))
+	process.on("exit", () => { try { rmSync(r45, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(r45, ".comm"), { recursive: true })
+	mkdirSync(join(r45, "db"), { recursive: true })
+	writeFileSync(join(r45, ".comm", "config.json"),
+		JSON.stringify({ leader: "leader", agents: { leader: ".", db: "db", ops: "db" } }))
+	writeFileSync(join(r45, "db", "ROUND.md"), "round 1\n")
+	const c45 = (args) => spawnSync("node", [join(PKG, "bin", "comm.mjs"), ...args], { cwd: r45, encoding: "utf8" })
+	const warned = (r) => /has not changed since your last message/.test(r.stdout)
+
+	// first message ever to 'db': nothing to be stale against, so it must be quiet
+	const first = c45(["send", "db", "--from", "leader", "--ref", "ROUND.md", "--note", "x"])
+	// second message, file untouched in between: THE DEFECT
+	const second = c45(["send", "db", "--from", "leader", "--ref", "ROUND.md", "--note", "x"])
+	// HIS CONTROL: write the file FOR this message, then send. Must be silent.
+	writeFileSync(join(r45, "db", "ROUND.md"), "round 2, written for this very message\n")
+	// mtime set EXPLICITLY rather than left to the clock: the variable this control
+	// moves is "modified after the last message", and a gate that depends on two
+	// events landing in different milliseconds is a flake, not a control.
+	{ const t = new Date(Date.now() + 2000); utimesSync(join(r45, "db", "ROUND.md"), t, t) }
+	const third = c45(["send", "db", "--from", "leader", "--ref", "ROUND.md", "--note", "x"])
+	// per-recipient: the same untouched file pointed at a DIFFERENT agent says nothing
+	const other = c45(["send", "ops", "--from", "leader", "--ref", "ROUND.md", "--note", "x"])
+
+	// and the warning is the SENDER's business: it must not travel in the message file
+	const queued = readdirSync(join(r45, ".comm", "inbox", "db"))
+		.filter((f) => f.endsWith(".json"))
+		.map((f) => readFileSync(join(r45, ".comm", "inbox", "db", f), "utf8"))
+	const notInMessage = queued.length > 0 && queued.every((j) => !/staleRef/.test(j))
+
+	check("A45 a --ref not written for this message warns the sender, and only the sender",
+		!warned(first) && warned(second) && !warned(third) && !warned(other) && notInMessage,
+		`first message to the agent (nothing to compare) -> quiet=${!warned(first)}; ` +
+		`second with the file untouched -> WARNED=${warned(second)}; ` +
+		`CONTROL, the file written for this very message -> quiet=${!warned(third)} ` +
+		`(a warning here would be a limiter that fires for everyone); ` +
+		`same untouched file to a different recipient -> quiet=${!warned(other)}; ` +
+		`the warning stays out of the queued message=${notInMessage}`)
+}
+
+// A46 — the launcher resolves the runtime to absolute paths and REFUSES, and the
+// environment it builds can actually run a hook.
+//
+// FINDINGS.md#hookless-launch. `kitten @ launch` starts the child from the KITTY
+// process, which here was started from a .desktop file with no nvm on PATH: the
+// session comes up, returns a window id, looks entirely normal, and every hook in it
+// is dead -- no bus, no ledger, no registry entry, no mail at any turn boundary.
+//
+// 🔴 The property is NOT "it refuses when claude is missing". It is that a launch which
+// SUCCEEDS produces an environment where a hook can find node -- so this arm runs node
+// out of the built PATH rather than pattern-matching the string, and carries the
+// converse as its positive control: kitty's own PATH, where node must be ABSENT. An
+// arm that only asserted the refusal would pass for a launcher that hands the child
+// kitty's environment, which is the entire defect.
+{
+	const r46 = mkdtempSync(join(tmpdir(), "comm-attack-launch-"))
+	process.on("exit", () => { try { rmSync(r46, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(r46, ".comm", "bin"), { recursive: true })
+	mkdirSync(join(r46, "db"), { recursive: true })
+	writeFileSync(join(r46, ".comm", "config.json"),
+		JSON.stringify({ leader: "leader", agents: { leader: ".", db: "db" } }))
+	cpSync(join(PKG, "bin", "comm.mjs"), join(r46, ".comm", "bin", "comm.mjs"))
+	cpSync(join(PKG, "bin", "launch.mjs"), join(r46, ".comm", "bin", "launch.mjs"))
+	const L = join(r46, ".comm", "bin", "launch.mjs")
+	const run46 = (args, env) => spawnSync(process.execPath, [L, ...args], { cwd: r46, encoding: "utf8", env })
+
+	// ① a name that is not on the roster is not launchable -- process control obeys the
+	// pointer-not-content rule: the name comes from config.json, never from message text
+	const unknown = run46(["db; rm -rf /", "--print"], process.env)
+	const refusesName = unknown.status !== 0 && !/kitten/.test(unknown.stdout)
+
+	// ② THE REFUSAL: no claude resolvable anywhere. No window id, non-zero exit.
+	const noClaude = run46(["db", "--print"], { PATH: "/nonexistent", HOME: "/nonexistent" })
+	const refusesRuntime = noClaude.status !== 0 && /REFUSING/.test(noClaude.stderr) && !/kitten/.test(noClaude.stdout)
+
+	// ③ the success case, and what it must be worth
+	const okRun = run46(["db", "--print"], process.env)
+	let built = null, absolute = false
+	try {
+		const j = JSON.parse(okRun.stdout)
+		built = j.path
+		absolute = j.node.startsWith("/") && j.claude.startsWith("/") &&
+			j.argv.some((a) => a === j.claude) && j.argv.some((a) => a === `--env=PATH=${j.path}`)
+	} catch {}
+	// the MEASUREMENT, not the string: run node with ONLY the built PATH in the env
+	const hookWorks = built !== null &&
+		spawnSync("sh", ["-c", "command -v node >/dev/null && node -e 'process.exit(0)'"],
+			{ env: { PATH: built }, encoding: "utf8" }).status === 0
+	// POSITIVE CONTROL for that probe: kitty's own environment, the real failing case.
+	// If node were findable here too, the check above would prove nothing.
+	const kittyIsBroken =
+		spawnSync("sh", ["-c", "command -v node"], { env: { PATH: "/usr/bin:/bin" }, encoding: "utf8" }).status !== 0
+
+	check("A46 the launcher resolves the runtime, REFUSES when it cannot, and builds a PATH a hook can use",
+		refusesName && refusesRuntime && okRun.status === 0 && absolute && hookWorks && kittyIsBroken,
+		`a name off the roster -> refused=${refusesName}; ` +
+		`no claude resolvable -> exit ${noClaude.status}, no window id=${refusesRuntime}; ` +
+		`resolved launch -> absolute node+claude carried into argv=${absolute}; ` +
+		`node RUNS with only the built PATH in its environment=${hookWorks}; ` +
+		`positive control, node ABSENT from kitty's own PATH=${kittyIsBroken} ` +
+		`(if this were false the line above would pass for a launcher that inherits kitty's env, which is the defect)`)
 }
 
 console.log(`\n${failed ? `✗ ${failed} adversarial check(s) FAILED` : "✓ all adversarial checks passed"}`)
