@@ -1406,7 +1406,13 @@ function proveRed() {
 	process.env.CLAUDE_COMM_RUNTIME = join(tmp, "runtime")
 
 	mkdirSync(pkg)
-	for (const e of ["bin", "install.mjs", "test", "CLAUDE.md", "README.md", "FINDINGS.md", "STATUS.md", "HISTORY.md", "DESIGN-autonomy.md", "CHANGELOG.md"]) {
+	// `.gitignore` is in this list for the same reason the fixture below gets a real upstream:
+	// a control must start where the real repo starts. Without it, `.boot-state.json` — which
+	// EVERY close writes — is untracked and unignored here, so the `tree` row is yellow for the
+	// whole close block and no arm can construct a green one. That cost a red arm on 2026-09-07
+	// which read as "the close haunts a healed row" and was nothing of the kind.
+	// FINDINGS.md#erosion-arm
+	for (const e of [".gitignore", "bin", "install.mjs", "test", "CLAUDE.md", "README.md", "FINDINGS.md", "STATUS.md", "HISTORY.md", "DESIGN-autonomy.md", "CHANGELOG.md"]) {
 		if (existsSync(join(SELF, e))) cpSync(join(SELF, e), join(pkg, e), { recursive: true })
 	}
 	const g = (...a) => execFileSync("git", a, { cwd: pkg, stdio: "ignore" })
@@ -2171,21 +2177,37 @@ function proveRed() {
 			// `tree` warns only because dirty.txt is there; remove it and the same count must
 			// stop demanding anything, because nothing was waved past.
 			rmSync(join(pkg, "dirty.txt"), { force: true })
+			// 🔴 ESTABLISH the green state instead of assuming removing one file produces it.
+			// On 2026-09-07, the first time this control ever ran to completion, it did not:
+			// the row was still yellow here and this arm reported the CODE as haunting a green
+			// row. It was not haunting -- reproduced in a clean clone, a green row carrying a
+			// count of 9 is held as history and demands nothing. `clean -fd` deliberately omits
+			// -x, so .boot-state.json (gitignored) survives to be rewritten below.
+			// FINDINGS.md#erosion-arm
+			try { g("reset", "-q", "--hard", baseSha); g("clean", "-qfd") } catch {}
 			const st2b = stateOf()
 			st2b.ackCounts = { ...(st2b.ackCounts || {}), tree: 9 }
 			writeFileSync(join(pkg, ".boot-state.json"), JSON.stringify(st2b, null, 2) + "\n")
 			touchStatus()
 			const whenGreen = closeRun2(ackAll()).stdout || ""
 			const greenSilent = !/\btree acknowledged \d+x/.test(whenGreen)
+			// AND THE PRECONDITION, ARMED. Without this the arm asserts "a GREEN row is silent"
+			// while never having checked the row is green, so a fixture that drifts yellow is
+			// reported as a defect in the code it is pointed at. An arm that does not verify the
+			// state it asserts about is an accusation, not a measurement -- and this project has
+			// now produced that shape often enough to gate it: a gate that CAN redden is not yet
+			// one that reddens for the property in its own title.
+			const treeWasGreen = /✓ tree\b/.test(whenGreen)
 			const ghostSilent = !/a-row-that-was-deleted acknowledged/.test(withGhost) &&
 				/a-row-that-was-deleted/.test(withGhost)   // held as history, and said so
 			assert("close: the erosion count is armed, dischargeable, and does not haunt",
-				demanded && (countsAfter3.tree || 0) >= 3 && cleared && !treeStillDemanded && ghostSilent && greenSilent,
+				demanded && (countsAfter3.tree || 0) >= 3 && cleared && !treeStillDemanded && ghostSilent && treeWasGreen && greenSilent,
 				`3 closes acking the same rows -> tree=${countsAfter3.tree}, AMEND on the 3rd=${demanded} (not on the 1st: control); ` +
 				`--amended tree -> count cleared and recorded=${cleared}, the next close no longer demands TREE=${!treeStillDemanded}` +
 				`${/AMEND THE PROTOCOL/.test(quiet) ? ` (it still demands, for another row: ${amendLine(quiet)} - correct, that one was not amended)` : ""}; ` +
 				`a count for a row this boot does not produce -> demanded=${/a-row-that-was-deleted acknowledged/.test(withGhost)} (want false), named as history=${/a-row-that-was-deleted/.test(withGhost)}; ` +
-				`the same count on a row that is GREEN this close -> demanded=${!greenSilent} (want false: a green row was not waved past)`)
+				`the same count on a row that is GREEN this close -> demanded=${!greenSilent} (want false: a green row was not waved past)` +
+				`, and the row really WAS green in that close=${treeWasGreen} (false here means THIS ARM's fixture drifted, not that the code haunts - FINDINGS.md#erosion-arm)`)
 		}
 
 		// ── a close whose record does not land is not a close ────────────────────────────
@@ -2328,9 +2350,21 @@ function proveRed() {
 
 	{
 		const realAfter = snapReal()
-		const changed = [], vanished = [], leaked = [], foreign = []
+		const changed = [], vanished = [], leaked = [], foreign = [], departed = []
 		for (const [f, v] of realBefore) {
-			if (!realAfter.has(f)) vanished.push(f)
+			// A vanished entry is damage ONLY if its session is still alive. This control cannot
+			// kill a live process, so an entry that went away while its pid died is ATTRITION —
+			// the world moving during a 12-minute run, which on this machine means an owner
+			// restarting windows. Measured 2026-09-07: four entries vanished, all four pids gone,
+			// four new sessions started in the same window, and the arm called it damage. The
+			// converse is the positive control and is still reported: an entry that disappeared
+			// while its process LIVES is this control deleting somebody's registry.
+			// FINDINGS.md#A20 — triage a red that arrives with no code change as evidence first.
+			if (!realAfter.has(f)) {
+				const pid = Number(String(f).replace(/\.json$/, ""))
+				if (Number.isFinite(pid) && existsSync(`/proc/${pid}`)) vanished.push(f)
+				else departed.push(f)
+			}
 			else if (realAfter.get(f).hash !== v.hash) changed.push(f)
 		}
 		for (const [f, v] of realAfter) {
@@ -2342,7 +2376,8 @@ function proveRed() {
 			`${REAL_REG}: ` +
 			(moved === 0 ? "no entry changed, vanished, or appeared carrying a fixture transcript"
 				: `THIS CONTROL MOVED IT - changed ${JSON.stringify(changed)}, vanished ${JSON.stringify(vanished)}, fixture transcripts ${JSON.stringify(leaked)}`) +
-			(foreign.length ? ` · ${foreign.length} session(s) started on this machine during the run (${foreign.join(", ")}) - the world moving, not this control` : ""))
+			(foreign.length ? ` · ${foreign.length} session(s) started on this machine during the run (${foreign.join(", ")}) - the world moving, not this control` : "") +
+			(departed.length ? ` · ${departed.length} session(s) ENDED during the run (${departed.join(", ")}) - their pids are gone, so this control did not remove them` : ""))
 	}
 
 	console.log(`\n${failed ? `✗ ${failed} boot row(s) could NOT be reddened - that row is decoration`

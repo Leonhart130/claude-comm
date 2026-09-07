@@ -622,6 +622,9 @@ applies the prose gets a launch that **returns a window id and looks like it suc
 it is dead. He named the cost exactly: *"whoever applies your fix gets the failure the fix was meant to
 remove, plus the conviction of having repaired it."*
 
+✅ **BUILT 2026-09-07, and the open half is closed: `FINDINGS.md#launch-refuses`.** The launcher resolves
+and refuses; a witness exists. A new wall appeared behind it — the trust prompt — and it is recorded there.
+
 ### The fix, in two halves
 
 1. **Launch through an INTERACTIVE shell** — `-i` is the flag that does the work; `-l` is inert on this box
@@ -663,6 +666,24 @@ a caveat deleted is a caveat retracted and neither of these has been measured:**
   in-between cases were never enumerated.
 - **Behaviour when an agent is mid-TOOL-CALL** rather than mid-turn. Still unexercised, on every delivery
   path, and the one state where a Stop hook's timing assumptions are least obviously safe.
+
+### Moved out of `STATUS.md` on 2026-09-07, when tier 0 hit 90 % of its cap
+
+Cut from the status file, **not retracted** — each is still unmeasured, and the reason each sat in
+`STATUS.md` was visibility, not novelty. The budget row is a byte cap and the protocol says to split
+or cut when it reddens, never to raise it.
+
+- **Two SessionStarts writing at the same instant.** Per-pid files remove the read-modify-write race that
+  `.boot-state.json` still has, but `prune` reads the directory while another session may be writing into it.
+  Every path is wrapped, so the worst case is a missed prune, not a lost entry. Not measured.
+- **Anything about the registry off this machine.** It reads `/proc/<pid>/stat` and
+  `/proc/sys/kernel/random/boot_id`; without both it refuses to record, which is a refusal, not support.
+- **Whether Claude Code enforces `"timeout": 20` on a SessionStart hook.** `--hook` refuses a TTY, but a pipe
+  that never closes still blocks and `|| true` cannot touch a hang. The harness's promise, not mine.
+- **`.boot-state.json` under concurrent writers.** Writes are atomic (rename), so no reader sees a partial
+  file — but two interleaved read-modify-writes can lose one update. It holds a counter, so a lost count is
+  recoverable. Not measured.
+
 
 ## `#measurement-traps` — five ways a control lied here
 
@@ -1548,3 +1569,271 @@ candidates are ESLint (a generated file failing `eslint .`), and any repo-wide c
 
 *(Found only because the drift row named the exact two files and I diffed them instead of reinstalling on
 reflex. Reinstalling would have made the symptom vanish for eight minutes and taught nothing.)*
+
+## `#ref-base` — the same rule taught two agents two contradictory lessons, and the silent case is the one that costs
+
+**Measured in the field on 2026-09-06 and 2026-09-07, by the two ends of ONE bus, a day apart.** Neither
+lost work — the send refused both times — and that is what makes it worth writing down: the tool was right
+and its rule was still unlearnable.
+
+| who | what they wrote into their own charter, after measuring |
+| --- | --- |
+| the `db` expert, 06/09 | *"a `--ref` is given relative to THIS repo"* — true for a spoke, false for the hub |
+| the `work` leader, 07/09 | *"a `--ref` is given relative to the RECIPIENT's repo"* — true for the hub, false for a spoke |
+
+Both measured. Both generalised honestly. **Both were wrong**, because the base is neither: it is the
+SPOKE's directory, whoever sends. `bin/comm.mjs`'s `subjectOf()` returns the non-leader end and has said so
+in a comment since it was written.
+
+⭐ **The rule was documented at the point it applies — exactly as this repo's doctrine prescribes — and that
+is where its users never look.** "Findings live in the code" is a rule for whoever EDITS the code. It does
+nothing for an agent typing a command, and the leader's diagnosis was sharper than the doctrine: the rule is
+not *unsayable*, it is **unreachable from the place the mistake is made**.
+
+### 🔴 The case that made his request insufficient, found while reproducing it
+
+He asked for one of two things: a canonical sentence in the README, or an error message that names the base.
+The second is better and makes the first unnecessary. **But naming the base only in the ERROR would not have
+caught the worst case, nor his own defect from the day before** — because the error only speaks when the
+file is missing:
+
+```
+leader → db, --ref LEAD.md, with a LEAD.md at the root AND another in db/
+  ✓ leader → db  [nudge]  they will read: LEAD.md      ← what he TYPED, character for character
+```
+
+**Nothing is refused.** The send resolves to `db/LEAD.md`, a different file that also exists, and prints back
+the sender's own string. The recipient opens the spoke's copy; the sender believes they pointed at the
+root's. ⇒ **This is `#A9` on the SENDER's side** — *a pointer resolving silently to the wrong file is worse
+than one that errors* — and A9 only ever fixed the recipient's view.
+
+### The fix, and why it prints on the success too
+
+Both refusals (missing file, escaping the root) and the success line now name the base. The success line
+appears **only when the resolved path differs from what was typed**, which is its own negative control: a
+project whose agents sit at the root prints nothing, because there is nothing to disambiguate. A notice that
+fires for everybody is how a real signal gets skipped. Armed as **A44**, whose third clause is that control.
+
+## `#stale-ref` — a pointer at a file you did not write for this message, and the limiter I nearly shipped
+
+Asked for by the `~/Dev/work` leader on 2026-09-06, from a defect he committed himself and caught by luck a
+minute later: the substance went into `--note`, the `--ref` pointed at a file holding the previous day's
+verdict, and the bus carried it without a word. The recipient would have opened something it had already
+read and hunted for what was meant.
+
+`send` now compares the ref's mtime against the sender's last message TO THAT RECIPIENT and warns. A
+warning, never a refusal — *"re-read what I already sent you"* is legitimate, and refusing it would push
+senders to `--force`, which also switches off the file-exists rule.
+
+🔴 **The first implementation warned on EVERY send, including the first.** The staleness was computed after
+the message was queued, so `lastSentTs` found the message that call had just written, compared the file
+against its own timestamp, and fired every time. **That is precisely the failure the requester named in his
+request** — *"a limiter that refuses everyone and passes all its tests"* — and I built it inside the fix for
+the defect he reported. It was caught by running the thing, not by reading it. The arm that would have
+caught it (**A45**, first clause: the first message to an agent must be quiet) was written before the code
+and did not save me, because I ran it after.
+
+⇒ **His negative control is the arm that matters and it is A45's third clause**: a ref modified FOR this
+message must produce no warning. Its mtime is set explicitly rather than left to the clock — a gate that
+depends on two events landing in different milliseconds is a flake, not a control.
+
+## `#erosion-arm` — the control finally finished, and the defect it found was its own
+
+**2026-09-07. `node bin/boot.mjs --prove-red` ran to completion for the first time since 2026-09-05**, when
+it was OOM-killed twice. 48 arms green, **1 red**:
+
+```
+✗ close: the erosion count is armed, dischargeable, and does not haunt
+    the same count on a row that is GREEN this close -> demanded=true (want false)
+```
+
+Read literally, that says the close still demands an amendment for a guard that has healed — the `field:work`
+case, acknowledged eight times and green since its owner relaunched the agent.
+
+🔴 **It is not true, and the code was never wrong.** Reproduced in a clean clone, where the `tree` row is
+green by construction (upstream present, nothing dirty), with `ackCounts.tree = 9` planted:
+
+```
+· 1 count(s) held as history for row(s) this close did not wave past (tree)
+  - a row that is green, or gone, is not eroding
+✓ CLOSED
+```
+
+**The arm never established the state it asserts about.** It removes `dirty.txt` and assumes that makes the
+`tree` row green; in the `--prove-red` fixture, at that point in the run, it does not — and the arm never
+checks. It then reports the code as haunting.
+
+⇒ **This is the 2026-09-04 amendment fired at the arm that amendment was written for:** *a gate that CAN
+redden is not yet one that reddens for the property in its own title.* The arm can go red. It goes red for
+"my fixture is not in the state I think it is", while its title says "the code haunts a green row". **An arm
+must verify its own precondition, or it is an accusation, not a measurement.**
+
+### The root cause was not an arm at all — the fixture was never built like the repo
+
+Found on the next run, because the precondition guard above turned the accusation into a question the arm
+could ask out loud (`the row really WAS green in that close=false`).
+
+**`.gitignore` was not among the files copied into the fixture.** In the real repo `.boot-state.json` is
+ignored — line 16 — so writing it leaves the tree clean. In the fixture it was untracked and unignored, and
+**every close writes one**. So `dirty` was true for the entire close block, the `tree` row was yellow no
+matter what any arm did, and the erosion count was correctly demanded because the row genuinely WAS being
+waved past. Removing `dirty.txt` never had a chance; neither did the `reset --hard` + `clean -fd` I added
+first, because the close rewrites the file after them.
+
+⇒ The fixture already had a comment saying *"a control must start where the real repo starts"*, written when
+it was given a real upstream for exactly this class of reason. **The rule was there; one file was missing
+from the list it governs.**
+
+⚠️ **Still not established:** whether any OTHER close arm carries the same unverified precondition. Only
+this one was ever reported red, which is not the same as the others having been checked.
+
+⚠️ **And the bisect that would have found this faster was abandoned:** `--prove-red --only close` was still
+running at 13 min 38 s — LONGER than the unfiltered suite — and was killed. `--only` cuts output, not
+runtime. `STATUS.md` suspected that; it is now measured.
+
+## `#control-weight` — the control was never too heavy; the machine was too full
+
+`STATUS.md` has carried, since 2026-09-05: *"🔴 The control is now too heavy for the machine it runs on"*,
+and drew a work item from it — making it runnable. **Measured 2026-09-07, and the premise is wrong.**
+
+Run inside a memory-capped cgroup (`systemd-run --user --scope -p MemoryMax=4G`), so that an OOM would land
+on the control instead of one of the owner's sessions:
+
+| | |
+| --- | --- |
+| peak memory of the whole control, children included | **164 MiB** |
+| the cap it ran under | 4096 MiB |
+| machine available while it ran | 5–6 GiB |
+| wall time | 12 min |
+
+`memory.peak` is a kernel high-water mark, not a sample, so the figure is exact rather than approached.
+
+⇒ **164 MiB is not heavy.** It was killed on 2026-09-05 because the machine was at ~1.2 GiB free with six
+sessions live and this thing ran for eleven minutes — it was the collateral, not the cause. **The fix is not
+to lighten the control; it is to cap it, so the kernel's choice is made in advance and lands on the process
+that can afford to die.** That is one flag, and it is how this run survived.
+
+⚠️ **What this does NOT say:** that the control is cheap. Twelve minutes of wall time on a shared
+workstation is a real cost, and it is the reason it went unrun for two days. Cost in TIME is the finding
+that stands; cost in MEMORY was a guess, and it was wrong.
+
+### Killed twice more the same day, at the same arm — and the coincidence dissolved under measurement
+
+Two later runs were stopped by the harness's own low-memory watchdog, both after exactly **16 arms**, both
+just before `gate: a real bus defect`. Two kills at the same point invites the conclusion that this arm
+spikes. **It does not.** Measured directly, inside its own capped scope:
+
+| | peak |
+| --- | --- |
+| `node test/attack.mjs` alone (the work that arm does, twice) | **124 MiB** |
+| the entire control, children included | 165 MiB |
+
+⇒ That arm is not the heaviest, it is the **longest** — it runs the full adversarial gate twice, about a
+quarter of the twelve minutes. Two interruptions landing inside the widest window is what uniformly
+distributed kills look like, not a signature. The pressure was the machine's: `clamd` at 900 MB and three
+`brave` processes at ~1.9 GiB, while every Claude session on the box totalled 2.6 GiB.
+
+⭐ **The trap avoided:** "killed twice at the same arm" is a compelling story, and it was wrong. The cheap
+measurement that dissolved it took ninety seconds. **A correlation seen twice is still not a mechanism.**
+
+## `#launch-refuses` — the launcher was built, the witness exists, and a new wall appeared behind it
+
+Closes the open half of `#hookless-launch`: *"it warns, it does not make such a session work."*
+`bin/launch.mjs` now resolves the runtime and refuses, and the rule it implements is the field leader's,
+not the per-workstation recipe this repo published and had to retract.
+
+### Why resolving `claude` was never the hard half
+
+`kitten @ launch` starts the child from the **kitty** process, so the child inherits kitty's environment —
+and the session's hooks run `node`, which they find on the CHILD's `PATH`. A launcher that resolved `claude`
+and let kitty supply the environment would produce a session that starts, returns a window id, and still has
+no bus. **So the launcher BUILDS the child's `PATH`** (`--env=PATH=…`) rather than inheriting one.
+
+`node` needs no resolution at all: `process.execPath` is absolute **by construction** — if `launch.mjs` is
+running, a working node is running it. `claude` is searched and checked for executability; unresolvable
+means **REFUSE**, with no window id, because a launcher that cannot find the runtime must not look like it
+succeeded.
+
+### The witness, which is what the field asked for
+
+The `~/Dev/work` leader had opened all five of his windows by hand, and said why: *"I do not dare depend on
+a mechanism I have no witness for."* Circular, as he noted, and it was this repo's job to break the circle.
+Launched 2026-09-07 through `.comm/bin/launch.mjs` into a throwaway project:
+
+```
+● expert   running (pid 650028) since 16:55:36
+{"pid":650028,"agent":"expert","source":"startup","transcript":"…/3595c3f8-….jsonl"}
+✓ leader → expert  [nudge]  they will read: WITNESS.md
+```
+
+**On the bus, in the registry, and its identity carried by `--env=CLAUDE_COMM_AGENT`, not by a cwd.** A46
+arms the refusal and, more importantly, RUNS node out of the built PATH — with kitty's own `/usr/bin:/bin`
+as the positive control, where node is absent.
+
+### 🔴 THE NEW WALL, and it is load-bearing for the autonomy mandate
+
+**A session launched into a directory Claude Code has never seen stops at the trust prompt and waits for a
+human.**
+
+```
+Quick safety check: Is this a project you created or one you trust?
+❯ No, exit
+  Yes, I trust this folder
+```
+
+Nothing in `DESIGN-autonomy.md` mentions this. It means **a self-launching expert can only be born in an
+ALREADY-TRUSTED directory** — which is a real restriction on the shape of the mandate, and it was invisible
+until a launch was actually attempted rather than designed.
+
+⚠️ **NOT ESTABLISHED, and I nearly recorded the opposite:** whether a program can answer that prompt at all.
+`kitten @ send-key --match id:2 down enter` returned **exit 0 and did nothing** — the silent-discard trap
+already recorded for `send-text`, now measured for `send-key` too. The prompt was answered ~3 minutes later
+by the OWNER, and the registry entry is timestamped after his message, not after my keystroke. **The
+owner's own question — "do you want me to confirm?" — is the finding: the launch needed a human, and that
+is the thing the mandate has to solve.**
+
+⭐ And the probe nearly lied in the other direction: an empty registry after the launch reads exactly like a
+dead hook. It was a blocking dialog. **A negative that is never inspected is a conclusion, not a
+measurement** — reading the window's actual text is what told the two apart.
+
+## `#release-roundtrip` — the tool wrote a heading it could not read, and told every field project the opposite of the truth
+
+**2026-09-07, on the first real use of `--release` — by its author, three days after shipping it.**
+
+`install.mjs --release <label>` stamps `CHANGELOG.md` so a field agent learns what a bus update brings.
+Its own parser is `/^(\S+) — bus print \`([0-9a-f]{12})\`/`: the label must be **one token**. Given a
+descriptive label with spaces in it, the tool wrote the heading anyway, and `releases()` then **skipped its
+own entry**.
+
+The consequence is not a missing note. The newest readable release went on being the previous one, whose
+print no longer matched the shipped bytes — so the version comparison **inverted**:
+
+```
+✗ A42 … current -> SPOKE (must be silent); a release behind -> SILENT (must speak)
+```
+
+⇒ **A project that was up to date was told it was stale, and a stale one was told nothing.** The gate caught
+it, and it took 7 boot arms down with it in the same run — the noisy failure was a cascade from one quiet
+write.
+
+### The fix is not the label
+
+Fixing my heading would have fixed my day and left the trap armed for the next person. **`--release` now
+reads its own entry back through `releases()` and, if it does not come back byte-for-byte as written,
+restores the file and refuses**, naming the rule and where the description belongs instead:
+
+```
+✗ '2026-09-08 — un libellé avec des espaces' was written and could NOT be read back — CHANGELOG.md left unchanged.
+  A release label must be ONE token: no spaces, no dashes of its own (e.g. 2026-09-07.1).
+```
+
+Proved with the bus print genuinely changed (an earlier guard refuses identical bytes, so a lazy test never
+reaches this one), and with a well-formed label as the positive control: it still stamps, and it reads back.
+
+⭐ **The shape to keep:** every write in this repo that something else must PARSE should read itself back
+before reporting success. `#update-signal` made the ledger say when its write was not seen by its re-read;
+this is the same rule applied to a document. **A write nobody verifies is a claim, not a change.**
+
+⚠️ **Not armed in `test/attack.mjs`.** `--release` operates on the source checkout's own `CHANGELOG.md`,
+and a fixture for it would have to relocate `HERE` — which is the test seam this file does not have. It is
+verified by hand, twice, and that is weaker than a gate. Named rather than implied.

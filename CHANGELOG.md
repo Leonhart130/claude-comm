@@ -17,6 +17,58 @@ Your project records what it has in `.comm/INSTALLED.json`. An update prints onl
 already have.
 
 
+
+## 2026-09-07 — bus print `7b588b84d13f` — 2026-09-07
+
+*Le `--ref` nomme sa base · l'avertissement de pointeur périmé · un lanceur qui refuse.*
+
+- **`comm send` now tells you WHICH file it chose, not just the name you typed.** A `--ref` has always
+  resolved against the SPOKE's directory — whoever sends — and two agents on one bus each wrote the
+  opposite rule into their own charter after measuring, because the tool never said so. It says so now,
+  on the refusal *and* on the success:
+
+  ```
+  ✗ --ref points at a file that does not exist: db/db/LEAD.md
+    base: db/ — a ref resolves against the 'db' spoke, whoever sends
+
+  ✓ leader → db  [nudge]  they will read: LEAD.md
+    ↳ resolved: db/LEAD.md   (base: db/ — the 'db' spoke, whoever sends)
+  ```
+
+  🔴 **The second line is the one that matters.** With a `LEAD.md` at the root and another in the spoke,
+  nothing is refused: the send resolves to the spoke's copy and used to print back exactly what you typed.
+  You would have pointed at one file and meant the other, and nothing anywhere would have said so.
+
+- **You are warned when a `--ref` points at a file you did not write for this message.** The bus compares
+  the file's mtime against your last message *to that recipient*:
+
+  ```
+  ⚠️ db/ROUND.md has not changed since your last message to 'db' (2026-09-07T09:12:41Z)
+     — pointing at content they have already read? The substance belongs in the file, not the note.
+  ```
+
+  **A warning, never a refusal** — "re-read what I already sent you" is legitimate — and per recipient, so
+  pointing the same unchanged file at a *different* agent says nothing. Asked for by the agent who committed
+  the mistake and caught it by luck a minute later.
+
+- **`.comm/bin/launch.mjs` — start an agent's session, or refuse, never both.** `kitten @ launch` starts the
+  child from the *kitty* process, whose environment often has no `node`: the session comes up, returns a
+  window id, looks entirely normal, and every hook in it is dead — no bus, no ledger, no registry entry, no
+  mail at any turn boundary.
+
+  ```
+  node .comm/bin/launch.mjs <agent>          # only a name in .comm/config.json; refuses one already running
+  node .comm/bin/launch.mjs <agent> --print  # what it WOULD run, resolving and refusing exactly the same
+  ```
+
+  It resolves `node` and `claude` to absolute paths, **builds** the child's `PATH` instead of inheriting
+  one, and refuses with a non-zero exit — returning no window id — when it cannot. Verified end to end: a
+  session launched this way is in the registry and answers `comm who`.
+
+  ⚠️ **Two limits, so you do not meet them by surprise.** A directory Claude Code has never seen stops at
+  its trust prompt and waits for a human, so this cannot yet start an agent anywhere unattended. And it
+  needs kitty's remote control; without it, it refuses rather than pretending.
+
 ## 2026-09-05.2 — bus print `873f43df21ed` — 2026-09-05
 
 - **Your session now tells you when your bus is out of date, and it did not before.** Until today the only

@@ -108,11 +108,24 @@ Hooks land in each repo's `.claude/settings.json` (existing keys and unrelated h
 ## Use
 
 ```bash
-comm who                                     # roster · who is actually running · pending counts
-comm send <agent> --ref <file> [--note ...]  # ring the bell
-comm inbox [<agent>]                         # what is waiting
-comm log                                     # delivery audit trail
+node .comm/bin/comm.mjs who                     # roster · who is actually running · pending counts
+node .comm/bin/comm.mjs send <agent> --ref <f>  # ring the bell            [--note ...] [--kind ...]
+node .comm/bin/comm.mjs inbox [<agent>]         # what is waiting
+node .comm/bin/comm.mjs log                     # delivery audit trail
 ```
+
+🔴 **Write the long form in anything an agent will read, and never `comm <subcommand>` on its own.**
+`comm` is already a POSIX coreutils binary. Outside an interactive shell — which is every tool call an
+agent makes — `comm inbox` does not fail as this bus:
+
+```
+error: the following required arguments were not provided:  <FILE2>
+Usage: comm [OPTION]... FILE1 FILE2
+```
+
+**That is indistinguishable from a broken bus**, and an agent has no way to tell which program answered it.
+Reported from the field 2026-09-07 by a leader who had already worked it out and applied the long form.
+A shell alias is a convenience for a HUMAN at a prompt; it is not a thing to document for an agent.
 
 `--kind` is `nudge` (a correction/brief landed) · `done` (round finished) · `blocked` (needs a ruling) ·
 `fyi`. It defaults to `nudge` from the leader and `done` from an expert.

@@ -702,7 +702,7 @@ function write(path, content, results) {
  * bus whose print no longer matches its top note is REPORTED as exactly that: changed, with
  * nothing said about it. `--release "<label>"` stamps a new entry with the current print.
  */
-const BUS_FILES = ["comm.mjs", "session-registry.mjs", "ledger.mjs", "wake.mjs", "restart-signal.mjs", "claim.mjs"]
+const BUS_FILES = ["comm.mjs", "session-registry.mjs", "ledger.mjs", "wake.mjs", "restart-signal.mjs", "claim.mjs", "launch.mjs"]
 const CHANGELOG = join(HERE, "CHANGELOG.md")
 function busPrint() {
 	const h = createHash("sha256")
@@ -755,7 +755,24 @@ if (process.argv.includes("--release")) {
 	const rest = head === -1 ? "" : text.slice(head + 1)
 	const entry = `## ${label} — bus print \`${print}\` — ${new Date().toISOString().slice(0, 10)}\n\n` +
 		"- WRITE WHAT CHANGED FOR THE AGENT READING THIS, not what changed in the code.\n\n"
+	const before = text
 	writeFileSync(CHANGELOG, `${preamble}\n${entry}${rest}`)
+	// 🔴 READ IT BACK. `releases()` parses `^(\S+) — bus print` — a label with a SPACE in it
+	// writes a heading this parser silently skips, so the newest release goes on being the
+	// previous one, its print no longer matches the bytes, and every field project is told
+	// the opposite of the truth: current ones speak, stale ones fall silent. Measured
+	// 2026-09-07 on the first real use of --release, by its author, with a descriptive
+	// label. A tool that writes what it cannot read back is this project's failure class,
+	// so it now refuses and puts the file back rather than leaving a heading nobody parses.
+	// FINDINGS.md#release-roundtrip
+	const back = releases()[0]
+	if (!back || back.label !== label || back.print !== print) {
+		writeFileSync(CHANGELOG, before)
+		console.error(`✗ '${label}' was written and could NOT be read back — ${CHANGELOG} left unchanged.`)
+		console.error(`  A release label must be ONE token: no spaces, no dashes of its own (e.g. 2026-09-07.1).`)
+		console.error(`  Put the description in the body underneath, where a field agent actually reads it.`)
+		process.exit(2)
+	}
 	console.log(`✓ ${label} stamped with print ${print} in ${CHANGELOG}\n  Now replace its placeholder line with what changed for a field agent.`)
 	process.exit(0)
 }
