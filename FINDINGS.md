@@ -1837,3 +1837,99 @@ this is the same rule applied to a document. **A write nobody verifies is a clai
 ⚠️ **Not armed in `test/attack.mjs`.** `--release` operates on the source checkout's own `CHANGELOG.md`,
 and a fixture for it would have to relocate `HERE` — which is the test seam this file does not have. It is
 verified by hand, twice, and that is weaker than a gate. Named rather than implied.
+
+## `#answered-mtime` — the row that declared a letter answered had never read the reply
+
+**2026-09-08, found while booting after an abrupt close — by reading the correspondence the row was
+describing, not by reading the row.**
+
+`channel:work-leader` printed, for seventeen hours:
+
+```
+✓ channel:work-leader  answered - last reply 17h ago, to 2026-09-07-who-ne-distingue-pas-...md
+```
+
+The field's letter about `who` arrived **16:26**. A reply landed **17:00** — answering **two other
+letters**, with no section on `who` anywhere in it. The row compared the newest mtime on each side, and
+from `out` being 34 minutes newer it concluded *answered*, then **named the letter it had not read**.
+
+⭐ **The peer's own second-order point, fired on our instrument the day after he wrote it:** *with the state
+unexposed every agent invents a proxy, and a proxy errs in the comfortable direction.* His said IDLE for a
+session at work; ours said ANSWERED for a letter nobody had opened. **The first-order defect he reported
+would not have found this. The second-order remark did.**
+
+**The fix is that a reply NAMES what it answers** — `Answers: <in filename>`, repeatable — and the row
+computes the set nobody named. It stays **stateless**: the evidence is the letter's own text, there is no
+watermark and no read receipt, because a signal that can be consumed is consumed by accident (A13, A17).
+Letters older than the convention are judged by the old rule **and the row says so**, rather than reddening
+on history it cannot re-derive.
+
+### The defect the fix made, found by attacking the fix ten minutes later
+
+Mutating the new rule to prove the arm reddened made **both** channel arms go green — not warn. The reason
+matters more than the mutation: **the legacy rule only covers letters older than the convention, so for new
+mail the marker is the ONLY thing that can warn.** A swallowed `readdir` error — an unreadable `in/`, a
+permission change, a regex that stops matching — would therefore print `answered` for a channel the row
+never managed to look at.
+
+⇒ **A scan that FAILED is not an empty scan.** The row now reports `CANNOT SAY whether mail here is
+answered` and warns. Armed with the positive control first, because if `chmod` were ignored the "blind"
+read would be an ordinary read and the arm would pass while measuring nothing.
+
+## `#no-turn-yet` — a launched session has no transcript, and calling that "gone" accused the sensor
+
+**2026-09-08 09:29, measured on four live field sessions during an ordinary boot.**
+
+`bin/context.mjs` resolved pid → transcript and, when the file was absent, said:
+
+```
+the registry names 3613e4a1….jsonl for pid 38760 and that file is gone
+```
+
+**"Gone" asserts a loss.** Measured that morning: four experts launched at 07:21, alive, and **no transcript
+file at all** — 8 minutes and 494 s of life with zero turns. The file is created by the **first turn**,
+never by the launch. So the sentence told their leader his sensor was broken while the truth was that his
+experts had not started. Nothing in the code was wrong; the **claim** was.
+
+| agent | launched | transcript |
+| --- | --- | --- |
+| `leader` | 4148 s ago | `quiet 8s` — working |
+| `HartEdge`, `-customer`, `-admin`, `db` | 489-494 s ago | **none at all** |
+
+**THE THIRD STATE.** `who` reports two (`running` / `not running`), the field asked for three, and there are
+three — but not the three anyone named: `quiet <age>`, `no transcript yet`, and the registry's own miss.
+
+### The proxy that looked right and does not discriminate — measured, then discarded
+
+Before shipping, CPU seconds per second of life, on the same six sessions:
+
+```
+four sessions with NO turn : 2.79 %  2.82 %  2.98 %  3.01 %
+one mid-turn (leader)      : 4.73 %        one mid-turn (this one) : 5.41 %
+```
+
+⇒ **Overlapping ranges. A threshold decides by luck.** The two worlds — never written, and removed — are
+not separable from file state either, so the message states only what is true in **both** and names the
+ambiguity instead of resolving it by guess.
+
+### What the signal does and does not assert
+
+Shipped as `bin/context.mjs --sessions`, printing `quiet 44m`, **never `at prompt`**.
+
+- 🟢 **It fixes the field's false IDLE.** A transcript is written **per tool call, not per turn** — measured
+  on this session: 35 entries in 3 minutes while 20 minutes into a single turn. An agent that reads and
+  measures without writing to its repo is LOUD on this signal, which is exactly the case that fooled the
+  field's own proxy.
+- 🔴 **A single long tool call is quiet too, and this is not theoretical.** Same morning, 09:37:
+  `HartEdge-admin quiet 136s` while holding `port-4174` for a 40-minute Playwright run. Printing `at prompt`
+  would have had its leader wake it mid-suite.
+
+⇒ **The number is a fact; "nobody is reading" is an inference, and it belongs to the reader.** The field
+leader put it better than we did: *« juste l'horodatage, pour que je puisse le rendre moi-même »*.
+
+### Why it is not in `comm who`, where it was asked for
+
+`A21` allows the bus no import outside `node:` builtins — the guard that makes a daemon unwritable — so
+`comm.mjs` **cannot reach `session-registry.mjs`**, and a second pid→transcript implementation is the defect
+`who --json` exists to prevent. Moving it into the bus costs an A21 amendment **and** a real split under
+A22, which is at 94 % (45 026 / 48 000). Named in `STATUS.md`, not smuggled.

@@ -1,95 +1,38 @@
-# STATUS — claude-comm, 2026-09-07 (sessions 4–14)
+# STATUS — claude-comm, 2026-09-08 (sessions 4–15)
 
 Design and gates are in `README.md`; **this file is only what is OPEN.** Keep it short — when it grows,
 fold the settled parts into the README.
 
 ## ▶ NEXT
 
-**1 — 🔴 RUN THE FULL CONTROL FIRST, AND CAP IT. It is not heavy; the machine was full.**
+**1 — 🔴 RUN THE FULL CONTROL UNFILTERED, ON TODAY'S BYTES. Nothing here is a green control yet.**
 
 ```sh
 systemd-run --user --scope -p MemoryMax=4G -p MemoryHigh=3500M node bin/boot.mjs --prove-red
+node test/attack.mjs        # A47 is new; 47/47 was the count BEFORE it
 ```
 
-It **completed 2026-09-07 for the first time since 09-05** — 48 green, 1 red — because the cap makes the
-kernel's choice in advance and lands it on the control instead of one of the owner's sessions.
+2026-09-08's full run was **49/49 green in 12 min 55 s** — and that was **before** the channel row, the
+sensor and A47 changed. Since then only `--only channel` and the sensor's own control have run, and the
+runner says it itself: *a filtered run is NOT a green control.* The cap is not optional: the control peaks
+at 165 MiB but takes 13 minutes, and it went unrun for two days because a full machine killed it —
+`FINDINGS.md#control-weight`. ✅ **`#erosion-arm` is CLOSED**: its fix was seen green in the 09-08 full run,
+which is what it was waiting for.
 
-🔴 **The line this file carried — "too heavy for the machine it runs on" — is FALSE, and the work item drawn
-from it was misdirected.** Peak of the whole control, children included: **164 MiB** of a 4096 MiB cap
-(`memory.peak`, a kernel high-water mark, not a sample). `FINDINGS.md#control-weight`.
-**What is real is the TIME**: 12 minutes, which is why it went unrun for two days. ⚠️ `--only <substring>`
-does not fix that — `--only close` ran **13 min 38 s**, longer than the unfiltered suite, before being killed.
+**2 — 🔴 THEN INSTALL INTO BOTH FIELD TREES.** `~/Dev/work` runs six live sessions on this bus and is
+waiting on `--sessions` (its leader asked for it twice). Nothing shipped today has left this repo.
 
-**2 — 🔴 THE RED ARM WAS THE ARM — root cause found, fix NOT yet seen in a full run.**
+**3 — 🔴 `--sessions` IS IN THE WRONG COMMAND, AND THE PRICE IS NAMED.** The field asked for it in
+`comm who`. `A21` forbids the bus any import outside `node:` builtins, so `comm.mjs` cannot reach
+`session-registry.mjs`, and a second pid→transcript implementation is the defect `who --json` exists to
+prevent. ⇒ **it costs an A21 amendment (extend the daemon check to the transitive closure, do not punch a
+hole in it) AND a real split, since `comm.mjs` is at 94 % of A22 (45 026 / 48 000) and the rule is split or
+cut, never raise.** Decide it as a gated change with an arm, or leave it out and say so.
 
-It claimed the close still demands an amendment for a row gone GREEN. It does not: reproduced in a clean
-clone with `ackCounts.tree=9`, the count is *held as history* and the close succeeds.
-
-**Root cause was not an arm at all: `.gitignore` was missing from the files copied into the fixture.** In
-the real repo `.boot-state.json` is ignored; in the fixture it was untracked and unignored, and every close
-writes one — so `tree` was yellow for the whole close block and the erosion demand was CORRECT. Fixed by
-copying `.gitignore`, plus a precondition guard (`treeWasGreen`) so a drifting fixture says so instead of
-accusing the code. `FINDINGS.md#erosion-arm`.
-
-🔴 **`node test/attack.mjs` is green, but `--prove-red` has NOT completed since these fixes** — the last two
-attempts were killed by the harness's low-memory watchdog after 16 arms (machine pressure, not the control:
-`attack.mjs` peaks at 124 MiB, the whole control at 165). **A full capped run is job one.**
-
-**3 — 🔴 THE AUTONOMY MANDATE MOVED, AND HIT A WALL NOBODY HAD SEEN.**
-
-`bin/launch.mjs` is built and shipped to both field trees: it resolves `node` (`process.execPath`, absolute
-by construction) and `claude`, **builds** the child's `PATH` instead of inheriting kitty's, and REFUSES with
-no window id when it cannot. **A46** runs node out of the built PATH, with kitty's own `/usr/bin:/bin` as the
-positive control. Witness: `● expert running (pid 650028)`, registry entry carrying `agent: expert` from
-`--env`. `FINDINGS.md#launch-refuses`.
-
-🔴 **THE WALL: a session launched into a directory Claude Code has never seen stops at its trust prompt and
-waits for a human.** `DESIGN-autonomy.md` does not mention it. ⇒ **a self-launching expert can only be born
-in an ALREADY-TRUSTED directory.**
-
-⚠️ **NOT ESTABLISHED, and the opposite was nearly recorded:** whether a program can answer that prompt.
-`kitten @ send-key` returned **exit 0 having done nothing** — the silent-discard trap, now measured for
-`send-key` too. The owner answered it three minutes later; the registry timestamp says so. **Gate every
-kitty send on a verified effect, never on its exit code.**
-⭐ An empty registry after a launch reads *exactly* like a dead hook. It was a dialog box. Only reading the
-window's text told them apart.
-
-**4 — The field's two requests are answered and SHIPPED** (`FINDINGS.md#ref-base`, `#stale-ref`, A44/A45).
-A `--ref` names its base on the refusal **and** on the success — the silent case (same filename at root and
-in the spoke) is refused by nothing and used to print back what the sender typed. 🔴 **I built the limiter
-the requester warned me about** while fixing his report: staleness computed after the queue write compared
-the file against its own timestamp and warned on every send. Caught by running it, not reading it.
-
-**5 — 🔴 NEW, from the field 2026-09-07: `who` reports TWO states and there are THREE.**
-`exchange/work-leader/in/2026-09-07-who-ne-distingue-pas-au-prompt-…md`. A session AT THE PROMPT takes no
-turn, so it never gets its mail — and `who` calls it `running` like a session at work. Measured cost: four
-agents at the prompt, `who` green, **nothing delivered for 2 h 30**. OPEN 1 with a name and a victim.
-
-⭐ **His second-order point is stronger:** with the state unexposed every agent invents a proxy, and a proxy
-errs in the comfortable direction — his read a false IDLE for an agent reading without writing.
-
-🟢 **The signal EXISTS and discriminates — measured across 7 live sessions 2026-09-07:** the mtime of the
-session's transcript, via the registry. `leader` 5 s (mid-turn) · `db` 2 636 s · `HartEdge` 2 954 s (at the
-prompt). A session that reads and measures still writes its transcript — which is the case that fooled him.
-🔴 **Not built, and one constraint decides how:** `bin/comm.mjs` is at **94 % of its A22 cap**
-(45 026 B of 48 000). CLAUDE.md is explicit that the fix for that row is to split or cut, never to raise —
-so this lands as a split, not as more code in `comm.mjs`. And it must expose the MEASUREMENT
-(`idle 44m`), not a claim about the session's inner state: a long single tool call is quiet too.
-
-**Carried forward, unchanged and still open:**
-- **ESLint is uncovered.** A43 stops a configured *prettier* from rewriting our generated files; ESLint is
-  the same shape and is not armed. `FINDINGS.md#generated-in-their-tree`.
-- **`#claim-file` between two REAL agents.** The arms cover it; two live sessions still have not. The one
-  that matters: two agents take a port, then **kill one brutally** — it must read HOLDER IS GONE, never a
-  lock. Asked of the peer 2026-09-05 and again today; unanswered.
-- **No real adversarial review has ever run from `review/`.** The routing is measured; the workflow is not.
-- **The 15-minute window is untested and my own timestamps are why.** 0 of 25 defects fall in it, but each is
-  dated at its commit — the upper bound. Not a result.
-- **The restart TTL lapsed on a human TWICE; the clock is the wrong instrument.** Try armer-gone AND not
-  ancient, TTL as a backstop. `claim.mjs` already ships the (pid, start, boot) test. Not built.
-- **Standing test debt from review #4, none of it gated:** `FINDINGS.md#test-debt`.
-- **`#A20` from 2026-09-04 is still unexplained.** The 09-05 instance was triaged and fixed
-  (`#update-signal`); the original is not. **Run gates unfiltered.**
+**4 — 🔴 THE TRUST PROMPT STILL STOPS AN UNATTENDED LAUNCH**, and whether a program can answer it is
+**NOT ESTABLISHED**: `kitten @ send-key` returned **exit 0 having done nothing**. Gate every kitty send on a
+verified effect, never on its exit code. ⭐ An empty registry after a launch reads exactly like a dead hook;
+only reading the window's text told them apart. `DESIGN-autonomy.md` does not mention the wall.
 
 ## Where it stands
 
@@ -117,20 +60,40 @@ so this lands as a split, not as more code in `comm.mjs`. And it must expose the
 3. ✅ **The wake is BUILT** (`bin/wake.mjs`, A32, `FINDINGS.md#wake-doorbell`). 🔴 Item 1's latency table
    predates it and has not been re-measured. The wake does not deliver — it makes a turn happen.
 
-4. **🟢 Holding a machine resource is written down now** — `bin/claim.mjs`. Two agents in **one** project
-   root collided over a port on 2026-09-04 and killed each other's servers. **The failure was never
-   transport**: both had a hub and neither could see the other, because nothing here had a concept of a
-   thing an agent is HOLDING. The expensive part was the peer reading the result as a broken test rather
-   than a port conflict. `HISTORY.md`, "The port collision".
+4. **🟢 Holding a machine resource — `bin/claim.mjs`, and the field measurement is IN.** Two agents in one
+   root collided over a port on 2026-09-04 and killed each other's servers; nothing here had a concept of a
+   thing an agent is HOLDING. `take` / `list` / `release`, 16 arms, `A38`, both field trees, and a boot row
+   that names a claim whose holder has **died**. The resource name is free text, not port-specific.
+   **It advises; it opens nothing, kills nothing, blocks nothing.**
 
-   `take` / `list` / `release`, 16 arms, `A38`, installed in both field projects, and a boot row that names
-   a claim whose holder has **died**. The resource name is **free text, not port-specific** — an external
-   shared thing (a rate-limit window, a staging database) is claimable today, and the field did not know
-   that. **It advises; it opens nothing, kills nothing, blocks nothing.**
-   🔴 **Untested between two real agents — ▶ NEXT, carried.** ⚠️ Claims live in one project's `.comm/`, so a
-   resource shared ACROSS projects is visible to nobody.
+   ✅ **E458 CLOSED 2026-09-08 by the field leader**, negative control first, then `kill -9`, then the
+   second-taker half — with a detached `--pid` holder so no working expert had to be killed. His declared
+   gap (*"two `--pid` holders, not two real sessions"*) is **smaller than he thought and the code says so**:
+   `stateOf` reads `rec.boot`, `rec.pid`, `rec.start` and **never `holder`**, so provenance cannot change the
+   branch. Our two reads compose to all three branches — his `kill -9`, ours on his crashed *session*-written
+   record after the 07:10 reboot. 🟢 **First real production claim: `port-4174`, `HartEdge-admin`, 2026-09-08.**
+   ⚠️ Claims live in one project's `.comm/`, so a resource shared ACROSS projects is visible to nobody.
 
-5. **🔴 A session launched outside an interactive shell has NO bus, and says nothing.** `node` lives only
+5. **🟡 `who` reports TWO states and there are THREE — half shipped, in the wrong command.**
+   A leader read `running` for four sessions at their prompt and lost **2 h 30** (his E453).
+   ✅ **`node bin/context.mjs --sessions`** prints `quiet <age>` from the transcript's mtime via the registry.
+   It prints a MEASUREMENT, never `at prompt`: a single long tool call is quiet too — measured, same morning,
+   `HartEdge-admin quiet 136s` while holding `port-4174` for a 40-minute Playwright run.
+   🟢 **The third state is new and was in no design document**: a launched session that has taken no turn has
+   **no transcript at all** — four field sessions, 8 minutes, 2026-09-08 09:29. Calling that "gone" accused
+   the sensor of being broken. `FINDINGS.md#no-turn-yet`.
+   🔴 **Open: it belongs in `comm who` and cannot go there yet — ▶ NEXT 3 names the price.**
+   ⚠️ **And it is NOT shipped:** `BUS_FILES` carries the bus and what the hooks run, never `context.mjs`.
+   The field leader runs it from this checkout. **Whether it joins the installed set is an undecided
+   question of scope, not an oversight** — asked of him in the 09-08 letter.
+
+6. **🟢 A reply must NAME what it answers.** `channel:*` declared a letter answered on mtime ordering alone
+   and named a letter it had never read — seventeen hours, on this repo's own correspondence.
+   `Answers: <file>`, stateless, no read receipt. And the fix's own hole, found by attacking it: **a scan
+   that failed is not an empty scan** — an unreadable `in/` now says `CANNOT SAY`, never `answered`.
+   `FINDINGS.md#answered-mtime`.
+
+7. **🟢 A session launched outside an interactive shell has NO bus, and says nothing.** `node` lives only
    under nvm, so `kitten @ launch claude` (or cron, or a `.desktop` file) starts a session whose **every hook
    dies** while it looks normal. **A self-launched expert is launched by a program, never by a shell** — the
    shape that would have made the whole autonomy program measure nothing. `FINDINGS.md#hookless-launch`.
@@ -138,10 +101,10 @@ so this lands as a split, not as more code in `comm.mjs`. And it must expose the
    absolutely, BUILDS the child's `PATH` rather than inheriting kitty's, and REFUSES with no window id when
    it cannot. Witness obtained. A46. `FINDINGS.md#launch-refuses`.
    🔴 **Open, and new:** the trust prompt stops an unattended launch in any directory Claude has not seen —
-   see ▶ NEXT 3. The published "a login shell" wording is corrected everywhere it shipped; the field
+   see ▶ NEXT 4. The published "a login shell" wording is corrected everywhere it shipped; the field
    leader's phrasing is the right one: *a shell that loads the user profile*.
 
-6. **🔴 The autonomy mandate — self-launching experts, a self-rebooting leader.** Given 2026-09-04.
+8. **🔴 The autonomy mandate — self-launching experts, a self-rebooting leader.** Given 2026-09-04.
    **Everything settled lives in [`DESIGN-autonomy.md`](DESIGN-autonomy.md)** — the four verified mechanisms,
    the RAM measurements, the consumer's reply, the review #4 dispositions. Do not re-derive any of it here.
 
@@ -150,10 +113,36 @@ so this lands as a split, not as more code in `comm.mjs`. And it must expose the
    the fifteen minutes AFTER a restart. And the handoff carries a **sha256 read manifest**, never prose.
 
    ✅ The instrument (`bin/ledger.mjs`), review #4's answer, the restart signal, and now **the launcher**
-   all exist. 🔴 **What is open is ▶ NEXT 3**: the trust prompt, whether a program can answer it, then a real
+   all exist. 🔴 **What is open is ▶ NEXT 4**: the trust prompt, whether a program can answer it, then a real
    restart that arms the reboot arm, then the trigger.
 
+**Carried forward, unchanged and still open** *(moved here from ▶ NEXT on 2026-09-08 — cut from that
+section, not retracted)*:
+- **ESLint is uncovered.** A43 stops a configured *prettier* from rewriting our generated files; ESLint is
+  the same shape and is not armed. `FINDINGS.md#generated-in-their-tree`.
+- **No real adversarial review has ever run from `review/`.** The routing is measured; the workflow is not.
+- **The 15-minute window is untested and my own timestamps are why.** 0 of 25 defects fall in it, but each
+  is dated at its commit — the upper bound. Not a result.
+- **The restart TTL lapsed on a human TWICE; the clock is the wrong instrument.** Try armer-gone AND not
+  ancient, TTL as a backstop. `claim.mjs` already ships the (pid, start, boot) test. Not built.
+- **Standing test debt from review #4, none of it gated:** `FINDINGS.md#test-debt`.
+- **`#A20` from 2026-09-04 is still unexplained.** The 09-05 instance was triaged and fixed
+  (`#update-signal`); the original is not. **Run gates unfiltered.**
+- 🔴 **The erosion counter has NEVER been discharged.** `.boot-state.json` carries `field:work: 8` and
+  `amendments: null` — `STATUS.md` said that row "was rewritten on the evidence", but in prose, never via
+  `--close --amended`. So the instrument still demands an amendment it already received, and a row waved
+  past eight times is one nobody reads. **Amend it properly or explain why it should keep counting.**
+
 ## ⚠️ What was NOT verified
+
+- 🔴 **`bin/boot.mjs`'s registry row still says "that file is GONE" — the same false accusation fixed in
+  `context.mjs` on 2026-09-08 (`FINDINGS.md#no-turn-yet`) — and its arm stages a state that cannot occur.**
+  Traced rather than guessed: in the `--hook` path the entry is written microseconds before it is read, so
+  the 120 s grace always covers it; in the manual path the session must have taken a turn to run boot at
+  all, which creates the transcript. ⇒ **the wording is unreachable, and the arm ("an AGED entry whose
+  transcript is GONE") therefore reddens for a state no session reaches.** Not fixed today because changing
+  it costs a 13-minute re-run of the control for a string. **Fix it with the next code change to that file,
+  and re-title the arm.**
 
 - **`--release` is verified by hand, not gated** (`FINDINGS.md#release-roundtrip`): `install.mjs` writes to
   its own checkout, and a fixture would have to relocate `HERE`. That test seam does not exist.

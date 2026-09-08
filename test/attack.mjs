@@ -1057,6 +1057,34 @@ const POINTER_SOURCES = (() => {
 		`pointers found=${refs.length} (want >=15); dangling=${dangling.length ? dangling.join(", ") : "none"}`)
 }
 
+// ── A47: agent-facing documentation never writes the bus as a bare `comm` ──────
+//
+// `comm` IS a POSIX binary (coreutils, "compare two sorted files"). In a NON-INTERACTIVE
+// shell - which is every tool call an agent makes - `comm inbox` therefore does not fail
+// as this bus. It fails as coreutils:
+//
+//     error: the following required arguments were not provided:  <FILE2>
+//     Usage: comm [OPTION]... FILE1 FILE2
+//
+// Nothing in that names a program, so it is INDISCERNIBLE from a bus that is broken.
+// Found in the field 2026-09-07 by the leader of ~/Dev/work, who had already adopted the
+// long form and asked only that we stop shipping the short one. The cost is paid by every
+// NEW agent, once, at the moment it is least able to tell what went wrong.
+//
+// The gate reads the notice this installer ACTUALLY WROTE, not install.mjs's source: the
+// notice is generated per machine, so the source is one step removed from the artifact and
+// a check on it can pass while the shipped file says otherwise.
+{
+	const notice = readFileSync(join(root, ".comm", "README.md"), "utf8")
+	// A bare invocation is `comm <subcommand>` NOT preceded by a path separator or a dot -
+	// `node .comm/bin/comm.mjs send` and `comm.mjs send` must both stay legal.
+	const bare = [...notice.matchAll(/(^|[^\w./-])comm\s+(who|send|inbox|sent|log|init|read|dismiss)\b/g)]
+	check("A47 the shipped notice never writes a bare `comm <sub>`",
+		bare.length === 0,
+		`${join(root, ".comm", "README.md")}: ${bare.length ? bare.map((m) => JSON.stringify(m[0].trim())).join(", ") : "none"} ` +
+		`(coreutils owns that name in a non-interactive shell; the long form is canonical)`)
+}
+
 // ── A21/A22: the properties that erode by accretion, not by a single bad commit ──
 // Asked for directly by the owner (2026-08-05): "performant, compact and secure by
 // default", with a worry about memory leaks as features are added. The honest
