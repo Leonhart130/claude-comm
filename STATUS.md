@@ -5,47 +5,60 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-**1 — 🔴 RUN THE FULL CONTROL UNFILTERED, ON TODAY'S BYTES. Nothing here is a green control yet.**
+**1 — 🔴 ASK FOR THE ADVERSARIAL REVIEW: IT IS WRITTEN AND NOT RUN.** `BRIEF-adversarial-8.md`, eight
+targets against `aeb39a9..3afe19f`. The owner offered a second expert explicitly and said asking is
+expected. **Do that before building anything new on yesterday's code.** Three of the eight are defects
+found and NOT fixed — items 2, 3, 4 below, so they survive even if the review never happens.
 
-```sh
-systemd-run --user --scope -p MemoryMax=4G -p MemoryHigh=3500M node bin/boot.mjs --prove-red
-node test/attack.mjs        # A47 is new; 47/47 was the count BEFORE it
-```
+*(Nothing is owed from yesterday: the full capped control ran **53/53 exit 0**, `attack` **48/48**, both
+field trees installed, `3afe19f` pushed and closed.)*
 
-2026-09-08's full run was **49/49 green in 12 min 55 s** — and that was **before** the channel row, the
-sensor and A47 changed. Since then only `--only channel` and the sensor's own control have run, and the
-runner says it itself: *a filtered run is NOT a green control.* The cap is not optional: the control peaks
-at 165 MiB but takes 13 minutes, and it went unrun for two days because a full machine killed it —
-`FINDINGS.md#control-weight`. ✅ **`#erosion-arm` is CLOSED**: its fix was seen green in the 09-08 full run,
-which is what it was waiting for.
+**2 — 🔴 `boot.mjs`'S REGISTRY ROW STILL SAYS "GONE", AND ITS ARM GUARDS A STATE NOTHING REACHES.**
+The same false accusation fixed in `context.mjs` (`FINDINGS.md#no-turn-yet`). Traced, not guessed: the 120 s
+grace covers the `--hook` path, and the manual path needs a turn, which creates the transcript. ⇒ **fix the
+wording AND re-title `registry: an AGED entry whose transcript is GONE`, which reddens for something no
+session can be in.** Deferred only because a string change costs a 13-minute re-run; do it with the next
+change to that file. ⚠️ **If the trace is wrong, the row is lying in production — check it first.**
 
-**2 — 🔴 THEN INSTALL INTO BOTH FIELD TREES.** `~/Dev/work` runs six live sessions on this bus and is
-waiting on `--sessions` (its leader asked for it twice). Nothing shipped today has left this repo.
+**3 — 🔴 `CONVENTION_SINCE` IS AN MTIME BOUNDARY AND MTIMES ARE NOT FACTS.** `bin/boot.mjs`, the `channel:`
+block. A `git checkout`, an `rsync` or a restore moves every letter across it, and everything on the old
+side is judged by the rule declared broken on 2026-09-08. **What does this row say on a fresh clone?**
+Measure that before trusting it.
 
-**3 — 🔴 `--sessions` IS IN THE WRONG COMMAND, AND THE PRICE IS NAMED.** The field asked for it in
+**4 — 🔴 THE EROSION COUNT KEYS ON A ROW; A ROW WARNS FOR SEVERAL CAUSES.** `field:work` reached **8** while
+its 2026-09-05 amendment sat undischarged, then today's warning came from an entirely different cause (two
+dead `zz-` claims). The discharge is now recorded — **the first one this repo has ever written** — but the
+design flaw is untouched: an amendment fixes one cause and clears the debt of all of them.
+**Amend the protocol properly: evidence, a gated change, an arm. Not prose.**
+
+**5 — 🟡 `--sessions` IS IN THE WRONG COMMAND AND THE PRICE IS NAMED.** The field asked for it in
 `comm who`. `A21` forbids the bus any import outside `node:` builtins, so `comm.mjs` cannot reach
 `session-registry.mjs`, and a second pid→transcript implementation is the defect `who --json` exists to
-prevent. ⇒ **it costs an A21 amendment (extend the daemon check to the transitive closure, do not punch a
-hole in it) AND a real split, since `comm.mjs` is at 94 % of A22 (45 026 / 48 000) and the rule is split or
-cut, never raise.** Decide it as a gated change with an arm, or leave it out and say so.
+prevent. ⇒ **an A21 amendment (extend the daemon check to the transitive closure — do not punch a hole in
+it) AND a real split, `comm.mjs` being at 94 % of A22.** ⚠️ Also undecided: whether `context.mjs` joins
+`BUS_FILES` at all — **asked of the field leader in the 09-08 letter; read his reply before deciding.**
 
-**4 — 🔴 THE TRUST PROMPT STILL STOPS AN UNATTENDED LAUNCH**, and whether a program can answer it is
+**6 — 🔴 THE TRUST PROMPT STILL STOPS AN UNATTENDED LAUNCH**, and whether a program can answer it is
 **NOT ESTABLISHED**: `kitten @ send-key` returned **exit 0 having done nothing**. Gate every kitty send on a
 verified effect, never on its exit code. ⭐ An empty registry after a launch reads exactly like a dead hook;
 only reading the window's text told them apart. `DESIGN-autonomy.md` does not mention the wall.
+
+⚠️ **Two things to check on arrival, before reading any of the above:** whether the field leader answered
+(`channel:work-leader`), and whether he released the two `zz-` claims — until he does, `field:work` warns
+every boot and the count starts climbing again.
 
 ## Where it stands
 
 | | state |
 | --- | --- |
 | toolkit | `bin/comm.mjs` · `session-registry.mjs` · `ledger.mjs` · `restart-signal.mjs` · `claim.mjs` · `wake.mjs` · `exchange-bell.mjs` · `context.mjs` · `boot.mjs` · `install.mjs` · `test/` — no dependencies |
-| repo | an `origin` exists (`Leonhart130/claude-comm`). **The push is the leader's call** — delegated 2026-09-05, along with installing into field trees. The previous line here said the owner decides, and quoting a stale sentence about my own authority back at him cost a round-trip |
+| repo | `origin` = `Leonhart130/claude-comm`. **The push is the leader's call**, delegated 2026-09-05, along with installing into field trees — do not ask again |
 | **electio** | in real daily use — 26 real deliveries, both directions |
 | gates | `attack` (deterministic, every case armed) · `ledger --prove-red`, now run INSIDE it · `selftest` (real sessions, not gated by boot) · `context` and `boot` controls. **Counts live in boot's output, never here** |
 | boot | `node bin/boot.mjs` — every gating row armed; `--fast` is injected at session start, contract in `CLAUDE.md` |
 | **ledger** | `node bin/ledger.mjs` — the reboot instrument. Records here AND in the field; a field arm is `--root ~/Dev/electio`. Its own arms run inside `attack` as A34. **11 defects recorded, its first**; each start now stores `pending`, the peer's covariate (files newer than the last start), never the inbox depth I proposed — his session #41 had an empty mailbox and the largest real queue of his last five boots |
 | **sensor** | `node bin/context.mjs` — pid → transcript through `bin/session-registry.mjs` (the `SessionStart` hook writes it, keyed on pid + start time + boot id); **refuses on a miss**. `FINDINGS.md#clear-blind` |
-| reviews | #1–#6 **all dispositioned**. #6's eleven findings are fixed and armed (`FINDINGS.md#review6-disposal`); F8–F11 were numbered on 2026-09-05 so each could carry a resolvable `--ref`. #5's amendment stands in `CLAUDE.md`: *a gate that CAN redden is not yet one that reddens for the property in its own title* — **the disposal itself produced four more defects, three of them in detectors** |
+| reviews | #1–#7 **all dispositioned**; **#8's brief is written and NOT RUN** — `BRIEF-adversarial-8.md`. #5's amendment stands in `CLAUDE.md`: *a gate that CAN redden is not yet one that reddens for the property in its own title* |
 
 ## ⏭️ OPEN
 1. **🔴 Latency is a mailbox, not an interrupt.** Re-derive with `node test/latency.mjs <log>`; never
@@ -60,18 +73,13 @@ only reading the window's text told them apart. `DESIGN-autonomy.md` does not me
 3. ✅ **The wake is BUILT** (`bin/wake.mjs`, A32, `FINDINGS.md#wake-doorbell`). 🔴 Item 1's latency table
    predates it and has not been re-measured. The wake does not deliver — it makes a turn happen.
 
-4. **🟢 Holding a machine resource — `bin/claim.mjs`, and the field measurement is IN.** Two agents in one
-   root collided over a port on 2026-09-04 and killed each other's servers; nothing here had a concept of a
-   thing an agent is HOLDING. `take` / `list` / `release`, 16 arms, `A38`, both field trees, and a boot row
-   that names a claim whose holder has **died**. The resource name is free text, not port-specific.
-   **It advises; it opens nothing, kills nothing, blocks nothing.**
-
-   ✅ **E458 CLOSED 2026-09-08 by the field leader**, negative control first, then `kill -9`, then the
-   second-taker half — with a detached `--pid` holder so no working expert had to be killed. His declared
-   gap (*"two `--pid` holders, not two real sessions"*) is **smaller than he thought and the code says so**:
-   `stateOf` reads `rec.boot`, `rec.pid`, `rec.start` and **never `holder`**, so provenance cannot change the
-   branch. Our two reads compose to all three branches — his `kill -9`, ours on his crashed *session*-written
-   record after the 07:10 reboot. 🟢 **First real production claim: `port-4174`, `HartEdge-admin`, 2026-09-08.**
+4. **🟢 Holding a machine resource — `bin/claim.mjs`, settled and IN PRODUCTION.** `take`/`list`/`release`,
+   16 arms, A38, both field trees. **It advises; it opens nothing, kills nothing, blocks nothing.**
+   ✅ **E458 closed 2026-09-08 by the field leader** — negative control, `kill -9`, then the second-taker
+   half, with a detached `--pid` holder so no working expert was killed. His declared gap is smaller than
+   he thought and the code says so: `stateOf` reads `boot`/`pid`/`start` and **never `holder`**. Our two
+   reads cover all three branches. 🟢 In production unprompted: `port-4173` and — the one that matters —
+   `supabase-anneau-visiteur`, a NON-port resource with a purpose and a duration.
    ⚠️ Claims live in one project's `.comm/`, so a resource shared ACROSS projects is visible to nobody.
 
 5. **🟡 `who` reports TWO states and there are THREE — half shipped, in the wrong command.**
@@ -87,22 +95,17 @@ only reading the window's text told them apart. `DESIGN-autonomy.md` does not me
    The field leader runs it from this checkout. **Whether it joins the installed set is an undecided
    question of scope, not an oversight** — asked of him in the 09-08 letter.
 
-6. **🟢 A reply must NAME what it answers.** `channel:*` declared a letter answered on mtime ordering alone
-   and named a letter it had never read — seventeen hours, on this repo's own correspondence.
-   `Answers: <file>`, stateless, no read receipt. And the fix's own hole, found by attacking it: **a scan
-   that failed is not an empty scan** — an unreadable `in/` now says `CANNOT SAY`, never `answered`.
-   `FINDINGS.md#answered-mtime`.
+6. **🟢 A reply must NAME what it answers** — `Answers: <file>`, stateless, no read receipt. The row used
+   to declare a letter answered on mtime ordering and name one it had never read (17 h, on this repo's own
+   mail). Three arms. A scan that FAILED now says `CANNOT SAY`; the marker counts in the header only.
+   `FINDINGS.md#answered-mtime`. 🔴 **Its open residue is ▶ NEXT 3.**
 
-7. **🟢 A session launched outside an interactive shell has NO bus, and says nothing.** `node` lives only
-   under nvm, so `kitten @ launch claude` (or cron, or a `.desktop` file) starts a session whose **every hook
-   dies** while it looks normal. **A self-launched expert is launched by a program, never by a shell** — the
-   shape that would have made the whole autonomy program measure nothing. `FINDINGS.md#hookless-launch`.
-   ✅ **BUILT 2026-09-07 — `bin/launch.mjs`, shipped to both field trees.** It resolves `node`/`claude`
-   absolutely, BUILDS the child's `PATH` rather than inheriting kitty's, and REFUSES with no window id when
-   it cannot. Witness obtained. A46. `FINDINGS.md#launch-refuses`.
-   🔴 **Open, and new:** the trust prompt stops an unattended launch in any directory Claude has not seen —
-   see ▶ NEXT 4. The published "a login shell" wording is corrected everywhere it shipped; the field
-   leader's phrasing is the right one: *a shell that loads the user profile*.
+7. **🟢 A session launched by a PROGRAM is on the bus — `bin/launch.mjs`, A46, both field trees.** It
+   resolves `node`/`claude` absolutely, BUILDS the child's `PATH` instead of inheriting kitty's, and
+   REFUSES with no window id when it cannot. `FINDINGS.md#hookless-launch`, `#launch-refuses`.
+   ⚠️ The published "a login shell" wording was WRONG on this machine and the field measured it: `zsh -l`
+   has no `node`, only `zsh -i`. Corrected everywhere — *a shell that loads the user profile*.
+   🔴 **Its open residue is ▶ NEXT 6.**
 
 8. **🔴 The autonomy mandate — self-launching experts, a self-rebooting leader.** Given 2026-09-04.
    **Everything settled lives in [`DESIGN-autonomy.md`](DESIGN-autonomy.md)** — the four verified mechanisms,
@@ -166,15 +169,12 @@ section, not retracted)*:
 
 ## Two conventions that erode silently
 
-**Measurement traps** (`FINDINGS.md#measurement-traps`): a control that does not travel the same code as the
-arms validates nothing, and one that writes into the world it measures is not a control at all. **Six
-instances now** — the fifth, 2026-09-05, were an ARM and then the OPERATOR: `A39` ran `boot --hook` against this repository (seven fabricated starts,
-6 cold becoming 15), and staging the same row by hand added five more under an agent this repo does not have.
-Anything that runs a real hook path writes wherever that path writes, and the ledger's root has no test seam.
+**Measurement traps** — a control that does not travel the same code as the arms validates nothing, and one
+that writes into the world it measures is not a control at all. **Six instances.** `FINDINGS.md#measurement-traps`.
+⚠️ Anything running a real hook path writes wherever that path writes, and the ledger's root has no test seam.
 
-**Acknowledgements amend the protocol** (`FINDINGS.md#ack-amendment`): the count hit three on `field:work`
-and the row was rewritten on that evidence — mail to a *running* agent is the bus working; mail for one that
-is *not* waits for a relaunch and nothing else says so. First time the mechanism fired on itself.
+**Acknowledgements amend the protocol** — `FINDINGS.md#ack-amendment`. 🟢 **The first discharge in this
+repo's history was written 2026-09-08** (`field:work`, from 8). 🔴 **Its design flaw is ▶ NEXT 4.**
 
 **Findings live in the code**, at the point they apply — *a rule whose cost you cannot see is a rule someone
 will simplify away.*
