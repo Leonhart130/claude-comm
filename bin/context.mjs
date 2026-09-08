@@ -35,12 +35,12 @@
  *    from the registry the SessionStart hook writes (`bin/session-registry.mjs`), and a
  *    miss REFUSES rather than falling back to the answer that was wrong.
  */
-import { readFileSync, existsSync, readdirSync, statSync, readlinkSync, openSync, readSync, closeSync, mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, unlinkSync } from "node:fs"
+import { readFileSync, existsSync, readdirSync, statSync, readlinkSync, openSync, readSync, closeSync, mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, unlinkSync, utimesSync } from "node:fs"
 import { join, basename } from "node:path"
 import { homedir, tmpdir } from "node:os"
 import { fileURLToPath } from "node:url"
 import { spawnSync } from "node:child_process"
-import { lookup as registryLookup, record as registryRecord, registryDir, startTimeOf, sessionPid } from "./session-registry.mjs"
+import { lookup as registryLookup, record as registryRecord, registryDir, startTimeOf, sessionPid, entries as registryEntries } from "./session-registry.mjs"
 
 const ARGV = process.argv.slice(2)
 const has = (f) => ARGV.includes(f)
@@ -207,6 +207,19 @@ function scratchUuidOfPid(pid) {
 }
 
 /**
+ * How long ago the SessionStart hook filed this entry, rendered short. Used only to date
+ * a session that has produced no transcript: the age of the ENTRY is the age of the
+ * silence, and it is the one number that makes "no turn yet" actionable rather than
+ * merely true.
+ */
+function ageOfEntry(r) {
+	const t = Date.parse((r && r.at) || "")
+	if (!Number.isFinite(t)) return null
+	const s = Math.max(0, Math.round((Date.now() - t) / 1000))
+	return s < 90 ? `${s}s` : s < 5400 ? `${Math.round(s / 60)}m` : `${(s / 3600).toFixed(1)}h`
+}
+
+/**
  * Resolve a session pid to the transcript it is writing NOW - from the registry the
  * SessionStart hook writes, and from nothing else.
  *
@@ -219,7 +232,23 @@ function transcriptOfPid(pid) {
 	const r = registryLookup(pid)
 	if (!r.ok) return { path: null, why: r.hint ? `${r.why} (${r.hint})` : r.why }
 	if (!existsSync(r.transcript)) {
-		return { path: null, why: `the registry names ${basename(r.transcript)} for pid ${pid} and that file is gone` }
+		// NOT "gone", which asserts a loss. Measured 2026-09-08 09:29 on four live field
+		// sessions: a session that has been LAUNCHED but has taken no turn has no transcript
+		// at all - the file is created by the first turn, never by the launch. Those four sat
+		// in that state for eight minutes while this word told their leader the sensor was
+		// broken. That is the comfortable-direction error the field named in
+		// exchange/work-leader/in/2026-09-07-who-...md, fired on our own instrument.
+		//
+		// The two worlds - never written, and removed - are NOT separable from file state,
+		// and the proxy that looked like it would separate them does not: CPU seconds per
+		// second of life, measured the same morning, ran 2.79-3.01 % across the four
+		// no-turn sessions against 4.73 % for one mid-turn and 5.41 % for this one. The
+		// ranges overlap, so a threshold would decide by luck. The message therefore states
+		// only what is true in BOTH worlds and names the ambiguity instead of resolving it.
+		const since = ageOfEntry(r)
+		return { path: null, state: "no-transcript", why: `the registry names ${basename(r.transcript)} for pid ${pid} and no such file exists - ` +
+			`this session has produced no transcript${since ? ` since it registered ${since} ago` : ""} ` +
+			`(a session that has taken no turn yet looks exactly like one whose file was removed)` }
 	}
 	// ONLY for a pid that is itself a session. A child inherits its parent's open
 	// descriptors, so any descendant of a session holds that session's scratch directory
@@ -310,6 +339,64 @@ function resolveTranscript() {
 	return { path: files[0].f, how: files.length > 1
 		? `GUESSED (newest of ${files.length} sharing this dir)`
 		: "GUESSED (the only transcript here, and nothing tied it to this process)" }
+}
+
+/**
+ * THE THIRD STATE, and why this is a measurement rather than a verdict.
+ *
+ * The field asked for `who` to tell "at prompt" from "in turn" (exchange/work-leader/in/
+ * 2026-09-07-who-ne-distingue-pas-...md): a leader read "running" for four sessions that
+ * were reading nobody's mail and lost 2 h 30. The signal that discriminates is the mtime
+ * of the session's own transcript, resolved through the registry - a session at its prompt
+ * writes nothing, one taking a turn writes every turn.
+ *
+ * What is printed is `quiet 44m`, NOT "at prompt". A single long tool call is quiet too,
+ * and a session reading without writing is the exact case that fooled the field's own
+ * proxy. The number is a fact; "nobody is reading" is an inference, and it belongs to the
+ * reader, who knows what he asked for.
+ *
+ * THREE states, not two - the third measured 2026-09-08 09:29 and absent from every
+ * design document until then:
+ *   quiet <age>     the transcript exists; that is how long since it was last written
+ *   no transcript   registered, and no turn has produced a file yet (see transcriptOfPid)
+ *   (not listed)    the registry's own lookup drops a dead or recycled pid, which is its
+ *                   job - this command does not re-implement that test. FINDINGS.md#liveness
+ *
+ * It lives HERE and not in `comm who` for a reason that is a constraint, not a taste:
+ * A21 allows the bus no import outside node: builtins, so `comm.mjs` cannot reach the
+ * registry, and a second pid->transcript implementation is the defect `who --json` already
+ * exists to prevent. Moving it into the bus costs an A21 amendment AND a real split under
+ * A22's budget. Named in STATUS.md, not smuggled in here.
+ */
+function sessions() {
+	const live = registryEntries()
+	const rows = live.map((e) => {
+		const r = transcriptOfPid(e.pid)
+		if (r.path) {
+			let age = null
+			try { age = Math.max(0, Math.round((Date.now() - statSync(r.path).mtimeMs) / 1000)) } catch {}
+			return { pid: e.pid, agent: e.agent || null, source: e.source || null, state: "quiet",
+				quiet_s: age, transcript: basename(r.path), note: (r.note || "").trim() || null }
+		}
+		return { pid: e.pid, agent: e.agent || null, source: e.source || null, state: "no-transcript",
+			quiet_s: null, registered: e.at || null, why: r.why }
+	})
+	if (has("--json")) { console.log(JSON.stringify({ registry: registryDir(), sessions: rows })); return }
+	console.log(`session registry: ${registryDir()}`)
+	if (!rows.length) {
+		console.log("  (no live session recorded - the SessionStart hook writes it, so this is empty")
+		console.log("   either because nothing is running or because the hook is not installed)")
+		return
+	}
+	for (const r of rows) {
+		const what = r.state === "quiet"
+			? (r.quiet_s === null ? "quiet ?" : `quiet ${r.quiet_s < 90 ? `${r.quiet_s}s` : r.quiet_s < 5400 ? `${Math.round(r.quiet_s / 60)}m` : `${(r.quiet_s / 3600).toFixed(1)}h`}`)
+			: "no transcript yet - no turn since it registered"
+		console.log(`  ${String(r.agent || "?").padEnd(18)} pid ${String(r.pid).padEnd(8)} ${what}${r.note ? `  ${r.note}` : ""}`)
+	}
+	console.log("\n  'quiet' is the age of the transcript's last write. It is a MEASUREMENT, not a claim")
+	console.log("  about the session: one long tool call is quiet too. What it rules out is the opposite -")
+	console.log("  a session that wrote 3s ago is not sitting at its prompt.")
 }
 
 function report() {
@@ -592,6 +679,65 @@ function proveRed() {
 				`--pid 0 -> ${zero.exit} (all must be exit 2 with no verdict)`)
 		}
 
+		// THE THIRD STATE (2026-09-08), and the arm is aimed at the WORD, because the word
+		// was the defect. A registered session whose transcript does not exist was reported
+		// as "that file is gone" - an assertion of LOSS. Measured that morning on four live
+		// field sessions: a session that has been launched and has taken no turn has no
+		// transcript at all, and those four sat in that state for eight minutes. The word
+		// told their leader his sensor was broken while the truth was that his experts had
+		// not started. Nothing in the code was wrong; the CLAIM was.
+		//
+		// ONE VARIABLE: whether the named file exists. The entry, the pid and the start tick
+		// are byte-identical across the two reads - the second read is the same registry
+		// entry with the file created underneath it.
+		//
+		// THE POSITIVE CONTROL IS THAT SECOND READ. If `present` ever stops measuring a
+		// number and a "quiet" row, this arm has gone void: it would then be asserting a
+		// refusal on a path no real session travels, which is exactly the shape review #6
+		// found five times. An arm that can only go red is not yet an arm that goes red for
+		// the property in its own title.
+		{
+			const ghost = join(dir, "never-written.jsonl")   // named by the entry, never created
+			registryRecord({ pid: me, transcript: ghost, agent: "control", source: "startup" })
+			const absent = read(null, ["--pid", String(me)])
+			const absentRows = (() => { try { return JSON.parse(spawnSelf(["--sessions", "--json"]).stdout) } catch { return {} } })()
+			writeFileSync(ghost, JSON.stringify(asst(50_000)) + "\n")
+			const present = read(null, ["--pid", String(me)])
+			const presentRows = (() => { try { return JSON.parse(spawnSelf(["--sessions", "--json"]).stdout) } catch { return {} } })()
+			const rowOf = (o) => ((o && o.sessions) || []).find((r) => r.pid === me) || {}
+			const saysGone = /\bgone\b/.test(String(absent.why))
+			check("a session with NO transcript is 'not yet', never 'gone'",
+				absent.exit === 2 && absent.tokens === null && !saysGone &&
+				/no such file exists/.test(String(absent.why)) &&
+				rowOf(absentRows).state === "no-transcript" &&
+				present.tokens === 50_000 && rowOf(presentRows).state === "quiet",
+				`file absent -> exit ${absent.exit}, --sessions state=${rowOf(absentRows).state}, ` +
+				`the word "gone"=${saysGone} (must be false); the SAME entry with the file created -> ` +
+				`${present.tokens} tokens, state=${rowOf(presentRows).state} (POSITIVE CONTROL: anything but ` +
+				`"quiet" here means the arm measured a path no session travels)`)
+			registryRecord({ pid: me, transcript: live, agent: "control", source: "startup" })
+		}
+
+		// `--sessions` must report the AGE of the last write, not merely that a file is
+		// there. One variable: the transcript's mtime, moved back an hour under an entry
+		// that is otherwise untouched. The control is the first read - a file written just
+		// now must read as seconds, or the second read proves nothing about the arithmetic.
+		{
+			const t = join(dir, "aged.jsonl")
+			writeFileSync(t, JSON.stringify(asst(10_000)) + "\n")
+			registryRecord({ pid: me, transcript: t, agent: "control", source: "startup" })
+			const rowNow = (() => { try { return (JSON.parse(spawnSelf(["--sessions", "--json"]).stdout).sessions || []).find((r) => r.pid === me) || {} } catch { return {} } })()
+			const hour = new Date(Date.now() - 3600_000)
+			utimesSync(t, hour, hour)
+			const rowOld = (() => { try { return (JSON.parse(spawnSelf(["--sessions", "--json"]).stdout).sessions || []).find((r) => r.pid === me) || {} } catch { return {} } })()
+			check("--sessions measures the SILENCE, not just presence",
+				rowNow.state === "quiet" && rowNow.quiet_s !== null && rowNow.quiet_s < 60 &&
+				rowOld.state === "quiet" && rowOld.quiet_s >= 3500,
+				`written now -> quiet ${rowNow.quiet_s}s (control: must be seconds); mtime moved back 1 h -> ` +
+				`quiet ${rowOld.quiet_s}s (must be ~3600 - a row that cannot move is not a measurement)`)
+			registryRecord({ pid: me, transcript: live, agent: "control", source: "startup" })
+		}
+
 		// REGRESSION GUARD, and the one that matters most. A real session - a process with
 		// a `claude` ancestor - that is not in the registry used to fall through to the
 		// newest transcript in its directory. Here the directory is deliberately ambiguous,
@@ -628,4 +774,5 @@ function spawnSelf(args) {
 }
 
 if (has("--prove-red")) proveRed()
+else if (has("--sessions")) sessions()
 else report()

@@ -1021,11 +1021,83 @@ function askBus(sessionPidForCwd) {
 		}
 		const inb = newest("in"), outb = newest("out")
 		if (!inb.at && !outb.at) continue
-		const waiting = inb.at > outb.at
-		row(`channel:${peer}`, waiting ? WARN : OK,
-			waiting
-				? `UNANSWERED - ${inb.name} arrived ${age(Date.now() - inb.at)} ago`
-				: `answered - last reply ${age(Date.now() - outb.at)} ago` + (inb.name ? `, to ${inb.name}` : ""))
+
+		// WHAT THIS ROW USED TO SAY, and why it was a lie (2026-09-08). It compared the
+		// newest mtime on each side, so a reply written 34 minutes after a letter marked
+		// that letter answered - and NAMED it - whatever the reply was actually about.
+		// Measured on this repo's own correspondence: the field's letter about `who`
+		// arrived 16:26, a reply landed 17:00 answering two OTHER letters with no section
+		// on `who` at all, and this row printed "answered ... to <the who letter>" for
+		// seventeen hours. The field's own second-order point, fired on our instrument:
+		// with the state unexposed every agent invents a proxy, and a proxy errs in the
+		// COMFORTABLE direction.
+		//
+		// So a reply now NAMES what it answers - `Answers: <in filename>`, repeatable -
+		// and the row computes the set nobody named. Still STATELESS: the evidence is the
+		// letter's own text, there is no watermark and no read receipt, because a signal
+		// that can be consumed gets consumed by accident (A13, A17).
+		//
+		// Letters that predate the convention are judged by the OLD rule and the row SAYS
+		// so, rather than reddening on history it cannot re-derive. That grandfathering is
+		// a constant, not a stored watermark, and it expires on its own as mail turns over.
+		const CONVENTION_SINCE = Date.parse("2026-09-08T07:00:00Z")
+		const answered = new Set()
+		let unread = 0
+		try {
+			for (const f of readdirSync(join(root, peer, "out"))) {
+				if (f.startsWith(".")) continue
+				let txt = ""
+				try { txt = readFileSync(join(root, peer, "out", f), "utf8") } catch { unread++; continue }
+				// THE MARKER IS A HEADER, and only a header. Matched anywhere in the file it would
+				// be inherited from QUOTED text - and quoting each other's letters is precisely what
+				// these two agents do - so one reply pasting another's header would mark answered a
+				// letter nobody answered. Same class as the row this whole block replaces: evidence
+				// that looks like a claim. Header = before the first fenced block, within 20 lines.
+				const head = []
+				for (const line of txt.split("\n").slice(0, 20)) {
+					if (line.startsWith("```")) break
+					head.push(line)
+				}
+				for (const m of head.join("\n").matchAll(/^\s*(?:\*\*)?Answers:(?:\*\*)?\s*(.+?)\s*$/gm))
+					for (const nm of m[1].split(/[,\s]+/)) if (nm) answered.add(nm.replace(/^`|`$/g, ""))
+			}
+		} catch { unread = -1 }
+		// A SCAN THAT FAILED IS NOT AN EMPTY SCAN. Found by attacking this very fix, minutes
+		// after writing it: with the marker logic disabled, BOTH channel arms went green rather
+		// than falling back to anything - because the legacy rule only covers letters older
+		// than the convention. For new mail the marker is the ONLY thing that can warn, so a
+		// swallowed readdir error - an unreadable in/, a permission change, a regex that stops
+		// matching - would print "answered" for a channel it never managed to look at. That is
+		// the exact shape this row was rewritten to remove, reintroduced by its own try/catch.
+		let open = [], blind = null
+		try {
+			for (const f of readdirSync(join(root, peer, "in"))) {
+				if (f.startsWith(".")) continue
+				const at = statSync(join(root, peer, "in", f)).mtimeMs
+				if (at < CONVENTION_SINCE) continue          // judged below, by the old rule
+				if (!answered.has(f)) open.push({ name: f, at })
+			}
+		} catch (e) { blind = "in/ could not be read (" + (e.code || e.message) + ")" }
+		open.sort((a, b) => a.at - b.at)                     // the one waiting LONGEST first
+		const legacyWaiting = inb.at > outb.at && inb.at < CONVENTION_SINCE
+		const dated = inb.at && inb.at < CONVENTION_SINCE ? " (by date: this predates the Answers: convention)" : ""
+
+		// A reply this row could not read may be the very one that names the waiting letter, so
+		// an unreadable out/ is reported as NOT KNOWING, never as an answer.
+		if (blind || unread) {
+			row(`channel:${peer}`, WARN, "CANNOT SAY whether mail here is answered - " +
+				(blind || (unread < 0 ? "out/ could not be listed" : unread + " repl(y/ies) could not be read")))
+		} else if (open.length) {
+			row(`channel:${peer}`, WARN,
+				`UNANSWERED - ${open[0].name} arrived ${age(Date.now() - open[0].at)} ago` +
+				(open.length > 1 ? ` (+${open.length - 1} more unnamed by any reply)` : ""))
+		} else if (legacyWaiting) {
+			row(`channel:${peer}`, WARN, `UNANSWERED - ${inb.name} arrived ${age(Date.now() - inb.at)} ago${dated}`)
+		} else {
+			row(`channel:${peer}`, OK,
+				`answered - last reply ${age(Date.now() - outb.at)} ago` +
+				(inb.name ? `, to ${inb.name}${answered.has(inb.name) ? " (it says so)" : dated}` : ""))
+		}
 	}
 }
 
@@ -1441,6 +1513,8 @@ function proveRed() {
 		try { return JSON.parse(r.stdout) } catch { return { worst: -1, rows: [] } }
 	}
 	const level = (res, label) => { const r = res.rows.find((x) => x.label === label); return r ? r.level : -1 }
+	// The whole row, for an assertion about WHAT it said and not only how loud it was.
+	const rowOf = (res, label) => res.rows.find((x) => x.label === label) || { level: -1, text: "" }
 	const LV = { "-1": "absent", 0: "ok", 1: "unknown", 2: "warn", 3: "RED" }
 
 	let failed = 0
@@ -1625,6 +1699,74 @@ function proveRed() {
 	arm("channel: a peer message goes unanswered", "channel:peer", WARN,
 		() => writeFileSync(join(chIn, "question.md"), "asked\n"),
 		() => rmSync(join(chIn, "question.md"), { force: true }))
+
+	// THE DEFECT THIS ROW ACTUALLY HAD, and the arm above cannot see it. That one moves the
+	// newest in-file past the newest out-file, which the old mtime rule already caught. What
+	// it never staged is the shape that was live in this repo for seventeen hours: a reply
+	// NEWER than the letter and about something else. The old row called that answered, and
+	// named the letter it had not read.
+	//
+	// ONE VARIABLE: the "Answers:" line. Same two files, same order, same mtimes.
+	// THE POSITIVE CONTROL IS THE SECOND READ. Without it a row that simply always warned
+	// would satisfy the first assertion and prove nothing at all.
+	{
+		const q = join(chIn, "asked-first.md"), a = join(chOut, "reply-later.md")
+		writeFileSync(q, "asked\n")
+		writeFileSync(a, "a reply about something else entirely\n")   // newer, names nothing
+		const silent = level(run(true), "channel:peer")
+		writeFileSync(a, "Answers: asked-first.md\n\nnow it names what it answers\n")
+		const naming = level(run(true), "channel:peer")
+		rmSync(q, { force: true }); rmSync(a, { force: true })
+		assert("channel: a NEWER reply that names nothing is not an answer",
+			silent === WARN && naming === OK,
+			`a reply newer than the letter, naming nothing -> ${LV[silent]} (must warn; the old rule ` +
+			`said ok AND named the letter); the same two files with "Answers:" added -> ${LV[naming]} ` +
+			`(POSITIVE CONTROL: anything but ok means the row just always warns)`)
+	}
+
+
+	// A MARKER IN QUOTED TEXT IS NOT AN ANSWER. These two agents quote each other's letters
+	// verbatim, so a header pasted into a body would otherwise mark answered a letter nobody
+	// answered - the same "evidence that looks like a claim" the whole block replaces.
+	// ONE VARIABLE: whether the name sits in the header or below a fenced block.
+	{
+		const q3 = join(chIn, "quoted.md"), a3 = join(chOut, "quoting.md")
+		writeFileSync(q3, "asked\n")
+		writeFileSync(a3, "# a reply about something else\n\nquoting his letter:\n\n```\nAnswers: quoted.md\n```\n")
+		const quotedOnly = level(run(true), "channel:peer")
+		writeFileSync(a3, "Answers: quoted.md\n\n# now the header names it\n")
+		const inHeader = level(run(true), "channel:peer")
+		rmSync(q3, { force: true }); rmSync(a3, { force: true })
+		assert("channel: a marker inside QUOTED text is not an answer",
+			quotedOnly === WARN && inHeader === OK,
+			`the name only inside a fenced block -> ${LV[quotedOnly]} (must warn); the same name in the ` +
+			`header -> ${LV[inHeader]} (POSITIVE CONTROL: if this is not ok the marker never works at all)`)
+	}
+
+	// A GATE THAT CANNOT LOOK MUST NOT SAY "ANSWERED". This is the arm for the defect the
+	// PREVIOUS arm's own mutation exposed: for mail newer than the convention the marker is
+	// the only thing that can warn, so a swallowed scan error would print a green row for a
+	// channel nobody read. One variable: whether in/ can be listed.
+	//
+	// POSITIVE CONTROL FIRST, and it is not decoration - if chmod is ignored (running as
+	// root, an exotic filesystem) the "blind" read would be an ordinary read and this arm
+	// would pass while measuring nothing. The control is the SAME directory readable again.
+	{
+		const q2 = join(chIn, "waiting.md")
+		writeFileSync(q2, "asked\n")
+		writeFileSync(join(chOut, "named.md"), "Answers: waiting.md\n")
+		const readable = level(run(true), "channel:peer")
+		spawnSync("chmod", ["000", chIn])
+		const blindRow = rowOf(run(true), "channel:peer")
+		spawnSync("chmod", ["755", chIn])
+		const restored = level(run(true), "channel:peer")
+		rmSync(q2, { force: true }); rmSync(join(chOut, "named.md"), { force: true })
+		assert("channel: a row that CANNOT read the mail never says answered",
+			readable === OK && restored === OK && blindRow.level === WARN && /CANNOT SAY/.test(blindRow.text),
+			`readable -> ${LV[readable]} (positive control: an answered channel); in/ unlistable -> ` +
+			`${LV[blindRow.level]} "${blindRow.text.slice(0, 46)}"; readable again -> ${LV[restored]} ` +
+			`(if this is not ok, chmod did nothing and the arm measured an ordinary read)`)
+	}
 
 	// A note that LAPSES costs the experiment its scarcest event - a real restart - and it
 	// does so silently: the record that follows looks like an ordinary cold start. The row
