@@ -743,13 +743,27 @@ function askBus(sessionPidForCwd) {
 		// here would redden the row every time the boot itself is edited - a warning
 		// that fires for a reason foreign to what it claims to measure is how a row
 		// gets ignored.
+		let oldest = Infinity
 		for (const rel of ["bin/comm.mjs", "install.mjs", "test/attack.mjs", "test/selftest.mjs"]) {
 			const fp = join(ROOT, rel)
 			if (!existsSync(fp)) continue
 			const mt = statSync(fp).mtimeMs
 			if (mt > newest) { newest = mt; newestFile = rel }
+			if (mt < oldest) oldest = mt
 		}
-		const stale = newest > doc
+		// A FRESH CHECKOUT IS NOT A STALE STATUS. `git clone` writes every file within the same
+		// instant, so which one lands last is arbitrary - and this row compared raw mtimes at
+		// millisecond resolution, which made it ⚠ on a clone roughly half the time, for the
+		// order the checkout happened to use. Review #9 C7. A row that fires on the order of a
+		// clone is reporting on git, not on whether anyone updated STATUS.md.
+		//
+		// So the SPREAD decides: when everything compared was written inside the same two
+		// seconds, mtimes carry no information here and the row says exactly that rather than
+		// inventing a verdict from noise. Two seconds is a checkout, not an edit - nobody
+		// edits STATUS.md and the bus inside two seconds, and if they do the next boot says so.
+		const CHECKOUT_MS = 2000
+		const uniform = Number.isFinite(oldest) && newest - oldest < CHECKOUT_MS && Math.abs(doc - newest) < CHECKOUT_MS
+		const stale = !uniform && newest > doc + CHECKOUT_MS
 		// SPLIT ON THE HEADING, never a lookahead ending in `\Z`. This read
 		// `(?=^## |\Z)` — and `\Z` is not an anchor in JavaScript, it is the letter Z — so the
 		// match depended entirely on ANOTHER `## ` section existing after this one. Move
@@ -765,7 +779,9 @@ function askBus(sessionPidForCwd) {
 		nextText = nx ? nx.slice(nx.indexOf("\n") + 1).trim() : ""
 		row("status", stale ? WARN : OK,
 			`headed ${stamp}` +
-			(stale ? ` - but ${newestFile} is newer by ${age(newest - doc)}: read it as a claim` : " - newer than the code it describes"))
+			(stale ? ` - but ${newestFile} is newer by ${age(newest - doc)}: read it as a claim`
+				: uniform ? " - every file here was written within the same 2 s: this is a fresh checkout and mtimes say nothing"
+				: " - newer than the code it describes"))
 	}
 }
 
@@ -2066,6 +2082,36 @@ function proveRed() {
 		() => utimesSync(busFile, new Date(), new Date(Date.now() + 36e5)),
 		() => utimesSync(busFile, stamp.atime, stamp.mtime))
 
+	// A FRESH CHECKOUT IS NOT A STALE STATUS, and this row used to say it was. `git clone`
+	// writes everything in the same instant and the order is arbitrary, so at millisecond
+	// resolution the row was ⚠ on a clone about half the time - reporting on git rather than
+	// on whether anyone updated STATUS.md (review #9 C7, measured on a real clone).
+	//
+	// ONE VARIABLE: the spread between the files compared. Both halves are needed and each
+	// is the other's control - if only the uniform case were staged, a row that had simply
+	// stopped warning would pass it.
+	{
+		// EXACTLY the set the row reads, and that is the point of listing it here rather than
+		// approximating: the first version of this arm left test/selftest.mjs untouched, the row
+		// saw a spread of days, and it reported the arm broken when the arm was staging the
+		// wrong world. A fixture that is not the row s input measures something else.
+		const files = ["STATUS.md", "bin/comm.mjs", "install.mjs", "test/attack.mjs", "test/selftest.mjs"]
+			.map((r) => join(pkg, r)).filter((f2) => existsSync(f2))
+		const saved = files.map((f2) => { const st = statSync(f2); return [f2, st.atime, st.mtime] })
+		const now = Date.now()
+		for (const f2 of files) utimesSync(f2, new Date(now), new Date(now))
+		const checkout = rowOf(run(true), "status")
+		// The same files, one code file pushed a minute past STATUS.md. Nothing else moves.
+		utimesSync(join(pkg, "bin", "comm.mjs"), new Date(now + 60000), new Date(now + 60000))
+		const outrun = level(run(true), "status")
+		for (const [f2, a, m] of saved) utimesSync(f2, a, m)
+		assert("status: a fresh checkout is not a stale STATUS",
+			checkout.level === OK && /fresh checkout/.test(checkout.text) && outrun === WARN,
+			`every file written in the same instant -> ${LV[checkout.level]} "${checkout.text.slice(-42)}"; ` +
+			`the same files with bin/comm.mjs pushed 60 s past STATUS.md -> ${LV[outrun]} (POSITIVE ` +
+			`CONTROL: if this is not warn the row has stopped reading mtimes at all)`)
+	}
+
 	// The bus defect is restored in the FIXTURE while the gate stays byte-identical,
 	// and the CONSTANT is left alone: raising MAX_NOTE would move the detector as well
 	// as the input, which proves a gate can be broken, not that it can detect.
@@ -2247,7 +2293,18 @@ function proveRed() {
 		// leader.json, and left an unnamed.json standing. The arm then reported the crossing
 		// broken with nothing broken. The name comes from the log the two control asserts
 		// above just produced, which IS the identity the recorder used.
-		const hookAgent = (handoffLogs[0] || "unnamed.log").replace(/\.log$/, "")
+		// RE-CHECKED, not inherited. The arm two screens up asserts `handoffLogs.length === 1`
+		// and says why: more than one means it is reading somebody else's log. This arm used
+		// the same array WITHOUT that test, and `readdirSync` order is not sorted - so on the
+		// day a second log appears the first arm goes red correctly and this one silently
+		// measures an arbitrary agent, red or green for a reason unrelated to its title.
+		// Review #9 A3. A guard consumed without being re-checked is not a guard here.
+		if (handoffLogs.length !== 1) {
+			assert("F2 a note armed in THIS repo crosses into THIS repo's ledger", false,
+				`SKIPPED-AS-FAILURE: ${handoffLogs.length} handoff log(s) ${JSON.stringify(handoffLogs)} - ` +
+				`this arm cannot tell which agent it would be arming for, so it measured nothing`)
+		} else {
+		const hookAgent = handoffLogs[0].replace(/\.log$/, "")
 		const rsHere = join(pkg, "bin", "restart-signal.mjs")
 		const noteHere = join(pkg, ".comm", "restart", `${hookAgent}.json`)
 		spawnSync(process.execPath, [rsHere, "arm", "--agent", hookAgent, "--root", pkg, "--quiet",
@@ -2267,6 +2324,7 @@ function proveRed() {
 			`note armed=${armedHere}; boot --hook -> prev_session=${crossedHere && crossedHere.prev_session}, ` +
 			`signal=${crossedHere && JSON.stringify(crossedHere.signal)}; note consumed=${consumedHere} ` +
 			`(the two asserts above fire the same hook with nothing armed: that is this arm's control)`)
+		}
 
 		// ---- review #4 R3: the FAILING direction of this row, which was never armed ----
 		const hookLevel = (input) => {
