@@ -32,13 +32,19 @@ evidence. **The bell REFUSED — his leader is not running** — so it waits for
 claims there are still held by dead pids; only he releases them, and the sentence his boot printed about
 them **was false and is fixed** (#8 C6).
 
-**6 — 🔴 `test/selftest.mjs` HAS NOT RUN SINCE 2026-09-08**, across two days of heavy change. `comm.mjs`
-was not touched, so the delivery path is judged unchanged — **that is a reasoning, not a measurement.**
+**6 — 🟢 `test/selftest.mjs` RAN 2026-09-10, both ways.** PASS with real sessions and real hooks (and the
+BEHAVIOUR half reported the agent DID read the file it was pointed at); `--prove-red` PASSED, so a green run
+means something. **The delivery gate is open for a delivery change** — the first time that has been true here.
 
-**7 — 🟢 THE AUTONOMY LOOP IS HALF BUILT AND MEASURED**: `launch.mjs` → `send` → `wake` → a real review,
-verified at each step, **and no trust prompt for a subdirectory of a trusted project**. Missing: a REAL
-restart arming the reboot arm (4 of 10), then the trigger. ⚠️ A `review` session may still be alive —
-`comm who`. **Do not close a window you did not open.**
+**7 — 🔴 THE TRIGGER IS THE BLOCKER, AND `DESIGN-autonomy.md` SAID OTHERWISE UNTIL TODAY.** It claimed the
+field records no starts; **it does — 58 across three trees**, corrected there by measurement. The reboot arm
+is short because a **DECLARED restart is rare**: 5 against 53 cold. ⇒ **build the trigger and the arm fills
+itself.** The design's answer is not a token threshold but *"you re-fetched a file you already read this
+session"*, countable by a hook. 🟢 `launch.mjs` → `send` → `wake` → a real review, measured end to end.
+🟢 **`bin/handoff.mjs` is NEW** (sha256 read manifest, 7 arms; this session's own is at
+`.comm/handoff/leader.md`, verified). ⚠️ **Nothing calls it and it is not in `BUS_FILES`** — shipping it is
+a delivery change, and the gate is open. ⚠️ A `review` session may still be alive — `comm who`. **Do not
+close a window you did not open.**
 
 ⚠️ **`LESSONS.md` (tier 2), the conduct register: 5 lessons, 10 FORMS, each priced. Read the form table
 BEFORE acting.**
@@ -136,11 +142,6 @@ section, not retracted)*:
 
 ## ⚠️ What was NOT verified
 
-- 🟢 **EXPLAINED, and the first reading of it was wrong.** A `Stop hook error occurred` in the launched
-  `review` session was recorded here as unreproducible; it then happened in the LEADER's own session, on the
-  turn mail was delivered. **That is the delivery mechanism**: the Stop hook blocks so the notice reaches the
-  agent, and the harness renders a blocking hook as an error. Reproducing it needs mail in flight — my three
-  attempts had none, so they measured an empty inbox. **A negative result from a probe that could not fire.**
 
 - 🔴 **Whether `boot`'s registry `GONE` wording is reachable — in BOTH directions.** The 09-08 trace said
   no; review #8 D4 found the enumeration incomplete (a transcript removed under a live session). ▶ NEXT 6.
