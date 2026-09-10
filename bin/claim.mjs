@@ -470,6 +470,16 @@ function release() {
  * implementation gets wrong, and the fourth is the one it did not: a recycled pid.
  */
 function proveRed() {
+	// 🔴 THE IDENTITY VARIABLE IS SCRUBBED, and it is this project's own launcher that sets it.
+	// bin/launch.mjs:113 passes --env=CLAUDE_COMM_AGENT=<agent> into every session it starts, so
+	// the FIRST time that launcher was used - to start the one agent whose charter is to run
+	// these controls - every suite in the repo broke for it: attack aborted with 8 red and 36
+	// arms never reached, boot went 8 red, claim 2. Mechanism: whoami() returns null when the
+	// declared name is not in the roster, and no FIXTURE roster contains a real agent's name.
+	// Every child inherits this, which is the same reason CLAUDE_COMM_RUNTIME and
+	// CLAUDE_COMM_PROJECTS are overridden here. A control that inherits the world it measures
+	// is not a control. Review #9 C1.
+	delete process.env.CLAUDE_COMM_AGENT
 	const dir = mkdtempSync(join(tmpdir(), "comm-claim-prove-"))
 	process.on("exit", () => { try { rmSync(dir, { recursive: true, force: true }) } catch {} })
 	let failed = 0

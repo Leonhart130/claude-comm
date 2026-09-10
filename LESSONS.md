@@ -31,6 +31,7 @@ dépôt, aucune n'est une intuition. `FINDINGS.md` (25 défauts) est le gisement
 | 🔴 **E** | 🔴 **UN BALAYAGE QUI ÉCHOUE REND LE MÊME RÉSULTAT QU'UN BALAYAGE VIDE** | `catch {}` nu, retour `{at:0}` : un dossier illisible est indiscernable d'un dossier vide, et la ligne **disparaît** au lieu de crier | mesuré le 2026-09-10, `bin/boot.mjs:1011-1023` — à un appel de distance du même défaut corrigé le 09-08 |
 | 🔴 **F** | 🔴 **J'AJOUTE DE LA CONFIANCE LÀ OÙ IL FALLAIT DE LA PREUVE** | Un pair écrit noir sur blanc *« je ne l'ai pas couru avec deux sessions réelles, donc je ne l'écris pas comme mesuré »*. Je lui réponds que son trou est plus petit qu'il ne croit — **sans une mesure de plus.** ⚠️ **Ça se propage** : la question qu'il avait laissée ouverte à raison a été fermée chez lui, puis SUPPRIMÉE de mon propre fichier d'état | **§2** |
 | 🔴 **G** | 🔴 **JE CITE UN NOM QUI N'EXISTE PAS, ET LE FOND EST JUSTE** | `stateOf` contre `holderState`. Comme la conclusion tenait, rien ne l'a contredite — **et le pair ne POUVAIT pas vérifier ce que je lui affirmais.** Une citation fausse dans un raisonnement juste est un cul-de-sac qu'on ne voit pas | **§2** |
+| 🔴 **J** | 🔴 **JE CONCLUS « NON REPRODUCTIBLE » D'UNE SONDE QUI NE POUVAIT PAS SE DÉCLENCHER** | Trois invocations du hook `Stop`, toutes sorties en 0 — **et toutes avec une boîte vide**, alors que le signal n'apparaît QUE lorsqu'un message est livré. J'ai mesuré une inbox vide et je l'ai écrit comme un mystère, dans `STATUS.md` et dans un message de commit | **§5** |
 | 🔴 **I** | 🔴 **JE GATE SUR LE CODE DE SORTIE D'UN ENVELOPPEUR** | `systemd-run --scope` rend **exit 0** pendant que la suite qu'il enveloppe écrit `✗ 8 lignes non rougies`. Treize minutes de contrôle qui se lisaient vertes. **Même forme que `kitten @ send-key`** : sortir 0 sans rien dire de ce qu'on a enveloppé | **§4** |
 | 🔴 **H** | 🔴 **JE CONCLUS « ABSENT » SUR UN AFFICHAGE QUE J'AI MOI-MÊME TRONQUÉ** | `grep … \| head -5` sur un fichier dont la section est ligne 126 : j'annonce deux fois au propriétaire qu'il manque une section qui était écrite, complète, meilleure que ce que je proposais | **§3** |
 
@@ -203,3 +204,42 @@ sortie de ce qui l'a lancée. Identique à `kitten @ send-key`, qui sort 0 sans 
 Note de machine corrigée. **La garde réelle serait de ne jamais lancer ce contrôle autrement que par un
 script qui relit sa dernière ligne. Non écrit — et nommé comme non écrit**, parce que l'absence d'un
 contrôle est un défaut du rapport, pas un blanc.
+
+---
+
+## §5 — J'ai écrit « je ne reproduis pas » trois fois, sur une sonde qui ne pouvait pas parler.
+
+**Le 2026-09-10.** La session `review` que je viens de lancer affiche `Stop hook error occurred`. Je lance
+le stub trois fois — nu, avec le payload, puis avec la ligne de commande exacte de sa configuration et son
+`CLAUDE_PROJECT_DIR`. **Exit 0, aucune sortie, à chaque fois.** J'écris dans `STATUS.md` : *« observée et non
+expliquée »*, et je le répète dans un message de commit poussé sur origin.
+
+Une heure plus tard, le même message apparaît dans MA session — sur le tour où le bus m'a livré le rapport
+du reviewer. **C'est le mécanisme de livraison lui-même** : le hook bloque pour que la notice atteigne
+l'agent, et le harnais rend un hook bloquant comme une erreur.
+
+### Le mécanisme
+
+**Mes trois sondes avaient toutes une boîte vide.** Le signal n'existe QUE quand un message est livré.
+J'ai donc mesuré trois fois « pas de courrier » et je l'ai écrit comme « pas de défaut trouvé ». ⚠️ **Le
+silence d'une sonde n'est une preuve que si on l'a d'abord fait parler** — et cette règle est déjà dans ma
+mémoire, sous le nom *prove-the-probe*. La connaître ne m'a pas protégé.
+
+### Ce que ça a coûté
+
+Une fausse énigme publiée deux fois : dans le fichier d'état que la prochaine session lit en entier, et dans
+l'historique git. Elle aurait envoyé quelqu'un chercher un défaut de hook qui n'existe pas. ⭐ **Et le coût
+symétrique, plus grave, est celui que j'ai évité de justesse : si la sonde avait « marché » par accident,
+j'aurais publié un défaut inexistant avec la même assurance.**
+
+### La règle
+
+**Avant d'écrire « je ne reproduis pas », je fais parler la sonde une fois dans les conditions où le signal
+DOIT apparaître.** Pas de contrôle positif ⇒ pas de résultat négatif, seulement une absence de mesure. Et
+je préfère « non mesuré » à « non reproductible » : les deux mots ne disent pas la même chose.
+
+### 🔴 Le contrôle
+
+Aucun, et c'est intrinsèque : c'est un jugement sur une méthode, pas une propriété du code. **Ce qui s'en
+approche : toute ligne de `STATUS.md` disant « non reproductible » doit nommer le contrôle positif qui a
+fait parler la sonde.** Non armé, nommé comme non armé.
