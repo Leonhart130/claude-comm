@@ -33,7 +33,14 @@ REVIEW-*.md
 # BRIEF/REPLY/REPORT/REVIEW prefixes above: it is conversation, not source. Named
 # explicitly rather than swept up by a wildcard - see the note above for what an
 # ignore-by-default rule cost this repo once already.
-exchange/
+# NOTE the trailing /*: git cannot re-include a file whose parent DIRECTORY is excluded,
+# so ignoring "exchange/" outright made the negation below silently do nothing.
+exchange/*
+# ...but the CONTRACT is source, and it was not. Review #8 D1 found this file still
+# publishing the mtime rule the repo repudiated on 2026-09-08; the fix was written on
+# 2026-09-10 into a file that git had never seen, so a clone had no peer contract at all
+# and the rule I publish to peers lived on one machine. The letters stay ignored.
+!exchange/README.md
 
 # claude-comm live state (regenerate with install.mjs)
 .comm/
