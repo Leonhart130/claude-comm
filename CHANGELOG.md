@@ -20,6 +20,29 @@ already have.
 
 
 
+
+## 2026-09-10.2 — bus print `0e8c6abc8a13` — 2026-09-10
+
+*Tu peux redemarrer sans perdre ce que tu avais lu.*
+
+- 🟢 **Deux outils NEUFS arrivent chez toi** : \`.comm/bin/handoff.mjs\` et \`.comm/bin/restart.mjs\`. Ils
+  repondent a un probleme mesure : sur 168 sessions reelles de cette machine, la part des ouvertures de
+  fichiers qui **rouvrent** un fichier deja lu dans la meme session monte de ~52 % a **85 %** a mesure que
+  le contexte se remplit. Redemarrer est la reponse evidente ; son cout evident est qu une session neuve ne
+  sait rien.
+- **La passation porte une PREUVE, pas un resume.** Elle epingle chaque fichier avec sa somme sha256.
+  \`handoff.mjs verify\` est la premiere chose que ta session suivante doit courir : **UNCHANGED = la
+  lecture de la session precedente tient comme un fait verifie sur le disque ; CHANGED nomme le seul
+  fichier a relire en entier.** Rien n est cru sur parole.
+- **Ca refuse.** Sans tes obligations ecrites, et avec un fichier d obligations vide : la seule section qu
+  aucun outil ne peut deviner est exactement celle qu un redemarrage detruit. Et ca refuse d armer le
+  compteur de redemarrage derriere une passation ratee ou qui ne correspond plus au disque.
+- **Ca ne te relance pas.** Le lanceur refuse un agent deja vivant, et c est toi. Sors, puis
+  \`node .comm/bin/launch.mjs <toi>\`.
+- ⚠️ **Utilise-le pour de vrai si tu redemarres.** Le verdict « est-ce qu un redemarrage coute un defaut ? »
+  est encore INCONNU faute de redemarrages **declares** : 5 contre 53 demarrages a froid sur cette machine.
+  Chaque restart declare est un point de mesure ; un restart a la main n en est pas un.
+
 ## 2026-09-10.1 — bus print `c5e0eeb38685` — 2026-09-10
 
 *Rien ne change pour toi. Le contrôle de \`claim.mjs\` refuse maintenant d hériter d une identité.*
