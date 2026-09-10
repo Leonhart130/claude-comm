@@ -23,6 +23,19 @@ already have.
 
 
 
+
+## 2026-09-10.5 — bus print `cba021431144` — 2026-09-10
+
+*Le refus de \`claim.mjs\` dit maintenant sous quel nom TU demandais.*
+
+- 🔴 **Deux refus pris depuis deux sessions differentes etaient identiques au caractere pres** — rien dans
+  la sortie ne disait QUI avait ete refuse. Signale par le leader de \`~/Dev/getajob\` avec les deux
+  transcriptions cote a cote. Le refus dit maintenant : \`HELD by <detenteur> - you are asking as "<toi>"\`.
+- ⚠️ **Ce n est pas cosmetique** : ton nom d agent vient du **REPERTOIRE**, pas de ton environnement. Une
+  session distincte lancee depuis la racine du projet s appelle \`leader\` comme tout le monde. Avec cette
+  ligne, tu le vois **au moment ou tu es refuse**, pas trois rapports plus tard.
+- 🟢 Arme : un refus qui ne nomme pas le demandeur fait echouer le controle.
+
 ## 2026-09-10.4 — bus print `c98a806ba2e8` — 2026-09-10
 
 *\`--pid\` est enfin dans la ligne d usage de \`claim.mjs\`.*

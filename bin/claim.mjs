@@ -337,7 +337,20 @@ function take() {
 		process.stderr.write(`claim: the record at ${cur.path} was not readable and was set aside at ${cur.setAside} — taking the resource\n`)
 	}
 	if (cur.state === "held" && !isMine(cur.rec) && !has("--force")) {
-		process.stdout.write(`HELD by ${describe(cur)}\n  nothing has been changed. This is advice, not a lock: --force takes it over and says so.\n`)
+		// 🔴 THE REFUSAL NAMES WHO WAS REFUSED, not only who holds it. Reported 2026-09-10 by
+		// the leader of ~/Dev/getajob with two transcripts taken from two different sessions
+		// ten minutes apart: they were IDENTICAL TO THE CHARACTER, so nothing in the output
+		// could say which agent had been turned away. That matters beyond tidiness - the open
+		// measurement in FINDINGS.md is "two DISTINCT agents refuse each other", and a refusal
+		// that cannot name the asker cannot carry that property. The transcript had to be
+		// believed rather than read.
+		//
+		// His own second measurement then proved the point twice over: his expert ran from the
+		// project ROOT, so the bus named it `leader` - a distinct session with an identical
+		// name - and neither of them saw it until the cwd appeared in a report. With this line
+		// that mistake is visible in the refusal itself, at the moment it happens.
+		const asker = busName() || "unnamed"
+		process.stdout.write(`HELD by ${describe(cur)} - you are asking as "${asker}"\n  nothing has been changed. This is advice, not a lock: --force takes it over and says so.\n`)
 		process.exit(EX_HELD)
 	}
 	if (cur.state === "gone") {
@@ -512,8 +525,11 @@ function proveRed() {
 	const held = run(["take", "port:4174", "--purpose", "mine now", "--quiet"])
 	const untouched = readFileSync(join(claimsDir(dir), "port:4174.json"), "utf8") === before
 	check("a live holder refuses, and nothing is changed",
-		held.status === EX_HELD && /HELD by/.test(held.stdout) && /vite dev server/.test(held.stdout) && untouched,
-		`exit ${held.status} (want ${EX_HELD}), names the purpose=${/vite dev server/.test(held.stdout)}, file untouched=${untouched}`)
+		held.status === EX_HELD && /HELD by/.test(held.stdout) && /vite dev server/.test(held.stdout) && untouched &&
+		/you are asking as "/.test(held.stdout),
+		`exit ${held.status} (want ${EX_HELD}), names the purpose=${/vite dev server/.test(held.stdout)}, file untouched=${untouched}, ` +
+		`NAMES THE ASKER=${/you are asking as "/.test(held.stdout)} (without it two refusals from two ` +
+		`different agents are byte-identical and prove nothing about which was refused)`)
 
 	// 3. THE ARM THE DESIGN NAMED IN ADVANCE: the holder is DEAD. A naive implementation
 	//    blocks everybody forever here. It must be taken, and the crash must be REPORTED —
