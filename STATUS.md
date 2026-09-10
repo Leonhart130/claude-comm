@@ -5,16 +5,18 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-09-10: review #8 RAN — 19 findings, `REVIEW-8.md`. Fixed and armed: C1/A1 the marker (front matter,
-anchored), C2/A2 the vanishing row, C3 the mtime boundary (filename dates), C6 the false crash, C8, D1, D2,
-D3 — and **the bus is installed in this repo**, `review/` on the roster, armed.)*
+*(2026-09-10: review #8 RAN — 19 findings, `REVIEW-8.md`. **Every CODE finding is fixed and armed**:
+C1/A1 the forgeable marker, C2/A2 the vanishing row, C3 the mtime boundary, C4 the descendant labelled
+cleared, C5 the inverted note, C6 the false crash, C8, D1, D2, D3. Controls: boot 55 arms, sensor 22,
+claim 17, attack 48. **The bus is installed in this repo**, `review/` on the roster, armed.)*
 
-**1 — 🔴 FIVE FINDINGS OF REVIEW #8 ARE STILL OPEN. Read `REVIEW-8.md`; it is not summarised here.**
-Both remaining CODE defects are in `bin/context.mjs` and neither is armed: **C4** `argv0 === "claude"` does
-not close the inherited-descriptor hole, and **a `claude -p` child is named `claude`** · **C5** the
-`CLEARED` note is inverted — it fires when the re-record WORKED, while a clear whose hook never fired prints
-a number and no note off a dead transcript. Then **C7** `status` ⚠ on a fresh clone · **A3** A47 passes
-`comm whoami` and `comm --json who` · **N1** the tier-0 charge moves ±34 B against a 14 B margin.
+**1 — 🟡 THREE MINOR FINDINGS OF REVIEW #8 REMAIN. Read `REVIEW-8.md`; it is not summarised here.**
+**C7** `status` is ⚠ on a fresh clone (mtime, ms resolution) · **A3** A47's regex passes `comm whoami` and
+`comm --json who` green and guards `read`, which is not a subcommand · **N1** the tier-0 charge moves ±34 B
+with what the last boot found in the world, against a 14 B margin. ⚠️ **And the half of C5 that no code can
+close stays open:** a `/clear` whose hook never fires leaves the entry naming a DEAD transcript with both
+uuids agreeing — byte-identical to a session never cleared. `FINDINGS.md#clear-blind`. What closes it is
+the hook running, not a better guess in the sensor.
 
 **2 — 🟡 THE CORRECTION TO THE FIELD LEADER IS WRITTEN AND UNREAD.**
 `exchange/work-leader/out/2026-09-10-correction-...md` — my citation named a function that does not exist,
