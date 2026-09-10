@@ -134,8 +134,10 @@ section, not retracted)*:
 
 ## ⚠️ What was NOT verified
 
-- ⚠️ **`attack` failed ONCE on 2026-09-10 and the case name was lost to a re-run** (three clean runs after,
-  no code change). **A defect in my procedure, not a clean bill** — capture the full output BEFORE re-running.
+- 🔴 **`attack` failed TWICE on 2026-09-10, both times passing immediately after with no code change, and
+  the case name is STILL unknown** — both failing runs had their output piped to `tail`. Twice is a flaky
+  case, not an accident. ⇒ **never pipe this suite's output away: redirect to a file, then read the file.**
+  The one-line habit is what destroyed the evidence, twice.
 
 
 - 🔴 **Whether `boot`'s registry `GONE` wording is reachable, in BOTH directions** (review #8 D4).
