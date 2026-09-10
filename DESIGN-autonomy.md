@@ -191,6 +191,36 @@ where the design effort belongs**, and that a reboot's cost is counted in defect
 They supplied the counter-evidence themselves (two of the worst defects of 2026-09-03 were authored at
 82–83 % of peak) and refused to claim they could separate the confound with 55 transcripts.
 
+### 🔴 MEASURED HERE 2026-09-10 — the signal reproduces, and its "no magic number" does not
+
+Their curve was taken on their corpus. Re-run on **this machine: 168 sessions, 45 923 opens, 23 984 tool
+calls**, bucketed by decile of context fullness against each session's own peak:
+
+```
+  0-10 %  n=  224  58%      50-60 %  n= 5497  73%
+ 10-20 %  n= 1669  52%      60-70 %  n= 5585  77%
+ 20-30 %  n= 2787  59%      70-80 %  n= 6166  79%
+ 30-40 %  n= 3543  62%      80-90 %  n= 7151  81%
+ 40-50 %  n= 4639  69%      90-100%  n= 8662  85%
+```
+
+**Monotone from the second decile on, ending at 85% against their 87%.** Verbatim-duplicate tool calls:
+**1.1%** — their "not looping, re-fetching" finding holds here too.
+
+🔴 **But the conclusion drawn from it does not.** The design says the trigger *"is not a token threshold …
+with no magic number"* — *"you have re-fetched a file you already read this session"*. **This corpus refuses
+that reading: the share is already 52-59% in the second and third deciles.** Re-fetching is the NORMAL state
+of a session from very early on, so a single re-fetch fires immediately and always. The curve rises without
+a knee, which means **any trigger taken from it is a threshold with a number in it**, and the design's claim
+to have avoided one is not supported.
+
+⚠️ **My measurement over-collects and I will not pretend otherwise:** file paths were taken from
+`file_path` inputs AND from tokens in Bash command text that end in a known source extension, so a path
+inside a `grep` pattern counts as an open. That inflates the absolute levels — the SHAPE is what
+reproduces, not the percentages. Re-run it before quoting a number:
+`bin/refetch.mjs` does not exist; the script lives in this session's scratchpad and was deliberately not
+shipped, because a measurement tool nobody has attacked is not an instrument yet.
+
 ### ✅ The one monotone signal, and it is not a token count
 
 Share of file-opens that RE-open a file already opened in the same session, 51 sessions, 1 945 opens:

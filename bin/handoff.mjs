@@ -160,6 +160,16 @@ function cmdWrite() {
 	if (!manifest.size) die("nothing to pin: no transcript was resolvable and no --read was given.\n" +
 		"  A handoff with an empty manifest proves nothing about the disk; say so with --read or fix the registry.")
 
+	// HASHED BEFORE THE GUARDS RUN, and the order is the point. It was the other way round
+	// until `restart.mjs`'s control could not stage a failure: with the guards first, a guard
+	// that REWRITES a pinned file - a formatter, a build, anything in A43's world - was
+	// hashed after its own damage and the manifest recorded the new bytes as if they had
+	// been read. Hashing first makes `verify` catch exactly that, loudly, before a restart
+	// is armed on top of it. A guard that changes the tree is not a guard, and now it cannot
+	// pass for one.
+	const rows = [...manifest.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+		.map(([p, how]) => ({ path: p, how, sha: sha(p) })).filter((r) => r.sha)
+
 	// GUARDS ARE RUN, NEVER REPORTED. "passed" is a claim; stdout is evidence.
 	const guards = []
 	for (const g of all("--guard")) {
@@ -167,9 +177,6 @@ function cmdWrite() {
 		const out = `${r.stdout || ""}${r.stderr || ""}`.trim().split("\n").slice(-6).join("\n")
 		guards.push({ cmd: g, exit: r.status, out })
 	}
-
-	const rows = [...manifest.entries()].sort((a, b) => a[0].localeCompare(b[0]))
-		.map(([p, how]) => ({ path: p, how, sha: sha(p) })).filter((r) => r.sha)
 	const body = `# HANDOFF — ${agent}, ${new Date().toISOString()}
 
 🔴 **This is a manifest, not a summary. Nothing here replaces reading a file — it tells you which files you

@@ -36,15 +36,21 @@ them **was false and is fixed** (#8 C6).
 BEHAVIOUR half reported the agent DID read the file it was pointed at); `--prove-red` PASSED, so a green run
 means something. **The delivery gate is open for a delivery change** — the first time that has been true here.
 
-**7 — 🔴 THE TRIGGER IS THE BLOCKER, AND `DESIGN-autonomy.md` SAID OTHERWISE UNTIL TODAY.** It claimed the
-field records no starts; **it does — 58 across three trees**, corrected there by measurement. The reboot arm
-is short because a **DECLARED restart is rare**: 5 against 53 cold. ⇒ **build the trigger and the arm fills
-itself.** The design's answer is not a token threshold but *"you re-fetched a file you already read this
-session"*, countable by a hook. 🟢 `launch.mjs` → `send` → `wake` → a real review, measured end to end.
-🟢 **`bin/handoff.mjs` is NEW** (sha256 read manifest, 7 arms; this session's own is at
-`.comm/handoff/leader.md`, verified). ⚠️ **Nothing calls it and it is not in `BUS_FILES`** — shipping it is
-a delivery change, and the gate is open. ⚠️ A `review` session may still be alive — `comm who`. **Do not
-close a window you did not open.**
+**7 — 🟡 THE DECLARED RESTART IS BUILT; THE AUTOMATIC ONE IS DELIBERATELY NOT.**
+🟢 `bin/handoff.mjs` (sha256 read manifest, 7 arms) + `bin/restart.mjs prepare` (handoff → verify → arm the
+note, in that order, 4 arms). **It refuses to arm a note behind a failed handoff**, and it does NOT relaunch:
+`launch.mjs` refuses an agent already alive (A17) and the caller is that agent, so the last step is named
+and left to it. This session's own handoff is at `.comm/handoff/leader.md`, verified.
+🔴 **Why no trigger. Measured here, 168 sessions, 45 923 opens:** the re-open share rises monotonically to
+**85 %** — their signal reproduces — **but it is already 52-59 % by the second decile and the curve has no
+knee**, so the design's *"no magic number"* is not supported and any trigger from it carries a threshold.
+The numbers are in `DESIGN-autonomy.md`, with the caveat that the measurement over-collects. **And the
+ledger still says UNKNOWN.** Automating a restart before knowing whether one costs a defect would be
+automating an unmeasured decision. ⇒ **use `restart.mjs` for real restarts; the arm fills, then decide.**
+⚠️ `DESIGN-autonomy.md` claimed the field records no starts — **false, 58 records**, corrected there.
+⚠️ Neither tool is in `BUS_FILES`, so the field cannot use them: that is a delivery change, and
+`selftest` is green both ways, so the gate is open for one. ⚠️ A `review` session may still be alive —
+`comm who`. **Do not close a window you did not open.**
 
 ⚠️ **`LESSONS.md` (tier 2), the conduct register: 5 lessons, 10 FORMS, each priced. Read the form table
 BEFORE acting.**
@@ -53,7 +59,7 @@ BEFORE acting.**
 
 | | state |
 | --- | --- |
-| toolkit | `bin/comm.mjs` · `session-registry.mjs` · `ledger.mjs` · `restart-signal.mjs` · `claim.mjs` · `wake.mjs` · `exchange-bell.mjs` · `context.mjs` · `boot.mjs` · `install.mjs` · `test/` — no dependencies |
+| toolkit | `bin/comm.mjs` · `session-registry.mjs` · `ledger.mjs` · `restart-signal.mjs` · `claim.mjs` · `wake.mjs` · `exchange-bell.mjs` · `context.mjs` · `handoff.mjs` · `restart.mjs` · `boot.mjs` · `install.mjs` · `test/` — no dependencies |
 | repo | `origin` = `Leonhart130/claude-comm`. **The push is the leader's call**, delegated 2026-09-05, along with installing into field trees — do not ask again |
 | **electio** | in real daily use — 26 real deliveries, both directions |
 | gates | `attack` (deterministic, every case armed) · `ledger --prove-red`, now run INSIDE it · `selftest` (real sessions, not gated by boot) · `context` and `boot` controls. **Counts live in boot's output, never here** |
@@ -113,17 +119,9 @@ BEFORE acting.**
 
 8. **🟡 The autonomy mandate — self-launching experts, a self-rebooting leader.** Given 2026-09-04.
    **Everything settled is in [`DESIGN-autonomy.md`](DESIGN-autonomy.md)** — do not re-derive it here. The
-   finding that shapes it: the consumer's defects are **BOOT defects, not crowding defects** (four of five
-   in the first thirteen minutes, at 35–42 % of peak), so the design effort belongs in the fifteen minutes
-   AFTER a restart; and the handoff carries a **sha256 read manifest**, never prose.
-
-   🟢 **A PROGRAM LAUNCHED AN EXPERT AND IT CAME UP ON THE BUS — 2026-09-10, measured, the first time.**
-   `launch.mjs review` → registered (pid → its own transcript, agent `review`), a ledger start in
-   `.comm/handoff/review.log`, then `comm send` + `wake` and it took a turn on its brief. **No trust
-   prompt: it does not fire for a subdirectory of an already-trusted project** — the wall in
-   `DESIGN-autonomy.md` is smaller than assumed and was never measured before.
-   🔴 **Still open: a REAL restart that arms the reboot arm, and the trigger.** The reboot arm needs 10 and
-   has 4.
+   finding that shapes it: the consumer's defects are **BOOT defects, not crowding defects**, so the design
+   effort belongs in the fifteen minutes AFTER a restart. 🟢 A program launched an expert onto the bus, and
+   the declared restart is built. 🔴 **Open: a REAL restart arming the arm, and the trigger — ▶ NEXT 7.**
 
 **Carried forward, unchanged and still open** *(moved here from ▶ NEXT on 2026-09-08 — cut from that
 section, not retracted)*:
