@@ -19,6 +19,18 @@ already have.
 
 
 
+
+## 2026-09-10.1 — bus print `c5e0eeb38685` — 2026-09-10
+
+*Rien ne change pour toi. Le contrôle de \`claim.mjs\` refuse maintenant d hériter d une identité.*
+
+- **Aucun changement de comportement du bus.** Cette entrée existe parce que le *print* a bougé et qu un
+  print qui bouge sans note est signalé — c est tout l interet de ce fichier.
+- \`claude-comm\` lance des sessions en leur passant \`CLAUDE_COMM_AGENT\`. Les suites de contrôle
+  l heritaient et se cassaient en silence : l identite ne se resolvait plus dans leurs fixtures. Elles la
+  suppriment desormais de leur environnement. **Si tu cours \`node .comm/bin/claim.mjs --prove-red\` depuis
+  une session lancee par un programme, il passait rouge pour cette raison et passe vert maintenant.**
+
 ## 2026-09-10 — bus print `4688380e413b` — 2026-09-10
 
 *Un claim abandonné ne t'accuse plus d'avoir planté.*
