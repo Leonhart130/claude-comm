@@ -5,18 +5,12 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-09-10: review #8 RAN — 19 findings, `REVIEW-8.md`. **Every CODE finding is fixed and armed**:
-C1/A1 the forgeable marker, C2/A2 the vanishing row, C3 the mtime boundary, C4 the descendant labelled
-cleared, C5 the inverted note, C6 the false crash, C8, D1, D2, D3. Controls: boot 55 arms, sensor 22,
-claim 17, attack 48. **The bus is installed in this repo**, `review/` on the roster, armed.)*
+*(2026-09-10: review #8 ran; **every CODE finding is fixed and armed** — see `REVIEW-8.md` and `HISTORY.md`.
+Controls: boot 55 · sensor 22 · claim 17 · attack 48. **The bus is installed here**, `review/` on the roster.)*
 
-**1 — 🟡 THREE MINOR FINDINGS OF REVIEW #8 REMAIN. Read `REVIEW-8.md`; it is not summarised here.**
-**C7** `status` is ⚠ on a fresh clone (mtime, ms resolution) · **A3** A47's regex passes `comm whoami` and
-`comm --json who` green and guards `read`, which is not a subcommand · **N1** the tier-0 charge moves ±34 B
-with what the last boot found in the world, against a 14 B margin. ⚠️ **And the half of C5 that no code can
-close stays open:** a `/clear` whose hook never fires leaves the entry naming a DEAD transcript with both
-uuids agreeing — byte-identical to a session never cleared. `FINDINGS.md#clear-blind`. What closes it is
-the hook running, not a better guess in the sensor.
+**1 — 🟡 REVIEW #8'S THREE MINOR FINDINGS REMAIN: C7, A3, N1. Read `REVIEW-8.md`; not summarised here.**
+⚠️ **And the half of C5 no code can close:** a `/clear` whose hook never fires leaves the entry naming a
+DEAD transcript, both uuids agreeing — byte-identical to a session never cleared. `FINDINGS.md#clear-blind`.
 
 **2 — 🟡 THE CORRECTION TO THE FIELD LEADER IS WRITTEN AND UNREAD.**
 `exchange/work-leader/out/2026-09-10-correction-...md` — my citation named a function that does not exist,
@@ -24,11 +18,10 @@ the advice added confidence rather than evidence, and his real gap is C6, which 
 **The bell REFUSED: his leader is not running**, so nothing was rung and the file waits for his `boot.sh`
 §7. ⚠️ **Two `zz-` claims in his tree are still held by dead pids** and only he can release them.
 
-**3 — 🟡 THE BUS IS INSTALLED HERE; THE WORKFLOW IS STILL UNTESTED.** `review/` exists and is on the
-roster, so `bin/launch.mjs review` is now possible for the first time. **It has never been run.** ⚠️ The
-trust prompt for a new directory is the known wall (▶ NEXT 5) and `kitten @ send-key` returns exit 0
-having done nothing — **gate any keystroke on a verified effect, never on its exit code.** Review #8 ran
-as a SUBAGENT, which contributes nothing to the ledger; that is the whole point of fixing this.
+**3 — 🟢 THE REVIEW WORKFLOW RAN, AND #9 IS IN FLIGHT.** `launch.mjs review` → on the bus, registered, a
+ledger start, then `comm send` + `wake` and it took a turn on `BRIEF-adversarial-9.md` (target:
+`a219e62..660543f`, a whole day of fixes by the person who had just been caught). **Read `REVIEW-9.md`
+when it lands.** ⚠️ A `Stop hook error` appeared once in that session and does not reproduce — see below.
 
 **4 — 🔴 THE EROSION COUNT KEYS ON A ROW; A ROW WARNS FOR SEVERAL CAUSES.** Unchanged. The discharge is
 recorded (`from: 9`), the design flaw is not. **Amend the protocol properly: evidence, a gated change, an
@@ -110,23 +103,24 @@ gate or it is a platitude** — §1's gate is the `session` row, armed today.
    `#launch-refuses`. 🔴 **Installed in THIS repo 2026-09-10 with a `review` agent, and never yet run:
    ▶ NEXT 3.**
 
-8. **🔴 The autonomy mandate — self-launching experts, a self-rebooting leader.** Given 2026-09-04.
-   **Everything settled lives in [`DESIGN-autonomy.md`](DESIGN-autonomy.md)** — the four verified mechanisms,
-   the RAM measurements, the consumer's reply, the review #4 dispositions. Do not re-derive any of it here.
+8. **🟡 The autonomy mandate — self-launching experts, a self-rebooting leader.** Given 2026-09-04.
+   **Everything settled is in [`DESIGN-autonomy.md`](DESIGN-autonomy.md)** — do not re-derive it here. The
+   finding that shapes it: the consumer's defects are **BOOT defects, not crowding defects** (four of five
+   in the first thirteen minutes, at 35–42 % of peak), so the design effort belongs in the fifteen minutes
+   AFTER a restart; and the handoff carries a **sha256 read manifest**, never prose.
 
-   **The two findings that shape it:** the consumer's defects are **BOOT defects, not crowding defects**
-   (four of five authored in the first thirteen minutes at 35–42 % of peak), so the design effort belongs in
-   the fifteen minutes AFTER a restart. And the handoff carries a **sha256 read manifest**, never prose.
-
-   ✅ The instrument (`bin/ledger.mjs`), review #4's answer, the restart signal, and now **the launcher**
-   all exist. 🔴 **What is open is ▶ NEXT 4**: the trust prompt, whether a program can answer it, then a real
-   restart that arms the reboot arm, then the trigger.
+   🟢 **A PROGRAM LAUNCHED AN EXPERT AND IT CAME UP ON THE BUS — 2026-09-10, measured, the first time.**
+   `launch.mjs review` → registered (pid → its own transcript, agent `review`), a ledger start in
+   `.comm/handoff/review.log`, then `comm send` + `wake` and it took a turn on its brief. **No trust
+   prompt: it does not fire for a subdirectory of an already-trusted project** — the wall in
+   `DESIGN-autonomy.md` is smaller than assumed and was never measured before.
+   🔴 **Still open: a REAL restart that arms the reboot arm, and the trigger.** The reboot arm needs 10 and
+   has 4.
 
 **Carried forward, unchanged and still open** *(moved here from ▶ NEXT on 2026-09-08 — cut from that
 section, not retracted)*:
 - **ESLint is uncovered.** A43 stops a configured *prettier* from rewriting our generated files; ESLint is
   the same shape and is not armed. `FINDINGS.md#generated-in-their-tree`.
-- **No real adversarial review has ever run from `review/`.** The routing is measured; the workflow is not.
 - **The 15-minute window is untested and my own timestamps are why.** 0 of 25 defects fall in it, but each
   is dated at its commit — the upper bound. Not a result.
 - **The restart TTL lapsed on a human TWICE; the clock is the wrong instrument.** Try armer-gone AND not
@@ -140,6 +134,13 @@ section, not retracted)*:
 
 ## ⚠️ What was NOT verified
 
+- 🔴 **A `Stop hook error occurred` appeared once in the launched `review` session (2026-09-10, its first
+  turn, the turn a wake delivered mail into) and I CANNOT REPRODUCE IT.** Three invocations of that stub —
+  bare, with the payload, and with the exact configured command line and `CLAUDE_PROJECT_DIR` — all exit 0
+  and print nothing. The session carried on working. Unexplained, not dismissed: `FINDINGS.md#A20` says a
+  signal with no code change is reporting a change in the world. **The Stop stub carries no `timeout` while
+  `SessionStart` carries 20 s — that is a hypothesis, not a finding, and it is untested.**
+
 - 🔴 **Whether `boot`'s registry `GONE` wording is reachable — in BOTH directions.** The 09-08 trace said
   no; review #8 D4 found the enumeration incomplete (a transcript removed under a live session). ▶ NEXT 6.
 
@@ -148,17 +149,16 @@ section, not retracted)*:
 - **Whether the pid→transcript descriptor returns after a cleared session takes a turn**
   (`FINDINGS.md#clear-blind`). MOOT for the sensor now, still unmeasured — it decides whether the sensor's
   "session CLEARED" note is permanent or transient.
-- **What happens to the entry when a session is `resume`d or `compact`ed.** Both fire `SessionStart` with a
-  source this repo has never seen, so whether they carry a `transcript_path` at all is unknown. A payload
-  without one leaves the previous entry standing, which is the safe direction and is not the same as correct.
-- **The ledger's 11 defects are all from ONE session and NONE fell in the 15-minute window** —
-  and they are dated at their commit, the upper bound. `FINDINGS.md#review6-disposal`.
+- **What the entry does on `resume` or `compact`.** Both fire `SessionStart` with a source never seen here;
+  a payload with no `transcript_path` leaves the old entry standing — the safe direction, not the same as correct.
+- **The ledger's 11 defects are all from ONE session, none in the 15-minute window**, and each is dated at
+  its commit — the upper bound. `FINDINGS.md#review6-disposal`.
 - **The git guard has never fired outside a fixture.** Both field projects were clean when it shipped, and
   the one agent who read the notice did not stage a case where it should fire.
-- **The crossing has happened ONCE**, one project, one agent, one hand (2026-09-04 20:44), after two lapse
-  warnings. Unverified: that it survives an unattended relaunch, that anyone repeats it, that the arm reaches ten.
-- **`selftest`'s BEHAVIOUR half is not a gate and never will be** — 3 of 6 runs showed the agent not reading
-  the file it was pointed at. This bus regularly rings a bell nobody answers, and no gate sees it.
+- **The crossing has happened ONCE** (2026-09-04, one hand, after two lapse warnings). Unverified: that it
+  survives an unattended relaunch, that anyone repeats it, that the arm reaches ten.
+- **`selftest`'s BEHAVIOUR half is not a gate** — 3 of 6 runs showed the agent not reading the file it was
+  pointed at. This bus rings bells nobody answers and no gate sees it. **It has not run since 2026-09-08.**
 - **Anything non-Linux**: `comm who` reads `/proc` and degrades to "not running" everywhere else.
 - Two older standing caveats were moved to `FINDINGS.md#test-debt` when this file hit its cap: A8's partial
   mutations, and behaviour mid-TOOL-CALL. Cut from here, not retracted.
