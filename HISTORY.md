@@ -752,3 +752,38 @@ real letters**, 13 of them in one channel. The arm wrote ONE file into `in/`, an
 cannot pick the wrong one: it could never exhibit the defect in its own title. Third and fourth instances
 of the 2026-09-04 amendment in one review. Both branches enumerate now, and the arm stages two letters and
 a reply with only the mtimes scrambled.
+
+## ✅ Session 16c — 2026-09-10: the trigger was measured and then not built
+
+**The signal reproduces; the conclusion drawn from it does not.** `DESIGN-autonomy.md` took from the
+consumer a trigger with no threshold in it — *"you have re-fetched a file you already read this session"*.
+Re-run here on **168 sessions and 45 923 opens**, bucketed by decile of context fullness: the re-open share
+rises monotonically to **85 %** (theirs: 87 %), and verbatim-duplicate tool calls are **1.1 %**, so it is
+re-fetching and not looping. Their observation holds.
+
+**But it is already 52–59 % in the second and third deciles, and the curve has no knee.** Re-fetching is
+the normal state of a session almost from the start, so the proposed rule fires immediately and always, and
+any trigger derived from the curve carries a number after all. Recorded in the design beside the claim it
+refutes, with the caveat stated rather than buried: the path extraction over-collects on purpose, so the
+SHAPE reproduces and the percentages inflate.
+
+⇒ **No automatic trigger was built, and that is the decision, not an omission.** The ledger still says
+UNKNOWN on whether a reboot costs a defect at all. Automating a restart before that verdict would be
+industrialising a choice nobody has priced. What was built is the DECLARED restart, so the arm fills with
+real trials: `bin/handoff.mjs` (a sha256 read manifest, seven arms) and `bin/restart.mjs prepare`
+(handoff → verify against the disk → arm the note, in that order, four arms). It refuses to arm behind a
+failed handoff — the consumer's own finding — and it does not relaunch, because `launch.mjs` refuses an
+agent already alive and the caller is that agent. **A step named and not taken is honest.**
+
+**Two defects found by trying to ARM a property rather than by reading it.** `handoff.mjs` ran its guards
+BEFORE hashing, so a guard that rewrites a pinned file — a formatter, a build, all of `A43`'s world — was
+hashed after its own damage and recorded as if it had been read; the restart control could not stage a
+failure until the order was inverted. And the generated field README still published *"a claim whose holder
+has died reads as a crash, not a stale lock"* — the sentence corrected in `claim.mjs` that morning, still
+being shipped to every field agent that afternoon. Same shape as review #8's D1, eight hours later.
+
+**And the delivery gate was used for what it is for.** `test/selftest.mjs` had not run since 09-08; it
+passed both ways, which opened the first delivery change this repo has made deliberately rather than
+avoided: `handoff.mjs` and `restart.mjs` joined `BUS_FILES` and are installed in all three field trees.
+The restarts happen there — 53 cold starts in one tree against 5 declared reboots — so a tool only the
+maintainer could run was a tool that could never fill the arm it exists to fill.

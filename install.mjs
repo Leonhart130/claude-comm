@@ -482,7 +482,32 @@ const NOTICE = (here, root) => [
 	"It **advises**: it opens nothing, kills nothing and blocks nothing — a mutex every agent can delete is a",
 	"promise the filesystem does not make. What it buys is that a collision is one command away from being",
 	"diagnosable instead of looking like a broken test, and your `SessionStart` says so without being asked.",
-	"A claim whose holder has died reads as **a crash, not a stale lock** — nothing expires here.",
+	"A claim whose holder is gone reads as **gone and never released — a crash OR a clean exit that forgot**,",
+	"because a record cannot tell those apart and this tool no longer pretends it can *(corrected 2026-09-10;",
+	"it used to say \"a crash\", and it said it about sessions that had exited cleanly)*. Nothing expires here.",
+	"",
+	"## Restarting an agent without losing what it had read",
+	"",
+	"A long session degrades: measured across 168 real sessions on this machine, the share of file-opens that",
+	"RE-OPEN a file already read that session rises from ~52 % to **85 %** as the context fills. Restarting is",
+	"the obvious answer and it has an obvious cost — a fresh session knows nothing — so **the handoff carries",
+	"a proof, never a summary**:",
+	"",
+	"```",
+	"node .comm/bin/restart.mjs prepare --obligations <your-notes.md> \\",
+	"      --read <a file you read> --guard \"<a check; it is RUN and its output recorded>\"",
+	"node .comm/bin/handoff.mjs verify      # the FIRST thing your next session runs",
+	"```",
+	"",
+	"`verify` re-hashes every file the handoff pinned. **UNCHANGED means the previous session's read stands as",
+	"a verified fact about the disk; CHANGED names the one file to read again in full.** Nothing is trusted.",
+	"",
+	"It REFUSES without your obligations, and refuses an obligations file that exists but is blank: the one",
+	"section no tool can derive is exactly what a restart destroys. It arms the note that makes your next start",
+	"score as a REBOOT rather than a cold one — **and it refuses to arm that note behind a handoff that failed",
+	"or that no longer matches the disk**, because a note with nothing behind it is a trial that reads as",
+	"measured and arrives empty. It does NOT relaunch you: the launcher refuses an agent that is already alive,",
+	"and you are it. Exit first, then `node .comm/bin/launch.mjs <you>`.",
 	"",
 	"## Launching a SECOND session in the same folder — a reviewer, a helper",
 	"",
@@ -703,7 +728,12 @@ function write(path, content, results) {
  * bus whose print no longer matches its top note is REPORTED as exactly that: changed, with
  * nothing said about it. `--release "<label>"` stamps a new entry with the current print.
  */
-const BUS_FILES = ["comm.mjs", "session-registry.mjs", "ledger.mjs", "wake.mjs", "restart-signal.mjs", "claim.mjs", "launch.mjs"]
+// handoff.mjs and restart.mjs joined 2026-09-10, and it is a DELIVERY change: gated by
+// test/selftest.mjs green in BOTH directions before it was made. They ship because the
+// restarts happen HERE - 53 cold starts in one field tree against 5 declared reboots - and
+// the ledger verdict stays UNKNOWN until declared restarts exist to count. A tool only the
+// maintainer can run cannot fill an arm the field is the source of.
+const BUS_FILES = ["comm.mjs", "session-registry.mjs", "ledger.mjs", "wake.mjs", "restart-signal.mjs", "claim.mjs", "launch.mjs", "handoff.mjs", "restart.mjs"]
 const CHANGELOG = join(HERE, "CHANGELOG.md")
 function busPrint() {
 	const h = createHash("sha256")

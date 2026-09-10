@@ -12,10 +12,9 @@ and aimed at #8's own fixes: **two were half-done, one killed its own process gr
 returns exit 0 whatever happens — read the suite's LAST LINE.** ⚠️ Run it with `CLAUDE_COMM_AGENT` **set as
 well**: that is what `launch.mjs` injects, it silently broke every suite here (#9 C1), and A48 guards it.
 
-**2 — 🟡 WHAT REVIEW #9 LEFT OPEN.** `REVIEW-9.md` has the measurements; not summarised here.
-**A3** the crossing arm consumes `handoffLogs` without re-checking the guard the arm above it asserted ·
-**C7** `status` is ⚠ on a fresh clone · **N1** the tier-0 charge moves ±34 B against a 14 B margin ·
-plus review #8's **A3** (A47 passes `comm whoami` and `comm --json who`).
+**2 — 🟡 WHAT REVIEWS #8 AND #9 LEFT OPEN**, all minor, measurements in the reports: **#9 A3** the
+crossing arm consumes `handoffLogs` without re-checking the guard above it · **C7** `status` ⚠ on a fresh
+clone · **N1** the tier-0 charge moves ±34 B against a 14 B margin · **#8 A3** A47 passes `comm whoami`.
 
 **3 — 🔴 TWO LIMITS THAT NO CODE CLOSES, AND BOTH ARE NAMED IN THE CODE.** A `/clear` whose hook never
 fires leaves the registry naming a DEAD transcript with both uuids agreeing — indistinguishable from a
@@ -47,13 +46,11 @@ knee**, so the design's *"no magic number"* is not supported and any trigger fro
 The numbers are in `DESIGN-autonomy.md`, with the caveat that the measurement over-collects. **And the
 ledger still says UNKNOWN.** Automating a restart before knowing whether one costs a defect would be
 automating an unmeasured decision. ⇒ **use `restart.mjs` for real restarts; the arm fills, then decide.**
-⚠️ `DESIGN-autonomy.md` claimed the field records no starts — **false, 58 records**, corrected there.
-⚠️ Neither tool is in `BUS_FILES`, so the field cannot use them: that is a delivery change, and
-`selftest` is green both ways, so the gate is open for one. ⚠️ A `review` session may still be alive —
+⚠️ `DESIGN-autonomy.md` claimed the field records no starts — **false, 58**, corrected there.
+🟢 **Both SHIPPED to the field 2026-09-10** (bus `0e8c6abc8a13`, release `2026-09-10.2`) — a delivery
+change, gated by `selftest` green in both directions before AND after, and the generated README now teaches
+the restart. **That is what makes the arm fillable: the restarts happen there, not here.** ⚠️ A `review` session may still be alive —
 `comm who`. **Do not close a window you did not open.**
-
-⚠️ **`LESSONS.md` (tier 2), the conduct register: 5 lessons, 10 FORMS, each priced. Read the form table
-BEFORE acting.**
 
 ## Where it stands
 
