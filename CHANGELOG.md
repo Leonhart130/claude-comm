@@ -22,6 +22,19 @@ already have.
 
 
 
+
+## 2026-09-10.4 — bus print `c98a806ba2e8` — 2026-09-10
+
+*\`--pid\` est enfin dans la ligne d usage de \`claim.mjs\`.*
+
+- 🔴 **\`--pid\` n apparaissait nulle part dans l aide** — son seul lieu de documentation etait un message
+  d erreur qu on ne voit **qu apres s etre trompe**. Signale par le leader de \`~/Dev/getajob\` a sa
+  premiere utilisation reelle, sur un port vite partage entre deux de ses experts.
+- ⚠️ **Ce n est pas cosmetique pour un PORT** : sans \`--pid\`, le claim est lie a TA SESSION. Or un port
+  survit a une session et meurt avant elle. La ligne d usage porte maintenant la raison :
+  *"without it the claim is bound to your SESSION, and a port outlives a session."*
+- 🟢 Rien d autre ne change dans le comportement du bus.
+
 ## 2026-09-10.3 — bus print `e1c88f7254fb` — 2026-09-10
 
 *Quand un \`--ref\` rate, le refus te dit quoi taper.*
