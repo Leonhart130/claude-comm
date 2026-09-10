@@ -808,3 +808,41 @@ suggestion at all, or the guard would send the next agent to a path that is equa
 
 `comm.mjs` is the bus, so this was a delivery change: `test/selftest.mjs` green before and after, real
 sessions both times. 46 652 B against A22's 48 KB cap.
+
+## ✅ Session 16e — 2026-09-10: the erosion counter stopped clearing debts it had not paid
+
+**The oldest open item in the repo, and a flaw in the mechanism that governs every other guard.** The
+acknowledgement count keyed on the ROW. `field:work` reached **nine** on one cause while a second sat
+undischarged, and a single `--amended` cleared both — so the instrument stopped demanding an amendment for
+a cause nobody had addressed. `CLAUDE.md` makes that count the evidence for changing this protocol, so the
+evidence was quietly wrong.
+
+**The cause is the ack's own reason, not the row's text.** `--ack <row>="why"` already forces the operator
+to state why they are waving a row past; that sentence, normalised and hashed, is the cause.
+⚠️ Normalising the ROW's text was considered and rejected: it moves with ages, pids and filenames, so it
+would either never accumulate — the detector going silent, the worst direction for a guard whose whole job
+is to notice repetition — or need per-row knowledge inside a generic mechanism, which is the shape A27/A28
+already cost this project three reviews.
+
+Two refusals carry it, and they are the fix rather than decoration: a bare `--amended` on a row carrying
+several causes **refuses and writes nothing**, listing each `@sig` with its count and its sentence; and an
+`--amended <row>@<sig>` naming a cause nobody acknowledged refuses too, because amending an imaginary debt
+is the same defect arriving by the front door. `ackCounts[row]` stays as the row total so existing readers
+keep working; migration is forward-only, and a state file with no `ackCauses` reads as "nothing acked yet",
+which demands more amendments rather than fewer.
+
+**Two reporting defects fell out of building it, both in the same family.** A deliberate refusal printed
+*".boot-state.json could not be written"*, because `!recorded` was two states rendered as one — that
+message sent its reader to check permissions on a healthy disk. And `updateState` wrapped the caller's
+mutator in the same `try` as the write, so a **bug in the callback** reported as a **disk failure**. Both
+now say which they are. The second cost more time than the bug it was hiding.
+
+⚠️ **And the arm was wrong twice before the code was.** It acked a row that was GREEN — only rows actually
+waved past are counted — and concluded the mechanism did not count; then it tested the bare-`--amended`
+refusal *after* the aimed amendment had left one cause, where discharging is correct behaviour. Each
+mistake cost a thirteen-minute control. That is the real price of the 2026-09-04 amendment, and it is worth
+paying: the fixture is the part most likely to be wrong, and a green arm over a wrong fixture is the defect
+this repo is named for.
+
+**And a full afternoon of it ran against a stale copy.** Several rounds of debugging the close path measured
+the fixture's own `bin/`, copied before the changes — the tool being run was not the tool being edited.

@@ -70,11 +70,35 @@ for (let i = 0; i < ARGV.length; i++) {
 // gitignored file - an unaudited edit to the evidence `CLAUDE.md` names as the authority for
 // changing this protocol. So the reset is a flag, it is recorded with its reason and the
 // head it landed at, and the history stays in the file.
+// 🔴 A ROW WARNS FOR SEVERAL CAUSES, AND THE COUNT USED TO KEY ON THE ROW. `field:work`
+// reached NINE on one cause while a second sat undischarged, and a single `--amended`
+// cleared both - so the instrument stopped demanding an amendment for a cause nobody had
+// addressed. The oldest open item in this repo, and a flaw in the mechanism that governs
+// every other guard. Design and rejected alternatives: FINDINGS.md#ack-amendment.
+//
+// The cause is the ACK'S OWN REASON, not the row's text: the operator already has to state
+// why they are waving the row past, and that sentence is the cause. Normalising the ROW's
+// text was rejected - it moves with ages, pids and filenames, so it would either never
+// accumulate (the detector goes silent, the worst direction for a guard whose job is to
+// notice repetition) or need per-row knowledge inside a generic mechanism.
+const causeSig = (why) => {
+	const flat = String(why ?? "").toLowerCase().replace(/\s+/g, " ").trim()
+	let h = 5381
+	for (let i = 0; i < flat.length; i++) h = ((h * 33) ^ flat.charCodeAt(i)) >>> 0
+	return h.toString(16).padStart(8, "0").slice(0, 6)
+}
+// `--amended <row>=<what changed>` or `--amended <row>@<sig>=<what changed>`. The sig is
+// printed by the amend instruction itself, so it is copied rather than derived; without it
+// a row carrying ONE eroding cause discharges that one, and a row carrying several REFUSES
+// and lists them. Never a silent multi-discharge - that is the defect being fixed.
 const AMENDED = new Map()
 for (let i = 0; i < ARGV.length; i++) {
 	if (ARGV[i] !== "--amended" || !ARGV[i + 1]) continue
 	const eq = ARGV[i + 1].indexOf("=")
-	if (eq > 0) AMENDED.set(ARGV[i + 1].slice(0, eq), ARGV[i + 1].slice(eq + 1))
+	if (eq <= 0) continue
+	const head = ARGV[i + 1].slice(0, eq), why = ARGV[i + 1].slice(eq + 1)
+	const at = head.indexOf("@")
+	AMENDED.set(at > 0 ? head.slice(0, at) : head, { why, sig: at > 0 ? head.slice(at + 1) : null })
 }
 
 // Four levels, because three forced "not measured" to borrow OK's tick - and OK is a
@@ -126,18 +150,27 @@ const git = (...a) => {
  * of a gate - and it is still not atomic. Losing a count in that window is recoverable;
  * losing a close was not.
  */
+let updateStateWhy = null
 function updateState(mutate) {
+	updateStateWhy = null
 	try {
 		const sp = join(ROOT, ".boot-state.json")
 		let disk = {}
 		try { disk = JSON.parse(readFileSync(sp, "utf8")) || {} } catch {}
-		const next = mutate(disk)
+		// A THROW IN THE MUTATOR IS NOT A WRITE FAILURE, and this reported it as one: the
+		// whole body was inside one try, so a bug in the caller's callback printed ".boot-state
+		// .json could not be written" and sent the reader to check permissions on a healthy
+		// disk. Measured 2026-09-10 while reworking the erosion counter - the message cost more
+		// time than the bug. The reason is now carried out so the caller can say which it was.
+		let next
+		try { next = mutate(disk) }
+		catch (e) { updateStateWhy = `the close could not compute its new state: ${(e && e.message) || e}`; return false }
 		if (!next) return false
 		const tmp = `${sp}.tmp-${process.pid}`
 		writeFileSync(tmp, JSON.stringify(next, null, 2) + "\n")
 		renameSync(tmp, sp)
 		return true
-	} catch { return false }
+	} catch (e) { updateStateWhy = updateStateWhy || `.boot-state.json could not be written: ${(e && e.message) || e}`; return false }
 	// IT REPORTS. The first version of this function swallowed its failures the way
 	// `writeState` did, and for the hook and the report-size record that is right - a broken
 	// instrument may not break a session. For the CLOSE it is not: the close's whole output
@@ -1438,32 +1471,94 @@ if (CLOSE) {
 		const at = new Date().toISOString()
 		// COUNTED AGAINST THE BYTES ON DISK, not against the snapshot `st` read at the top of
 		// this block: review #7 F2. What the report prints is what was actually written.
-		let written = {}
-		const recorded = updateState((d) => {
+		// REFUSE BEFORE WRITING, never after. An amendment that clears more than the operator
+		// named is exactly the defect this rework exists to remove, so it is checked against
+		// the state ON DISK first: a row with several eroding causes will not discharge on a
+		// bare `--amended <row>=`, and a `@sig` nobody has acked is refused rather than
+		// invented. Both refusals print what to type instead.
+		{
+			let disk = {}
+			try { disk = JSON.parse(readFileSync(join(ROOT, ".boot-state.json"), "utf8")) || {} } catch {}
+			const known = disk.ackCauses || {}
+			for (const [label, { sig }] of AMENDED) {
+				const rowCauses = known[label] || {}
+				const sigs = Object.keys(rowCauses)
+				if (sig && !rowCauses[sig]) {
+					closeFailed = true
+					lines.length = 0
+					lines.push(`  ✗ NOT CLOSED - --amended ${label}@${sig} names a cause that was never acknowledged.`)
+					lines.push(sigs.length
+						? `    The causes counted for ${label} are: ${sigs.map((x) => `@${x} "${rowCauses[x].why}"`).join(" · ")}`
+						: `    Nothing has been acknowledged for ${label} at all.`)
+					lines.push("    An amendment for a cause nobody raised discharges an imaginary debt.")
+					break
+				}
+				if (!sig && sigs.length > 1) {
+					closeFailed = true
+					lines.length = 0
+					lines.push(`  ✗ NOT CLOSED - ${label} carries ${sigs.length} acknowledged causes and --amended named none of them.`)
+					for (const x of sigs) lines.push(`      @${x}  ${rowCauses[x].n}x  "${rowCauses[x].why}"`)
+					lines.push(`    Amending one must not discharge the others - that is the defect this refusal exists for.`)
+					lines.push(`    Name it:  node bin/boot.mjs --close --amended ${label}@<sig>="what it measures now"`)
+					break
+				}
+			}
+		}
+		let written = {}, writtenCauses = {}
+		const recorded = closeFailed ? false : updateState((d) => {
 			const c = { ...(d.ackCounts || {}) }
 			for (const r of open) c[r.label] = (c[r.label] || 0) + 1
-			// THE DISCHARGE (review #7 F10). An amendment zeroes the row it amended and says
-			// so in the file; anything else would leave the instruction unfollowable.
+			// PER CAUSE, alongside the row total. The total stays because arms and readers use
+			// it; the three-strikes instruction now fires on a CAUSE. Migration is forward-only:
+			// an old state file has no `ackCauses`, which reads as "no cause acked yet" - the
+			// safe direction, since it demands more amendments rather than fewer.
+			const causes = JSON.parse(JSON.stringify(d.ackCauses || {}))
+			for (const r of open) {
+				const why = ACKS.get(r.label)
+				if (why === undefined) continue
+				const sig = causeSig(why)
+				causes[r.label] = causes[r.label] || {}
+				const prev = causes[r.label][sig] || { n: 0, why }
+				causes[r.label][sig] = { n: prev.n + 1, why }
+			}
+			// THE DISCHARGE (review #7 F10), now aimed. An amendment clears the CAUSE it names
+			// and leaves the row's other causes standing - which is the whole point, and the
+			// arm the previous code would have failed.
 			const hist = Array.isArray(d.amendments) ? [...d.amendments] : []
-			for (const [label, why] of AMENDED) {
-				hist.push({ row: label, why, at, head, from: c[label] || 0 })
-				delete c[label]
+			for (const [label, { why, sig }] of AMENDED) {
+				const rowCauses = causes[label] || {}
+				const target = sig || Object.keys(rowCauses)[0] || null
+				const from = target && rowCauses[target] ? rowCauses[target].n : (c[label] || 0)
+				hist.push({ row: label, why, at, head, from, cause: target, causeWhy: target && rowCauses[target] ? rowCauses[target].why : null })
+				if (target && rowCauses[target]) {
+					delete rowCauses[target]
+					causes[label] = rowCauses
+					if (!Object.keys(rowCauses).length) { delete causes[label]; delete c[label] }
+					else c[label] = Object.values(rowCauses).reduce((a, v) => a + v.n, 0)
+				} else delete c[label]
 			}
 			written = c
+			writtenCauses = causes
 			d.ackCounts = c
+			d.ackCauses = causes
 			if (hist.length) d.amendments = hist
 			d.lastClose = { at, head, acked: [...ACKS.keys()], amended: [...AMENDED.keys()] }
 			return d
 		})
-		if (!recorded) {
+		// `!recorded` is TWO states and it used to render as one: the write genuinely failed,
+		// or this close REFUSED before attempting it. Clobbering the refusal here replaced a
+		// message naming which cause to amend with "the file could not be written" - a report
+		// that sends the reader to check permissions on a healthy disk. Found by running it.
+		if (!recorded && !closeFailed) {
 			closeFailed = true
 			lines.length = 0
-			lines.push("  ✗ NOT CLOSED - .boot-state.json could not be written.")
+			lines.push(`  ✗ NOT CLOSED - ${updateStateWhy || ".boot-state.json could not be written."}`)
 			lines.push("    The acknowledgements and the close timestamp did not land, so the next boot would")
 			lines.push("    inherit no record of this close at all. Fix the file, then close again.")
 		} else {
-		for (const [label, why] of AMENDED)
-			lines.push(`  ⟳ amended       ${label}: ${why} - its erosion count is cleared and the amendment is recorded`)
+		for (const [label, { why, sig }] of AMENDED)
+			lines.push(`  ⟳ amended       ${label}${sig ? "@" + sig : ""}: ${why} - THAT CAUSE's count is cleared, ` +
+				`any other cause on the row still stands, and the amendment is recorded`)
 		// Amendment evidence. Not a suggestion to think about it - a count.
 		//
 		// 🔴 ONLY FOR ROWS THIS BOOT ACTUALLY PRODUCED. It read the all-time map, so a row
@@ -1481,15 +1576,24 @@ if (CLOSE) {
 		// misuse `--amended` on a guard that needed no amendment, which corrupts the very
 		// evidence `CLAUDE.md` builds the amendment protocol on.
 		const waved = new Set(open.map((r) => r.label))
-		const eroding = Object.entries(written).filter(([label, n]) => n >= EROSION && waved.has(label))
+		// PER CAUSE. A row waved past three times for three DIFFERENT reasons is not eroding -
+		// it is a row doing its job on three different problems, and demanding an amendment
+		// there would push the operator to misuse `--amended` on a guard that needs none,
+		// corrupting the evidence CLAUDE.md builds the whole protocol on.
+		const eroding = []
+		for (const [label, byCause] of Object.entries(writtenCauses)) {
+			if (!waved.has(label)) continue
+			for (const [sig, v] of Object.entries(byCause)) if (v.n >= EROSION) eroding.push([label, sig, v])
+		}
 		const stale = Object.keys(written).filter((label) => !waved.has(label) && written[label] >= EROSION)
 		if (eroding.length) {
 			lines.push("")
-			lines.push("  🔴 AMEND THE PROTOCOL - these rows are being waved past, not acted on:")
-			for (const [label, n] of eroding) {
-				lines.push(`      ${label} acknowledged ${n}x. A row that is defensible every time it is bypassed is`)
-				lines.push(`      already failing. Change what it measures, or delete it. Raising nothing is not a fix.`)
-				lines.push(`      When you have: node bin/boot.mjs --close --amended ${label}="what it measures now"`)
+			lines.push("  🔴 AMEND THE PROTOCOL - these CAUSES are being waved past, not acted on:")
+			for (const [label, sig, v] of eroding) {
+				lines.push(`      ${label} @${sig} acknowledged ${v.n}x for the same reason: "${v.why}"`)
+				lines.push(`      A row defensible every time it is bypassed is already failing. Change what it`)
+				lines.push(`      measures, or delete it. Raising nothing is not a fix.`)
+				lines.push(`      When you have: node bin/boot.mjs --close --amended ${label}@${sig}="what it measures now"`)
 			}
 		}
 		if (stale.length) lines.push(`  · ${stale.length} count(s) held as history for row(s) this close did not wave past (${stale.join(", ")}) - a row that is green, or gone, is not eroding`)
@@ -2627,7 +2731,7 @@ function proveRed() {
 			// count for it, so without this the arm measures rows it never touched. (Measured:
 			// it did, and the "silent after the amendment" half failed for a row this arm had
 			// never named.)
-			{ const st0 = stateOf(); st0.ackCounts = {}; writeFileSync(join(pkg, ".boot-state.json"), JSON.stringify(st0, null, 2) + "\n") }
+			{ const st0 = stateOf(); st0.ackCounts = {}; st0.ackCauses = {}; writeFileSync(join(pkg, ".boot-state.json"), JSON.stringify(st0, null, 2) + "\n") }
 			// ONE full boot for the ack list, reused: `run(false)` runs the gate, and calling it
 			// per close cost four extra suite runs for a list that cannot change.
 			const acks = run(false).rows.filter((r) => r.label && r.label !== "close")
@@ -2694,6 +2798,63 @@ function proveRed() {
 				`a count for a row this boot does not produce -> demanded=${/a-row-that-was-deleted acknowledged/.test(withGhost)} (want false), named as history=${/a-row-that-was-deleted/.test(withGhost)}; ` +
 				`the same count on a row that is GREEN this close -> demanded=${!greenSilent} (want false: a green row was not waved past)` +
 				`, and the row really WAS green in that close=${treeWasGreen} (false here means THIS ARM's fixture drifted, not that the code haunts - FINDINGS.md#erosion-arm)`)
+
+			// ── A ROW WARNS FOR SEVERAL CAUSES, AND ONE AMENDMENT MUST NOT CLEAR THEM ALL ──
+			//
+			// The defect this repo carried longest: the count keyed on the ROW. `field:work`
+			// reached NINE on one cause while a second sat undischarged, and a single
+			// `--amended` cleared both - so the instrument stopped demanding an amendment for
+			// a cause nobody had addressed. FINDINGS.md#ack-amendment.
+			//
+			// ONE VARIABLE: the ack's own REASON. Same row, same close machinery, two
+			// different sentences. The third assertion is the one the previous code fails.
+			{
+				const st0 = stateOf(); st0.ackCounts = {}; st0.ackCauses = {}
+				writeFileSync(join(pkg, ".boot-state.json"), JSON.stringify(st0, null, 2) + "\n")
+				// THE ROW MUST ACTUALLY BE WAVED PAST, or nothing is counted: only rows in
+				// `open` increment, and the block above may have left the tree clean. The first
+				// version of this arm acked a GREEN tree three times and then reported the code
+				// broken because no cause existed - the fixture, not the mechanism.
+				writeFileSync(join(pkg, "dirty-causes.txt"), "x\n")
+				// ONE gate run for the row list, reused - `run(false)` runs the whole suite, and
+				// building the list per close cost five of them for a list that cannot change.
+				const causeRows = run(false).rows.filter((r) => r.label && r.label !== "close").map((r) => r.label)
+				const ackWith = (treeWhy) => causeRows
+					.flatMap((label) => ["--ack", `${label}=${label === "tree" ? treeWhy : "fixture: deliberately " + label}`])
+				const reasonA = ackWith("cause A: work in flight")
+				for (let i = 0; i < 3; i++) { touchStatus(); closeRun2(reasonA) }
+				const causesA = (stateOf().ackCauses || {}).tree || {}
+				const sigA = Object.keys(causesA)[0]
+				// A SECOND, DIFFERENT reason on the SAME row.
+                                touchStatus()
+				closeRun2(ackWith("cause B: something else entirely"))
+				const both = (stateOf().ackCauses || {}).tree || {}
+				const sigB = Object.keys(both).find((k) => k !== sigA)
+				const separate = !!sigA && !!sigB && both[sigA].n === 3 && both[sigB].n === 1
+				// ORDER MATTERS HERE, and the first version of this arm got it wrong: the bare
+				// --amended must be tried while the row still carries BOTH causes. Tried after
+				// the aimed amendment, the row has one cause left and discharging it is correct
+				// behaviour - so the arm read a working refusal as absent. The fixture, not the
+				// mechanism, and it cost a 13-minute run to see.
+				touchStatus()
+				const bare = closeRun2([...ackWith("cause A: work in flight"), "--amended", "tree=guessing"])
+				const refused = /carries \d+ acknowledged causes and --amended named none/.test(bare.stdout || "")
+				// ...and it must change NOTHING: a refusal that half-wrote would be worse than
+				// the defect, since the operator would believe nothing happened.
+				const untouched = JSON.stringify((stateOf().ackCauses || {}).tree || {}) === JSON.stringify(both)
+				// Amending A must leave B standing. This is the assertion that fails on a
+				// count keyed by row.
+				touchStatus()
+				const amended = closeRun2([...ackWith("cause B: something else entirely"), "--amended", `tree@${sigA}=it measures something else now`])
+				const after = (stateOf().ackCauses || {}).tree || {}
+				const aGone = !after[sigA], bStands = !!after[sigB]
+				assert("close: an amendment discharges ONE cause, not the whole row",
+					separate && aGone && bStands && refused && untouched && (amended.status === 0),
+					`two reasons on one row -> A=${sigA && both[sigA] && both[sigA].n}x B=${sigB && both[sigB] && both[sigB].n}x kept apart=${separate}; ` +
+					`a bare --amended while BOTH stand -> REFUSED=${refused}, state untouched=${untouched}; ` +
+					`--amended tree@${sigA} -> A cleared=${aGone}, **B still standing=${bStands}** (this is the one ` +
+					`a row-keyed count fails)`)
+			}
 		}
 
 		// ── a close whose record does not land is not a close ────────────────────────────
