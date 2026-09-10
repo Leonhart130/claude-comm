@@ -1361,7 +1361,7 @@ Still unverified, still true, and no longer worth a line in the file every boot 
   defect. Moot for delivery (identity no longer reads cwd); still governs `whoami`-returns-null, open item 2.
 
 
-### 🔴 The design for the fix, decided 2026-09-10 — execute it, do not re-derive it
+### ✅ Fixed 2026-09-10, and this section is now the record of how — not a plan
 
 The flaw, stated exactly: **the count keys on a ROW, and a row warns for several causes.** `field:work`
 reached **9** on one cause while a second sat undischarged, and a single `--amended` cleared both — so the

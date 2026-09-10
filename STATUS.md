@@ -22,10 +22,12 @@ never fires leaves the registry naming a DEAD transcript with both uuids agreein
 and the cleared-note discriminator goes quiet if the session owning the inherited uuid has itself ended.
 **Do not "fix" either with a better guess.**
 
-**4 — 🔴 THE EROSION COUNT KEYS ON A ROW; A ROW WARNS FOR SEVERAL CAUSES.** The oldest open item, and a
-flaw in the mechanism that governs every other one. **The design is decided and written out in full at
-`FINDINGS.md#ack-amendment` — execute it, do not re-derive it.** It names the rejected alternative and the
-four arms required, one of which the current code would fail.
+**4 — 🟢 THE EROSION COUNT KEYS ON THE CAUSE NOW.** The oldest open item in this repo, closed 2026-09-10.
+`--ack <row>="why"` is the cause; the three-strikes instruction fires per cause and prints
+`--amended <row>@<sig>="…"`; a bare `--amended` on a row carrying several causes **REFUSES and writes
+nothing**, and one naming a cause nobody acked refuses too. Armed: two causes kept apart, the refusal, and
+**an amendment clearing one while the other stands** — the assertion the row-keyed count failed.
+`FINDINGS.md#ack-amendment` is now the record of how, not a plan.
 
 **5 — 🟡 THE LETTER TO THE FIELD LEADER IS WRITTEN AND UNREAD** (`exchange/work-leader/out/2026-09-10-
 correction-...md`): my citation named a function that does not exist, and the advice added confidence, not
@@ -50,8 +52,8 @@ automating an unmeasured decision. ⇒ **use `restart.mjs` for real restarts; th
 ⚠️ `DESIGN-autonomy.md` claimed the field records no starts — **false, 58**, corrected there.
 🟢 **Both SHIPPED to the field 2026-09-10** (bus `0e8c6abc8a13`, release `2026-09-10.2`) — a delivery
 change, gated by `selftest` green in both directions before AND after, and the generated README now teaches
-the restart. **That is what makes the arm fillable: the restarts happen there, not here.** ⚠️ A `review` session may still be alive —
-`comm who`. **Do not close a window you did not open.**
+the restart. **That is what makes the arm fillable: the restarts happen there, not here.** 🟢 The `review` session did its work and the OWNER closed it, hours later — `comm who` says
+`not running`. **Launch a fresh one for the next review; do not close a window you did not open.**
 
 ## Where it stands
 
@@ -164,7 +166,7 @@ section, not retracted)*:
 world it measures is not a control. **Six instances.** `FINDINGS.md#measurement-traps`.
 
 **Acknowledgements amend the protocol** — `FINDINGS.md#ack-amendment`. First discharge 2026-09-08, `from: 9`.
-🔴 Design flaw: ▶ NEXT 4.
+🟢 **Its design flaw — one row, several causes, one amendment clearing all of them — was fixed 2026-09-10.**
 
 **Conduct defects go in `LESSONS.md`** (tier 2, priced, catalogued by form) — *a lesson ends as an armed
 gate or it is a platitude.*
