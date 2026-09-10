@@ -8,22 +8,24 @@ fold the settled parts into the README.
 *(2026-09-10. **Reviews #8 and #9 both ran.** #9 was launched BY A PROGRAM from `review/` — a first —
 and aimed at #8's own fixes: **two were half-done, one killed its own process group.** All repaired.)*
 
-**1 — 🔴 RUN THE CONTROLS FIRST.** `test/attack.mjs` (49; A48 is new) and the long one. ⚠️ **`systemd-run`
-returns exit 0 whatever happens — read the suite's LAST LINE.** ⚠️ Run it with `CLAUDE_COMM_AGENT` **set as
-well**: that is what `launch.mjs` injects, it silently broke every suite here (#9 C1), and A48 guards it.
+**1 — 🔴 RUN THE CONTROLS FIRST.** `test/attack.mjs` (**50**) and the long one. ⚠️ **`systemd-run` returns
+exit 0 whatever happens — read the suite's LAST LINE**, and **capture the full output**: one case failed once
+today and its name was lost to a re-run. ⚠️ Run it with `CLAUDE_COMM_AGENT` **set too** — that is what
+`launch.mjs` injects, it silently broke every suite here (#9 C1), and A48 guards it.
 
 **2 — 🟡 WHAT REVIEWS #8 AND #9 LEFT OPEN**, all minor, measurements in the reports: **#9 A3** the
 crossing arm consumes `handoffLogs` without re-checking the guard above it · **C7** `status` ⚠ on a fresh
 clone · **N1** the tier-0 charge moves ±34 B against a 14 B margin · **#8 A3** A47 passes `comm whoami`.
 
-**3 — 🔴 TWO LIMITS THAT NO CODE CLOSES, AND BOTH ARE NAMED IN THE CODE.** A `/clear` whose hook never
-fires leaves the registry naming a DEAD transcript with both uuids agreeing — indistinguishable from a
-session never cleared (`FINDINGS.md#clear-blind`). And the cleared-note discriminator goes quiet if the
-session that OWNS the inherited scratch uuid has itself ended. **Do not "fix" either with a better guess.**
+**3 — 🔴 TWO LIMITS NO CODE CLOSES, both named at their site in `bin/context.mjs`.** A `/clear` whose hook
+never fires leaves the registry naming a DEAD transcript with both uuids agreeing (`FINDINGS.md#clear-blind`);
+and the cleared-note discriminator goes quiet if the session owning the inherited uuid has itself ended.
+**Do not "fix" either with a better guess.**
 
-**4 — 🔴 THE EROSION COUNT KEYS ON A ROW; A ROW WARNS FOR SEVERAL CAUSES.** Unchanged, and now the oldest
-open item here. The discharge is recorded (`from: 9`); the design flaw is not. **Evidence, a gated change,
-an arm. Not prose.**
+**4 — 🔴 THE EROSION COUNT KEYS ON A ROW; A ROW WARNS FOR SEVERAL CAUSES.** The oldest open item, and a
+flaw in the mechanism that governs every other one. **The design is decided and written out in full at
+`FINDINGS.md#ack-amendment` — execute it, do not re-derive it.** It names the rejected alternative and the
+four arms required, one of which the current code would fail.
 
 **5 — 🟡 THE LETTER TO THE FIELD LEADER IS WRITTEN AND UNREAD** (`exchange/work-leader/out/2026-09-10-
 correction-...md`): my citation named a function that does not exist, and the advice added confidence, not
@@ -31,9 +33,8 @@ evidence. **The bell REFUSED — his leader is not running** — so it waits for
 claims there are still held by dead pids; only he releases them, and the sentence his boot printed about
 them **was false and is fixed** (#8 C6).
 
-**6 — 🟢 `test/selftest.mjs` RAN 2026-09-10, both ways.** PASS with real sessions and real hooks (and the
-BEHAVIOUR half reported the agent DID read the file it was pointed at); `--prove-red` PASSED, so a green run
-means something. **The delivery gate is open for a delivery change** — the first time that has been true here.
+**6 — 🟢 `test/selftest.mjs` RAN 2026-09-10, both ways** — PASS with real sessions, `--prove-red` PASSED.
+It gated today's delivery change (`handoff.mjs`/`restart.mjs` into `BUS_FILES`) before and after.
 
 **7 — 🟡 THE DECLARED RESTART IS BUILT; THE AUTOMATIC ONE IS DELIBERATELY NOT.**
 🟢 `bin/handoff.mjs` (sha256 read manifest, 7 arms) + `bin/restart.mjs prepare` (handoff → verify → arm the
@@ -78,19 +79,12 @@ the restart. **That is what makes the arm fillable: the restarts happen there, n
 3. ✅ **The wake is BUILT** (`bin/wake.mjs`, A32, `FINDINGS.md#wake-doorbell`). 🔴 Item 1's latency table
    predates it and has not been re-measured. The wake does not deliver — it makes a turn happen.
 
-4. **🟢 Holding a machine resource — `bin/claim.mjs`, settled and IN PRODUCTION.** `take`/`list`/`release`,
-   16 arms, A38, both field trees. **It advises; it opens nothing, kills nothing, blocks nothing.**
-   ✅ **E458 closed 2026-09-08 by the field leader** — negative control, `kill -9`, then the second-taker
-   half, with a detached `--pid` holder so no working expert was killed.
-   🔴 **STILL NOT MEASURED: no two REAL agents have contended through it** — `FINDINGS.md:1090` never
-   stopped saying so, and **the 09-08 rewrite of this file deleted the line that did** (review #8 D2, its
-   worst finding). He had made the code argument himself and *declined* to call it measured: *« je ne l'ai
-   pas couru avec deux sessions réelles, et je ne l'écris donc pas comme mesuré »*. I answered that his gap
-   was smaller than he thought, citing `stateOf` — **a function that does not exist here**. The real one is
-   `holderState` (`bin/claim.mjs:112`) and it does read `boot`/`pid`/`start` and never `holder`, so the
-   conclusion held; **the evidence did not change, only the confidence did.** ⇒ **a correction is owed to
-   him, and it is ▶ NEXT 2.** 🟢 In production unprompted: `port-4173` and — the one that matters —
-   `supabase-anneau-visiteur`, a NON-port resource with a purpose and a duration.
+4. **🟢 Holding a machine resource — `bin/claim.mjs`, IN PRODUCTION**, 17 arms, A38, three field trees.
+   **It advises; it opens nothing, kills nothing, blocks nothing.** In production unprompted, including a
+   NON-port resource with a purpose and a duration.
+   🔴 **STILL NOT MEASURED: no two REAL agents have contended through it.** `FINDINGS.md:1090` never stopped
+   saying so and the 09-08 rewrite of this file **deleted** the line that did — review #8's worst finding,
+   and the whole story is at `LESSONS.md` §2. ⇒ the correction to him is ▶ NEXT 5.
    ⚠️ Claims live in one project's `.comm/`, so a resource shared ACROSS projects is visible to nobody.
 
 5. **🟡 `who` reports TWO states and there are THREE — half shipped, in the wrong command.** A leader read
@@ -137,12 +131,17 @@ section, not retracted)*:
 
 ## ⚠️ What was NOT verified
 
+- ⚠️ **`test/attack.mjs` failed ONCE on 2026-09-10 and I did not capture which case.** Three runs
+  immediately after, no code change, all green. My grep had already moved on, so the case name is lost —
+  **that is a defect in my procedure, not a clean bill.** Likeliest cause, unproven: it ran seconds after a
+  `--prove-red` finished, and several cases snapshot the real registry (`FINDINGS.md#A20` shape). **Capture
+  the full output next time before re-running** — a second run is not evidence about the first.
+
 
 - 🔴 **Whether `boot`'s registry `GONE` wording is reachable — in BOTH directions.** The 09-08 trace said
   no; review #8 D4 found the enumeration incomplete (a transcript removed under a live session). ▶ NEXT 6.
 
-- **`--release` is verified by hand, not gated** (`FINDINGS.md#release-roundtrip`): `install.mjs` writes to
-  its own checkout, and a fixture would have to relocate `HERE`. That test seam does not exist.
+- **`--release` is verified by hand, not gated** (`FINDINGS.md#release-roundtrip`): the test seam does not exist.
 - **Whether the pid→transcript descriptor returns after a cleared session takes a turn**
   (`FINDINGS.md#clear-blind`). MOOT for the sensor now, still unmeasured — it decides whether the sensor's
   "session CLEARED" note is permanent or transient.
@@ -150,13 +149,12 @@ section, not retracted)*:
   a payload with no `transcript_path` leaves the old entry standing — the safe direction, not the same as correct.
 - **The ledger's 11 defects are all from ONE session, none in the 15-minute window**, and each is dated at
   its commit — the upper bound. `FINDINGS.md#review6-disposal`.
-- **The git guard has never fired outside a fixture.** Both field projects were clean when it shipped, and
-  the one agent who read the notice did not stage a case where it should fire.
+- **The git guard has never fired outside a fixture** — both field projects were clean when it shipped.
 - **The crossing has happened ONCE** (2026-09-04, one hand, after two lapse warnings). Unverified: that it
   survives an unattended relaunch, that anyone repeats it, that the arm reaches ten.
 - **`selftest`'s BEHAVIOUR half is not a gate** — 3 of 6 runs showed the agent not reading the file it was
   pointed at. This bus rings bells nobody answers and no gate sees it. **It has not run since 2026-09-08.**
-- **Anything non-Linux**: `comm who` reads `/proc` and degrades to "not running" everywhere else.
+- **Anything non-Linux**: `comm who` reads `/proc`, and degrades to "not running" elsewhere.
 - Two older standing caveats were moved to `FINDINGS.md#test-debt` when this file hit its cap: A8's partial
   mutations, and behaviour mid-TOOL-CALL. Cut from here, not retracted.
 

@@ -2547,6 +2547,9 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	writeFileSync(join(r44, ".comm", "config.json"),
 		JSON.stringify({ leader: "leader", agents: { leader: ".", db: "db" } }))
 	writeFileSync(join(r44, "LEAD.md"), "the ROOT copy\n")
+	// A49 uses this: it exists at the ROOT and NOT in the spoke, which is the shape the field
+	// leader hit three times - a file he could see, referenced at the wrong depth.
+	writeFileSync(join(r44, "ROOTONLY.md"), "only at the root\n")
 	writeFileSync(join(r44, "db", "LEAD.md"), "the SPOKE copy\n")
 	const c44 = (args, cwd = r44) => spawnSync("node", [join(PKG, "bin", "comm.mjs"), ...args], { cwd, encoding: "utf8" })
 
@@ -2578,6 +2581,33 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		`the SILENT case (LEAD.md at root AND in the spoke, so nothing is refused) names db/LEAD.md=${okNames}; ` +
 		`control, a spoke sitting at the root so the resolved path IS what was typed -> no base line=${ctlQuiet} ` +
 		`(a notice printed unconditionally would pass the first two and be noise)`)
+
+	// A49 — WHEN THE REF MISSES, THE REFUSAL NAMES THE STRING THAT WOULD WORK.
+	//
+	// The base rule is right and it is still hard to hold in the head: the leader of
+	// ~/Dev/getajob got the depth wrong THREE TIMES IN A ROW on 2026-09-10 and reported it
+	// as a compliment - every one was caught. A guard that refuses the same person three
+	// times for the same reason is working AND saying the contract is not obvious. The
+	// maintainer made the identical mistake the same morning. So the refusal now looks for
+	// the same basename at the project root and at the sender's own directory, and prints
+	// the ref that WOULD have resolved.
+	//
+	// ONE VARIABLE: whether the file exists somewhere findable. The control is a ref that
+	// exists NOWHERE - without it this passes for a tool that prints a suggestion always,
+	// which would send the next agent to a path that does not exist either.
+	{
+		const hint = c44(["send", "db", "--from", "leader", "--ref", "ROOTONLY.md", "--note", "x"])
+		const hintOut = `${hint.stdout || ""}${hint.stderr || ""}`
+		const suggests = hint.status !== 0 && /found at the project root: pass\s+--ref \.\.\/ROOTONLY\.md/.test(hintOut)
+		const nowhere = c44(["send", "db", "--from", "leader", "--ref", "NO-SUCH-FILE.md", "--note", "x"])
+		const nowhereOut = `${nowhere.stdout || ""}${nowhere.stderr || ""}`
+		const quiet = nowhere.status !== 0 && !/found at/.test(nowhereOut)
+		check("A49 a missed --ref names the string that would have worked",
+			suggests && quiet,
+			`a file that exists at the root, referenced without the ../ -> suggestion printed=${suggests}; ` +
+			`CONTROL, a file that exists nowhere -> no suggestion=${quiet} (a suggestion printed ` +
+			`unconditionally would point the next agent at a path that does not exist either)`)
+	}
 }
 
 // A45 — a --ref at a file you did not write FOR THIS MESSAGE is warned about, and the

@@ -21,6 +21,29 @@ already have.
 
 
 
+
+## 2026-09-10.3 — bus print `e1c88f7254fb` — 2026-09-10
+
+*Quand un \`--ref\` rate, le refus te dit quoi taper.*
+
+- 🟢 **Le refus d un \`--ref\` introuvable cherche maintenant le fichier** a la racine du projet et dans ton
+  propre dossier, et il imprime **la chaine qui aurait marche** :
+  \`\`\`
+  ✗ --ref points at a file that does not exist: review/BRIEF-9.md
+    base: review/ — a ref resolves against the review spoke, whoever sends
+    found at the project root: pass  --ref ../BRIEF-9.md
+  \`\`\`
+- **Pourquoi maintenant :** le leader de \`~/Dev/getajob\` s est trompe de profondeur **trois fois de suite**
+  le 2026-09-10, et le mainteneur a fait la meme erreur le meme matin. La garde attrapait tout — elle
+  disait pourquoi tu avais tort, pas quoi ecrire. **Une garde qui refuse trois fois la meme personne pour
+  la meme raison signale aussi que le contrat est dur a tenir en tete.**
+- ⚠️ **Ca SUGGERE, ca ne corrige pas.** Un bus qui devine ce que tu voulais dire livrerait un pointeur que
+  personne n a choisi, et tout cet outil existe parce qu un pointeur est cru la ou un contenu ne l est pas.
+- Arme comme **A49**, avec le controle qui compte : un \`--ref\` qui n existe **nulle part** ne doit produire
+  **aucune** suggestion, sinon la garde enverrait l agent suivant vers un chemin tout aussi faux.
+- 🟢 Aussi : \`handoff.mjs\` ne fige plus l etat vivant que git ignore (\`.comm/\`, \`.boot-state.json\`) — il
+  changeait a chaque boot et \`verify\` aurait affiche CHANGED pour toujours sur des fichiers sans portee.
+
 ## 2026-09-10.2 — bus print `0e8c6abc8a13` — 2026-09-10
 
 *Tu peux redemarrer sans perdre ce que tu avais lu.*

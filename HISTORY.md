@@ -787,3 +787,24 @@ passed both ways, which opened the first delivery change this repo has made deli
 avoided: `handoff.mjs` and `restart.mjs` joined `BUS_FILES` and are installed in all three field trees.
 The restarts happen there — 53 cold starts in one tree against 5 declared reboots — so a tool only the
 maintainer could run was a tool that could never fill the arm it exists to fill.
+
+## ✅ Session 16d — 2026-09-10: a compliment read as a defect report
+
+The leader of `~/Dev/getajob` sent word that he liked the bus refusing three of his sends because he had
+the depth wrong in a relative path — *"il a vérifié que le fichier existait avant de sonner, au lieu de
+pointer dans le vide. C'est le genre d'outil qu'on veut."*
+
+**Three times in a row is the finding.** The guard worked every time; a guard that refuses the same person
+three times for the same reason is also reporting that the contract is hard to hold in the head. The
+maintainer had made the identical mistake that same morning, sending a brief to his own reviewer — so this
+is two independent agents, one day, one rule. The refusal named the base it had resolved against and
+stopped there, which tells you why you were wrong and not what to type.
+
+It now looks for the same basename at the project root and at the sender's own directory and prints the ref
+that WOULD have resolved. **It suggests and never rewrites**: a bus that guessed what you meant would
+deliver a pointer nobody chose, and this whole tool exists because a pointer is trusted where content is
+not. Armed as **A49**, and the control is the half that matters — a ref that exists NOWHERE must produce no
+suggestion at all, or the guard would send the next agent to a path that is equally wrong.
+
+`comm.mjs` is the bus, so this was a delivery change: `test/selftest.mjs` green before and after, real
+sessions both times. 46 652 B against A22's 48 KB cap.

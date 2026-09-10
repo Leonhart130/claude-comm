@@ -32,7 +32,7 @@ import {
 	readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync,
 	readdirSync, renameSync, statSync, readlinkSync,
 } from "node:fs"
-import { join, dirname, resolve, relative, sep } from "node:path"
+import { join, dirname, resolve, relative, sep, basename } from "node:path"
 import { randomBytes } from "node:crypto"
 import { fileURLToPath } from "node:url"
 
@@ -176,6 +176,36 @@ const baseNote = (b) => b.dir === "." ? "" :
 	`  base: ${b.dir}/ — a ref resolves against the '${b.subject}' spoke, whoever sends\n`
 
 /**
+ * WHEN THE REF MISSES, SAY WHERE THE FILE ACTUALLY IS. The base rule is correct and it is
+ * still not obvious: the leader of ~/Dev/getajob got the depth wrong THREE TIMES IN A ROW
+ * on 2026-09-10 and said so as a compliment - the guard caught every one. A guard that
+ * refuses the same person three times for the same reason is working AND telling you the
+ * contract is hard to hold in the head. The maintainer made the identical mistake the same
+ * morning, sending a brief to his own reviewer.
+ *
+ * So the refusal now does the one thing that turns three refusals into one: it looks for
+ * the same basename at the project root and at the sender's own spoke, and prints the ref
+ * string that WOULD have resolved. It suggests, never rewrites - a bus that guessed what
+ * you meant would be a bus that delivers a pointer nobody chose.
+ */
+function whereItActuallyIs(root, cfg, from, to, ref) {
+	const bare = basename(String(ref))
+	if (!bare || bare === "." || bare === "..") return ""
+	const base = refBase(cfg, from, to)
+	const seen = new Set()
+	const hits = []
+	for (const [label, dir] of [["the project root", "."], [`your own directory ('${from}')`, cfg.agents[from] ?? "."]]) {
+		const rel = dir === "." ? bare : `${dir}/${bare}`
+		if (seen.has(rel) || !existsSync(join(root, rel))) continue
+		seen.add(rel)
+		// Expressed FROM THE BASE, because that is the string the sender has to type.
+		const up = base.dir === "." ? "" : base.dir.split("/").map(() => "../").join("")
+		hits.push(`  found at ${label}: pass  --ref ${up}${rel}\n`)
+	}
+	return hits.join("")
+}
+
+/**
  * Resolve + confine a ref. `../COORDINATION.md` from an expert is legitimate and
  * common; `../../../../etc/shadow` is not, and pointing another agent outside the
  * project is never intended. Returns the ref normalised to PROJECT-ROOT relative,
@@ -285,6 +315,7 @@ function send(root, cfg, { from, to, kind, ref, note, force = false }) {
 		throw new Error(
 			`--ref points at a file that does not exist: ${refPath}\n` +
 			baseNote(refBase(cfg, from, to)) +
+			whereItActuallyIs(root, cfg, from, to, ref) +
 			`  Check the path, or pass --force if you are about to create it.`
 		)
 	}

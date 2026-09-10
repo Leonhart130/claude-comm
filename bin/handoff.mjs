@@ -167,8 +167,28 @@ function cmdWrite() {
 	// been read. Hashing first makes `verify` catch exactly that, loudly, before a restart
 	// is armed on top of it. A guard that changes the tree is not a guard, and now it cannot
 	// pass for one.
+	// 🔴 LIVE STATE CANNOT BE PINNED, and pinning it is worse than omitting it. Measured on
+	// this tool's own first real use: `.boot-state.json` and `.comm/INSTALLED.json` were in
+	// the manifest because the session had cat-ed them, and they change on EVERY boot - so
+	// `verify` would report CHANGED rows for ever, on files whose change means nothing. A
+	// verifier that always shows noise teaches its reader to skim past the row that matters.
+	//
+	// The project already draws this line and it is not this tool's to redraw: what git
+	// IGNORES is live state, by the same rule that keeps `.comm/` out of every field repo.
+	// ONE `git check-ignore --stdin` call for the whole set, never one spawn per file; if git
+	// cannot answer, nothing is dropped and the manifest is merely noisier - the safe
+	// direction, since a pinned file costs a re-read and a missing one costs a false belief.
+	const allPaths = [...manifest.keys()]
+	const ignored = new Set()
+	if (allPaths.length) {
+		const g = spawnSync("git", ["check-ignore", "--stdin"], { cwd: ROOT, encoding: "utf8", input: allPaths.join("\n") })
+		if (g.status === 0 || g.status === 1) for (const l of (g.stdout || "").split("\n")) if (l.trim()) ignored.add(resolve(ROOT, l.trim()))
+	}
 	const rows = [...manifest.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+		.filter(([p]) => !ignored.has(resolve(p)))
 		.map(([p, how]) => ({ path: p, how, sha: sha(p) })).filter((r) => r.sha)
+	if (!rows.length) die("every file this session read is git-ignored live state - nothing can be pinned.\n" +
+		"  Name what you actually read with --read, or this handoff proves nothing about the disk.", 3)
 
 	// GUARDS ARE RUN, NEVER REPORTED. "passed" is a claim; stdout is evidence.
 	const guards = []
@@ -199,6 +219,7 @@ ${guards.length ? guards.map((g) => `**\`${g.cmd}\`** → exit ${g.exit}\n\n\`\`
 
 ⚠️ Provenance: \`tool\` = a file_path input · \`shell\` = **a heuristic** over Bash command text, which
 over-collects on purpose · \`declared\` = named by the agent. A file in none of these is simply not covered.
+${ignored.size ? `\n⚠️ **${ignored.size} path(s) dropped as git-ignored live state** - they change every boot, so pinning them would report CHANGED for ever.` : ""}
 
 ${rows.map((r) => `- \`${r.sha.slice(0, 16)}\`  ${r.how.padEnd(8)}  ${r.path.replace(ROOT + "/", "")}`).join("\n")}
 `

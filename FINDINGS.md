@@ -1360,6 +1360,32 @@ Still unverified, still true, and no longer worth a line in the file every boot 
   session's Bash cwd resets between turns is unmeasured. It decides the exposure, not the existence, of the
   defect. Moot for delivery (identity no longer reads cwd); still governs `whoami`-returns-null, open item 2.
 
+
+### 🔴 The design for the fix, decided 2026-09-10 — execute it, do not re-derive it
+
+The flaw, stated exactly: **the count keys on a ROW, and a row warns for several causes.** `field:work`
+reached **9** on one cause while a second sat undischarged, and a single `--amended` cleared both — so the
+instrument stopped demanding an amendment for a cause nobody had addressed. It is the oldest open item in
+this repo and it is a flaw in the mechanism that governs every other one.
+
+- **Key the count on the ACK'S OWN `why`, never on the row's text.** `--ack <row>="why"` already forces the
+  operator to state the cause; normalise that string (lowercase, collapse whitespace, hash it) and count per
+  `(row, why)`.
+  ⚠️ **Rejected, and the reason matters: normalising the ROW's text.** It varies with ages, pids and
+  filenames, so it either never accumulates — the detector goes silent, which is the worst possible
+  direction for a guard whose whole job is to notice repetition — or it needs per-row knowledge inside a
+  generic mechanism, which is the shape A27/A28 already cost this repo three reviews.
+- **`--amended <row>="why"` discharges only the matching cause.** An amendment naming a cause that was never
+  acked must **REFUSE**, not silently create and clear one: an amendment for an imaginary cause is exactly
+  the false discharge this fix exists to prevent, arriving by the front door.
+- **Keep `ackCounts[row]` as the row total** so existing arms and readers keep working, and add
+  `ackCauses[row][sig] = {n, why}`. The three-strikes instruction fires on a **cause** reaching 3, never on
+  the total. Migration is forward-only: an old state file has no `ackCauses`, which reads as "no cause has
+  been acked yet" — the safe direction, since it demands more amendments rather than fewer.
+- **Arms required, and the third is the one the current code would fail:** two different causes on one row
+  accumulate separately · acking the same cause three times prints the amend instruction · **an amendment
+  discharges that cause and LEAVES THE OTHER STANDING** · an amendment for an unacked cause refuses.
+
 ## `#review7-disposal` — disposing review #7, and the defect the disposal made before it shipped
 
 **2026-09-05.** Fourteen findings, all fixed and armed in `3939fb3`. What is written here is only what the
