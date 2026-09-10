@@ -5,41 +5,43 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-09-10: review #8 ran; **every CODE finding is fixed and armed** — see `REVIEW-8.md` and `HISTORY.md`.
-Controls: boot 55 · sensor 22 · claim 17 · attack 48. **The bus is installed here**, `review/` on the roster.)*
+*(2026-09-10. **Reviews #8 and #9 both ran.** #9 was launched BY A PROGRAM from `review/` — a first —
+and aimed at #8's own fixes: **two were half-done, one killed its own process group.** All repaired.)*
 
-**1 — 🟡 REVIEW #8'S THREE MINOR FINDINGS REMAIN: C7, A3, N1. Read `REVIEW-8.md`; not summarised here.**
-⚠️ **And the half of C5 no code can close:** a `/clear` whose hook never fires leaves the entry naming a
-DEAD transcript, both uuids agreeing — byte-identical to a session never cleared. `FINDINGS.md#clear-blind`.
+**1 — 🔴 RUN THE CONTROLS FIRST.** `test/attack.mjs` (49; A48 is new) and the long one. ⚠️ **`systemd-run`
+returns exit 0 whatever happens — read the suite's LAST LINE.** ⚠️ Run it with `CLAUDE_COMM_AGENT` **set as
+well**: that is what `launch.mjs` injects, it silently broke every suite here (#9 C1), and A48 guards it.
 
-**2 — 🟡 THE CORRECTION TO THE FIELD LEADER IS WRITTEN AND UNREAD.**
-`exchange/work-leader/out/2026-09-10-correction-...md` — my citation named a function that does not exist,
-the advice added confidence rather than evidence, and his real gap is C6, which is now fixed and armed.
-**The bell REFUSED: his leader is not running**, so nothing was rung and the file waits for his `boot.sh`
-§7. ⚠️ **Two `zz-` claims in his tree are still held by dead pids** and only he can release them.
+**2 — 🟡 WHAT REVIEW #9 LEFT OPEN.** `REVIEW-9.md` has the measurements; not summarised here.
+**A3** the crossing arm consumes `handoffLogs` without re-checking the guard the arm above it asserted ·
+**C7** `status` is ⚠ on a fresh clone · **N1** the tier-0 charge moves ±34 B against a 14 B margin ·
+plus review #8's **A3** (A47 passes `comm whoami` and `comm --json who`).
 
-**3 — 🟢 THE REVIEW WORKFLOW RAN, AND #9 IS IN FLIGHT.** `launch.mjs review` → on the bus, registered, a
-ledger start, then `comm send` + `wake` and it took a turn on `BRIEF-adversarial-9.md` (target:
-`a219e62..660543f`, a whole day of fixes by the person who had just been caught). **Read `REVIEW-9.md`
-when it lands.** ⚠️ A `Stop hook error` appeared once in that session and does not reproduce — see below.
+**3 — 🔴 TWO LIMITS THAT NO CODE CLOSES, AND BOTH ARE NAMED IN THE CODE.** A `/clear` whose hook never
+fires leaves the registry naming a DEAD transcript with both uuids agreeing — indistinguishable from a
+session never cleared (`FINDINGS.md#clear-blind`). And the cleared-note discriminator goes quiet if the
+session that OWNS the inherited scratch uuid has itself ended. **Do not "fix" either with a better guess.**
 
-**4 — 🔴 THE EROSION COUNT KEYS ON A ROW; A ROW WARNS FOR SEVERAL CAUSES.** Unchanged. The discharge is
-recorded (`from: 9`), the design flaw is not. **Amend the protocol properly: evidence, a gated change, an
-arm. Not prose.**
+**4 — 🔴 THE EROSION COUNT KEYS ON A ROW; A ROW WARNS FOR SEVERAL CAUSES.** Unchanged, and now the oldest
+open item here. The discharge is recorded (`from: 9`); the design flaw is not. **Evidence, a gated change,
+an arm. Not prose.**
 
-**5 — 🔴 THE TRUST PROMPT STILL STOPS AN UNATTENDED LAUNCH**, and whether a program can answer it is
-**NOT ESTABLISHED**. ⭐ An empty registry after a launch reads exactly like a dead hook; only reading the
-window's text told them apart. `DESIGN-autonomy.md` does not mention the wall.
+**5 — 🟡 THE LETTER TO THE FIELD LEADER IS WRITTEN AND UNREAD** (`exchange/work-leader/out/2026-09-10-
+correction-...md`): my citation named a function that does not exist, and the advice added confidence, not
+evidence. **The bell REFUSED — his leader is not running** — so it waits for his `boot.sh` §7. ⚠️ Two `zz-`
+claims there are still held by dead pids; only he releases them, and the sentence his boot printed about
+them **was false and is fixed** (#8 C6).
 
-**6 — 🔴 DO NOT ACT ON THE OLD ▶ NEXT 2 AS IT WAS WRITTEN** (review #8 D4). It said the registry row's
-`GONE` wording was unreachable and should be deleted. **Both legs of that trace check out and the
-enumeration is incomplete:** it omits a transcript removed under a live session, where the sentence is true
-and useful. Reachability is unverified in **both** directions. A row deleted on an incomplete enumeration
-is a warning thrown away.
+**6 — 🔴 `test/selftest.mjs` HAS NOT RUN SINCE 2026-09-08**, across two days of heavy change. `comm.mjs`
+was not touched, so the delivery path is judged unchanged — **that is a reasoning, not a measurement.**
 
-⚠️ **`LESSONS.md` is new (tier 2, never at boot).** It is the register this repo did not have: conduct
-defects, priced, catalogued by FORM. §1 is why the bus was not installed here. **A lesson ends as an armed
-gate or it is a platitude** — §1's gate is the `session` row, armed today.
+**7 — 🟢 THE AUTONOMY LOOP IS HALF BUILT AND MEASURED**: `launch.mjs` → `send` → `wake` → a real review,
+verified at each step, **and no trust prompt for a subdirectory of a trusted project**. Missing: a REAL
+restart arming the reboot arm (4 of 10), then the trigger. ⚠️ A `review` session may still be alive —
+`comm who`. **Do not close a window you did not open.**
+
+⚠️ **`LESSONS.md` (tier 2), the conduct register: 5 lessons, 10 FORMS, each priced. Read the form table
+BEFORE acting.**
 
 ## Where it stands
 
@@ -52,7 +54,7 @@ gate or it is a platitude** — §1's gate is the `session` row, armed today.
 | boot | `node bin/boot.mjs` — every gating row armed; `--fast` is injected at session start, contract in `CLAUDE.md` |
 | **ledger** | `node bin/ledger.mjs` — the reboot instrument. Records here AND in the field; a field arm is `--root ~/Dev/electio`. Its own arms run inside `attack` as A34. **11 defects recorded, its first**; each start now stores `pending`, the peer's covariate (files newer than the last start), never the inbox depth I proposed — his session #41 had an empty mailbox and the largest real queue of his last five boots |
 | **sensor** | `node bin/context.mjs` — pid → transcript through `bin/session-registry.mjs` (the `SessionStart` hook writes it, keyed on pid + start time + boot id); **refuses on a miss**. `FINDINGS.md#clear-blind` |
-| reviews | #1–#7 **all dispositioned**; **#8's brief is written and NOT RUN** — `BRIEF-adversarial-8.md`. #5's amendment stands in `CLAUDE.md`: *a gate that CAN redden is not yet one that reddens for the property in its own title* |
+| reviews | #1–#8 **dispositioned**; **#9 RAN 2026-09-10 from `review/`, launched by a program** — `REVIEW-9.md`, 4 red, **and its worst two are defects in the previous review's own fixes**. #5's amendment stands in `CLAUDE.md`: *a gate that CAN redden is not yet one that reddens for the property in its own title* — review #9 found the third and fourth instances |
 
 ## ⏭️ OPEN
 1. **🔴 Latency is a mailbox, not an interrupt.** Re-derive with `node test/latency.mjs <log>`; never
@@ -134,12 +136,11 @@ section, not retracted)*:
 
 ## ⚠️ What was NOT verified
 
-- 🔴 **A `Stop hook error occurred` appeared once in the launched `review` session (2026-09-10, its first
-  turn, the turn a wake delivered mail into) and I CANNOT REPRODUCE IT.** Three invocations of that stub —
-  bare, with the payload, and with the exact configured command line and `CLAUDE_PROJECT_DIR` — all exit 0
-  and print nothing. The session carried on working. Unexplained, not dismissed: `FINDINGS.md#A20` says a
-  signal with no code change is reporting a change in the world. **The Stop stub carries no `timeout` while
-  `SessionStart` carries 20 s — that is a hypothesis, not a finding, and it is untested.**
+- 🟢 **EXPLAINED, and the first reading of it was wrong.** A `Stop hook error occurred` in the launched
+  `review` session was recorded here as unreproducible; it then happened in the LEADER's own session, on the
+  turn mail was delivered. **That is the delivery mechanism**: the Stop hook blocks so the notice reaches the
+  agent, and the harness renders a blocking hook as an error. Reproducing it needs mail in flight — my three
+  attempts had none, so they measured an empty inbox. **A negative result from a probe that could not fire.**
 
 - 🔴 **Whether `boot`'s registry `GONE` wording is reachable — in BOTH directions.** The 09-08 trace said
   no; review #8 D4 found the enumeration incomplete (a transcript removed under a live session). ▶ NEXT 6.

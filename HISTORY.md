@@ -715,3 +715,40 @@ something else entirely: the unregistered-session arm ran a copy of `node` with 
 `exit undefined`. Found by RUNNING the suite, not by reading it — and the C4 arm's own comment, written
 minutes earlier for a different fixture, already said that an arm which disturbs another arm's fixture is
 the next defect along.
+
+## ✅ Session 16b — 2026-09-10: review #9, launched by a program, aimed at the day's own fixes
+
+**The first review this project ever launched itself.** `launch.mjs review` → a real session, on the bus,
+registered, a ledger start; then `comm send` + `wake` and it took a turn on `BRIEF-adversarial-9.md`. The
+brief's target was `a219e62..660543f` — four commits written the same day by the leader, after the owner
+had caught him not reading `STATUS.md`. That is the profile `CLAUDE.md` names as the weakest code in the
+repo, and the result argues it is right: **four reds, and the two worst are defects inside the previous
+review's own fixes.**
+
+**C1 — the launcher poisoned every control in the repo, and did it the first time it was ever used.**
+`bin/launch.mjs:113` passes `--env=CLAUDE_COMM_AGENT=<agent>` into each session it starts. `whoami()`
+returns null when the declared name is not in the roster, and no *fixture* roster carries a real agent's
+name — so identity resolved to null in every child every suite spawned. Measured both directions: with the
+variable, `attack` aborted with 8 red and **36 cases never reached**, `boot --prove-red` went 8 red, `claim`
+2; without it, all green. The failure was the comfortable kind — an abort reads as some ticks, some crosses
+and a lot of absence, and only the exit code says the run was not a control. `CLAUDE_COMM_RUNTIME` and
+`CLAUDE_COMM_PROJECTS` were already scrubbed for exactly this reason; the one the project's own launcher
+sets on purpose was not. Now scrubbed in all four harnesses and armed as **A48**, whose positive control is
+the poisoned call itself.
+
+**C2 — the arm written the day before killed its own process group.** `process.kill(topPid)` where
+`pidOfMarker()` returns **0** when its scan finds nothing: `kill(2)` with pid 0 signals every process in the
+caller's group, and it does not throw, so the `catch {}` caught nothing. The reviewer armed it against the
+real code with a `setsid` shim that exits 1 — the exact failure the arm's own comment anticipates — and
+watched it kill the suite, its shell and a bystander. **The SKIPPED-AS-FAILURE degradation the comment
+promises was unreachable, because the cleanup that precedes it is what killed the process.** Nothing is
+signalled now that was not positively identified: pid > 0, still carrying this run's marker, killed by
+group. `test/attack.mjs` had used the negative-pid idiom in six places all along.
+
+**C4 — the previous day's C3 fix was half a fix, and its arm could not have shown it.** `stampOf` read the
+date out of the filename and then handed it `newest()`'s pick, which is still ordered by mtime — so any
+channel holding more than one letter went on deciding by mtime. Live exposure at the time: **14 of the 15
+real letters**, 13 of them in one channel. The arm wrote ONE file into `in/`, and with one letter `newest()`
+cannot pick the wrong one: it could never exhibit the defect in its own title. Third and fourth instances
+of the 2026-09-04 amendment in one review. Both branches enumerate now, and the arm stages two letters and
+a reply with only the mtimes scrambled.

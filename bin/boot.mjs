@@ -313,7 +313,7 @@ if (has("--hook")) {
 	row("session", refused && !deliberate ? WARN : authorExempt ? WARN : OK, `${how} (${where})` +
 		`${kitty ? ` - kitty win ${kitty[1]}` : ""}${src}` +
 		(authorExempt ? ` - ⚠ THE ROOT AT ${ROOT} SHIPS THE BUS AND IS NOT ON IT: no .comm/config.json` +
-			" there, so launch.mjs cannot start an agent in it. Run: node install.mjs . --add-agent review=review" : ""))
+			" there, so launch.mjs cannot start an agent in it. Run: node install.mjs . --add-agent <name>=<dir>" : ""))
 }
 
 // -- 1b. the ledger: every session start, recorded where a reboot can be compared to it -
@@ -1104,18 +1104,32 @@ function askBus(sessionPidForCwd) {
 			const t = Date.parse(`${m[1]}-${m[2]}-${m[3]}T00:00:00Z`)
 			return Number.isFinite(t) ? t : null
 		}
-		// The letter's OWN date when it has one, its mtime only as a last resort - and the row
-		// says which, because "2 d ago" off a name and off a restored mtime are not the same
-		// claim. `newest()` still ORDERS by mtime; that is a question about arrival, not about
-		// which rule judges the letter.
-		const stampOf = (b) => { const nd = nameDate(b && b.name); return nd === null ? (b ? b.at : 0) : nd }
+		// The letter's OWN date when it has one, its mtime only as a last resort.
+		const stampOfName = (name, mtime) => { const nd = nameDate(name); return nd === null ? mtime : nd }
+		// 🔴 EVERY LETTER, NEVER "THE NEWEST ONE". The first version of this fix read the date
+		// out of the filename and then handed it `newest()`'s pick - which is still ordered by
+		// MTIME - so a channel holding more than one letter went on deciding by mtime after all.
+		// Review #9 C4 measured it on a two-letter fixture: names identical, only the mtimes
+		// scrambled, and the row went from "UNANSWERED - the 09-07 letter" to "answered, to the
+		// 09-05 one". Verbatim the failure the previous commit claimed to have removed. Live
+		// exposure at the time: 14 of the 15 real letters were on that side, 13 of them in one
+		// channel. `newest()` survives for exactly one question - WHEN did mail last arrive -
+		// and decides nothing.
 		const answered = new Set()
+		let outMaxStamp = 0
 		let unread = 0
 		try {
 			for (const f of readdirSync(join(root, peer, "out"))) {
 				if (f.startsWith(".")) continue
 				let txt = ""
 				try { txt = readFileSync(join(root, peer, "out", f), "utf8") } catch { unread++; continue }
+				// The reply side needs the same treatment: a restore can make an OLD reply the
+				// newest by mtime, and the legacy comparison below would then be judged against it.
+				{
+					const nd = nameDate(f)
+					const st = nd === null ? (() => { try { return statSync(join(root, peer, "out", f)).mtimeMs } catch { return 0 } })() : nd
+					if (st > outMaxStamp) outMaxStamp = st
+				}
 				// THE MARKER LIVES IN A HEADER ANCHORED TO THE FILE'S FIRST BYTE, and a file has
 				// exactly one. The rule used to be "before the first fence, within 20 lines", and
 				// review #8 MEASURED what that actually forbids: the fenced form, and nothing else.
@@ -1149,19 +1163,23 @@ function askBus(sessionPidForCwd) {
 		// swallowed readdir error - an unreadable in/, a permission change, a regex that stops
 		// matching - would print "answered" for a channel it never managed to look at. That is
 		// the exact shape this row was rewritten to remove, reintroduced by its own try/catch.
-		let open = [], blind = null
+		let open = [], legacyOpen = [], newestLetter = null, blind = null
 		try {
 			for (const f of readdirSync(join(root, peer, "in"))) {
 				if (f.startsWith(".")) continue
-				const at = nameDate(f) ?? statSync(join(root, peer, "in", f)).mtimeMs
-				if (at < CONVENTION_DAY) continue            // judged below, by the old rule
+				const at = stampOfName(f, (() => { try { return statSync(join(root, peer, "in", f)).mtimeMs } catch { return 0 } })())
+				if (!newestLetter || at > newestLetter.at) newestLetter = { name: f, at }
+				// The old rule, applied to EACH pre-convention letter rather than to whichever
+				// one happened to be newest by mtime: it is waiting when no reply is dated after
+				// it. Grandfathered, and it expires on its own as mail turns over.
+				if (at < CONVENTION_DAY) { if (at > outMaxStamp) legacyOpen.push({ name: f, at }); continue }
 				if (!answered.has(f)) open.push({ name: f, at })
 			}
 		} catch (e) { blind = "in/ could not be read (" + (e.code || e.message) + ")" }
 		open.sort((a, b) => a.at - b.at)                     // the one waiting LONGEST first
-		const inStamp = stampOf(inb), outStamp = stampOf(outb)
-		const legacyWaiting = inStamp > outStamp && inStamp < CONVENTION_DAY
-		const dated = inStamp && inStamp < CONVENTION_DAY ? " (by date: this predates the Answers: convention)" : ""
+		legacyOpen.sort((a, b) => a.at - b.at)
+		const legacyWaiting = legacyOpen.length > 0
+		const dated = " (by date: this predates the Answers: convention)"
 
 		// A reply this row could not read may be the very one that names the waiting letter, so
 		// an unreadable out/ is reported as NOT KNOWING, never as an answer.
@@ -1173,11 +1191,17 @@ function askBus(sessionPidForCwd) {
 				`UNANSWERED - ${open[0].name} arrived ${age(Date.now() - open[0].at)} ago` +
 				(open.length > 1 ? ` (+${open.length - 1} more unnamed by any reply)` : ""))
 		} else if (legacyWaiting) {
-			row(`channel:${peer}`, WARN, `UNANSWERED - ${inb.name} arrived ${age(Date.now() - inStamp)} ago${dated}`)
+			row(`channel:${peer}`, WARN, `UNANSWERED - ${legacyOpen[0].name} arrived ` +
+				`${age(Date.now() - legacyOpen[0].at)} ago${dated}` +
+				(legacyOpen.length > 1 ? ` (+${legacyOpen.length - 1} more on the old rule)` : ""))
 		} else {
+			// NAMED BY DATE, not by mtime. The green branch printed `inb.name` - newest by
+			// mtime - so a restore made the row name the wrong letter while the verdict was
+			// right (review #9 C4, second half).
 			row(`channel:${peer}`, OK,
-				`answered - last reply ${age(Date.now() - outStamp)} ago` +
-				(inb.name ? `, to ${inb.name}${answered.has(inb.name) ? " (it says so)" : dated}` : ""))
+				`answered - last reply ${age(Date.now() - (outMaxStamp || outb.at))} ago` +
+				(newestLetter ? `, to ${newestLetter.name}${answered.has(newestLetter.name) ? " (it says so)"
+					: newestLetter.at < CONVENTION_DAY ? dated : ""}` : ""))
 		}
 	}
 }
@@ -1556,6 +1580,16 @@ function proveRed() {
 		return out
 	}
 	const realBefore = snapReal()
+	// 🔴 THE IDENTITY VARIABLE IS SCRUBBED, and it is this project's own launcher that sets it.
+	// bin/launch.mjs:113 passes --env=CLAUDE_COMM_AGENT=<agent> into every session it starts, so
+	// the FIRST time that launcher was used - to start the one agent whose charter is to run
+	// these controls - every suite in the repo broke for it: attack aborted with 8 red and 36
+	// arms never reached, boot went 8 red, claim 2. Mechanism: whoami() returns null when the
+	// declared name is not in the roster, and no FIXTURE roster contains a real agent's name.
+	// Every child inherits this, which is the same reason CLAUDE_COMM_RUNTIME and
+	// CLAUDE_COMM_PROJECTS are overridden here. A control that inherits the world it measures
+	// is not a control. Review #9 C1.
+	delete process.env.CLAUDE_COMM_AGENT
 	process.env.CLAUDE_COMM_RUNTIME = join(tmp, "runtime")
 
 	mkdirSync(pkg)
@@ -1832,28 +1866,47 @@ function proveRed() {
 		// duration and put back: an arm that quietly deletes another arm's fixture is the next
 		// defect along.
 		const seeded = join(chOut, "answer.md"), aside = join(chOut, "..answer.md.aside")
+		// try/finally, because four `run(true)` calls and six filesystem calls sit between the
+		// borrow and the return: one throw and every arm after this one measures a channel with
+		// no reply in it, reporting a defect that is this arm's litter (review #9 A2).
 		renameSync(seeded, aside)
-		const oldIn = join(chIn, "2026-09-05-asked-long-ago.md"), oldOut = join(chOut, "2026-09-06-answered-then.md")
-		writeFileSync(oldIn, "asked\n"); writeFileSync(oldOut, "replied\n")
-		const natural = level(run(true), "channel:peer")
-		// The restore: the letter looks brand new, the reply looks ancient. Pure mtime.
-		utimesSync(oldIn, new Date(), new Date())
-		utimesSync(oldOut, new Date(Date.now() - 400 * 86400000), new Date(Date.now() - 400 * 86400000))
-		const restored = level(run(true), "channel:peer")
-		// One variable, and it is the NAME: the letter is now dated AFTER the reply.
-		rmSync(oldIn, { force: true })
-		const newerName = join(chIn, "2026-09-07-asked-after-the-reply.md")
-		writeFileSync(newerName, "asked\n")
-		utimesSync(newerName, new Date(Date.now() - 400 * 86400000), new Date(Date.now() - 400 * 86400000))
-		const byName = level(run(true), "channel:peer")
-		rmSync(newerName, { force: true }); rmSync(oldOut, { force: true })
-		renameSync(aside, seeded)
+		let naturalRow, restoredRow, byName
+		try {
+		// 🔴 TWO LETTERS, and that is the whole point. The first version of this arm wrote ONE
+		// file into in/, so `newest()` could not pick the wrong one and the arm could never
+		// exhibit the defect in its own title - the third instance in this repo of the
+		// 2026-09-04 amendment, found by review #9 C4 on a two-letter fixture. The live corpus
+		// had thirteen letters in one channel at the time.
+		const oldA = join(chIn, "2026-09-05-a-old-question.md")
+		const openB = join(chIn, "2026-09-07-b-still-waiting.md")
+		const oldOut = join(chOut, "2026-09-06-reply.md")
+		writeFileSync(oldA, "asked long ago\n"); writeFileSync(openB, "asked after the reply\n")
+		writeFileSync(oldOut, "replied\n")
+		naturalRow = rowOf(run(true), "channel:peer")
+		// THE RESTORE. Only the mtimes move: every filename and every byte is identical, and
+		// the reply is made to look like the most recent thing in the channel.
+		const ancient = new Date(Date.now() - 400 * 86400000)
+		utimesSync(oldA, new Date(), new Date())
+		utimesSync(openB, ancient, ancient)
+		utimesSync(oldOut, new Date(), new Date())
+		restoredRow = rowOf(run(true), "channel:peer")
+		// POSITIVE CONTROL, one variable: the waiting letter is renamed to a date BEFORE the
+		// reply, so nothing is waiting any more. Its mtime stays scrambled.
+		rmSync(openB, { force: true })
+		const answeredName = join(chIn, "2026-09-04-b-answered-by-date.md")
+		writeFileSync(answeredName, "asked\n"); utimesSync(answeredName, ancient, ancient)
+		byName = level(run(true), "channel:peer")
+		rmSync(oldA, { force: true }); rmSync(answeredName, { force: true }); rmSync(oldOut, { force: true })
+		} finally { try { renameSync(aside, seeded) } catch {} }
+		const namesB = (r) => /2026-09-07-b-still-waiting/.test(r.text)
 		assert("channel: a restore moves every mtime and no verdict",
-			natural === OK && restored === OK && byName === WARN,
-			`letter 09-05, reply 09-06 -> ${LV[natural]}; the SAME two files with the letter's mtime ` +
-			`set to now and the reply's to 400 days ago -> ${LV[restored]} (must not move); the letter ` +
-			`renamed 09-07, its mtime still ancient -> ${LV[byName]} (POSITIVE CONTROL: if this is not ` +
-			`warn the row reads neither dates nor names)`)
+			naturalRow.level === WARN && namesB(naturalRow) &&
+			restoredRow.level === WARN && namesB(restoredRow) && byName === OK,
+			`two letters (09-05, 09-07) and one reply (09-06), mtimes honest -> ${LV[naturalRow.level]} ` +
+			`naming the 09-07=${namesB(naturalRow)}; the SAME files with ONLY the mtimes scrambled -> ` +
+			`${LV[restoredRow.level]} naming the 09-07=${namesB(restoredRow)} (must not move: this is the ` +
+			`arm); the waiting letter renamed to 09-04 -> ${LV[byName]} (POSITIVE CONTROL: if this is not ` +
+			`ok the row just always warns)`)
 	}
 
 	arm("channel: a peer message goes unanswered", "channel:peer", WARN,

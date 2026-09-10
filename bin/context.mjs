@@ -302,6 +302,25 @@ function transcriptOfPid(pid) {
 	// that is wrong is not weaker evidence, it is a wrong claim.
 	const launched = isTopLevelSession(pid) ? scratchUuidOfPid(pid) : null
 	const live = basename(r.transcript).replace(/\.jsonl$/, "")
+	// 🔴 ANCESTRY IS NECESSARY AND NOT SUFFICIENT, and review #9 C3 measured the gap in the
+	// fix written the day before: a `claude -p` child whose PARENT HAS EXITED is reparented
+	// to the user's systemd, has no `claude` ancestor at all, and goes on holding the scratch
+	// descriptor it inherited. isTopLevelSession() said yes and the wrong claim came back.
+	// The arm could not see it either - it held its descendant leg as a LIVE child, which is
+	// the one state the defect does not need.
+	//
+	// THE DISCRIMINATOR IS ALREADY ON DISK. entries() lists only registry entries that still
+	// resolve (pid + start tick + boot id), so it is a list of LIVE sessions. A uuid that
+	// another live session is currently writing is not a uuid this process was launched as:
+	// it is somebody else's, held through an inherited fd. A genuinely cleared session cannot
+	// look like that, because its own entry was REWRITTEN to the new transcript and nothing
+	// names the old uuid any more.
+	//
+	// ⚠️ RESIDUAL, and it is named rather than papered over: if the session that owns the uuid
+	// has itself ended and its entry no longer resolves, this check goes quiet and the claim
+	// returns. Ancestry plus this cover the reachable cases; neither covers a dead owner.
+	const heldByAnother = launched && launched !== live &&
+		registryEntries().some((e) => e.pid !== pid && basename(e.transcript || "").replace(/\.jsonl$/, "") === launched)
 	// WHAT THIS NOTE MEANS, because it read as an alarm and it is the opposite (review #8 C5).
 	// The scratch directory keeps the uuid the process was LAUNCHED as; the registry entry is
 	// rewritten by the SessionStart hook on every /clear. So the two disagreeing is the
@@ -314,7 +333,7 @@ function transcriptOfPid(pid) {
 	// never cleared. This tool prints a plausible in-range number off a dead file and says
 	// nothing. That half is not detectable from file state (FINDINGS.md#clear-blind); what
 	// closes it is the hook running, not a better guess here.
-	const note = launched && launched !== live
+	const note = launched && launched !== live && !heldByAnother
 		? ` - re-registered after a /clear (launched as ${launched.slice(0, 8)}), so this is the CURRENT transcript`
 		: ""
 	return { path: r.transcript, why: null, note }
@@ -514,6 +533,16 @@ function proveRed() {
 	// before any child is spawned, because every child inherits it - the same reason
 	// CLAUDE_COMM_PROJECTS exists. A control that writes into the real world is not a
 	// control, and this one would write into the sensor every live session depends on.
+	// 🔴 THE IDENTITY VARIABLE IS SCRUBBED, and it is this project's own launcher that sets it.
+	// bin/launch.mjs:113 passes --env=CLAUDE_COMM_AGENT=<agent> into every session it starts, so
+	// the FIRST time that launcher was used - to start the one agent whose charter is to run
+	// these controls - every suite in the repo broke for it: attack aborted with 8 red and 36
+	// arms never reached, boot went 8 red, claim 2. Mechanism: whoami() returns null when the
+	// declared name is not in the roster, and no FIXTURE roster contains a real agent's name.
+	// Every child inherits this, which is the same reason CLAUDE_COMM_RUNTIME and
+	// CLAUDE_COMM_PROJECTS are overridden here. A control that inherits the world it measures
+	// is not a control. Review #9 C1.
+	delete process.env.CLAUDE_COMM_AGENT
 	process.env.CLAUDE_COMM_RUNTIME = join(dir, "runtime")
 	let n = 0, failed = 0
 	const check = (name, pass, detail) => {
@@ -676,11 +705,28 @@ function proveRed() {
 	{
 		const uuidA = "aaaaaaaa-1111-2222-3333-444444444444"   // what the process was LAUNCHED as
 		const uuidB = "bbbbbbbb-1111-2222-3333-444444444444"   // what the registry names NOW
-		const scratchRoot = join("/tmp", "claude-999999", "zz-context-arm")
+		// PER-RUN, not fixed. It was /tmp/claude-999999/zz-context-arm for every process on the
+		// machine, and this block ends by removing it recursively - so two sensor controls at
+		// once (six live sessions here) would delete each other's fixture. Same class as the
+		// join(dir,"claude") collision fixed inside this very block one day earlier, which is
+		// how it got noticed at all. The /tmp/claude-<digits>/ shape is required: it is what
+		// scratchUuidOfPid() matches.
+		const scratchRoot = join("/tmp", `claude-9${String(process.pid).padStart(6, "0")}`, "zz-context-arm")
 		const scratchA = join(scratchRoot, uuidA, "tasks")
 		mkdirSync(scratchA, { recursive: true })
 		const held = join(scratchA, "held")
 		writeFileSync(held, "")
+		// A SECOND scratch dir whose uuid IS owned by a live registry entry - the shape a
+		// process holding an INHERITED descriptor is really in, since the session that owns
+		// the directory is normally still running. uuidA above is owned by nobody, which is
+		// what a genuinely cleared session looks like.
+		const uuidOwned = "cccccccc-1111-2222-3333-444444444444"
+		const scratchOwned = join(scratchRoot, uuidOwned, "tasks")
+		mkdirSync(scratchOwned, { recursive: true })
+		const heldOwned = join(scratchOwned, "held")
+		writeFileSync(heldOwned, "")
+		const transcriptOwned = join(dir, `${uuidOwned}.jsonl`)
+		writeFileSync(transcriptOwned, readFileSync(write([user(), asst(111_000)])))
 		// ITS OWN DIRECTORY. The file must be NAMED `claude` for argv0 to matter, and an arm
 		// two screens down creates join(dir, "claude") as a symlink to /bin/sh - its
 		// symlinkSync is wrapped in a silent catch, so whichever arm runs second inherits the
@@ -704,33 +750,74 @@ function proveRed() {
 			return 0
 		}
 		const marker = `zz-ctx-${process.pid}-${Date.now()}`
+		// 🔴 NOTHING IS SIGNALLED THAT THIS ARM DID NOT POSITIVELY IDENTIFY, and the reason is
+		// the defect review #9 C2 measured in the first version of this block, written the day
+		// before: the cleanup read `process.kill(topPid)`, `pidOfMarker` returns **0** when its
+		// scan finds nothing, and `kill(2)` with pid 0 signals EVERY PROCESS IN THE CALLER'S
+		// PROCESS GROUP. It does not throw, so the `catch {}` caught nothing. Armed against the
+		// real code with a `setsid` shim that exits 1 - exactly the failure the comment below
+		// anticipates - it killed the suite, its shell and a bystander `sleep`, and the
+		// SKIPPED-AS-FAILURE degradation this block promises was never reached, because the
+		// cleanup that precedes it is what killed the process.
+		//
+		// So: a pid is killed only when it is > 0 AND still carries this run's marker, and it
+		// is killed BY GROUP (`-pid`), which is the idiom test/attack.mjs already uses in six
+		// places. `detached: true` makes the child its own group leader so that group is the
+		// unit; the setsid child is a session leader and already is.
+		const killMine = (p, mk) => {
+			if (!Number.isInteger(p) || p <= 0) return
+			try { if (!readFileSync(`/proc/${p}/cmdline`, "utf8").includes(mk)) return } catch { return }
+			try { process.kill(-p) } catch { try { process.kill(p) } catch {} }
+		}
 		// TOP-LEVEL: reparented away from this suite by setsid --fork.
 		spawnSync("setsid", ["--fork", fakeClaude, "-e", script, held, marker], { stdio: "ignore" })
 		const topPid = pidOfMarker(marker)
 		// DESCENDANT: identical in every way except that this suite is its parent.
 		const marker2 = `${marker}-child`
-		const child = spawn(fakeClaude, ["-e", script, held, marker2], { stdio: "ignore" })
+		const child = spawn(fakeClaude, ["-e", script, held, marker2], { stdio: "ignore", detached: true })
 		const kidPid = child.pid
 
-		const ancestryOk = topPid > 0 && kidPid > 0 && !hasClaudeAncestorForArm(topPid) && hasClaudeAncestorForArm(kidPid)
-		let topHow = "", kidHow = ""
+		// LEG 3, THE ORPHAN. Review #9 C3: a child whose `claude` parent has EXITED is
+		// reparented to systemd, has no claude ancestor, and keeps the descriptor it
+		// inherited - so ancestry alone hands it the note. The arm could not see that because
+		// it held its descendant leg as a LIVE child, which is the one state the defect does
+		// not need. Here the parent is a `claude`-named process that spawns and exits.
+		const markerO = `${marker}-orphan`
+		const spawner = `const{spawn}=require("child_process");spawn(process.argv[1],["-e",process.argv[2],process.argv[3],process.argv[4]],{stdio:"ignore",detached:true}).unref()`
+		spawnSync(fakeClaude, ["-e", spawner, fakeClaude, script, heldOwned, markerO], { stdio: "ignore" })
+		const orphanPid = pidOfMarker(markerO)
+		// The owner of that scratch uuid, alive and registered - the discriminator's input.
+		registryRecord({ pid: process.pid, transcript: transcriptOwned, agent: "control", source: "startup" })
+
+		const ancestryOk = topPid > 0 && kidPid > 0 && orphanPid > 0 &&
+			!hasClaudeAncestorForArm(topPid) && hasClaudeAncestorForArm(kidPid) &&
+			!hasClaudeAncestorForArm(orphanPid)
+		let topHow = "", kidHow = "", orphanHow = ""
+		if (ancestryOk) {
+			registryRecord({ pid: orphanPid, transcript: transcriptB, agent: "control", source: "clear" })
+			orphanHow = String(read(null, ["--pid", String(orphanPid)]).how || "")
+			try { unlinkSync(join(registryDir(), `${orphanPid}.json`)) } catch {}
+		}
 		if (ancestryOk) {
 			registryRecord({ pid: topPid, transcript: transcriptB, agent: "control", source: "clear" })
 			registryRecord({ pid: kidPid, transcript: transcriptB, agent: "control", source: "clear" })
 			topHow = String(read(null, ["--pid", String(topPid)]).how || "")
 			kidHow = String(read(null, ["--pid", String(kidPid)]).how || "")
-			for (const p of [topPid, kidPid]) { try { process.kill(p) } catch {} }
 			for (const p of [topPid, kidPid]) { try { unlinkSync(join(registryDir(), `${p}.json`)) } catch {} }
-		} else { try { process.kill(kidPid) } catch {}; try { process.kill(topPid) } catch {} }
-		try { rmSync(join("/tmp", "claude-999999"), { recursive: true, force: true }) } catch {}
+		}
+		killMine(topPid, marker); killMine(kidPid, marker2); killMine(orphanPid, markerO)
+		try { unlinkSync(join(registryDir(), `${process.pid}.json`)) } catch {}
+		try { rmSync(scratchRoot, { recursive: true, force: true }) } catch {}
 
-		check("a DESCENDANT of a session is not labelled cleared",
-			ancestryOk && /re-registered after a \/clear/.test(topHow) && !/re-registered/.test(kidHow),
+		check("only a real session gets the cleared note",
+			ancestryOk && /re-registered after a \/clear/.test(topHow) &&
+			!/re-registered/.test(kidHow) && !/re-registered/.test(orphanHow),
 			ancestryOk
-				? `top-level pid ${topPid} -> "${topHow.slice(-52)}" (POSITIVE CONTROL: the note must fire ` +
-				  `here or this arm proves nothing); its identical CHILD -> "${kidHow.slice(-52)}"`
-				: `SKIPPED-AS-FAILURE: could not build the fixture (top=${topPid} kid=${kidPid}) - ` +
-				  `setsid --fork did not reparent, so nothing was measured`)
+				? `top-level, uuid owned by nobody -> "${topHow.slice(-46)}" (POSITIVE CONTROL: the note ` +
+				  `must fire here or this arm proves nothing); LIVE-parented child -> "${kidHow.slice(-30)}"; ` +
+				  `ORPHAN holding a uuid a live session owns -> "${orphanHow.slice(-30)}"`
+				: `SKIPPED-AS-FAILURE: could not build the fixture (top=${topPid} kid=${kidPid} ` +
+				  `orphan=${orphanPid}) - nothing was measured`)
 	}
 
 	// ---- the registry: pid -> the transcript that pid is writing NOW ----------

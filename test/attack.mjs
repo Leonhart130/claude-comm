@@ -115,6 +115,16 @@ process.on("exit", () => {
 			`appeared with a fixture transcript: ${JSON.stringify(d.leaked)}`)
 	}
 })
+// 🔴 THE IDENTITY VARIABLE IS SCRUBBED, and it is this project's own launcher that sets it.
+// bin/launch.mjs:113 passes --env=CLAUDE_COMM_AGENT=<agent> into every session it starts, so
+// the FIRST time that launcher was used - to start the one agent whose charter is to run
+// these controls - every suite in the repo broke for it: attack aborted with 8 red and 36
+// arms never reached, boot went 8 red, claim 2. Mechanism: whoami() returns null when the
+// declared name is not in the roster, and no FIXTURE roster contains a real agent's name.
+// Every child inherits this, which is the same reason CLAUDE_COMM_RUNTIME and
+// CLAUDE_COMM_PROJECTS are overridden here. A control that inherits the world it measures
+// is not a control. Review #9 C1.
+delete process.env.CLAUDE_COMM_AGENT
 process.env.CLAUDE_COMM_RUNTIME = mkdtempSync(join(tmpdir(), "comm-attack-runtime-"))
 
 execFileSync("node", [join(PKG, "install.mjs"), root], { stdio: "pipe" })
@@ -1083,6 +1093,47 @@ const POINTER_SOURCES = (() => {
 		bare.length === 0,
 		`${join(root, ".comm", "README.md")}: ${bare.length ? bare.map((m) => JSON.stringify(m[0].trim())).join(", ") : "none"} ` +
 		`(coreutils owns that name in a non-interactive shell; the long form is canonical)`)
+}
+
+// ── A48: a control does not inherit an agent identity from the world ───────────
+//
+// bin/launch.mjs:113 passes `--env=CLAUDE_COMM_AGENT=<agent>` into every session it starts.
+// The first time that launcher was ever used - 2026-09-10, to start the `review` agent,
+// whose entire charter is to RUN THESE CONTROLS - it broke all of them: this suite aborted
+// with 8 red and 36 cases never reached, `boot --prove-red` went 8 red, `claim` 2. Review
+// #9 C1 measured all four, one variable, both directions.
+//
+// The mechanism is not exotic and that is the point: `whoami()` returns null when the
+// declared name is absent from the roster, and no FIXTURE roster contains a real agent's
+// name. So identity resolved to null in every child every suite spawned, and the failure
+// was COMFORTABLE - an abort reads as 4 green, 8 red and 36 absent, and only the exit code
+// says the run was not a control at all.
+//
+// ONE VARIABLE: whether the variable is in the environment a child inherits. The first
+// half is the POSITIVE CONTROL and it is not decoration - it proves the hazard is real, so
+// that the second half is evidence of a scrub rather than of a variable nobody reads.
+{
+	const proj = mkdtempSync(join(tmpdir(), "comm-a48-"))
+	mkdirSync(join(proj, ".comm", "inbox", "leader"), { recursive: true })
+	writeFileSync(join(proj, ".comm", "config.json"),
+		JSON.stringify({ leader: "leader", agents: { leader: "." } }, null, 2) + "\n")
+	const ask = (env) => {
+		const r = spawnSync(process.execPath, [join(PKG, "bin", "comm.mjs"), "whoami"],
+			{ cwd: proj, encoding: "utf8", env })
+		return { out: `${r.stdout || ""}${r.stderr || ""}`.trim(), status: r.status }
+	}
+	// The hazard, staged: a name this project's roster has never heard of.
+	const poisoned = ask({ ...process.env, CLAUDE_COMM_AGENT: "review" })
+	// The suite's own environment, after the scrub at the top of this file.
+	const clean = ask({ ...process.env })
+	rmSync(proj, { recursive: true, force: true })
+	check("A48 a control does not inherit an agent identity",
+		poisoned.status !== 0 && clean.status === 0 && clean.out === "leader" &&
+		process.env.CLAUDE_COMM_AGENT === undefined,
+		`with CLAUDE_COMM_AGENT=review -> exit ${poisoned.status} ${JSON.stringify(poisoned.out.slice(0, 40))} ` +
+		`(POSITIVE CONTROL: if this exits 0 the variable is inert and this case proves nothing); ` +
+		`this suite's own env -> exit ${clean.status} ${JSON.stringify(clean.out)}; scrubbed here=` +
+		`${process.env.CLAUDE_COMM_AGENT === undefined}`)
 }
 
 // ── A21/A22: the properties that erode by accretion, not by a single bad commit ──
