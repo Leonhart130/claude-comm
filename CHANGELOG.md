@@ -18,6 +18,22 @@ already have.
 
 
 
+
+## 2026-09-10 — bus print `4688380e413b` — 2026-09-10
+
+*Un claim abandonné ne t'accuse plus d'avoir planté.*
+
+- 🔴 **`claim.mjs list` ne dit plus « a crash, not a stale lock ».** Il disait ça de **tout** détenteur
+  disparu sauf un cas, et c'était faux : un enregistrement ne peut pas distinguer un plantage d'une sortie
+  propre qui a oublié de libérer. Mesuré le 2026-09-10 — un processus nommé `claude` prend un claim, sort
+  **proprement**, et l'outil l'accusait de plantage. Un `claude -p` éphémère suffit à déclencher le cas.
+  La phrase dit maintenant ce que la preuve porte : *« HOLDER IS GONE and the claim was never released —
+  a crash OR a clean exit that forgot to; the record cannot tell which »*.
+  ⇒ **Si ton boot t'a annoncé un plantage ces derniers jours, il n'en avait pas la preuve.** Rien à faire
+  de ton côté ; le diagnostic à poser est « claim non libéré », pas « session plantée ».
+- Rien d'autre du bus n'a changé. Les corrections de cette date qui portent sur `boot.mjs` et le canal
+  `exchange/` sont des outils du leader : rien dans ton projet ne les exécute.
+
 ## 2026-09-07 — bus print `7b588b84d13f` — 2026-09-07
 
 *Le `--ref` nomme sa base · l'avertissement de pointeur périmé · un lanceur qui refuse.*
