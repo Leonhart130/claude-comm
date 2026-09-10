@@ -22,23 +22,19 @@ never fires leaves the registry naming a DEAD transcript with both uuids agreein
 and the cleared-note discriminator goes quiet if the session owning the inherited uuid has itself ended.
 **Do not "fix" either with a better guess.**
 
-**4 — 🟢 THE EROSION COUNT KEYS ON THE CAUSE NOW.** The oldest open item in this repo, closed 2026-09-10.
-`--ack <row>="why"` is the cause; the three-strikes instruction fires per cause and prints
-`--amended <row>@<sig>="…"`; a bare `--amended` on a row carrying several causes **REFUSES and writes
-nothing**, and one naming a cause nobody acked refuses too. Armed: two causes kept apart, the refusal, and
-**an amendment clearing one while the other stands** — the assertion the row-keyed count failed.
-`FINDINGS.md#ack-amendment` is now the record of how, not a plan.
+**4 — 🔴 ASKED BY THE OWNER 2026-09-10, NOT BUILT: a launch that SPLITS the tab, and a session that
+CLOSES ITSELF when done.** *"un environnement intense et autonome risque d avoir beaucoup de fenêtres."*
+Full design, both halves, in `DESIGN-autonomy.md` — including the trap that decides it: the window id in
+the environment is EVIDENCE, never authority, or a `claude -p` child closes its parent s window (review #8
+C4 again). **Gate the close on the window being GONE, never on kitten s exit code.**
 
-**5 — 🟡 THE LETTER TO THE FIELD LEADER IS WRITTEN AND UNREAD** (`exchange/work-leader/out/2026-09-10-
+**5 — 🟡 THE LETTER TO THE FIELD LEADER OF `work` IS WRITTEN AND UNREAD** (`exchange/work-leader/out/2026-09-10-
 correction-...md`): my citation named a function that does not exist, and the advice added confidence, not
 evidence. **The bell REFUSED — his leader is not running** — so it waits for his `boot.sh` §7. ⚠️ Two `zz-`
 claims there are still held by dead pids; only he releases them, and the sentence his boot printed about
 them **was false and is fixed** (#8 C6).
 
-**6 — 🟢 `test/selftest.mjs` RAN 2026-09-10, both ways** — PASS with real sessions, `--prove-red` PASSED.
-It gated today's delivery change (`handoff.mjs`/`restart.mjs` into `BUS_FILES`) before and after.
-
-**7 — 🟡 THE DECLARED RESTART IS BUILT; THE AUTOMATIC ONE IS DELIBERATELY NOT.**
+**6 — 🟡 THE DECLARED RESTART IS BUILT; THE AUTOMATIC ONE IS DELIBERATELY NOT.**
 🟢 `bin/handoff.mjs` (sha256 read manifest, 7 arms) + `bin/restart.mjs prepare` (handoff → verify → arm the
 note, in that order, 4 arms). **It refuses to arm a note behind a failed handoff**, and it does NOT relaunch:
 `launch.mjs` refuses an agent already alive (A17) and the caller is that agent, so the last step is named
