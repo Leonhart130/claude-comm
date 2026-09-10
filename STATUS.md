@@ -165,8 +165,7 @@ world it measures is not a control. **Six instances.** `FINDINGS.md#measurement-
 **Acknowledgements amend the protocol** — `FINDINGS.md#ack-amendment`. First discharge 2026-09-08, `from: 9`.
 🟢 **Its design flaw — one row, several causes, one amendment clearing all of them — was fixed 2026-09-10.**
 
-**Conduct defects go in `LESSONS.md`** (tier 2, priced, catalogued by form) — *a lesson ends as an armed
-gate or it is a platitude.*
+**Conduct defects go in `LESSONS.md`** — *a lesson ends as an armed gate or it is a platitude.*
 
 **Findings live in the code**, at the point they apply — *a rule whose cost you cannot see is a rule someone
 will simplify away.*
