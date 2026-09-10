@@ -744,4 +744,12 @@ if (has("--prove-red")) proveRed()
 else if (verb === "take") take()
 else if (verb === "list") list()
 else if (verb === "release") release()
-else die("usage: claim.mjs take <resource> --purpose <why> | list | release <resource>  [--root <dir>]")
+// --pid BELONGS IN THE USAGE LINE, and it was only ever documented in an error message
+// you see AFTER getting it wrong. Reported 2026-09-10 by the leader of ~/Dev/getajob on his
+// FIRST real use, holding a shared vite port: without --pid the claim binds to the agent
+// SESSION, and a port outlives a session and dies before it - so --pid is exactly the flag
+// that changes the answer for the resource people actually claim. The one place it was
+// written down was the "gone" verdict, which is to say: after the damage.
+else die("usage: claim.mjs take <resource> --purpose <why> [--pid <the process that HOLDS it>]\n" +
+	"                 | list | release <resource> [--force]   [--root <dir>]\n" +
+	"  --pid matters: without it the claim is bound to your SESSION, and a port outlives a session.")

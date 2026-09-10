@@ -80,7 +80,12 @@ the restart. **That is what makes the arm fillable: the restarts happen there, n
 4. **🟢 Holding a machine resource — `bin/claim.mjs`, IN PRODUCTION**, 17 arms, A38, three field trees.
    **It advises; it opens nothing, kills nothing, blocks nothing.** In production unprompted, including a
    NON-port resource with a purpose and a duration.
-   🔴 **STILL NOT MEASURED: no two REAL agents have contended through it.** `FINDINGS.md:1090` never stopped
+   🟡 **PARTIAL FIELD MEASUREMENT 2026-09-10** (getajob, a real shared vite port): the refusal is clean
+   and scriptable — **exit 3**, holder + pid + purpose + since, nothing changed — and **discrimination is on
+   PROCESS identity, not agent name**, so an agent that lost track of what it held is refused too. ⭐ He
+   wrote himself that this is NARROWER: both sides carried the same agent name, and he told me not to close
+   the line on it. His `extension` expert is running the real one.
+   🔴 **STILL NOT MEASURED: two real SESSIONS contending.** `FINDINGS.md:1090` never stopped
    saying so and the 09-08 rewrite of this file **deleted** the line that did — review #8's worst finding,
    and the whole story is at `LESSONS.md` §2. ⇒ the correction to him is ▶ NEXT 5.
    ⚠️ Claims live in one project's `.comm/`, so a resource shared ACROSS projects is visible to nobody.
@@ -129,15 +134,11 @@ section, not retracted)*:
 
 ## ⚠️ What was NOT verified
 
-- ⚠️ **`test/attack.mjs` failed ONCE on 2026-09-10 and I did not capture which case.** Three runs
-  immediately after, no code change, all green. My grep had already moved on, so the case name is lost —
-  **that is a defect in my procedure, not a clean bill.** Likeliest cause, unproven: it ran seconds after a
-  `--prove-red` finished, and several cases snapshot the real registry (`FINDINGS.md#A20` shape). **Capture
-  the full output next time before re-running** — a second run is not evidence about the first.
+- ⚠️ **`attack` failed ONCE on 2026-09-10 and the case name was lost to a re-run** (three clean runs after,
+  no code change). **A defect in my procedure, not a clean bill** — capture the full output BEFORE re-running.
 
 
-- 🔴 **Whether `boot`'s registry `GONE` wording is reachable — in BOTH directions.** The 09-08 trace said
-  no; review #8 D4 found the enumeration incomplete (a transcript removed under a live session). ▶ NEXT 6.
+- 🔴 **Whether `boot`'s registry `GONE` wording is reachable, in BOTH directions** (review #8 D4).
 
 - **`--release` is verified by hand, not gated** (`FINDINGS.md#release-roundtrip`): the test seam does not exist.
 - **Whether the pid→transcript descriptor returns after a cleared session takes a turn**
