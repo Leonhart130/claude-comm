@@ -9,6 +9,24 @@
             "timeout": 20
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if command -v node >/dev/null 2>&1; then node \"$CLAUDE_PROJECT_DIR/.claude/comm-hook.mjs\" session-start; else echo \"claude-comm: node is NOT on this session PATH, so the bus hooks did not run. No mail will be delivered at any turn boundary and nothing else will say so. This session was launched outside an interactive shell (kitten @ launch, a .desktop file, cron); relaunch it through an INTERACTIVE shell - zsh -ic, not zsh -lc: on the box this was measured on, node lives under nvm and nvm is loaded from .zshrc, which a login shell never reads.\"; fi"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if command -v node >/dev/null 2>&1; then node \"$CLAUDE_PROJECT_DIR/.claude/comm-hook.mjs\" stop; fi"
+          }
+        ]
       }
     ]
   }
