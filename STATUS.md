@@ -90,15 +90,12 @@ the restart. **That is what makes the arm fillable: the restarts happen there, n
    and the whole story is at `LESSONS.md` §2. ⇒ the correction to him is ▶ NEXT 5.
    ⚠️ Claims live in one project's `.comm/`, so a resource shared ACROSS projects is visible to nobody.
 
-5. **🟡 `who` reports TWO states and there are THREE — half shipped, in the wrong command.** A leader read
-   `running` for four sessions sitting at their prompt and lost **2 h 30** (his E453). ✅ `bin/context.mjs
-   --sessions` prints `quiet <age>` from the transcript mtime — a MEASUREMENT, never "at prompt": a single
-   long tool call is quiet too. 🟢 The **third** state was in no design document: a launched session that
+5. **🟡 `who` reports TWO states and there are THREE — half shipped, in the wrong command.** A leader lost
+   **2 h 30** reading `running` for four sessions sitting at their prompt. ✅ `context.mjs --sessions` prints
+   `quiet <age>` — a MEASUREMENT, never "at prompt". 🟢 The third state was in no design doc: a session that
    has taken no turn has **no transcript at all** (`FINDINGS.md#no-turn-yet`). 🔴 It belongs in `comm who`
-   and cannot go there: A21 forbids the bus that import, and a second pid→transcript implementation is the
-   defect `who --json` exists to prevent ⇒ an A21 amendment **and** a split, `comm.mjs` being at 94 % of
-   A22. ⚠️ `context.mjs` is **not** in `BUS_FILES` — undecided scope, asked of the field leader 09-08,
-   still unanswered. Review #8 C4/C5 are in this same file.
+   and cannot go there — A21 forbids the bus that import ⇒ an A21 amendment **and** a split, `comm.mjs`
+   being near A22's cap. ⚠️ `context.mjs` is not in `BUS_FILES`: undecided scope, asked 09-08, unanswered.
 
 6. **🟢 A reply must NAME what it answers** — `Answers:` in a front-matter block on **line 1**, anchored to
    the first byte so a quotation cannot forge one (review #8 C1: a pasted marker used to count, and to print
