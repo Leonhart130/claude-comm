@@ -35,11 +35,11 @@
  *    from the registry the SessionStart hook writes (`bin/session-registry.mjs`), and a
  *    miss REFUSES rather than falling back to the answer that was wrong.
  */
-import { readFileSync, existsSync, readdirSync, statSync, readlinkSync, openSync, readSync, closeSync, mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, unlinkSync, utimesSync } from "node:fs"
+import { readFileSync, existsSync, readdirSync, statSync, readlinkSync, openSync, readSync, closeSync, mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, unlinkSync, utimesSync, chmodSync } from "node:fs"
 import { join, basename } from "node:path"
 import { homedir, tmpdir } from "node:os"
 import { fileURLToPath } from "node:url"
-import { spawnSync } from "node:child_process"
+import { spawnSync, spawn } from "node:child_process"
 import { lookup as registryLookup, record as registryRecord, registryDir, startTimeOf, sessionPid, entries as registryEntries } from "./session-registry.mjs"
 
 const ARGV = process.argv.slice(2)
@@ -194,6 +194,52 @@ function argv0Of(pid) {
 	try { return basename(readFileSync(`/proc/${pid}/cmdline`, "utf8").split("\0")[0] || "") } catch { return "" }
 }
 
+/**
+ * IS THIS PID A SESSION, OR A DESCENDANT OF ONE? `argv0 === "claude"` cannot tell them
+ * apart, and review #8 C4 measured the consequence: **a `claude -p` child is named
+ * `claude`**, inherits its parent's open descriptors, and was therefore labelled
+ * "session CLEARED (launched as <the PARENT's uuid>)" - a wrong claim about somebody
+ * else's session, printed with the confidence of a measurement. `test/selftest.mjs`
+ * spawns exactly this shape from this repo.
+ *
+ * A top-level session has no `claude` above it: it is started by a terminal, by a
+ * .desktop entry, or by `bin/launch.mjs` (whose parent is kitty). A descendant always
+ * does. The walk stops at pid 1 and on any unreadable /proc entry - a pid that vanishes
+ * mid-walk answers "cannot say it is a session", which is the safe direction here
+ * because the only thing this gates is an extra claim.
+ */
+function isTopLevelSession(pid) {
+	if (argv0Of(pid) !== "claude") return false
+	let cur = pid
+	for (let hops = 0; hops < 40; hops++) {
+		let ppid = 0
+		try {
+			const m = /^PPid:\s*(\d+)/m.exec(readFileSync(`/proc/${cur}/status`, "utf8"))
+			ppid = m ? Number(m[1]) : 0
+		} catch { return false }
+		if (!ppid || ppid === 1) return true
+		if (argv0Of(ppid) === "claude") return false
+		cur = ppid
+	}
+	return false
+}
+
+/** The arm's own reading of the ancestry, so the fixture is verified rather than assumed. */
+function hasClaudeAncestorForArm(pid) {
+	let cur = pid
+	for (let hops = 0; hops < 40; hops++) {
+		let ppid = 0
+		try {
+			const m = /^PPid:\s*(\d+)/m.exec(readFileSync(`/proc/${cur}/status`, "utf8"))
+			ppid = m ? Number(m[1]) : 0
+		} catch { return false }
+		if (!ppid || ppid === 1) return false
+		if (argv0Of(ppid) === "claude") return true
+		cur = ppid
+	}
+	return false
+}
+
 function scratchUuidOfPid(pid) {
 	try {
 		for (const fd of readdirSync(`/proc/${pid}/fd`)) {
@@ -250,14 +296,27 @@ function transcriptOfPid(pid) {
 			`this session has produced no transcript${since ? ` since it registered ${since} ago` : ""} ` +
 			`(a session that has taken no turn yet looks exactly like one whose file was removed)` }
 	}
-	// ONLY for a pid that is itself a session. A child inherits its parent's open
-	// descriptors, so any descendant of a session holds that session's scratch directory
-	// and would be labelled "cleared" on the strength of its parent's uuid. Found by
-	// reading this control's own output: the arm below printed CLEARED for the test
-	// harness. Evidence that is wrong is not weaker evidence, it is a wrong claim.
-	const launched = argv0Of(pid) === "claude" ? scratchUuidOfPid(pid) : null
+	// ONLY for a pid that is itself a session - see isTopLevelSession(). A child inherits
+	// its parent's open descriptors, so any descendant holds that session's scratch
+	// directory and was labelled "cleared" on the strength of its PARENT's uuid. Evidence
+	// that is wrong is not weaker evidence, it is a wrong claim.
+	const launched = isTopLevelSession(pid) ? scratchUuidOfPid(pid) : null
 	const live = basename(r.transcript).replace(/\.jsonl$/, "")
-	const note = launched && launched !== live ? ` - session CLEARED (launched as ${launched.slice(0, 8)})` : ""
+	// WHAT THIS NOTE MEANS, because it read as an alarm and it is the opposite (review #8 C5).
+	// The scratch directory keeps the uuid the process was LAUNCHED as; the registry entry is
+	// rewritten by the SessionStart hook on every /clear. So the two disagreeing is the
+	// evidence that the clear re-recorded correctly and this transcript is the CURRENT one.
+	// It was worded "session CLEARED", which sends the reader to distrust a good reading.
+	//
+	// 🔴 AND THE DANGEROUS CASE IS THE SILENT ONE, which is why it is named here rather than
+	// left to be rediscovered: when a clear's hook never fires at all, the entry still names
+	// the DEAD transcript and the two uuids AGREE - byte-identical to a session that was
+	// never cleared. This tool prints a plausible in-range number off a dead file and says
+	// nothing. That half is not detectable from file state (FINDINGS.md#clear-blind); what
+	// closes it is the hook running, not a better guess here.
+	const note = launched && launched !== live
+		? ` - re-registered after a /clear (launched as ${launched.slice(0, 8)}), so this is the CURRENT transcript`
+		: ""
 	return { path: r.transcript, why: null, note }
 }
 
@@ -594,6 +653,84 @@ function proveRed() {
 		check("F3 a SINGLE-transcript guess is refused too",
 			code === "3" && /"guessed":true/.test(txt),
 			`one transcript, no claude ancestor -> exit ${code}, guessed=${/"guessed":true/.test(txt)}`)
+	}
+
+	// ---- C4/C5: a DESCENDANT of a session is not the session ------------------
+	//
+	// Review #8 C4 measured a `claude -p` child - named `claude`, holding its parent's
+	// inherited scratch descriptor - being labelled "session CLEARED (launched as <the
+	// PARENT's uuid>)". A wrong claim about somebody else's session, printed with the
+	// confidence of a measurement. `test/selftest.mjs` spawns exactly this shape.
+	//
+	// ONE VARIABLE: whether the process has a `claude` ancestor. Everything else is held
+	// identical - the same executable named `claude`, the same inherited-looking scratch
+	// descriptor, the same registry entry naming a DIFFERENT uuid.
+	//
+	// 🔴 THE POSITIVE CONTROL CANNOT BE BUILT AS A CHILD OF THIS SUITE, because the suite
+	// itself runs under a `claude` session and every descendant inherits that ancestry.
+	// It is built with `setsid --fork`, which reparents the process out of this tree. If
+	// the machine will not do that - no setsid, or a subreaper named `claude`, which is
+	// not a thing - this arm reports SKIPPED-AS-FAILURE rather than passing on a fixture
+	// it did not manage to arm. A control that quietly measures nothing is the failure
+	// mode this file exists to prevent.
+	{
+		const uuidA = "aaaaaaaa-1111-2222-3333-444444444444"   // what the process was LAUNCHED as
+		const uuidB = "bbbbbbbb-1111-2222-3333-444444444444"   // what the registry names NOW
+		const scratchRoot = join("/tmp", "claude-999999", "zz-context-arm")
+		const scratchA = join(scratchRoot, uuidA, "tasks")
+		mkdirSync(scratchA, { recursive: true })
+		const held = join(scratchA, "held")
+		writeFileSync(held, "")
+		// ITS OWN DIRECTORY. The file must be NAMED `claude` for argv0 to matter, and an arm
+		// two screens down creates join(dir, "claude") as a symlink to /bin/sh - its
+		// symlinkSync is wrapped in a silent catch, so whichever arm runs second inherits the
+		// other one's file and measures nothing it thinks it is measuring. Found by running
+		// the suite, not by reading it.
+		const armDir = join(dir, "c4-descendant"); mkdirSync(armDir, { recursive: true })
+		const fakeClaude = join(armDir, "claude")
+		writeFileSync(fakeClaude, readFileSync(process.execPath))
+		chmodSync(fakeClaude, 0o755)
+		const transcriptB = join(dir, `${uuidB}.jsonl`)
+		writeFileSync(transcriptB, readFileSync(write([user(), asst(222_000)])))
+
+		const script = `require("fs").openSync(process.argv[1],"r");setTimeout(()=>{},30000)`
+		const pidOfMarker = (marker) => {
+			for (const e of readdirSync("/proc")) {
+				if (!/^\d+$/.test(e)) continue
+				try {
+					if (readFileSync(`/proc/${e}/cmdline`, "utf8").includes(marker)) return Number(e)
+				} catch {}
+			}
+			return 0
+		}
+		const marker = `zz-ctx-${process.pid}-${Date.now()}`
+		// TOP-LEVEL: reparented away from this suite by setsid --fork.
+		spawnSync("setsid", ["--fork", fakeClaude, "-e", script, held, marker], { stdio: "ignore" })
+		const topPid = pidOfMarker(marker)
+		// DESCENDANT: identical in every way except that this suite is its parent.
+		const marker2 = `${marker}-child`
+		const child = spawn(fakeClaude, ["-e", script, held, marker2], { stdio: "ignore" })
+		const kidPid = child.pid
+
+		const ancestryOk = topPid > 0 && kidPid > 0 && !hasClaudeAncestorForArm(topPid) && hasClaudeAncestorForArm(kidPid)
+		let topHow = "", kidHow = ""
+		if (ancestryOk) {
+			registryRecord({ pid: topPid, transcript: transcriptB, agent: "control", source: "clear" })
+			registryRecord({ pid: kidPid, transcript: transcriptB, agent: "control", source: "clear" })
+			topHow = String(read(null, ["--pid", String(topPid)]).how || "")
+			kidHow = String(read(null, ["--pid", String(kidPid)]).how || "")
+			for (const p of [topPid, kidPid]) { try { process.kill(p) } catch {} }
+			for (const p of [topPid, kidPid]) { try { unlinkSync(join(registryDir(), `${p}.json`)) } catch {} }
+		} else { try { process.kill(kidPid) } catch {}; try { process.kill(topPid) } catch {} }
+		try { rmSync(join("/tmp", "claude-999999"), { recursive: true, force: true }) } catch {}
+
+		check("a DESCENDANT of a session is not labelled cleared",
+			ancestryOk && /re-registered after a \/clear/.test(topHow) && !/re-registered/.test(kidHow),
+			ancestryOk
+				? `top-level pid ${topPid} -> "${topHow.slice(-52)}" (POSITIVE CONTROL: the note must fire ` +
+				  `here or this arm proves nothing); its identical CHILD -> "${kidHow.slice(-52)}"`
+				: `SKIPPED-AS-FAILURE: could not build the fixture (top=${topPid} kid=${kidPid}) - ` +
+				  `setsid --fork did not reparent, so nothing was measured`)
 	}
 
 	// ---- the registry: pid -> the transcript that pid is writing NOW ----------

@@ -707,3 +707,11 @@ went red with no defect in the code: the arms had encoded the fact that this rep
 DISCOVER the log and fail if there is more than one, which is the shape a control should have had from the
 start. It is `FINDINGS.md#A20` again — a gate reddening with no code change is reporting a change in the
 world — and this time the world changed because we changed it.
+
+**And two arms were sharing one fixture path.** The C4 arm needs a file NAMED `claude` (argv0 is the whole
+point) and wrote it to `join(dir, "claude")` — which an arm two screens down creates as a symlink to
+`/bin/sh`, inside a silent `catch {}`. Whichever ran second inherited the other's file and measured
+something else entirely: the unregistered-session arm ran a copy of `node` with `sh` arguments and reported
+`exit undefined`. Found by RUNNING the suite, not by reading it — and the C4 arm's own comment, written
+minutes earlier for a different fixture, already said that an arm which disturbs another arm's fixture is
+the next defect along.
