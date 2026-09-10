@@ -322,13 +322,22 @@ pool's cap saturates correctly and never re-issues a safer verdict as an answer;
 next change — DST and NTP steps, network filesystems, scale past ~6 400 records, and the fact that **the
 ledger has still never scored a real defect.**
 
-### ⚠️ What is NOT recorded yet, and it is the half that matters
+### ✅ The field IS wired — corrected 2026-09-10 by measurement, this section said the opposite
 
-**The field is not wired.** `~/Dev/work` and `~/Dev/electio` run `comm-hook.mjs session-start`, not boot, so
-no field session leaves a record. The reboots will happen there, and their cold arm is therefore still
-empty. Wiring it means changing the generated hook stub in `install.mjs` — a **delivery change**, gated by
-`test/selftest.mjs` before and after, which is why it was deliberately not done in the same session that
-built the instrument.
+It said *"the field is not wired … no field session leaves a record"*. **False, and it was false in a
+document a future session would have believed.** The generated stub records starts through the installed
+`ledger.mjs`, and the field has been recording all along. Measured, three trees, the same day:
+
+| tree | records | cold | reboot |
+| --- | --- | --- | --- |
+| `~/Dev/work` | 53 across 6 agent logs | 49 | 4 |
+| `~/Dev/getajob` | 4 across 3 | 3 | 1 |
+| `~/Dev/electio` | 1 | 1 | 0 |
+
+🔴 **So the reboot arm is short for a different reason than the one written here, and it is the reason that
+matters: a DECLARED restart is rare.** Five in the field against 53 cold. Wiring was never the blocker —
+**the trigger is.** Nothing decides when to restart, so restarts only happen when a human does one by hand,
+and only some of those are declared. ⇒ the arm fills when the trigger ships, not before.
 
 ## Phase 2 — the kitty wake, as it stood before the lifecycle mandate
 
