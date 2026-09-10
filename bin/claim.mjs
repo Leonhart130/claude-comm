@@ -255,9 +255,22 @@ function isMine(rec) {
 export function verdict(c) {
 	switch (c.state) {
 		case "held": return { mark: "●", note: "" }
+		// WHAT THE EVIDENCE ACTUALLY CARRIES, and it is less than this used to say. The note
+		// read "a crash, not a stale lock" for every holder but "self" - and review #8 C6
+		// measured a process named `claude` taking a claim and exiting CLEANLY: nothing
+		// crashed, and the row accused it anyway. `holder:"session"` is set whenever
+		// sessionPid() finds an ancestor named `claude` (below), INCLUDING an ephemeral
+		// `claude -p` child, so a clean exit without a release is an ordinary event.
+		//
+		// A record cannot distinguish a crash from a forgotten release: both leave a live
+		// claim behind a dead pid, and nothing on disk says which. So the note names the
+		// state it can see - the holder is gone and the claim was never released - and stops
+		// naming a cause it cannot. This row's whole purpose is to be believed by another
+		// agent, and "a crash" sends them looking for one. `boot.mjs`'s field: row renders
+		// this same string, so the accusation reached every boot of every project.
 		case "gone": return c.rec && c.rec.holder === "self"
 			? { mark: "✗", note: "the COMMAND that took this has exited - no session ever held it and nothing crashed; --pid names the process that does" }
-			: { mark: "✗", note: "HOLDER IS GONE: a crash, not a stale lock" }
+			: { mark: "✗", note: "HOLDER IS GONE and the claim was never released - a crash OR a clean exit that forgot to; the record cannot tell which. Not a lock that merely expired" }
 		case "corrupt": return { mark: "?", note: c.setAside
 			? `bytes this version cannot read, SET ASIDE at ${c.setAside} - something wrote here that should not have`
 			: `BYTES THIS VERSION CANNOT READ, still at ${c.path} - something wrote here that should not have` }
@@ -640,18 +653,31 @@ function proveRed() {
 			? `unreadable: exit ${relBad.status} (want non-zero), file survived=${survived}; readable: exit ${relOk.status}, removed=${!existsSync(rel)}`
 			: "SKIPPED-AS-FAILURE: chmod 000 was still readable (running as root?), so this arm proved nothing")
 
-	// 12. A `holder: "self"` claim is a prediction this tool MADE and warned about on stderr;
-	//     reporting it back as evidence of a crash is a false alarm at every session start
-	//     (review #7 F14). One variable: the `holder` field, same dead pid, same everything.
+	// 12. NEITHER BRANCH MAY NAME A CAUSE THE RECORD CANNOT SEE. One variable: `holder`,
+	//     same dead pid, same everything.
+	//
+	//     🔴 THIS ARM USED TO FREEZE THE DEFECT IT WAS WRITTEN BESIDE. Review #7 F14 fixed the
+	//     `holder:"self"` note and made the OTHER branch its positive control, asserting
+	//     `/a crash/.test(sessLine)` - so "a crash, not a stale lock" for a session holder
+	//     became a property this suite REQUIRED. Review #8 C6 then measured a process named
+	//     `claude` taking a claim and exiting cleanly, and the tool accused it of crashing
+	//     with a green control behind it. An arm can hold a defect in place; that is the
+	//     sharpest form of CLAUDE.md's 2026-09-04 amendment, because nothing looks wrong.
+	//
+	//     The positive control is now that the two branches still DIFFER and each still names
+	//     what it can see - not that either one names a crash.
 	write("port:4179", base({ resource: "port:4179", pid: 4194303, start: 1, holder: "self" }))
 	write("port:4180", base({ resource: "port:4180", pid: 4194303, start: 1, holder: "session" }))
 	const listed = run(["list"]).stdout
 	const selfLine = listed.split("\n").find((l) => l.includes("port:4179")) || ""
 	const sessLine = listed.split("\n").find((l) => l.includes("port:4180")) || ""
-	check("a dead SELF-held claim is not reported as a crash",
-		/nothing crashed/.test(selfLine) && !/a crash/.test(selfLine) && /a crash/.test(sessLine),
-		`holder:"self" -> ${JSON.stringify(selfLine.trim().slice(-60))}; ` +
-		`positive control holder:"session" says crash=${/a crash/.test(sessLine)}`)
+	check("neither branch names a cause the record cannot see",
+		/nothing crashed/.test(selfLine) && !/a crash/.test(selfLine)
+			&& !/a crash, not a stale lock/.test(sessLine)
+			&& /never released/.test(sessLine) && /a crash OR a clean exit/.test(sessLine),
+		`holder:"self" -> ${JSON.stringify(selfLine.trim().slice(-52))}; holder:"session" -> ` +
+		`${JSON.stringify(sessLine.trim().slice(-64))} (the two must still differ, and neither ` +
+		`may assert a crash)`)
 
 	// 13. The verb is a positional, not the first token that is not a flag (review #7 F12).
 	//     Two shapes the old resolver got wrong: a flag BEFORE the verb, and a flag value that

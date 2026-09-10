@@ -34,3 +34,6 @@ REVIEW-*.md
 # explicitly rather than swept up by a wildcard - see the note above for what an
 # ignore-by-default rule cost this repo once already.
 exchange/
+
+# claude-comm live state (regenerate with install.mjs)
+.comm/

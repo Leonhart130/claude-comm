@@ -662,3 +662,48 @@ cheap, not that it is needed**, which is the correct reading: a rule its author 
 discipline, not a gap. The gap was proven by the first incident and by nothing since.
 
 Correspondence: `exchange/work-leader/` (gitignored — it is correspondence, not source).
+
+## ✅ Session 16 — 2026-09-10: review #8 ran, and the marker stopped guessing
+
+**The first adversarial review this repo ever ran against a written brief.** It was written on 09-08 and
+sat unrun for two days; the owner had to ask why it was not being asked for. Nineteen findings on eight
+targets, report in `REVIEW-8.md`. Baselines the reviewer measured itself rather than quoting: `attack`
+48/48, `context` 21 arms, `claim` 17, `ledger` 41, `boot --prove-red` 52 arms 0 failures.
+
+**The decision worth recording — the `Answers:` marker is ANCHORED, not windowed.** The 09-08 fix defined a
+"header" as *the first 20 lines, cut at the first fence*. Review #8 mutation-proved what that actually
+forbade: delete the 20-line cap and the arm still passed. It closed the fenced form and nothing else, while
+a marker pasted into ordinary prose still marked a letter answered **and printed "(it says so)"**.
+
+Three candidate rules were considered and the corpus decided it, not taste:
+
+- **keep a window, tighten it** — rejected: whatever window is chosen, prose can occupy it. Position in
+  free text cannot separate a QUOTE from a CLAIM, and these two agents quote each other by pasting.
+- **first non-blank line must be the marker** — workable, and it reads wrong for a human: the title would
+  have to come second.
+- **front matter anchored at byte 0** ✅ — a `---` on line 1, closed by the next `---`. A file has one first
+  byte, so quoting a whole letter *including its front matter* cannot forge one. **Measured before
+  choosing: 33 letters in the corpus, one carries a marker, one migration.**
+
+Two false negatives of the old window went with it (a marker below an early fence, or past line 20). That
+is a feature of an anchored rule: the position is defined rather than guessed. The constraint is now
+published in `exchange/README.md`, which until today still told peers the mtime rule this repo repudiated
+on 09-08 — the contract with the peer was two days behind the code it described (review #8 D1).
+
+**Two arms were found holding defects in place, which is the sharpest form of the 09-04 amendment.**
+`channel: a marker inside QUOTED text` armed fences only; and `claim.mjs`'s F14 arm made *"a crash, not a
+stale lock"* its **positive control**, so a session holder that exited cleanly was accused of crashing with
+a green suite behind it. An arm can require a defect. Nothing looks wrong when it does.
+
+**And the bus was installed in this repo, with a `review/` agent.** `bin/launch.mjs` — written here,
+verified here, installed in two field trees — could not launch an agent in the folder it lives in, because
+this repo had no roster. The `session` row printed that in green for weeks. It is now a gated row with an
+arm and a positive control: `LESSONS.md` §1, and the register itself is new.
+
+**And a control was measuring the operator.** Installing the bus here gave this session an identity, so the
+ledger filed its starts as `leader.log` — while three places named `unnamed` outright: two reads of
+`.comm/handoff/unnamed.log`, and F2 arming its restart note for `--agent unnamed`. All
+went red with no defect in the code: the arms had encoded the fact that this repo had no roster. They now
+DISCOVER the log and fail if there is more than one, which is the shape a control should have had from the
+start. It is `FINDINGS.md#A20` again — a gate reddening with no code change is reporting a change in the
+world — and this time the world changed because we changed it.

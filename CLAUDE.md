@@ -12,7 +12,7 @@ doorbell** — and a reboot obeys it too, since what survives a restart is what 
 | --- | --- | --- |
 | **0 — always** | this file · `node bin/boot.mjs --fast` (injected at session start) · **`STATUS.md`** | every boot, ~6 k tokens |
 | **1 — on topic** | `README.md` (the design) · `FINDINGS.md` (**before touching any guard**) | only when the work touches them |
-| **2 — on demand** | `HISTORY.md` (how each decision was reached) · `BRIEF-*` / `REVIEW-*` correspondence | when re-opening something already settled |
+| **2 — on demand** | `HISTORY.md` (how a decision was reached) · `LESSONS.md` (**my own repeated errors, priced**) · `BRIEF-*` / `REVIEW-*` | when re-opening something settled |
 
 ```bash
 node bin/boot.mjs          # ~14 s · state + the adversarial gate (it prints the count; do not restate it here)

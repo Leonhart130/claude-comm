@@ -292,8 +292,28 @@ if (has("--hook")) {
 			: `declared "${declared}" - REFUSED by the bus: no such agent on this roster, so this session is OFF the bus and records as unnamed`)
 		: onBus ? `"${sessionAgent}" by directory - on the bus, no CLAUDE_COMM_AGENT needed`
 		: "not on any roster here - off the bus"
-	row("session", refused && !deliberate ? WARN : OK, `${how} (${where})` +
-		`${kitty ? ` - kitty win ${kitty[1]}` : ""}${src}`)
+
+	// 🔴 THE AUTHOR IS NOT EXEMPT FROM HIS OWN TOOL, and this row printed the exemption in
+	// GREEN for weeks. `~/Dev/claude-comm` was the one project on this machine with no
+	// `.comm/config.json`, so `bin/launch.mjs` - written here, verified here, installed in
+	// two field trees - could not launch an agent IN THE FOLDER IT LIVES IN, and `review/`
+	// had never been created. The owner had already written the rule three days earlier, in
+	// his own words: "il ne faut pas que j'aie à rappeler à qui que ce soit que l'outil
+	// existe et qu'il doit être utilisé". LESSONS.md §1, form A.
+	//
+	// "off the bus" is a NEUTRAL FACT for an ordinary project and a DEFECT for this one, so
+	// the row cannot judge it without knowing which it is looking at. The test is whether
+	// this root SHIPS the bus: an installer and a bus beside it. That is also true of a
+	// fresh clone, where it is the right thing to say - nobody has run the installer yet.
+	//
+	// Knowing the rule does not protect you; running a control does. Armed as
+	// "session: a root that SHIPS the bus and is not ON it".
+	const shipsTheBus = existsSync(join(ROOT, "install.mjs")) && existsSync(join(ROOT, "bin", "comm.mjs"))
+	const authorExempt = shipsTheBus && !existsSync(join(ROOT, ".comm", "config.json"))
+	row("session", refused && !deliberate ? WARN : authorExempt ? WARN : OK, `${how} (${where})` +
+		`${kitty ? ` - kitty win ${kitty[1]}` : ""}${src}` +
+		(authorExempt ? ` - ⚠ THE ROOT AT ${ROOT} SHIPS THE BUS AND IS NOT ON IT: no .comm/config.json` +
+			" there, so launch.mjs cannot start an agent in it. Run: node install.mjs . --add-agent review=review" : ""))
 }
 
 // -- 1b. the ledger: every session start, recorded where a reboot can be compared to it -
@@ -1003,11 +1023,26 @@ function askBus(sessionPidForCwd) {
  */
 {
 	const root = join(ROOT, "exchange")
-	let peers = []
+	let peers = [], rootErr = null
 	try {
 		peers = readdirSync(root, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name)
-	} catch {}
+	} catch (e) { rootErr = e.code || e.message }
+	// ENOENT is an ANSWER - there are no channels here, which is the state of every fresh
+	// clone because exchange/ is gitignored. Any other error is a BLINDNESS, and review #8
+	// measured that this bare catch printed neither: no row, no warning, no change to
+	// `worst`. A reader cannot tell "no peers" from "could not look", and the fresh-clone
+	// case made that indistinguishable state the DEFAULT one.
+	if (rootErr === "ENOENT") row("channel", OK, `no exchange/ directory at ${root} - this project has no channels`)
+	else if (rootErr) row("channel", WARN, `exchange/ could not be read (${rootErr}) - this project's channels ` +
+		`CANNOT BE SEEN, which is not the same as having none`)
 	for (const peer of peers) {
+		// A DIRECTORY THAT COULD NOT BE READ IS NOT AN EMPTY DIRECTORY. This returned
+		// {at:0} for both, and `continue` below then DELETED THE WHOLE ROW: review #8
+		// measured chmod 000 on the channel directory and got a report one line shorter,
+		// nothing added, `worst` unmoved - a channel that ceases to exist reads exactly
+		// like a project with no peers. The `blind`/`unread` branches two screens down
+		// were added against this very failure class for in/ and out/; this is the same
+		// class, one level up, in the helper that feeds them.
 		const newest = (dir) => {
 			let best = 0, name = null
 			try {
@@ -1016,10 +1051,17 @@ function askBus(sessionPidForCwd) {
 					const m = statSync(join(root, peer, dir, f)).mtimeMs
 					if (m > best) { best = m; name = f }
 				}
-			} catch {}
-			return { at: best, name }
+			} catch (e) { return { at: 0, name: null, err: e.code || e.message } }
+			return { at: best, name, err: null }
 		}
 		const inb = newest("in"), outb = newest("out")
+		// Both sides unreadable means the channel directory itself is: say so LOUDLY rather
+		// than silently, and never fall through to the `continue` that removes the row.
+		if (inb.err && outb.err) {
+			row(`channel:${peer}`, WARN, `CANNOT SAY whether mail here is answered - the channel ` +
+				`directory could not be read (${inb.err}) - this is NOT the same as having no mail`)
+			continue
+		}
 		if (!inb.at && !outb.at) continue
 
 		// WHAT THIS ROW USED TO SAY, and why it was a lie (2026-09-08). It compared the
@@ -1040,7 +1082,33 @@ function askBus(sessionPidForCwd) {
 		// Letters that predate the convention are judged by the OLD rule and the row SAYS
 		// so, rather than reddening on history it cannot re-derive. That grandfathering is
 		// a constant, not a stored watermark, and it expires on its own as mail turns over.
-		const CONVENTION_SINCE = Date.parse("2026-09-08T07:00:00Z")
+		// 🔴 A DATE IN A FILENAME IS A FACT. AN MTIME IS NOT. This boundary was an mtime, and
+		// review #8 C3 measured both directions on the real corpus: rsync-fresh mtimes gave 12
+		// false UNANSWERED, and archive-restored mtimes turned the row GREEN AND NAMING - the
+		// exact defect the marker replaced, re-entered through the grandfathering constant. A
+		// `git checkout`, an `rsync` or a restore moves every letter across an mtime boundary
+		// at once, and nothing on the row would say it had happened.
+		//
+		// The corpus already carried the answer and it was measured before this was written:
+		// **15 of 15 letters on both sides name their own date** (`2026-09-08-...`, or embedded
+		// as in `work-leader-2026-09-04-...`). A name survives every operation an mtime does
+		// not. Day resolution, UTC, and the boundary is the DAY the convention was declared, so
+		// a letter dated 09-08 is judged by the marker rather than grandfathered by an hour.
+		//
+		// AN UNDATED FILE IS TREATED AS NEW, which is the safe direction: it must be named by a
+		// reply or the row warns. The unsafe direction would grandfather anything unparseable.
+		const CONVENTION_DAY = Date.parse("2026-09-08T00:00:00Z")
+		const nameDate = (f) => {
+			const m = /(\d{4})-(\d{2})-(\d{2})/.exec(f || "")
+			if (!m) return null
+			const t = Date.parse(`${m[1]}-${m[2]}-${m[3]}T00:00:00Z`)
+			return Number.isFinite(t) ? t : null
+		}
+		// The letter's OWN date when it has one, its mtime only as a last resort - and the row
+		// says which, because "2 d ago" off a name and off a restored mtime are not the same
+		// claim. `newest()` still ORDERS by mtime; that is a question about arrival, not about
+		// which rule judges the letter.
+		const stampOf = (b) => { const nd = nameDate(b && b.name); return nd === null ? (b ? b.at : 0) : nd }
 		const answered = new Set()
 		let unread = 0
 		try {
@@ -1048,17 +1116,29 @@ function askBus(sessionPidForCwd) {
 				if (f.startsWith(".")) continue
 				let txt = ""
 				try { txt = readFileSync(join(root, peer, "out", f), "utf8") } catch { unread++; continue }
-				// THE MARKER IS A HEADER, and only a header. Matched anywhere in the file it would
-				// be inherited from QUOTED text - and quoting each other's letters is precisely what
-				// these two agents do - so one reply pasting another's header would mark answered a
-				// letter nobody answered. Same class as the row this whole block replaces: evidence
-				// that looks like a claim. Header = before the first fenced block, within 20 lines.
-				const head = []
-				for (const line of txt.split("\n").slice(0, 20)) {
-					if (line.startsWith("```")) break
-					head.push(line)
-				}
-				for (const m of head.join("\n").matchAll(/^\s*(?:\*\*)?Answers:(?:\*\*)?\s*(.+?)\s*$/gm))
+				// THE MARKER LIVES IN A HEADER ANCHORED TO THE FILE'S FIRST BYTE, and a file has
+				// exactly one. The rule used to be "before the first fence, within 20 lines", and
+				// review #8 MEASURED what that actually forbids: the fenced form, and nothing else.
+				// A pasted `Answers: x.md` at line 5 of ordinary prose still marked x.md answered
+				// AND printed "(it says so)" - evidence that looks like a claim, which is the exact
+				// defect this whole block was written to remove, reintroduced by its own fix. The
+				// blockquote form only failed by accident, on the `^\s*` in the old regex.
+				//
+				// POSITION IN FREE TEXT CANNOT SEPARATE A QUOTE FROM A CLAIM: whatever window is
+				// chosen, prose can occupy it, and these two agents quote each other by pasting.
+				// So the region is no longer guessed, it is ANCHORED - a `---` on line 1, closed by
+				// the next `---`. Quoting a whole letter, front matter and all, cannot forge one:
+				// the quoted `---` is not the file's first line. Two false NEGATIVES of the old
+				// window go with it (a marker below an early fence, or past line 20): under an
+				// anchored rule the position is defined rather than guessed, so neither is a
+				// judgement call any more.
+				//
+				// The cost was measured on the corpus BEFORE the rule was chosen: 33 letters, one
+				// carries a marker, one had to be migrated. Documented where a letter-writer reads
+				// it - `exchange/README.md` - because a constraint that lives only in this comment
+				// is one the next writer loses silently (review #8 D1).
+				const fm = /^---\r?\n([\s\S]*?)\r?\n---(\r?\n|$)/.exec(txt)
+				if (fm) for (const m of fm[1].matchAll(/^(?:\*\*)?Answers:(?:\*\*)?[ \t]*(.+?)[ \t]*$/gm))
 					for (const nm of m[1].split(/[,\s]+/)) if (nm) answered.add(nm.replace(/^`|`$/g, ""))
 			}
 		} catch { unread = -1 }
@@ -1073,14 +1153,15 @@ function askBus(sessionPidForCwd) {
 		try {
 			for (const f of readdirSync(join(root, peer, "in"))) {
 				if (f.startsWith(".")) continue
-				const at = statSync(join(root, peer, "in", f)).mtimeMs
-				if (at < CONVENTION_SINCE) continue          // judged below, by the old rule
+				const at = nameDate(f) ?? statSync(join(root, peer, "in", f)).mtimeMs
+				if (at < CONVENTION_DAY) continue            // judged below, by the old rule
 				if (!answered.has(f)) open.push({ name: f, at })
 			}
 		} catch (e) { blind = "in/ could not be read (" + (e.code || e.message) + ")" }
 		open.sort((a, b) => a.at - b.at)                     // the one waiting LONGEST first
-		const legacyWaiting = inb.at > outb.at && inb.at < CONVENTION_SINCE
-		const dated = inb.at && inb.at < CONVENTION_SINCE ? " (by date: this predates the Answers: convention)" : ""
+		const inStamp = stampOf(inb), outStamp = stampOf(outb)
+		const legacyWaiting = inStamp > outStamp && inStamp < CONVENTION_DAY
+		const dated = inStamp && inStamp < CONVENTION_DAY ? " (by date: this predates the Answers: convention)" : ""
 
 		// A reply this row could not read may be the very one that names the waiting letter, so
 		// an unreadable out/ is reported as NOT KNOWING, never as an answer.
@@ -1092,10 +1173,10 @@ function askBus(sessionPidForCwd) {
 				`UNANSWERED - ${open[0].name} arrived ${age(Date.now() - open[0].at)} ago` +
 				(open.length > 1 ? ` (+${open.length - 1} more unnamed by any reply)` : ""))
 		} else if (legacyWaiting) {
-			row(`channel:${peer}`, WARN, `UNANSWERED - ${inb.name} arrived ${age(Date.now() - inb.at)} ago${dated}`)
+			row(`channel:${peer}`, WARN, `UNANSWERED - ${inb.name} arrived ${age(Date.now() - inStamp)} ago${dated}`)
 		} else {
 			row(`channel:${peer}`, OK,
-				`answered - last reply ${age(Date.now() - outb.at)} ago` +
+				`answered - last reply ${age(Date.now() - outStamp)} ago` +
 				(inb.name ? `, to ${inb.name}${answered.has(inb.name) ? " (it says so)" : dated}` : ""))
 		}
 	}
@@ -1484,9 +1565,20 @@ function proveRed() {
 	// whole close block and no arm can construct a green one. That cost a red arm on 2026-09-07
 	// which read as "the close haunts a healed row" and was nothing of the kind.
 	// FINDINGS.md#erosion-arm
-	for (const e of [".gitignore", "bin", "install.mjs", "test", "CLAUDE.md", "README.md", "FINDINGS.md", "STATUS.md", "HISTORY.md", "DESIGN-autonomy.md", "CHANGELOG.md"]) {
+	// LESSONS.md is here for the reason A28 exists: bin/ comments point at it, and a fixture
+	// missing a pointed-at document reddens the `gate` row - which then failed SEVEN close arms
+	// behind it, because a close refuses on a red row. Measured 2026-09-10, and the cascade is
+	// the honest behaviour: one dangling pointer, one red row, every gate downstream refusing.
+	for (const e of [".gitignore", "bin", "install.mjs", "test", "CLAUDE.md", "README.md", "FINDINGS.md", "STATUS.md", "HISTORY.md", "DESIGN-autonomy.md", "CHANGELOG.md", "LESSONS.md"]) {
 		if (existsSync(join(SELF, e))) cpSync(join(SELF, e), join(pkg, e), { recursive: true })
 	}
+	// SAME REASON AS THE .gitignore ABOVE: the `session` row now reddens for a root that
+	// ships the bus and carries no roster, and this fixture ships the bus. Written rather
+	// than copied from `.comm/` - a control that reads the live state it is measuring is
+	// not a control, and this file already carries that lesson twice.
+	mkdirSync(join(pkg, ".comm"), { recursive: true })
+	writeFileSync(join(pkg, ".comm", "config.json"),
+		JSON.stringify({ leader: "leader", agents: { leader: "." } }, null, 2) + "\n")
 	const g = (...a) => execFileSync("git", a, { cwd: pkg, stdio: "ignore" })
 	g("init", "-q")
 	g("config", "user.email", "boot@fixture"); g("config", "user.name", "boot")
@@ -1526,9 +1618,16 @@ function proveRed() {
 	// now heavy enough that a busy machine cannot finish it — and a control that cannot be run
 	// is not a strict control, it is an absent one. This does NOT make a subset a pass: the
 	// summary counts what was skipped, so a filtered run can never be quoted as a green control.
+	// MEASURED by review #8, and the comment above was wrong about the only thing that
+	// matters: --only CUTS OUTPUT, NOT WORK. A run selecting ZERO arms still took 612 s
+	// (10 min 13 s) of the ~13 min suite, because most arms are inline blocks that build
+	// their fixture and run full `--close` gates BEFORE reaching their assert. It does not
+	// rescue a machine that cannot finish the suite; it only narrows what is printed.
+	// FINDINGS.md:1690 already said so - the finding lived everywhere except at the point
+	// it applies, which is the one place CLAUDE.md requires it to live.
 	const ONLY = opt("--only", null)
-	let skipped = 0
-	const selected = (name) => { if (!ONLY || name.includes(ONLY)) return true; skipped++; return false }
+	let skipped = 0, ran = 0
+	const selected = (name) => { if (!ONLY || name.includes(ONLY)) { ran++; return true } skipped++; return false }
 	const assert = (name, pass, detail) => {
 		if (!selected(name)) return
 		if (!pass) failed++
@@ -1693,9 +1792,70 @@ function proveRed() {
 	arm("budget: the tier-0 marker goes missing", "budget", WARN,
 		...swap(claudeMd, (s) => s.replace(/<!--\s*boot-tier0:[^>]*-->/, "")))
 
+	// THE ARM FOR LESSONS.md §1. One variable: the roster file. The forbidden state is the
+	// one that shipped - a root carrying install.mjs and bin/comm.mjs, with no .comm/config.json,
+	// printed as a green tick. The positive control is the SAME root with its roster back:
+	// without it, a row that simply always warned would satisfy the assertion and prove
+	// nothing, which is the failure this repo amended its own standard about on 2026-09-04.
+	{
+		const roster = join(pkg, ".comm", "config.json")
+		const saved = readFileSync(roster, "utf8")
+		const onIt = rowOf(run(true), "session")
+		rmSync(roster, { force: true })
+		const offIt = rowOf(run(true), "session")
+		writeFileSync(roster, saved)
+		const restored = level(run(true), "session")
+		assert("session: a root that SHIPS the bus and is not ON it",
+			onIt.level === OK && restored === OK && offIt.level === WARN && /SHIPS THE BUS AND IS NOT ON IT/.test(offIt.text),
+			`roster present -> ${LV[onIt.level]} (positive control); roster removed from a root that ` +
+			`ships install.mjs + bin/comm.mjs -> ${LV[offIt.level]} "${offIt.text.slice(-58)}"; roster ` +
+			`back -> ${LV[restored]} (if this is not ok the row just always warns)`)
+	}
+
 	const chIn = join(pkg, "exchange", "peer", "in"), chOut = join(pkg, "exchange", "peer", "out")
 	mkdirSync(chIn, { recursive: true }); mkdirSync(chOut, { recursive: true })
 	writeFileSync(join(chOut, "answer.md"), "answered\n")
+	// A RESTORE MOVES EVERY MTIME AT ONCE, AND MUST MOVE NO VERDICT. Review #8 C3 measured
+	// the old boundary both ways on the real corpus: rsync-fresh mtimes produced 12 false
+	// UNANSWERED, and archive-restored mtimes turned the row GREEN AND NAMING - on mtime
+	// ordering alone, which is the defect the whole block replaced. The dates now come from
+	// the filenames, so this arm moves the mtimes as far as they can go and requires the row
+	// NOT to move.
+	//
+	// THE POSITIVE CONTROL IS THE SECOND HALF, and without it this arm would pass for a row
+	// that had stopped reading anything at all: the same two files, one NAME changed, must
+	// flip the verdict.
+	{
+		// The fixture seeds an UNDATED `answer.md` two lines up, and an undated file falls back
+		// to its mtime - written just now, so it would be the newest reply on every run and this
+		// arm would be measuring the seed instead of its own variable. Moved aside for the
+		// duration and put back: an arm that quietly deletes another arm's fixture is the next
+		// defect along.
+		const seeded = join(chOut, "answer.md"), aside = join(chOut, "..answer.md.aside")
+		renameSync(seeded, aside)
+		const oldIn = join(chIn, "2026-09-05-asked-long-ago.md"), oldOut = join(chOut, "2026-09-06-answered-then.md")
+		writeFileSync(oldIn, "asked\n"); writeFileSync(oldOut, "replied\n")
+		const natural = level(run(true), "channel:peer")
+		// The restore: the letter looks brand new, the reply looks ancient. Pure mtime.
+		utimesSync(oldIn, new Date(), new Date())
+		utimesSync(oldOut, new Date(Date.now() - 400 * 86400000), new Date(Date.now() - 400 * 86400000))
+		const restored = level(run(true), "channel:peer")
+		// One variable, and it is the NAME: the letter is now dated AFTER the reply.
+		rmSync(oldIn, { force: true })
+		const newerName = join(chIn, "2026-09-07-asked-after-the-reply.md")
+		writeFileSync(newerName, "asked\n")
+		utimesSync(newerName, new Date(Date.now() - 400 * 86400000), new Date(Date.now() - 400 * 86400000))
+		const byName = level(run(true), "channel:peer")
+		rmSync(newerName, { force: true }); rmSync(oldOut, { force: true })
+		renameSync(aside, seeded)
+		assert("channel: a restore moves every mtime and no verdict",
+			natural === OK && restored === OK && byName === WARN,
+			`letter 09-05, reply 09-06 -> ${LV[natural]}; the SAME two files with the letter's mtime ` +
+			`set to now and the reply's to 400 days ago -> ${LV[restored]} (must not move); the letter ` +
+			`renamed 09-07, its mtime still ancient -> ${LV[byName]} (POSITIVE CONTROL: if this is not ` +
+			`warn the row reads neither dates nor names)`)
+	}
+
 	arm("channel: a peer message goes unanswered", "channel:peer", WARN,
 		() => writeFileSync(join(chIn, "question.md"), "asked\n"),
 		() => rmSync(join(chIn, "question.md"), { force: true }))
@@ -1714,7 +1874,7 @@ function proveRed() {
 		writeFileSync(q, "asked\n")
 		writeFileSync(a, "a reply about something else entirely\n")   // newer, names nothing
 		const silent = level(run(true), "channel:peer")
-		writeFileSync(a, "Answers: asked-first.md\n\nnow it names what it answers\n")
+		writeFileSync(a, "---\nAnswers: asked-first.md\n---\n\nnow it names what it answers\n")
 		const naming = level(run(true), "channel:peer")
 		rmSync(q, { force: true }); rmSync(a, { force: true })
 		assert("channel: a NEWER reply that names nothing is not an answer",
@@ -1728,19 +1888,73 @@ function proveRed() {
 	// A MARKER IN QUOTED TEXT IS NOT AN ANSWER. These two agents quote each other's letters
 	// verbatim, so a header pasted into a body would otherwise mark answered a letter nobody
 	// answered - the same "evidence that looks like a claim" the whole block replaces.
-	// ONE VARIABLE: whether the name sits in the header or below a fenced block.
+	//
+	// THIS ARM WAS HALF ARMED AND REVIEW #8 PROVED IT BY MUTATION: with the 20-line cap
+	// deleted from the scanner the arm STILL PASSED, because the only form it staged was the
+	// FENCED one. Its title said "QUOTED text" while it forbade fences - a gate reddening for
+	// a narrower property than its own name, which is exactly what CLAUDE.md's 2026-09-04
+	// amendment forbids. The form that was actually live - a marker pasted into plain prose -
+	// went green AND printed "(it says so)".
+	//
+	// So the arm now stages the two forms that must never count and keeps one positive
+	// control. Case A is the one that guards the ANCHOR: it pastes a whole letter INCLUDING
+	// its `---` front matter into a body, which is what quoting really looks like now, and it
+	// can only warn while the scanner's `---` is anchored to the file's first byte.
 	{
 		const q3 = join(chIn, "quoted.md"), a3 = join(chOut, "quoting.md")
 		writeFileSync(q3, "asked\n")
-		writeFileSync(a3, "# a reply about something else\n\nquoting his letter:\n\n```\nAnswers: quoted.md\n```\n")
-		const quotedOnly = level(run(true), "channel:peer")
-		writeFileSync(a3, "Answers: quoted.md\n\n# now the header names it\n")
+		// A: his ENTIRE letter pasted below a line of prose, front matter and all.
+		writeFileSync(a3, "# a reply about something else\n\nhe wrote, and I quote:\n\n---\nAnswers: quoted.md\n---\n\nand that is why I disagree\n")
+		const pastedHeader = level(run(true), "channel:peer")
+		// B: the bare marker in ordinary prose - the form that was live until review #8.
+		writeFileSync(a3, "# a reply about something else\n\nhis header said\n\nAnswers: quoted.md\n\nand I am not answering it\n")
+		const inProse = level(run(true), "channel:peer")
+		// C: fenced, the only form the old arm ever staged.
+		writeFileSync(a3, "# a reply about something else\n\nquoting:\n\n```\nAnswers: quoted.md\n```\n")
+		const fenced = level(run(true), "channel:peer")
+		// D: POSITIVE CONTROL - the real thing, anchored at the first byte.
+		writeFileSync(a3, "---\nAnswers: quoted.md\n---\n\n# now the header names it\n")
 		const inHeader = level(run(true), "channel:peer")
 		rmSync(q3, { force: true }); rmSync(a3, { force: true })
-		assert("channel: a marker inside QUOTED text is not an answer",
-			quotedOnly === WARN && inHeader === OK,
-			`the name only inside a fenced block -> ${LV[quotedOnly]} (must warn); the same name in the ` +
-			`header -> ${LV[inHeader]} (POSITIVE CONTROL: if this is not ok the marker never works at all)`)
+		assert("channel: a marker QUOTED anywhere below the first byte is not an answer",
+			pastedHeader === WARN && inProse === WARN && fenced === WARN && inHeader === OK,
+			`his whole letter pasted, front matter included -> ${LV[pastedHeader]} (must warn; this is ` +
+			`the arm on the ANCHOR); the bare marker in prose -> ${LV[inProse]} (must warn; THIS was the ` +
+			`live defect); fenced -> ${LV[fenced]} (must warn); real front matter -> ${LV[inHeader]} ` +
+			`(POSITIVE CONTROL: if this is not ok the marker never works at all)`)
+	}
+
+	// A ROW MUST NOT BE ABLE TO DISAPPEAR. The arm below covers an unreadable in/ and out/,
+	// and review #8 measured what neither covers: chmod 000 on the CHANNEL DIRECTORY, or on
+	// exchange/ itself, produced a report one line SHORTER - no row, no warning, `worst`
+	// unmoved. A channel that ceases to exist reads exactly like a project with no peers,
+	// and that is the state of every fresh clone, since exchange/ is gitignored.
+	//
+	// The forbidden state here is ABSENCE, which the harness can already say: level() gives
+	// -1 for a row that is not in the report. Two positive controls, because either chmod
+	// silently doing nothing would make this arm measure an ordinary read.
+	{
+		const chDir = join(pkg, "exchange", "peer"), exDir = join(pkg, "exchange")
+		const q4 = join(chIn, "vanish.md")
+		writeFileSync(q4, "asked\n")
+		const before = level(run(true), "channel:peer")
+		spawnSync("chmod", ["000", chDir])
+		const noChannel = rowOf(run(true), "channel:peer")
+		spawnSync("chmod", ["755", chDir])
+		const midControl = level(run(true), "channel:peer")
+		spawnSync("chmod", ["000", exDir])
+		const noRoot = rowOf(run(true), "channel")
+		spawnSync("chmod", ["755", exDir])
+		const after = level(run(true), "channel:peer")
+		rmSync(q4, { force: true })
+		assert("channel: an unreadable channel still PRINTS a row",
+			before !== -1 && after !== -1 && midControl !== -1 &&
+			noChannel.level === WARN && /CANNOT SAY/.test(noChannel.text) &&
+			noRoot.level === WARN && /CANNOT BE SEEN/.test(noRoot.text),
+			`readable -> ${LV[before]}; channel dir unreadable -> ${LV[noChannel.level]} ` +
+			`"${noChannel.text.slice(0, 40)}" (must warn, NOT vanish); exchange/ unreadable -> ` +
+			`${LV[noRoot.level]} "${noRoot.text.slice(0, 40)}"; readable again -> ${LV[after]} ` +
+			`(POSITIVE CONTROLS: if these are absent, chmod did nothing and this arm measured nothing)`)
 	}
 
 	// A GATE THAT CANNOT LOOK MUST NOT SAY "ANSWERED". This is the arm for the defect the
@@ -1754,7 +1968,7 @@ function proveRed() {
 	{
 		const q2 = join(chIn, "waiting.md")
 		writeFileSync(q2, "asked\n")
-		writeFileSync(join(chOut, "named.md"), "Answers: waiting.md\n")
+		writeFileSync(join(chOut, "named.md"), "---\nAnswers: waiting.md\n---\n")
 		const readable = level(run(true), "channel:peer")
 		spawnSync("chmod", ["000", chIn])
 		const blindRow = rowOf(run(true), "channel:peer")
@@ -1938,10 +2152,22 @@ function proveRed() {
 		const payloadIn = JSON.stringify({ source: "startup", transcript_path: "/x/11111111-2222-3333-4444-555555555555.jsonl" })
 		const hookRun = spawnSync(process.execPath, [SELFFILE, "--json", "--fast", "--hook", "--root", pkg, "--field", tmp],
 			{ encoding: "utf8", input: payloadIn })
+		// THE LOG IS FOUND, NOT NAMED. This read `unnamed.log`, which was only ever right while
+		// THIS repo had no roster: the ledger files a start under the agent the operator's own
+		// session resolves to, and on 2026-09-10 the bus was installed here, so every start
+		// became `leader.log` and both these arms went red with no defect in the code. A
+		// control that hard-codes an incidental name measures the operator's identity as well
+		// as the property in its title. There is exactly one log because one start was fired;
+		// MORE than one would mean this arm is reading somebody else's, so that is a failure
+		// too, not a "pick the first" situation.
+		const handoffLogs = (() => {
+			try { return readdirSync(join(pkg, ".comm", "handoff")).filter((f) => f.endsWith(".log")) } catch { return [] }
+		})()
 		let recorded = ""
-		try { recorded = readFileSync(join(pkg, ".comm", "handoff", "unnamed.log"), "utf8") } catch {}
-		assert("ledger: a session start is recorded", /"event":"start"/.test(recorded) && /555555555555/.test(recorded),
-			`one --hook boot -> ${recorded.split("\n").filter(Boolean).length} record(s), session id carried=${/555555555555/.test(recorded)}`)
+		if (handoffLogs.length === 1) { try { recorded = readFileSync(join(pkg, ".comm", "handoff", handoffLogs[0]), "utf8") } catch {} }
+		assert("ledger: a session start is recorded", handoffLogs.length === 1 && /"event":"start"/.test(recorded) && /555555555555/.test(recorded),
+			`one --hook boot -> ${handoffLogs.length} log(s) ${JSON.stringify(handoffLogs)}, ` +
+			`${recorded.split("\n").filter(Boolean).length} record(s), session id carried=${/555555555555/.test(recorded)}`)
 		// The row must SAY it recorded, so a silent writer cannot hide behind a green row.
 		let hookRows = []
 		try { hookRows = JSON.parse(hookRun.stdout).rows } catch {}
@@ -1962,16 +2188,23 @@ function proveRed() {
 		// the hook with NOTHING ARMED, so they are the control for this arm rather than a
 		// test of it. A33 covers the same crossing through the stub, in a field fixture; this
 		// covers the path this repo actually runs, and the two failed independently once.
+		// THE AGENT IS DISCOVERED, NOT NAMED - for the reason the log above is. This armed a
+		// note for "unnamed", which is what the hook resolved to only while THIS repo had no
+		// roster; once the bus was installed here the same hook resolved "leader", looked for
+		// leader.json, and left an unnamed.json standing. The arm then reported the crossing
+		// broken with nothing broken. The name comes from the log the two control asserts
+		// above just produced, which IS the identity the recorder used.
+		const hookAgent = (handoffLogs[0] || "unnamed.log").replace(/\.log$/, "")
 		const rsHere = join(pkg, "bin", "restart-signal.mjs")
-		const noteHere = join(pkg, ".comm", "restart", "unnamed.json")
-		spawnSync(process.execPath, [rsHere, "arm", "--agent", "unnamed", "--root", pkg, "--quiet",
+		const noteHere = join(pkg, ".comm", "restart", `${hookAgent}.json`)
+		spawnSync(process.execPath, [rsHere, "arm", "--agent", hookAgent, "--root", pkg, "--quiet",
 			"--prev-session", "PREV-BOOT-HOOK", "--ttl", "900", "--by", "prove-red"], { encoding: "utf8" })
 		const armedHere = existsSync(noteHere)
 		spawnSync(process.execPath, [SELFFILE, "--json", "--fast", "--hook", "--root", pkg, "--field", tmp],
 			{ encoding: "utf8", input: JSON.stringify({ source: "startup", transcript_path: "/x/77777777-7777-7777-7777-777777777777.jsonl" }) })
 		let crossedHere = null
 		try {
-			const ls = readFileSync(join(pkg, ".comm", "handoff", "unnamed.log"), "utf8").trim().split("\n")
+			const ls = readFileSync(join(pkg, ".comm", "handoff", handoffLogs[0] || "unnamed.log"), "utf8").trim().split("\n")
 			crossedHere = JSON.parse(ls[ls.length - 1])
 		} catch {}
 		const consumedHere = !existsSync(noteHere)
@@ -2522,8 +2755,14 @@ function proveRed() {
 			(departed.length ? ` · ${departed.length} session(s) ENDED during the run (${departed.join(", ")}) - their pids are gone, so this control did not remove them` : ""))
 	}
 
+	// A RUN THAT ASSERTED NOTHING IS NOT A PASS, and it used to print a tick and exit 0.
+	// Review #8 ran --only with a substring matching no arm: 612 s, exit 0, final line
+	// "✓ every arm matching ... passed". The caveat lived in the text and never in the
+	// exit code, so any caller reading the status got a green control out of a filter typo.
+	const nothingRan = ONLY && ran === 0
 	console.log(`\n${failed ? `✗ ${failed} boot row(s) could NOT be reddened - that row is decoration`
+		: nothingRan ? `✗ --only ${JSON.stringify(ONLY)} selected NO arm - ${skipped} skipped, NOTHING was asserted. This is not a control.`
 		: skipped ? `✓ every arm matching ${JSON.stringify(ONLY)} passed - ⚠ ${skipped} SKIPPED: a filtered run is NOT a green control`
 		: "✓ every gating boot row demonstrated able to go red"}\n`)
-	process.exit(failed ? 1 : 0)
+	process.exit(failed || nothingRan ? 1 : 0)
 }

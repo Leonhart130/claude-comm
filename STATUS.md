@@ -1,51 +1,50 @@
-# STATUS — claude-comm, 2026-09-08 (sessions 4–15)
+# STATUS — claude-comm, 2026-09-10 (sessions 4–16)
 
 Design and gates are in `README.md`; **this file is only what is OPEN.** Keep it short — when it grows,
 fold the settled parts into the README.
 
 ## ▶ NEXT
 
-**1 — 🔴 ASK FOR THE ADVERSARIAL REVIEW: IT IS WRITTEN AND NOT RUN.** `BRIEF-adversarial-8.md`, eight
-targets against `aeb39a9..3afe19f`. The owner offered a second expert explicitly and said asking is
-expected. **Do that before building anything new on yesterday's code.** Three of the eight are defects
-found and NOT fixed — items 2, 3, 4 below, so they survive even if the review never happens.
+*(2026-09-10: review #8 RAN — 19 findings, `REVIEW-8.md`. Fixed and armed: C1/A1 the marker (front matter,
+anchored), C2/A2 the vanishing row, C3 the mtime boundary (filename dates), C6 the false crash, C8, D1, D2,
+D3 — and **the bus is installed in this repo**, `review/` on the roster, armed.)*
 
-*(Nothing is owed from yesterday: the full capped control ran **53/53 exit 0**, `attack` **48/48**, both
-field trees installed, `3afe19f` pushed and closed.)*
+**1 — 🔴 FIVE FINDINGS OF REVIEW #8 ARE STILL OPEN. Read `REVIEW-8.md`; it is not summarised here.**
+Both remaining CODE defects are in `bin/context.mjs` and neither is armed: **C4** `argv0 === "claude"` does
+not close the inherited-descriptor hole, and **a `claude -p` child is named `claude`** · **C5** the
+`CLEARED` note is inverted — it fires when the re-record WORKED, while a clear whose hook never fired prints
+a number and no note off a dead transcript. Then **C7** `status` ⚠ on a fresh clone · **A3** A47 passes
+`comm whoami` and `comm --json who` · **N1** the tier-0 charge moves ±34 B against a 14 B margin.
 
-**2 — 🔴 `boot.mjs`'S REGISTRY ROW STILL SAYS "GONE", AND ITS ARM GUARDS A STATE NOTHING REACHES.**
-The same false accusation fixed in `context.mjs` (`FINDINGS.md#no-turn-yet`). Traced, not guessed: the 120 s
-grace covers the `--hook` path, and the manual path needs a turn, which creates the transcript. ⇒ **fix the
-wording AND re-title `registry: an AGED entry whose transcript is GONE`, which reddens for something no
-session can be in.** Deferred only because a string change costs a 13-minute re-run; do it with the next
-change to that file. ⚠️ **If the trace is wrong, the row is lying in production — check it first.**
+**2 — 🟡 THE CORRECTION TO THE FIELD LEADER IS WRITTEN AND UNREAD.**
+`exchange/work-leader/out/2026-09-10-correction-...md` — my citation named a function that does not exist,
+the advice added confidence rather than evidence, and his real gap is C6, which is now fixed and armed.
+**The bell REFUSED: his leader is not running**, so nothing was rung and the file waits for his `boot.sh`
+§7. ⚠️ **Two `zz-` claims in his tree are still held by dead pids** and only he can release them.
 
-**3 — 🔴 `CONVENTION_SINCE` IS AN MTIME BOUNDARY AND MTIMES ARE NOT FACTS.** `bin/boot.mjs`, the `channel:`
-block. A `git checkout`, an `rsync` or a restore moves every letter across it, and everything on the old
-side is judged by the rule declared broken on 2026-09-08. **What does this row say on a fresh clone?**
-Measure that before trusting it.
+**3 — 🟡 THE BUS IS INSTALLED HERE; THE WORKFLOW IS STILL UNTESTED.** `review/` exists and is on the
+roster, so `bin/launch.mjs review` is now possible for the first time. **It has never been run.** ⚠️ The
+trust prompt for a new directory is the known wall (▶ NEXT 5) and `kitten @ send-key` returns exit 0
+having done nothing — **gate any keystroke on a verified effect, never on its exit code.** Review #8 ran
+as a SUBAGENT, which contributes nothing to the ledger; that is the whole point of fixing this.
 
-**4 — 🔴 THE EROSION COUNT KEYS ON A ROW; A ROW WARNS FOR SEVERAL CAUSES.** `field:work` reached **8** while
-its 2026-09-05 amendment sat undischarged, then today's warning came from an entirely different cause (two
-dead `zz-` claims). The discharge is now recorded — **the first one this repo has ever written** — but the
-design flaw is untouched: an amendment fixes one cause and clears the debt of all of them.
-**Amend the protocol properly: evidence, a gated change, an arm. Not prose.**
+**4 — 🔴 THE EROSION COUNT KEYS ON A ROW; A ROW WARNS FOR SEVERAL CAUSES.** Unchanged. The discharge is
+recorded (`from: 9`), the design flaw is not. **Amend the protocol properly: evidence, a gated change, an
+arm. Not prose.**
 
-**5 — 🟡 `--sessions` IS IN THE WRONG COMMAND AND THE PRICE IS NAMED.** The field asked for it in
-`comm who`. `A21` forbids the bus any import outside `node:` builtins, so `comm.mjs` cannot reach
-`session-registry.mjs`, and a second pid→transcript implementation is the defect `who --json` exists to
-prevent. ⇒ **an A21 amendment (extend the daemon check to the transitive closure — do not punch a hole in
-it) AND a real split, `comm.mjs` being at 94 % of A22.** ⚠️ Also undecided: whether `context.mjs` joins
-`BUS_FILES` at all — **asked of the field leader in the 09-08 letter; read his reply before deciding.**
+**5 — 🔴 THE TRUST PROMPT STILL STOPS AN UNATTENDED LAUNCH**, and whether a program can answer it is
+**NOT ESTABLISHED**. ⭐ An empty registry after a launch reads exactly like a dead hook; only reading the
+window's text told them apart. `DESIGN-autonomy.md` does not mention the wall.
 
-**6 — 🔴 THE TRUST PROMPT STILL STOPS AN UNATTENDED LAUNCH**, and whether a program can answer it is
-**NOT ESTABLISHED**: `kitten @ send-key` returned **exit 0 having done nothing**. Gate every kitty send on a
-verified effect, never on its exit code. ⭐ An empty registry after a launch reads exactly like a dead hook;
-only reading the window's text told them apart. `DESIGN-autonomy.md` does not mention the wall.
+**6 — 🔴 DO NOT ACT ON THE OLD ▶ NEXT 2 AS IT WAS WRITTEN** (review #8 D4). It said the registry row's
+`GONE` wording was unreachable and should be deleted. **Both legs of that trace check out and the
+enumeration is incomplete:** it omits a transcript removed under a live session, where the sentence is true
+and useful. Reachability is unverified in **both** directions. A row deleted on an incomplete enumeration
+is a warning thrown away.
 
-⚠️ **Two things to check on arrival, before reading any of the above:** whether the field leader answered
-(`channel:work-leader`), and whether he released the two `zz-` claims — until he does, `field:work` warns
-every boot and the count starts climbing again.
+⚠️ **`LESSONS.md` is new (tier 2, never at boot).** It is the register this repo did not have: conduct
+defects, priced, catalogued by FORM. §1 is why the bus was not installed here. **A lesson ends as an armed
+gate or it is a platitude** — §1's gate is the `session` row, armed today.
 
 ## Where it stands
 
@@ -76,36 +75,38 @@ every boot and the count starts climbing again.
 4. **🟢 Holding a machine resource — `bin/claim.mjs`, settled and IN PRODUCTION.** `take`/`list`/`release`,
    16 arms, A38, both field trees. **It advises; it opens nothing, kills nothing, blocks nothing.**
    ✅ **E458 closed 2026-09-08 by the field leader** — negative control, `kill -9`, then the second-taker
-   half, with a detached `--pid` holder so no working expert was killed. His declared gap is smaller than
-   he thought and the code says so: `stateOf` reads `boot`/`pid`/`start` and **never `holder`**. Our two
-   reads cover all three branches. 🟢 In production unprompted: `port-4173` and — the one that matters —
+   half, with a detached `--pid` holder so no working expert was killed.
+   🔴 **STILL NOT MEASURED: no two REAL agents have contended through it** — `FINDINGS.md:1090` never
+   stopped saying so, and **the 09-08 rewrite of this file deleted the line that did** (review #8 D2, its
+   worst finding). He had made the code argument himself and *declined* to call it measured: *« je ne l'ai
+   pas couru avec deux sessions réelles, et je ne l'écris donc pas comme mesuré »*. I answered that his gap
+   was smaller than he thought, citing `stateOf` — **a function that does not exist here**. The real one is
+   `holderState` (`bin/claim.mjs:112`) and it does read `boot`/`pid`/`start` and never `holder`, so the
+   conclusion held; **the evidence did not change, only the confidence did.** ⇒ **a correction is owed to
+   him, and it is ▶ NEXT 2.** 🟢 In production unprompted: `port-4173` and — the one that matters —
    `supabase-anneau-visiteur`, a NON-port resource with a purpose and a duration.
    ⚠️ Claims live in one project's `.comm/`, so a resource shared ACROSS projects is visible to nobody.
 
-5. **🟡 `who` reports TWO states and there are THREE — half shipped, in the wrong command.**
-   A leader read `running` for four sessions at their prompt and lost **2 h 30** (his E453).
-   ✅ **`node bin/context.mjs --sessions`** prints `quiet <age>` from the transcript's mtime via the registry.
-   It prints a MEASUREMENT, never `at prompt`: a single long tool call is quiet too — measured, same morning,
-   `HartEdge-admin quiet 136s` while holding `port-4174` for a 40-minute Playwright run.
-   🟢 **The third state is new and was in no design document**: a launched session that has taken no turn has
-   **no transcript at all** — four field sessions, 8 minutes, 2026-09-08 09:29. Calling that "gone" accused
-   the sensor of being broken. `FINDINGS.md#no-turn-yet`.
-   🔴 **Open: it belongs in `comm who` and cannot go there yet — ▶ NEXT 3 names the price.**
-   ⚠️ **And it is NOT shipped:** `BUS_FILES` carries the bus and what the hooks run, never `context.mjs`.
-   The field leader runs it from this checkout. **Whether it joins the installed set is an undecided
-   question of scope, not an oversight** — asked of him in the 09-08 letter.
+5. **🟡 `who` reports TWO states and there are THREE — half shipped, in the wrong command.** A leader read
+   `running` for four sessions sitting at their prompt and lost **2 h 30** (his E453). ✅ `bin/context.mjs
+   --sessions` prints `quiet <age>` from the transcript mtime — a MEASUREMENT, never "at prompt": a single
+   long tool call is quiet too. 🟢 The **third** state was in no design document: a launched session that
+   has taken no turn has **no transcript at all** (`FINDINGS.md#no-turn-yet`). 🔴 It belongs in `comm who`
+   and cannot go there: A21 forbids the bus that import, and a second pid→transcript implementation is the
+   defect `who --json` exists to prevent ⇒ an A21 amendment **and** a split, `comm.mjs` being at 94 % of
+   A22. ⚠️ `context.mjs` is **not** in `BUS_FILES` — undecided scope, asked of the field leader 09-08,
+   still unanswered. Review #8 C4/C5 are in this same file.
 
-6. **🟢 A reply must NAME what it answers** — `Answers: <file>`, stateless, no read receipt. The row used
-   to declare a letter answered on mtime ordering and name one it had never read (17 h, on this repo's own
-   mail). Three arms. A scan that FAILED now says `CANNOT SAY`; the marker counts in the header only.
-   `FINDINGS.md#answered-mtime`. 🔴 **Its open residue is ▶ NEXT 3.**
+6. **🟢 A reply must NAME what it answers** — `Answers:` in a front-matter block on **line 1**, anchored to
+   the first byte so a quotation cannot forge one (review #8 C1: a pasted marker used to count, and to print
+   *"it says so"*). Stateless, no read receipt. A failed scan says `CANNOT SAY`; an unreadable channel still
+   prints a row (C2). Contract: `exchange/README.md`. `FINDINGS.md#answered-mtime`. 🔴 Residue: ▶ NEXT 1.
 
-7. **🟢 A session launched by a PROGRAM is on the bus — `bin/launch.mjs`, A46, both field trees.** It
-   resolves `node`/`claude` absolutely, BUILDS the child's `PATH` instead of inheriting kitty's, and
-   REFUSES with no window id when it cannot. `FINDINGS.md#hookless-launch`, `#launch-refuses`.
-   ⚠️ The published "a login shell" wording was WRONG on this machine and the field measured it: `zsh -l`
-   has no `node`, only `zsh -i`. Corrected everywhere — *a shell that loads the user profile*.
-   🔴 **Its open residue is ▶ NEXT 6.**
+7. **🟢 A session launched by a PROGRAM is on the bus — `bin/launch.mjs`, A46.** It BUILDS the child's
+   `PATH` instead of inheriting kitty's, resolves `node`/`claude` absolutely, and REFUSES with no window id
+   otherwise. ⚠️ "a login shell" was WRONG here — `zsh -l` has no `node`. `FINDINGS.md#hookless-launch`,
+   `#launch-refuses`. 🔴 **Installed in THIS repo 2026-09-10 with a `review` agent, and never yet run:
+   ▶ NEXT 3.**
 
 8. **🔴 The autonomy mandate — self-launching experts, a self-rebooting leader.** Given 2026-09-04.
    **Everything settled lives in [`DESIGN-autonomy.md`](DESIGN-autonomy.md)** — the four verified mechanisms,
@@ -131,21 +132,14 @@ section, not retracted)*:
 - **Standing test debt from review #4, none of it gated:** `FINDINGS.md#test-debt`.
 - **`#A20` from 2026-09-04 is still unexplained.** The 09-05 instance was triaged and fixed
   (`#update-signal`); the original is not. **Run gates unfiltered.**
-- 🔴 **The erosion counter has NEVER been discharged.** `.boot-state.json` carries `field:work: 8` and
-  `amendments: null` — `STATUS.md` said that row "was rewritten on the evidence", but in prose, never via
-  `--close --amended`. So the instrument still demands an amendment it already received, and a row waved
-  past eight times is one nobody reads. **Amend it properly or explain why it should keep counting.**
+- **The erosion counter WAS discharged** on 2026-09-08 — one entry in `.boot-state.json`, `from: 9` (not 8;
+  two sections of this file said 8 and review #8 D3 caught all three disagreements). 🔴 **Its design flaw is
+  untouched and is ▶ NEXT 4:** the count keys on a ROW, and a row warns for several causes.
 
 ## ⚠️ What was NOT verified
 
-- 🔴 **`bin/boot.mjs`'s registry row still says "that file is GONE" — the same false accusation fixed in
-  `context.mjs` on 2026-09-08 (`FINDINGS.md#no-turn-yet`) — and its arm stages a state that cannot occur.**
-  Traced rather than guessed: in the `--hook` path the entry is written microseconds before it is read, so
-  the 120 s grace always covers it; in the manual path the session must have taken a turn to run boot at
-  all, which creates the transcript. ⇒ **the wording is unreachable, and the arm ("an AGED entry whose
-  transcript is GONE") therefore reddens for a state no session reaches.** Not fixed today because changing
-  it costs a 13-minute re-run of the control for a string. **Fix it with the next code change to that file,
-  and re-title the arm.**
+- 🔴 **Whether `boot`'s registry `GONE` wording is reachable — in BOTH directions.** The 09-08 trace said
+  no; review #8 D4 found the enumeration incomplete (a transcript removed under a live session). ▶ NEXT 6.
 
 - **`--release` is verified by hand, not gated** (`FINDINGS.md#release-roundtrip`): `install.mjs` writes to
   its own checkout, and a fixture would have to relocate `HERE`. That test seam does not exist.
@@ -169,12 +163,14 @@ section, not retracted)*:
 
 ## Two conventions that erode silently
 
-**Measurement traps** — a control that does not travel the same code as the arms validates nothing, and one
-that writes into the world it measures is not a control at all. **Six instances.** `FINDINGS.md#measurement-traps`.
-⚠️ Anything running a real hook path writes wherever that path writes, and the ledger's root has no test seam.
+**Measurement traps** — a control not travelling the arms' code validates nothing; one that writes into the
+world it measures is not a control. **Six instances.** `FINDINGS.md#measurement-traps`.
 
-**Acknowledgements amend the protocol** — `FINDINGS.md#ack-amendment`. 🟢 **The first discharge in this
-repo's history was written 2026-09-08** (`field:work`, from 8). 🔴 **Its design flaw is ▶ NEXT 4.**
+**Acknowledgements amend the protocol** — `FINDINGS.md#ack-amendment`. First discharge 2026-09-08, `from: 9`.
+🔴 Design flaw: ▶ NEXT 4.
+
+**Conduct defects go in `LESSONS.md`** (tier 2, priced, catalogued by form) — *a lesson ends as an armed
+gate or it is a platitude.*
 
 **Findings live in the code**, at the point they apply — *a rule whose cost you cannot see is a rule someone
 will simplify away.*
