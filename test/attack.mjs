@@ -1258,9 +1258,13 @@ const POINTER_SOURCES = (() => {
 	// EVERY module, not just comm.mjs. Splitting must not be a way to stop being measured:
 	// the property is that a person can read the bus, and a second file is a second sitting,
 	// so each one is held to the same limit and the TOTAL is printed to keep the growth in
-	// view. 🔴 A third module appearing without being added to BUS_MODULES fails A21 above,
-	// because comm.mjs importing it would count as foreign — so the two lists cannot drift
-	// apart silently, which was the first thing wrong with this amendment.
+	// view. 🔴 A third module that comm.mjs IMPORTS cannot escape: A21 above counts an
+	// unlisted relative specifier as foreign, so adding one without listing it reddens.
+	// ⚠️ THAT IS ONE DIRECTION ONLY, and the first draft of this comment overclaimed it as
+	// both. A file added to install.mjs's BUS_FILES that comm.mjs does NOT import ships
+	// without ever being seen here — already true of wake.mjs, claim.mjs and the rest, so it
+	// is A21's pre-existing scope, not something the split introduced: A21 has always been
+	// about the BUS, not about every file the installer carries.
 	const sizes = BUS_MODULES.map((f) => ({ f, size: Buffer.byteLength(readFileSync(join(PKG, "bin", f), "utf8")) }))
 	const over = sizes.filter((m) => m.size > BUS_BUDGET)
 	check("A22 every bus module stays readable in one sitting",
