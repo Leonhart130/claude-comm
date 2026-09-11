@@ -102,7 +102,15 @@ if (process.argv[2] !== "session-start") {
 			spawnSync(process.execPath, [wake, "--root", projectRoot], { timeout: 10000, stdio: "ignore" })
 		}
 	} catch { /* a doorbell must never break a turn boundary */ }
-	process.exit(stopped.status ?? 0)
+	// Same rule as the session-start exit at the foot of this file, and I fixed that one
+	// first while assuming it was the only one — it is not. THE STOP PATH IS THE HOT ONE:
+	// it runs at every turn boundary, so a bus that cannot start breaks every turn until
+	// somebody notices. The bus exits 0 on every hook decision (the block travels as stdout
+	// JSON), so a non-zero here means it never RAN.
+	if (stopped.status) {
+		process.stderr.write(`claude-comm: the bus could not RUN (exit ${stopped.status}) — the hook path exits 0 on every decision, so this is a broken or half-installed bus, not a verdict. Your mail is untouched and this turn is not blocked. Re-run the installer.\n`)
+	}
+	process.exit(0)
 }
 
 // SESSION-START. The payload can be read only ONCE and the bus is no longer its only
@@ -378,4 +386,15 @@ try {
 	} catch {}
 } catch { /* an instrument must never break a session */ }
 
-process.exit(delivered.status ?? 0)
+// 🔴 EXIT 0, ALWAYS — and say why when it is not zero. The bus's own main() wraps the
+// hook in try/catch and exits 0 on every path, INCLUDING the block, which it signals with
+// stdout JSON rather than a status. So a non-zero here cannot be a decision: it means the
+// bus process never RAN — a missing module, a truncated file, a syntax error mid-install.
+// Propagating it broke the turn, which is the one thing this project says a broken bus must
+// never do. Measured 2026-09-11 on a half-installed tree: exit 1 and a Node stack trace.
+// ⚠️ Loud AND non-breaking: the child's stderr is inherited, so its trace is already on
+// screen; this line names what the status meant. Silence would be the worse defect.
+if (delivered.status) {
+	process.stderr.write(`claude-comm: the bus could not RUN (exit ${delivered.status}) — the hook path exits 0 on every decision, so this is a broken or half-installed bus, not a verdict. Your mail is untouched and this turn is not blocked. Re-run the installer.\n`)
+}
+process.exit(0)

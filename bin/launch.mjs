@@ -199,6 +199,16 @@ const before = wake.windows()
 const mine = wake.resolveWindow(sessionPid(), before)
 const myTab = mine.ok && mine.how === "foreground process" ? mine.win : null
 
+// 🔴 SPLIT BESIDE THE CALLER, NOT INTO "THE ACTIVE TAB". `kitten @ launch --type=window`
+// targets whichever tab is ACTIVE, and that is not necessarily the caller's: measured
+// 2026-09-11, a concurrent process opened an OS window and my split landed in ITS tab
+// (65) while the caller sat in tab 1. For a leader launching several experts while windows
+// come and go around it — the whole point of this launcher — "active" is the wrong target
+// and it fails silently, because the window IS created and IS returned.
+// `--match window_id:<caller>` names the tab by a window we resolved ourselves. Omitted
+// when there is no caller window: there is then no "beside" to mean, and kitty's default
+// is the honest fallback.
+if (!osWindow && myTab) argv.splice(2, 0, "--match", `window_id:${myTab.id}`)
 const r = spawnSync("kitten", argv, { encoding: "utf8" })
 if (r.status !== 0) die(`kitten @ launch failed (exit ${r.status}): ${(r.stderr || "").trim()}`)
 
@@ -216,7 +226,15 @@ if (!Number.isInteger(winId) || winId <= 0)
 // launch that reported an id for a window that is not there is the silent no-op this
 // project keeps paying for, and the exit status above would not have shown it.
 const after = wake.windows()
-const born = after.find((w) => w.id === winId && (!myTab || w.sock === myTab.sock))
+// WHICH INSTANCE. Window ids are per kitty PROCESS, and `windows()` deliberately scans
+// every socket (wake.mjs rule 3), so an id alone can match a window in a DIFFERENT kitty —
+// and the next line would then mark a stranger's window as ours. The caller's socket is
+// the answer when we have one; otherwise the ambient $KITTY_LISTEN_ON, which is the
+// instance `kitten` was just talking to. Only if neither is known do we fall back to the
+// id, and then it is reported as unconfirmed rather than asserted.
+const ambient = (process.env.KITTY_LISTEN_ON || "").replace(/^unix:/, "")
+const wantSock = myTab ? myTab.sock : (ambient || null)
+const born = after.find((w) => w.id === winId && (!wantSock || w.sock === wantSock))
 if (!born)
 	die(`kitten @ launch said window ${winId}, and no such window is there.\n` +
 	    `  Reported, not assumed: this was re-read from 'kitten @ ls' after the launch.`)
@@ -241,7 +259,7 @@ console.log(`✓ launched '${agent}' in ${cwd}`)
 console.log(`  node:   ${nodeBin}`)
 console.log(`  claude: ${claudeBin}`)
 console.log(`  the child's PATH was BUILT, not inherited — its hooks can find node.`)
-console.log(`  window: ${winId} (${split ? "split" : "os-window"})` +
+console.log(`  window: ${winId} (${split ? "split" : "os-window"})${wantSock ? "" : " ⚠ instance unconfirmed: no caller window and no KITTY_LISTEN_ON"}` +
 	(split ? sameTab === true ? ` in this tab (${born.tab}) — verified after the fact, not assumed`
 		: sameTab === false ? ` ⚠ in tab ${born.tab}, NOT the caller's tab ${myTab.tab}`
 		: ` in tab ${born.tab} — no caller window to compare against, so "current tab" is unverified here`
