@@ -29,6 +29,28 @@ already have.
 
 
 
+
+## 2026-09-11.6 — bus print `54ced6770f52` — 2026-09-11
+
+*A broken bus can no longer break your turn, and a launched expert lands beside YOU.*
+
+- 🔴 **A HALF-INSTALLED BUS USED TO BREAK EVERY TURN.** `comm.mjs` imports `who.mjs` since the split, and
+  the installer wrote them in the wrong order — so an interrupted update left a bus that could not load, and
+  the hook **exited 1 with a Node stack trace at every turn boundary**. The rule here has always been that a
+  broken bus must never break a session; it now holds. The hook exits 0, **your mail is untouched**, and it
+  prints one line telling you the bus could not run and to re-run the installer.
+  ⚠️ There were TWO exit paths and the first fix caught only one. The `Stop` path — the one that runs at
+  every turn boundary — was the one still breaking.
+- 🟢 **The installer writes dependencies before dependents**, so that state is no longer reachable through
+  an ordinary update rather than merely survivable.
+- 🟢 **`launch.mjs` now splits the tab YOU are in.** `kitten @ launch` targets whichever tab is ACTIVE, so a
+  window opened by something else could take your expert with it — measured: a split from tab 1 landed in
+  tab 65. **The window was created, the id returned, the mark set; only the placement was wrong**, which is
+  the whole reason the split exists.
+- ⚠️ **If you run the controls yourself:** `test/attack.mjs` now drives real kitty windows, and
+  `boot.mjs --prove-red` runs `attack.mjs` inside its own copies. **Do not start both at once** — they
+  collide over windows and the result is a flake, not a finding.
+
 ## 2026-09-11.5 — bus print `dd26637a4001` — 2026-09-11
 
 *The bus is now TWO files, and a `--ref` that is not a regular file can no longer hang your turn.*
