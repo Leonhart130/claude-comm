@@ -5,54 +5,56 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-09-10. **Reviews #8 and #9 both ran.** #9 was launched BY A PROGRAM from `review/` — a first —
-and aimed at #8's own fixes: **two were half-done, one killed its own process group.** All repaired.)*
+*(2026-09-11. **The `getajob` field leader sent four letters in one day and every one carried a measurement.
+Five armed changes came out of them, and TWO OF THE DEFECTS WERE IN CODE I HAD WRITTEN AND DOCUMENTED
+WRONG.** Read `FINDINGS.md#doorbell-text` before touching anything that writes into a session's input.)*
 
-**1 — 🔴 RUN THE CONTROLS FIRST**, with `CLAUDE_COMM_AGENT` set (A48) and the output **redirected to a file,
-never piped** — a case failed twice on 09-10 and both names died in a `tail`. 🔴 **NEVER trust a wrapper's
-exit code: `systemd-run` and the harness's own task notice both reported 0 over a suite that returned 1** —
-the 0 belonged to the `tail` at the end of the chain. Read the suite's LAST LINE.
-*(09-11: attack 55/55 ~40 s; selftest green BOTH ways — A54 now forces both suites to scrub the identity.)*
+**1 — 🔴 RUN THE CONTROLS FIRST**, `CLAUDE_COMM_AGENT` set (A48), output **to a file, never piped**.
+🔴 **Never trust a wrapper's exit code — `systemd-run` AND the harness's task notice both reported 0 over a
+suite that returned 1** (the `tail`'s). Read the suite's LAST LINE. *(09-11: attack 56/56 ~40 s; selftest
+green, run 3× — it changed delivery three times today.)*
 
-**2 — 🟡 WHAT REVIEWS #8 AND #9 LEFT OPEN**, all minor, measurements in the reports: **#9 A3** the
-crossing arm consumes `handoffLogs` without re-checking the guard above it · **C7** `status` ⚠ on a fresh
-clone · **N1** the tier-0 charge moves ±34 B against a 14 B margin · **#8 A3** A47 passes `comm whoami`.
+**2 — 🔴 `bin/comm.mjs` IS AT ITS CAP: 47 864 B of A22's 48 000, and the nudge render is 7535 of a hard
+8000.** ⇒ **the next thing added there is a SPLIT, not an addition**, and open item 5's third `who` state is
+already waiting on one. 🔴 **Also open and older than today: the suite's unbounded `while (count) fire()`
+loops HANG on any render exception** (render-before-drain never drains). A55's red proof hung instead of
+reddening; `FINDINGS.md#note-eats-the-file`.
 
-**3 — 🔴 TWO LIMITS NO CODE CLOSES, both named at their site in `bin/context.mjs`.** A `/clear` whose hook
-never fires leaves the registry naming a DEAD transcript with both uuids agreeing (`FINDINGS.md#clear-blind`);
-and the cleared-note discriminator goes quiet if the session owning the inherited uuid has itself ended.
-**Do not "fix" either with a better guess.**
+**3 — 🟡 WHAT REVIEWS #8 AND #9 LEFT OPEN**, all minor: **#9 A3** the crossing arm consumes `handoffLogs`
+without re-checking the guard above it · **C7** `status` ⚠ on a fresh clone · **N1** the tier-0 charge moves
+±34 B against a thin margin · **#8 A3** A47 passes `comm whoami`.
 
-**4 — 🟢 BUILT 2026-09-11: the launcher SPLITS, and an agent CLOSES ITSELF.** `launch.mjs` opens a pane in
-the caller's tab (`--os-window` opts out) and now REFUSES a launch it cannot name; 🟢 **new `bin/close.mjs`**,
-armed as **A50/A51**, five red proofs, each on its own clause. Release `2026-09-11.1`, installed HERE only.
-🔴 **Building it refuted three sentences of its own design** — the env var that cannot exist, a guard resting
-on the harness, and an arm reddening for the wrong property: `FINDINGS.md#self-close`.
-🔴 **NOT verified: a REAL agent invoking it** — every arm uses a `node` named `claude`. Whether an agent runs
-the verb, and when, is BEHAVIOUR ⇒ `selftest`, unasked.
+**4 — 🔴 TWO LIMITS NO CODE CLOSES**, both named at their site in `bin/context.mjs`. A `/clear` whose hook
+never fires leaves the registry naming a DEAD transcript with both uuids agreeing
+(`FINDINGS.md#clear-blind`); the cleared-note discriminator goes quiet if the session owning the inherited
+uuid has ended. **Do not "fix" either with a better guess.**
 
-**5 — 🟡 THE LETTER TO THE FIELD LEADER OF `work` IS WRITTEN AND UNREAD** (`exchange/work-leader/out/2026-09-10-
-correction-...md`): my citation named a function that does not exist, and the advice added confidence, not
-evidence. **The bell REFUSED — his leader is not running** — so it waits for his `boot.sh` §7. ⚠️ Two `zz-`
-claims there are still held by dead pids; only he releases them, and the sentence his boot printed about
-them **was false and is fixed** (#8 C6).
+**5 — 🟡 ASKED BY THE FIELD, DESIGNED, NOT BUILT.** Each has its open questions written down; none is a
+promise. ⇒ **`dismiss --citing "<phrase>"`** that refuses when the phrase is not in the `ref` — a status set
+by the recipient records a BELIEF, and it has already lied (`FINDINGS.md#note-eats-the-file`, with the three
+open questions). ⇒ **`comm wait --for a,b,c`**, refused inside the bus (A21 forbids it the liveness it
+needs) and accepted beside it — **but parked behind a measurement HE agreed to make first**: wake-per-report
+costs N turns, and the number decides whether a quorum is worth building. ⇒ **`who`'s FOURTH state**: CPU
+time separates *working* from *idle* (21 s in 2 min 51 vs 1 s in 1 h 10) and `/proc/<pid>/stat` already
+carries it — **one sample each, so no threshold from it.**
 
-**6 — 🟡 THE DECLARED RESTART IS BUILT AND SHIPPED; THE AUTOMATIC ONE IS DELIBERATELY NOT.**
-🟢 `bin/handoff.mjs` + `bin/restart.mjs prepare` (11 arms), in the field since 09-10. **It refuses to arm a
-note behind a failed handoff** and does NOT relaunch — `launch.mjs` refuses an agent already alive (A17) and
-the caller IS that agent, so the last step is left to it.
-🔴 **Why no trigger:** measured here (168 sessions, 45 923 opens) the re-open share rises to **85 %**, but it
-is 52-59 % by the second decile and **has no knee** — so *"no magic number"* is unsupported and any trigger
-carries a threshold. **And the ledger still says UNKNOWN.** ⇒ **use `restart.mjs`; the arm fills, then
-decide.** `DESIGN-autonomy.md` has the numbers and the over-collection caveat.
-🟢 No `review` session is running; the OWNER closed the last one. **Launch a fresh one — and it can now put
-itself away (`close.mjs`). Still: do not close a window you did not open.**
+**6 — 🟡 THE LETTER TO THE FIELD LEADER OF `work` IS STILL UNREAD.** The bell REFUSES cleanly — his leader is
+not running — so it waits for his `boot.sh` §7. ⚠️ Two `zz-` claims there are still held by dead pids; only
+he releases them.
+
+**7 — 🟡 THE DECLARED RESTART IS BUILT AND SHIPPED; THE AUTOMATIC ONE IS DELIBERATELY NOT.**
+🟢 `handoff.mjs` + `restart.mjs prepare` (11 arms), in the field since 09-10, refusing to arm a note behind
+a failed handoff. 🔴 **No trigger:** the re-open share reaches 85 % but is 52-59 % by the second decile and
+**has no knee**, so any trigger carries a threshold — **and the ledger still says UNKNOWN.** ⇒ use
+`restart.mjs`; the arm fills, then decide.
+🟢 No `review` session is running. **Launch a fresh one — `launch.mjs review --prompt "…"`, and it can now
+put itself away.** Still: do not close a window you did not open.
 
 ## Where it stands
 
 | | state |
 | --- | --- |
-| toolkit | `bin/comm.mjs` · `session-registry.mjs` · `ledger.mjs` · `restart-signal.mjs` · `claim.mjs` · `wake.mjs` · `exchange-bell.mjs` · `context.mjs` · `handoff.mjs` · `restart.mjs` · `boot.mjs` · `install.mjs` · `test/` — no dependencies |
+| toolkit | `bin/comm.mjs` · `session-registry.mjs` · `ledger.mjs` · `restart-signal.mjs` · `claim.mjs` · `wake.mjs` · `exchange-bell.mjs` · `context.mjs` · `handoff.mjs` · `restart.mjs` · `launch.mjs` · `close.mjs` · `boot.mjs` · `install.mjs` · `test/` — no dependencies |
 | repo | `origin` = `Leonhart130/claude-comm`. **The push is the leader's call**, delegated 2026-09-05, along with installing into field trees — do not ask again |
 | **electio** | in real daily use — 26 real deliveries, both directions |
 | gates | `attack` (deterministic, every case armed) · `ledger --prove-red`, now run INSIDE it · `selftest` (real sessions, not gated by boot) · `context` and `boot` controls. **Counts live in boot's output, never here** |
@@ -87,23 +89,25 @@ itself away (`close.mjs`). Still: do not close a window you did not open.**
    ⭐ Their verdict, accepted as the honest scope: *a claim makes sharing visible; the first answer is not
    to share* — they isolated the ports instead, and kept the claim for what cannot be isolated.
 
-5. **🟡 `who` reports TWO states and there are THREE — half shipped, in the wrong command.** A leader lost
-   **2 h 30** reading `running` for four sessions sitting at their prompt. ✅ `context.mjs --sessions` prints
-   `quiet <age>` — a MEASUREMENT, never "at prompt". 🟢 The third state was in no design doc: a session that
-   has taken no turn has **no transcript at all** (`FINDINGS.md#no-turn-yet`). 🔴 It belongs in `comm who`
-   and cannot go there — A21 forbids the bus that import ⇒ an A21 amendment **and** a split, `comm.mjs`
-   being near A22's cap. ⚠️ `context.mjs` is not in `BUS_FILES`: undecided scope, asked 09-08, unanswered.
+5. **🟡 `who` reports TWO states and there are FOUR.** A leader lost **2 h 30** reading `running` for four
+   sessions sitting at their prompt. ✅ `context.mjs --sessions` prints `quiet <age>` — a MEASUREMENT, never
+   "at prompt". 🟢 Third: a session that has taken **no turn has no transcript at all**
+   (`FINDINGS.md#no-turn-yet`) — and `launch.mjs --prompt` now stops manufacturing them. 🟢 Fourth, measured
+   by the field 09-11: **CPU time separates *working* from *idle*** and `/proc` already carries it; one
+   sample each, so no threshold from it. 🔴 All of it belongs in `comm who` and cannot go there — A21 forbids
+   the import ⇒ an A21 amendment **and a split; `comm.mjs` is now AT A22's cap, not near it.**
 
 6. **🟢 A reply must NAME what it answers** — `Answers:` in a front-matter block on **line 1**, anchored to
    the first byte so a quotation cannot forge one (review #8 C1: a pasted marker used to count, and to print
    *"it says so"*). Stateless, no read receipt. A failed scan says `CANNOT SAY`; an unreadable channel still
    prints a row (C2). Contract: `exchange/README.md`. `FINDINGS.md#answered-mtime`. 🔴 Residue: ▶ NEXT 1.
 
-7. **🟢 A session launched by a PROGRAM is on the bus — `bin/launch.mjs`, A46.** It BUILDS the child's
-   `PATH` instead of inheriting kitty's, resolves `node`/`claude` absolutely, and REFUSES with no window id
-   otherwise. ⚠️ "a login shell" was WRONG here — `zsh -l` has no `node`. `FINDINGS.md#hookless-launch`,
-   `#launch-refuses`. 🔴 **Installed in THIS repo 2026-09-10 with a `review` agent, and never yet run:
-   ▶ NEXT 3.**
+7. **🟢 A program launches an agent, and the agent puts its own window away.** `launch.mjs` (A46) builds the
+   child's `PATH` rather than inheriting kitty's and resolves the runtime absolutely; 🟢 **09-11 it SPLITS
+   the caller's tab, refuses a launch it cannot name, and `--prompt` gives the new session a first turn** —
+   without one it sits inert while `who` says `running`. 🟢 **`close.mjs` (A51)**: an agent closes ITSELF,
+   never a sibling, and refuses over waiting mail or a held claim. `FINDINGS.md#self-close`,
+   `#hookless-launch`.
 
 8. **🟡 The autonomy mandate — self-launching experts, a self-rebooting leader.** Given 2026-09-04.
    **Everything settled is in [`DESIGN-autonomy.md`](DESIGN-autonomy.md)** — do not re-derive it here. The
@@ -131,7 +135,9 @@ section, not retracted)*:
 - 🔴 **`attack` failed TWICE on 2026-09-10, both times passing immediately after with no code change, and
   the case name is STILL unknown** — both failing runs had their output piped to `tail`. Twice is a flaky
   case, not an accident. ⇒ **never pipe this suite's output away: redirect to a file, then read the file.**
-  The one-line habit is what destroyed the evidence, twice.
+  *(09-11: 6 clean runs, no flake seen.)*
+- 🔴 **NOTHING VERIFIES `close.mjs` UNDER A REAL AGENT.** Every arm uses a `node` named `claude`. **Whether
+  an agent runs the verb, and when, is BEHAVIOUR** ⇒ `selftest`, unasked.
 
 
 - 🔴 **Whether `boot`'s registry `GONE` wording is reachable, in BOTH directions** (review #8 D4).

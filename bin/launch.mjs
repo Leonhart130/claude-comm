@@ -106,6 +106,12 @@ const osWindow = process.argv.includes("--os-window")
 // launcher that writes an agent's first instruction is a launcher with an opinion about
 // the work. What it does instead is REFUSE TO BE QUIET about the consequence — see the
 // closing lines, which say plainly that a promptless session will sit inert.
+// ONE definition, printed by BOTH the real launch and --print. Two copies of this sentence
+// would drift, and the drift would land in the mode nobody reads twice.
+const NO_PROMPT_WARNING =
+	`  ⚠ NO --prompt: this session will sit at its prompt and take NO TURN. 'comm who' will still say\n` +
+	`    'running', and mail delivered at its start will sit in its context unread. Give it a first\n` +
+	`    turn with --prompt, or type into the window yourself.`
 const pi = process.argv.indexOf("--prompt")
 const prompt = pi > -1 ? process.argv[pi + 1] : null
 if (pi > -1 && (prompt === undefined || prompt.startsWith("--")))
@@ -171,6 +177,13 @@ if (printOnly) {
 	// control that uses it travels the code the real launch travels.
 	console.log(JSON.stringify({ agent, cwd, node: nodeBin, claude: claudeBin, path: childPath, argv,
 		type: osWindow ? "os-window" : "window", prompt }, null, 2))
+	// 🔴 THE WARNING BELONGS HERE TOO. Reported by the `getajob` field leader 2026-09-11:
+	// --print is the mode someone uses to CHECK a launch before making it, and it was the one
+	// mode that omitted the consequence of launching with no first turn. An absent prompt is
+	// technically visible in the argv above, which is exactly the excuse — the whole point of
+	// the line is that "no turn" does not look like anything. A verification surface that is
+	// quieter than the real thing is a verification surface that lies by omission.
+	if (!prompt) console.error(NO_PROMPT_WARNING)
 	process.exit(0)
 }
 
@@ -242,6 +255,4 @@ console.log(marked
 // is a legitimate thing to launch, and only the caller knows which this is.
 console.log(prompt
 	? `  first turn: ${JSON.stringify(prompt.length > 60 ? prompt.slice(0, 57) + "..." : prompt)} — it will act on this immediately`
-	: `  ⚠ NO --prompt: this session will sit at its prompt and take NO TURN. 'comm who' will still say\n` +
-	  `    'running', and mail delivered at its start will sit in its context unread. Give it a first\n` +
-	  `    turn with --prompt, or type into the window yourself.`)
+	: NO_PROMPT_WARNING)
