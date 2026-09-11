@@ -9,19 +9,16 @@ fold the settled parts into the README.
 wrong; the bus then hit its cap, A21 forbade the only remedy A22 names, and the split broke a stated
 invariant that only a measurement found.** `FINDINGS.md#doorbell-text`, `#bus-split`.)*
 
-**0 — 🔴 REVIEW #10 LANDED: SIX RED, EVERY ONE INSIDE THAT DAY'S OWN WORK.** `REVIEW-10.md`, summarised in
-`FINDINGS.md#split-raised-the-cap`. **C4 first — it is the worst and it is mine:** I satisfied A22 by making
-it stop measuring what it caps. The bus grew to **51 142 B**, 6.5 % past a number just declared a hard cap,
-and the gate went red→green. *Printing is not gating.* ⚠️ It reviewed a tree that MOVED under it (brief
-pinned `7a18d97..b1da9ea`); read it against what is there now.
-🔴 **Do NOT just add a total cap and move on: the honest total is already over, so gating it reddens at once
-and 48 000 must be re-argued ONCE, with evidence.** Deliberately not done in a session's last minutes —
-that is how a cap becomes a fitted number.
-🔴 Then **C1** (`close.mjs`'s claim refusal has NEVER run — `claim list --json` returns an object, `for…of`
-throws, a bare catch eats it) · **C3** (A21 has `watchFile(` and not `watch(`, so `fs.watch()` passes) ·
-**C2** (the close probe says `gone:true` when it cannot look) · **C5** (`selftest --prove-red` passes when
-`claude` cannot run at all). 🟢 **C6 fixed at close**: `boot` ran `attack` with NO timeout, so a hung suite
-hung every boot.
+**0 — 🔴 REVIEW #10: SIX RED, ALL INSIDE THAT DAY'S OWN WORK.** `REVIEW-10.md` · `FINDINGS.md#split-raised-the-cap`.
+**C4 first, the worst and it is mine:** I satisfied A22 by making it stop measuring what it caps — the bus
+grew to **51 142 B**, past a cap declared hours earlier, and the gate went red→green. *Printing is not
+gating.* 🔴 **Do NOT just add a total cap: the honest total is already over, so 48 000 must be re-argued
+ONCE with evidence** — not in a session's last minutes, which is how a cap becomes a fitted number.
+🔴 Still open: **C1** (`close.mjs`'s claim refusal has NEVER run — `claim list --json` returns an object) ·
+**C3** (A21 has `watchFile(` not `watch(`, so `fs.watch()` passes) · **C2** (the close probe says
+`gone:true` when blind) · **C5** (`selftest --prove-red` passes when `claude` cannot run).
+🟢 C6/A2/A3 fixed. 🔴 **A1 is a better design than mine, unbuilt:** replace `ARM_FLOOR` with a RATCHET on
+`.boot-state.json`'s `pass` — redden on a LOSS of arms, silent on a gain.
 
 **1 — 🔴 RUN THE CONTROLS FIRST**, `CLAUDE_COMM_AGENT` set (A48), output **to a file, never piped**.
 🔴 **Never trust a wrapper's exit code — `systemd-run` AND the harness's task notice both reported 0 over a
@@ -44,13 +41,13 @@ never fires leaves the registry naming a DEAD transcript with both uuids agreein
 (`FINDINGS.md#clear-blind`); the cleared-note discriminator goes quiet if the session owning the inherited
 uuid has ended. **Do not "fix" either with a better guess.**
 
-**5 — 🟡 ASKED BY THE FIELD, DESIGNED, NOT BUILT.** Open questions written down; none is a promise.
-⇒ **`dismiss --citing "<phrase>"`**, refusing when the phrase is not in the `ref` — a status set by the
-recipient records a BELIEF and has already lied (`FINDINGS.md#note-eats-the-file`, three open questions).
+**5 — 🟡 ASKED BY THE FIELD, DESIGNED, NOT BUILT.** ⇒ **`dismiss --citing "<phrase>"`**, refusing when the
+phrase is not in the `ref` — a recipient-set status records a BELIEF and has already lied
+(`FINDINGS.md#note-eats-the-file`). 🟢 The field settled two of its three open questions by USE: normalise
+case/quotes/NBSP, and BLOCK rather than annotate.
 ⇒ **`comm wait --for a,b,c`** — refused inside the bus, accepted beside it, **parked behind a measurement HE
-agreed to make first**: wake-per-report costs N turns, and that number decides it.
-⇒ **`who`'s FOURTH state**: CPU separates *working* from *idle* (21 s in 2 min 51 vs 1 s in 1 h 10) and
-`/proc` already carries it — **one sample each, so no threshold from it.**
+agreed to make first.** ⇒ **`who`'s FOURTH state**: CPU separates *working* from *idle* (21 s in 2 min 51 vs
+1 s in 1 h 10) and `/proc` already carries it — **one sample each, so no threshold from it.**
 
 **6 — 🟡 THE LETTER TO `work`'s LEADER IS STILL UNREAD.** The bell REFUSES cleanly (he is not running), so it
 waits for his `boot.sh` §7. ⚠️ Two `zz-` claims there are held by dead pids; only he releases them.

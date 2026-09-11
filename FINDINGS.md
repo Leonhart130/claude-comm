@@ -2498,6 +2498,33 @@ recent fix* holding for a fourth consecutive session. Alongside C4:
   ⚠️ C6's *named site* (A9's unbounded drain) was already bounded in `d20f3f2`, after the brief's pinned
   range — **the reviewer read a tree that moved under it, and that is my fault for reviewing a live branch.**
 
+### The three ambers, and one of them is a better design than mine
+
+- 🟡 **A1 — the arm floor.** Its NUMBER was stale within hours (it measured 58 arms against `ARM_FLOOR = 56`;
+  it is 57 against 57 now, zero slack) — **but its argument stands and beats my reasoning.** I justified a
+  floor over an equality with *"a gate that cries wolf on routine work gets ignored"*; the reviewer answered
+  with this repo's own precedent: **A22 is an equality-shaped cap that reddens for the ordinary act of adding
+  bytes, and this project calls that correct.** Holding bytes to a cap that bites and arms to a floor that
+  does not is an inconsistency, not a considered difference. ⭐ **Its proposal is better than either:** a
+  RATCHET — redden when `ran` drops below the last recorded count, which `.boot-state.json` already stores as
+  `pass`. Reddens on a loss, silent on a gain: the asymmetry my comment wanted and did not implement.
+  **Not built.** ▶ NEXT.
+- 🟡 **A2 — the launcher named a tab in an instance it had not named.** The caller is resolved across EVERY
+  socket (`wake.mjs` rule 3) and the launch then trusted the ambient `$KITTY_LISTEN_ON` — **the only kitty
+  call in the repository without `--to`**, while `set-user-vars` two lines below it passes one. 🟢 Fixed.
+- 🟡 **A3 — the prompt guard was one character short, and the realistic trigger is a MARKDOWN BULLET.**
+  `startsWith("--")` let a single dash through, so `--prompt "- read REVIEW-10.md first"` reaches `claude` as
+  the flag `-p` — print mode — **which is exactly the "takes no turn" failure the flag exists to prevent,
+  arriving through the flag itself.** ⭐ It is not an attack; it is how a leader writes a first turn from its
+  notes, and I would have done it. 🟢 Fixed. ⚠️ It also VERIFIED the brief's claim that no shell is in the
+  path: `$( )`, backticks, `&`, newlines and tabs all arrive as one inert argv element.
+
+🔴 **And fixing A2/A3 cost two more arms, which is the part worth keeping.** Making `--print` show the
+placement flags gave the checking mode a real new dependency (`wake.mjs`, `session-registry.mjs`), and A46's
+fixture did not carry them — **the arm going red is how that dependency announced itself.** A53 went red
+because I reworded a refusal it pinned verbatim; **an arm that pins prose reddens for edits instead of for
+behaviour**, and it now matches the stable half.
+
 🟢 **How it ran, because the mechanism is the point:** launched BY THE LEADER with `bin/launch.mjs review
 --prompt …` into a split pane, marked so it could close itself. First real-agent exercise of the whole
 chain. ⭐ **It also caught me through the bus** — `--ref FINDINGS.md` was refused with the exact string that

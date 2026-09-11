@@ -30,6 +30,22 @@ already have.
 
 
 
+
+## 2026-09-11.7 — bus print `cf5efbcf46c5` — 2026-09-11
+
+*Two fixes from an adversarial review, and one of them is a trap you would have walked into.*
+
+- 🔴 **`launch.mjs --prompt "- do the thing"` is now REFUSED, and that is a feature.** A prompt beginning
+  with `-` reaches `claude` as a FLAG — `-p` is print mode, so the session answers once and exits, which is
+  exactly the "takes no turn" failure `--prompt` exists to prevent. **The realistic trigger is not an attack,
+  it is a markdown bullet**: composing a first turn from your notes as `"- read X first"`. Drop the leading
+  `- ` and it launches normally.
+- 🟢 **The launcher names the kitty instance it is talking to** (`--to`), instead of trusting the ambient
+  `$KITTY_LISTEN_ON` while having resolved your window across every socket. It was the only kitty call in
+  the bus without one.
+- 🟢 **`--print` now shows the argv that actually runs**, placement flags included. It used to print one
+  thing and launch another, which is the whole failure mode `--print` exists to rule out.
+
 ## 2026-09-11.6 — bus print `54ced6770f52` — 2026-09-11
 
 *A broken bus can no longer break your turn, and a launched expert lands beside YOU.*

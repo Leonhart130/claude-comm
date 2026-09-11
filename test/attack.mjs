@@ -2785,7 +2785,10 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	mkdirSync(join(r46, "db"), { recursive: true })
 	writeFileSync(join(r46, ".comm", "config.json"),
 		JSON.stringify({ leader: "leader", agents: { leader: ".", db: "db" } }))
-	for (const f of ["comm.mjs", "who.mjs", "launch.mjs"])
+	// `--print` resolves the caller's kitty window since review #10 A2, so it now needs
+	// wake.mjs and session-registry.mjs beside it. That is a REAL new dependency of the
+	// checking mode, and this arm going red is how it announced itself.
+	for (const f of ["comm.mjs", "who.mjs", "launch.mjs", "wake.mjs", "session-registry.mjs"])
 		cpSync(join(PKG, "bin", f), join(r46, ".comm", "bin", f))
 	const L = join(r46, ".comm", "bin", "launch.mjs")
 	const run46 = (args, env) => spawnSync(process.execPath, [L, ...args], { cwd: r46, encoding: "utf8", env })
@@ -3153,7 +3156,10 @@ process.stdout.write(JSON.stringify({ ops, res }))
 
 	// ① a bare --prompt is refused: it would launch exactly the inert session the flag exists to remove
 	const bare = spawnSync(process.execPath, [L53, "db", "--prompt"], { cwd: r53, encoding: "utf8", env: env53 })
-	const refusesBare = bare.status !== 0 && /needs text after it/.test(bare.stderr)
+	// Matched on the stable half of the sentence, not its wording: this went red when the
+	// message was reworded for review #10 A3 (a single dash now refuses too), and an arm
+	// that pins prose reddens for edits instead of for behaviour.
+	const refusesBare = bare.status !== 0 && /needs TEXT after it/i.test(bare.stderr)
 
 	// ②a --print MUST CARRY THE SAME WARNING. Reported by the field 2026-09-11: --print is the
 	//    mode used to CHECK a launch before making it, and it was the one mode that omitted the
