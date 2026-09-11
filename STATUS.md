@@ -5,9 +5,9 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-09-11. **The `getajob` field leader sent four letters in one day and every one carried a measurement.
-Five armed changes came out of them, and TWO OF THE DEFECTS WERE IN CODE I HAD WRITTEN AND DOCUMENTED
-WRONG.** Read `FINDINGS.md#doorbell-text` before touching anything that writes into a session's input.)*
+*(2026-09-11. **Five field letters, eight releases. Two defects were in code I had written AND documented
+wrong; the bus then hit its cap, A21 forbade the only remedy A22 names, and the split broke a stated
+invariant that only a measurement found.** `FINDINGS.md#doorbell-text`, `#bus-split`.)*
 
 **1 — 🔴 RUN THE CONTROLS FIRST**, `CLAUDE_COMM_AGENT` set (A48), output **to a file, never piped**.
 🔴 **Never trust a wrapper's exit code — `systemd-run` AND the harness's task notice both reported 0 over a
@@ -20,8 +20,13 @@ and checks every bus module transitively (`FINDINGS.md#bus-split`). 🔴 **NOW B
 open item 5's third and fourth `who` states. The seam was chosen for them, and they are still not built.
 ⚠️ Adding `session-registry.mjs` to `BUS_MODULES` is the next step and puts it under A21 too.
 
-**3 — 🔴 REVIEW #10 WAS LAUNCHED BY THE LEADER ITSELF** (`BRIEF-adversarial-10.md`, a program-launched
-expert in a split pane with a first turn — a first). **Read `REVIEW-10.md` before anything else.**
+**3 — 🔴 REVIEW #10 WAS STILL RUNNING WHEN THIS SESSION CLOSED.** The LEADER launched it
+(`BRIEF-adversarial-10.md`) — a program-launched expert, split pane, first turn, told to close its own
+window: a first, and the first real-agent exercise of `launch --prompt` + `close.mjs`.
+**FIRST THING: `node bin/comm.mjs inbox leader` and read `REVIEW-10.md`.** If neither exists, `comm who`
+says whether `review` is still alive; **it was pid 438942, window 268, at 87 s CPU after 21 min.**
+⚠️ **It reviews a tree that MOVED under it** — the brief pinned `7a18d97..b1da9ea`, and `d20f3f2` +
+`2704739` landed afterwards. Read its findings against what is there now, not against what it read.
 ⚠️ **DO NOT run `attack.mjs` and `boot --prove-red` at once**: `--prove-red` runs the suite in its own
 copies, both drive REAL kitty windows, and they collide into a flake that looks like a finding
 (`FINDINGS.md#split-lands-in-the-active-tab`). It cost me one false red today.
@@ -33,14 +38,13 @@ never fires leaves the registry naming a DEAD transcript with both uuids agreein
 (`FINDINGS.md#clear-blind`); the cleared-note discriminator goes quiet if the session owning the inherited
 uuid has ended. **Do not "fix" either with a better guess.**
 
-**5 — 🟡 ASKED BY THE FIELD, DESIGNED, NOT BUILT.** Each has its open questions written down; none is a
-promise. ⇒ **`dismiss --citing "<phrase>"`** that refuses when the phrase is not in the `ref` — a status set
-by the recipient records a BELIEF, and it has already lied (`FINDINGS.md#note-eats-the-file`, with the three
-open questions). ⇒ **`comm wait --for a,b,c`**, refused inside the bus (A21 forbids it the liveness it
-needs) and accepted beside it — **but parked behind a measurement HE agreed to make first**: wake-per-report
-costs N turns, and the number decides whether a quorum is worth building. ⇒ **`who`'s FOURTH state**: CPU
-time separates *working* from *idle* (21 s in 2 min 51 vs 1 s in 1 h 10) and `/proc/<pid>/stat` already
-carries it — **one sample each, so no threshold from it.**
+**5 — 🟡 ASKED BY THE FIELD, DESIGNED, NOT BUILT.** Open questions written down; none is a promise.
+⇒ **`dismiss --citing "<phrase>"`**, refusing when the phrase is not in the `ref` — a status set by the
+recipient records a BELIEF and has already lied (`FINDINGS.md#note-eats-the-file`, three open questions).
+⇒ **`comm wait --for a,b,c`** — refused inside the bus, accepted beside it, **parked behind a measurement HE
+agreed to make first**: wake-per-report costs N turns, and that number decides it.
+⇒ **`who`'s FOURTH state**: CPU separates *working* from *idle* (21 s in 2 min 51 vs 1 s in 1 h 10) and
+`/proc` already carries it — **one sample each, so no threshold from it.**
 
 **6 — 🟡 THE LETTER TO THE FIELD LEADER OF `work` IS STILL UNREAD.** The bell REFUSES cleanly — his leader is
 not running — so it waits for his `boot.sh` §7. ⚠️ Two `zz-` claims there are still held by dead pids; only
@@ -63,24 +67,23 @@ put itself away.** Still: do not close a window you did not open.
 | **electio** | in real daily use — 26 real deliveries, both directions |
 | gates | `attack` (deterministic, every case armed) · `ledger --prove-red`, now run INSIDE it · `selftest` (real sessions, not gated by boot) · `context` and `boot` controls. **Counts live in boot's output, never here** |
 | boot | `node bin/boot.mjs` — every gating row armed; `--fast` is injected at session start, contract in `CLAUDE.md` |
-| **ledger** | `node bin/ledger.mjs` — the reboot instrument. Records here AND in the field; a field arm is `--root ~/Dev/electio`. Its own arms run inside `attack` as A34. **11 defects recorded, its first**; each start now stores `pending`, the peer's covariate (files newer than the last start), never the inbox depth I proposed — his session #41 had an empty mailbox and the largest real queue of his last five boots |
+| **ledger** | `node bin/ledger.mjs` — the reboot instrument. Records here AND in the field (`--root ~/Dev/electio`); its arms run inside `attack` as A34. Each start stores `pending`, the peer's covariate (files newer than the last start) — **never inbox depth**: his session #41 had an empty mailbox and the largest real queue of its last five boots |
 | **sensor** | `node bin/context.mjs` — pid → transcript through `bin/session-registry.mjs` (the `SessionStart` hook writes it, keyed on pid + start time + boot id); **refuses on a miss**. `FINDINGS.md#clear-blind` |
-| reviews | #1–#8 **dispositioned**; **#9 RAN 2026-09-10 from `review/`, launched by a program** — `REVIEW-9.md`, 4 red, **and its worst two are defects in the previous review's own fixes**. #5's amendment stands in `CLAUDE.md`: *a gate that CAN redden is not yet one that reddens for the property in its own title* — review #9 found the third and fourth instances |
+| reviews | #1–#9 **dispositioned**; **#10 launched 2026-09-11 BY THE LEADER** and still running at close — ▶ NEXT 3. #9's worst two were defects in #8's own fixes. #5's amendment stands in `CLAUDE.md`: *a gate that CAN redden is not yet one that reddens for the property in its own title* — **09-11 found its fifth and sixth instances, one of them inside the arm written to record the fifth** |
 
 ## ⏭️ OPEN
 1. **🔴 Latency is a mailbox, not an interrupt.** Re-derive with `node test/latency.mjs <log>`; never
-   transcribe the table. 26 deliveries: leader→expert median **1462 s**, expert→leader **586 s** — the
-   asymmetry is structural, mail lands at the recipient's *turn boundary*. **An agent alive but idle never
-   receives its mail** (the justification for item 3), and `who` saying "running" does not mean reachable.
-   Never call this bus real-time. A16; `HISTORY.md`.
+   transcribe the table. 26 deliveries: leader→expert median **1462 s**, expert→leader **586 s** — mail
+   lands at the recipient's *turn boundary*, so **an agent alive but idle never receives it** and `who`
+   saying "running" does not mean reachable. Never call this bus real-time. A16; `HISTORY.md`.
 
 2. **`--reply-to <id>` (threading).** Field-requested, then field-deprioritised: the substance lives in the
    file.
 
-3. ✅ **The wake is BUILT** (`bin/wake.mjs`, A32) and 09-11 its TEXT was rewritten — it gave a conduct order
-   in the owner's own channel and promised a delivery it cannot keep (`FINDINGS.md#doorbell-text`). 🔴 Item
-   1's latency table predates the wake and has not been re-measured. ⚠️ A wake inside `QUIET_MS` rings
-   nobody and nothing catches up: it prints `○ rung 104s ago`, which reads like a success.
+3. ✅ **The wake is BUILT** (`bin/wake.mjs`, A32); 09-11 its TEXT was rewritten — it gave a conduct order in
+   the owner's own channel and promised a delivery it cannot keep (`FINDINGS.md#doorbell-text`). 🔴 Item 1's
+   table predates it. ⚠️ A wake inside `QUIET_MS` rings nobody and nothing catches up — it prints
+   `○ rung 104s ago`, which reads like success.
 
 4. **🟢 Holding a machine resource — `bin/claim.mjs`, IN PRODUCTION**, 17 arms, A38, three field trees.
    **It advises; it opens nothing, kills nothing, blocks nothing.**
@@ -120,17 +123,16 @@ put itself away.** Still: do not close a window you did not open.
    the fifteen minutes AFTER a restart. 🟢 A program launches an expert, gives it a first turn, and it can
    close itself. 🔴 **Open: a REAL restart arming the arm, and the trigger — ▶ NEXT 7.**
 
-**Carried forward, unchanged and still open** *(moved here from ▶ NEXT on 2026-09-08 — cut from that
-section, not retracted)*:
-- **ESLint is uncovered.** A43 stops a configured *prettier* from rewriting our generated files; ESLint is
-  the same shape and is not armed. `FINDINGS.md#generated-in-their-tree`.
+**Carried forward, still open** *(cut from ▶ NEXT 2026-09-08, not retracted)*:
+- **ESLint is uncovered.** A43 stops a configured *prettier* rewriting our generated files; ESLint is the
+  same shape, unarmed. `FINDINGS.md#generated-in-their-tree`.
 - **The 15-minute window is untested and my own timestamps are why:** each defect is dated at its commit,
   the upper bound. Not a result.
 - **The restart TTL lapsed on a human TWICE; the clock is the wrong instrument.** Try armer-gone AND not
   ancient, TTL as a backstop — `claim.mjs` already ships the (pid, start, boot) test. Not built.
 - **Test debt from review #4, none of it gated:** `FINDINGS.md#test-debt`.
-- **`#A20` from 2026-09-04 is still unexplained.** The 09-05 instance was triaged and fixed
-  (`#update-signal`); the original is not. **Run gates unfiltered.**
+- **`#A20` from 2026-09-04 is still unexplained** (the 09-05 instance was fixed, `#update-signal`).
+  **Run gates unfiltered.**
 - **The erosion counter WAS discharged** 2026-09-08 (`from: 9`, review #8 D3). 🟢 Its design flaw — one row,
   several causes — was fixed 09-10; the stale "▶ NEXT 4" pointer here was cut 09-11, not retracted.
 
@@ -164,11 +166,11 @@ section, not retracted)*:
 
 ## Two conventions that erode silently
 
-**Measurement traps** — a control not travelling the arms' code validates nothing; one that writes into the
-world it measures is not a control. **Six instances.** `FINDINGS.md#measurement-traps`.
+**Measurement traps** — a control not travelling the arms' code validates nothing; one that writes into, or
+INHERITS, the world it measures is not a control. **Seven instances.** `FINDINGS.md#measurement-traps`.
 
-**Acknowledgements amend the protocol** — `FINDINGS.md#ack-amendment`. First discharge 2026-09-08, `from: 9`.
-🟢 **Its design flaw — one row, several causes, one amendment clearing all of them — was fixed 2026-09-10.**
+**Acknowledgements amend the protocol** — `FINDINGS.md#ack-amendment`. First discharge 2026-09-08.
+🟢 **A21 was amended this way on 2026-09-11**, on evidence: `FINDINGS.md#bus-split`.
 
 **Conduct defects go in `LESSONS.md`** — *a lesson ends as an armed gate or it is a platitude.*
 
