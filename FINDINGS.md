@@ -2362,7 +2362,13 @@ silently stop running still clears 56. It catches the catastrophic case, not a s
 rejected because it reddens for the ordinary act of adding an arm, and a gate that cries wolf on routine
 work gets ignored — which this project has paid for once already.
 
-⚠️ **`test/selftest.mjs` has no equivalent** and has the same shape: it `fail()`s early on the first
-problem. Not fixed here; named. It is the second control suite, and the lesson of
-`#one-suite-hardened` — *a fix applied to one member of a family is a fix and a new asymmetry* — was
-recorded ten hours ago in this same file.
+🟢 **`test/selftest.mjs` was given the same treatment in the same session, and that is the point.** The
+first draft of this section ended *"not fixed here; named"* — which would have been the third time in one
+day that a fix went to one member of a family and not the other, ten hours after
+`#one-suite-hardened` recorded exactly that as a lesson **in this file**. ⇒ it now names the STAGE it
+reached (`✗ SELFTEST ABORTED during: ARM A …`), which matters more there than here: it spawns REAL
+sessions, so a throw is likelier (a model call, a timeout, a missing binary) and a stack trace names a line,
+never a stage. Proved by throwing in the installer: *"ABORTED during: startup"*.
+⚠️ **It remains less dangerous than the `attack` case and the difference is worth keeping straight:** a
+`selftest` abort already exits non-zero and prints a trace, so it was never readable as a clean pass. The
+parity is for the OUTPUT, not for the verdict.
