@@ -8,9 +8,11 @@ fold the settled parts into the README.
 *(2026-09-10. **Reviews #8 and #9 both ran.** #9 was launched BY A PROGRAM from `review/` — a first —
 and aimed at #8's own fixes: **two were half-done, one killed its own process group.** All repaired.)*
 
-**1 — 🔴 RUN THE CONTROLS FIRST**, with `CLAUDE_COMM_AGENT` set (A48; #9 C1) and the output **redirected to
-a file, never piped** — a case failed twice on 09-10 and both names died in a `tail`. Read the LAST LINE:
-`systemd-run` exits 0 whatever happens. *(09-11: 52/52 green, ~40 s. The twice-failing case is still unnamed.)*
+**1 — 🔴 RUN THE CONTROLS FIRST**, with `CLAUDE_COMM_AGENT` set (A48) and the output **redirected to a file,
+never piped** — a case failed twice on 09-10 and both names died in a `tail`. 🔴 **NEVER trust a wrapper's
+exit code: `systemd-run` and the harness's own task notice both reported 0 over a suite that returned 1** —
+the 0 belonged to the `tail` at the end of the chain. Read the suite's LAST LINE.
+*(09-11: attack 55/55 ~40 s; selftest green BOTH ways — A54 now forces both suites to scrub the identity.)*
 
 **2 — 🟡 WHAT REVIEWS #8 AND #9 LEFT OPEN**, all minor, measurements in the reports: **#9 A3** the
 crossing arm consumes `handoffLogs` without re-checking the guard above it · **C7** `status` ⚠ on a fresh
@@ -35,19 +37,16 @@ evidence. **The bell REFUSED — his leader is not running** — so it waits for
 claims there are still held by dead pids; only he releases them, and the sentence his boot printed about
 them **was false and is fixed** (#8 C6).
 
-**6 — 🟡 THE DECLARED RESTART IS BUILT; THE AUTOMATIC ONE IS DELIBERATELY NOT.**
-🟢 `bin/handoff.mjs` (sha256 read manifest, 7 arms) + `bin/restart.mjs prepare` (handoff → verify → arm the
-note, in that order, 4 arms). **It refuses to arm a note behind a failed handoff**, and it does NOT relaunch:
-`launch.mjs` refuses an agent already alive (A17) and the caller is that agent, so the last step is named
-and left to it. This session's own handoff is at `.comm/handoff/leader.md`, verified.
-🔴 **Why no trigger:** measured here (168 sessions, 45 923 opens) the re-open share rises to **85 %** — their
-signal reproduces — **but it is 52-59 % by the second decile and has no knee**, so *"no magic number"* is not
-supported and any trigger carries a threshold. **And the ledger still says UNKNOWN.** ⇒ **use `restart.mjs`;
-the arm fills, then decide.** Numbers and the over-collection caveat in `DESIGN-autonomy.md`.
-🟢 **Both SHIPPED to the field 2026-09-10** (bus `0e8c6abc8a13`, release `2026-09-10.2`) — a delivery
-change, gated by `selftest` green in both directions before AND after, and the generated README now teaches
-the restart. **That is what makes the arm fillable: the restarts happen there, not here.** 🟢 The `review` session did its work and the OWNER closed it, hours later — `comm who` says
-`not running`. **Launch a fresh one for the next review; do not close a window you did not open.**
+**6 — 🟡 THE DECLARED RESTART IS BUILT AND SHIPPED; THE AUTOMATIC ONE IS DELIBERATELY NOT.**
+🟢 `bin/handoff.mjs` + `bin/restart.mjs prepare` (11 arms), in the field since 09-10. **It refuses to arm a
+note behind a failed handoff** and does NOT relaunch — `launch.mjs` refuses an agent already alive (A17) and
+the caller IS that agent, so the last step is left to it.
+🔴 **Why no trigger:** measured here (168 sessions, 45 923 opens) the re-open share rises to **85 %**, but it
+is 52-59 % by the second decile and **has no knee** — so *"no magic number"* is unsupported and any trigger
+carries a threshold. **And the ledger still says UNKNOWN.** ⇒ **use `restart.mjs`; the arm fills, then
+decide.** `DESIGN-autonomy.md` has the numbers and the over-collection caveat.
+🟢 No `review` session is running; the OWNER closed the last one. **Launch a fresh one — and it can now put
+itself away (`close.mjs`). Still: do not close a window you did not open.**
 
 ## Where it stands
 
@@ -149,7 +148,8 @@ section, not retracted)*:
 - **The crossing has happened ONCE** (2026-09-04, one hand, after two lapse warnings). Unverified: that it
   survives an unattended relaunch, that anyone repeats it, that the arm reaches ten.
 - **`selftest`'s BEHAVIOUR half is not a gate** — 3 of 6 runs showed the agent not reading the file it was
-  pointed at. This bus rings bells nobody answers and no gate sees it. **It has not run since 2026-09-08.**
+  pointed at, and 09-11 added a 4th miss in 4 runs. This bus rings bells nobody answers and no gate sees it.
+  🟢 Transport green 09-11 with and without `CLAUDE_COMM_AGENT` (`FINDINGS.md#one-suite-hardened`).
 - **Anything non-Linux**: `comm who` reads `/proc`, and degrades to "not running" elsewhere.
 - Two older standing caveats were moved to `FINDINGS.md#test-debt` when this file hit its cap: A8's partial
   mutations, and behaviour mid-TOOL-CALL. Cut from here, not retracted.

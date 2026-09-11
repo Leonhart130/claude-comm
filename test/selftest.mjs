@@ -52,6 +52,27 @@ const fail = (s) => { console.error(`\n✗ ${s}`); process.exit(1) }
 // REAL stub, which since 2026-09-04 invalidates the registry entry for the session pid it
 // resolves — and from an agent-run suite that pid is the operator's own session. Same
 // reason as the block at the top of test/attack.mjs, which carries the measurement.
+// 🔴 THE IDENTITY VARIABLE IS SCRUBBED — and this suite needed it MORE than attack.mjs did.
+// Review #9 C1 fixed that trap on 2026-09-10 by deleting this variable at the top of
+// test/attack.mjs. **The sibling suite never got the same line**, and it is the one that
+// spawns REAL sessions: `runAgent` starts `claude -p` in app/, the child inherits
+// CLAUDE_COMM_AGENT from whoever ran the suite, and that session then answers as the
+// OPERATOR's agent instead of as `app`. Mail addressed to `app` is therefore not its mail,
+// and the turn boundary delivers nothing.
+//
+// ⚠️ Measured 2026-09-11, and it is worse than a latent hazard: STATUS.md's own ▶ NEXT 1
+// instructs the operator to run the controls WITH this variable set, because that is what
+// bin/launch.mjs injects. Following this repo's written instruction therefore made this
+// suite fail, twice, with `mail 1 -> 1` and no explanation. With the variable unset the same
+// run is green (`mail 1 -> 0, via=hook`) — one variable, nothing else touched.
+//
+// ⇒ A control that inherits the world it measures is not a control. FINDINGS.md#one-suite-hardened.
+const INHERITED_AGENT = process.env.CLAUDE_COMM_AGENT
+delete process.env.CLAUDE_COMM_AGENT
+// SAY IT. A silent scrub leaves an operator who set the variable on purpose believing it
+// applied. The failure that does not look like a failure is this week's recurring bill.
+if (INHERITED_AGENT) log(`⚠ CLAUDE_COMM_AGENT=${INHERITED_AGENT} was set and has been IGNORED for this run — ` +
+	`the sessions spawned here must take their identity from their directory, as a real agent does.`)
 process.env.CLAUDE_COMM_RUNTIME = mkdtempSync(join(tmpdir(), "comm-selftest-runtime-"))
 const root = mkdtempSync(join(tmpdir(), "comm-selftest-"))
 const app = join(root, "app")
