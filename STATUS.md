@@ -14,15 +14,19 @@ WRONG.** Read `FINDINGS.md#doorbell-text` before touching anything that writes i
 suite that returned 1** (the `tail`'s). Read the suite's LAST LINE. *(09-11: attack 56/56 ~40 s; selftest
 green, run 3× — it changed delivery three times today.)*
 
-**2 — 🔴 `bin/comm.mjs` IS AT ITS CAP: 47 864 B of A22's 48 000, and the nudge render is 7535 of a hard
-8000.** ⇒ **the next thing added there is a SPLIT, not an addition**, and open item 5's third `who` state is
-already waiting on one. 🔴 **Also open and older than today: the suite's unbounded `while (count) fire()`
-loops HANG on any render exception** (render-before-drain never drains). A55's red proof hung instead of
-reddening; `FINDINGS.md#note-eats-the-file`.
+**2 — 🟢 THE BUS IS SPLIT AND THE CAP IS CLEARED: `comm.mjs` 41 407 B, `who.mjs` 9 735 B.** A22 went red at
+48 370 and **A21 forbade the only remedy A22 names** — the amendment allows a relative import of a bus file
+and checks every bus module transitively (`FINDINGS.md#bus-split`). 🔴 **NOW BUILD WHAT THE SPLIT WAS FOR:**
+open item 5's third and fourth `who` states. The seam was chosen for them, and they are still not built.
+⚠️ Adding `session-registry.mjs` to `BUS_MODULES` is the next step and puts it under A21 too.
 
-**3 — 🟡 WHAT REVIEWS #8 AND #9 LEFT OPEN**, all minor: **#9 A3** the crossing arm consumes `handoffLogs`
-without re-checking the guard above it · **C7** `status` ⚠ on a fresh clone · **N1** the tier-0 charge moves
-±34 B against a thin margin · **#8 A3** A47 passes `comm whoami`.
+**3 — 🔴 REVIEW #10 WAS LAUNCHED BY THE LEADER ITSELF** (`BRIEF-adversarial-10.md`, a program-launched
+expert in a split pane with a first turn — a first). **Read `REVIEW-10.md` before anything else.**
+⚠️ **DO NOT run `attack.mjs` and `boot --prove-red` at once**: `--prove-red` runs the suite in its own
+copies, both drive REAL kitty windows, and they collide into a flake that looks like a finding
+(`FINDINGS.md#split-lands-in-the-active-tab`). It cost me one false red today.
+🟡 Older and minor: **#9 A3** the crossing arm consumes `handoffLogs` without re-checking the guard above it ·
+**C7** `status` ⚠ on a fresh clone · **#8 A3** A47 passes `comm whoami`.
 
 **4 — 🔴 TWO LIMITS NO CODE CLOSES**, both named at their site in `bin/context.mjs`. A `/clear` whose hook
 never fires leaves the registry naming a DEAD transcript with both uuids agreeing
@@ -80,16 +84,15 @@ put itself away.** Still: do not close a window you did not open.
 
 4. **🟢 Holding a machine resource — `bin/claim.mjs`, IN PRODUCTION**, 17 arms, A38, three field trees.
    **It advises; it opens nothing, kills nothing, blocks nothing.**
-   🟢 **CLOSED 2026-09-10 BY THE `getajob` FIELD** — the measurement open since 09-05, made by someone not
-   looking for it: two real SESSIONS, two names, one real vite server (three pids, none confused) ⇒
-   **refused, exit 3, nothing changed**, and both names in ONE line. Its first transcript did NOT close it
-   (it predated the fix and proved the claimant by an attached `whoami` — evidence about a shell).
+   🟢 **CLOSED 2026-09-10 BY THE `getajob` FIELD** — open since 09-05, made by someone not looking for it:
+   two real SESSIONS, two names, one real vite server ⇒ **refused, exit 3, nothing changed**, both names in
+   ONE line. Its FIRST transcript did not close it — it proved the claimant by an attached `whoami`.
    🔴 The name in the record is the CALLER'S DIRECTORY (`claim.mjs:405-425`): a `cd` changes it, only the
    pid identifies who acted. 🟢 A third property neither of us had listed: `release` REFUSES while the
    holder process still LIVES. All of it, and what it does not close, at `FINDINGS.md#claim-file`.
    ⚠️ Claims live in one project's `.comm/`, so a resource shared ACROSS projects is visible to nobody.
-   ⭐ Their verdict, accepted as the honest scope: *a claim makes sharing visible; the first answer is not
-   to share* — they isolated the ports instead, and kept the claim for what cannot be isolated.
+   ⭐ Their verdict, accepted as the scope: *a claim makes sharing visible; the first answer is not to
+   share.*
 
 5. **🟡 `who` reports TWO states and there are FOUR.** A leader lost **2 h 30** reading `running` for four
    sessions sitting at their prompt. ✅ `context.mjs --sessions` prints `quiet <age>` — a MEASUREMENT, never
@@ -121,10 +124,10 @@ put itself away.** Still: do not close a window you did not open.
 section, not retracted)*:
 - **ESLint is uncovered.** A43 stops a configured *prettier* from rewriting our generated files; ESLint is
   the same shape and is not armed. `FINDINGS.md#generated-in-their-tree`.
-- **The 15-minute window is untested and my own timestamps are why.** 0 of 25 defects fall in it, but each
-  is dated at its commit — the upper bound. Not a result.
+- **The 15-minute window is untested and my own timestamps are why:** each defect is dated at its commit,
+  the upper bound. Not a result.
 - **The restart TTL lapsed on a human TWICE; the clock is the wrong instrument.** Try armer-gone AND not
-  ancient, TTL as a backstop. `claim.mjs` already ships the (pid, start, boot) test. Not built.
+  ancient, TTL as a backstop — `claim.mjs` already ships the (pid, start, boot) test. Not built.
 - **Test debt from review #4, none of it gated:** `FINDINGS.md#test-debt`.
 - **`#A20` from 2026-09-04 is still unexplained.** The 09-05 instance was triaged and fixed
   (`#update-signal`); the original is not. **Run gates unfiltered.**
@@ -133,10 +136,8 @@ section, not retracted)*:
 
 ## ⚠️ What was NOT verified
 
-- 🔴 **`attack` failed TWICE on 2026-09-10, both times passing immediately after with no code change, and
-  the case name is STILL unknown** — both failing runs had their output piped to `tail`. Twice is a flaky
-  case, not an accident. ⇒ **never pipe this suite's output away: redirect to a file, then read the file.**
-  *(09-11: 6 clean runs, no flake seen.)*
+- 🔴 **`attack` failed TWICE on 2026-09-10 and the case name is STILL unknown** — both runs were piped to
+  `tail`. ⇒ **redirect to a file, then read the file.** *(09-11: 8 clean runs, no flake.)*
 - 🔴 **NOTHING VERIFIES `close.mjs` UNDER A REAL AGENT.** Every arm uses a `node` named `claude`. **Whether
   an agent runs the verb, and when, is BEHAVIOUR** ⇒ `selftest`, unasked.
 
@@ -147,13 +148,13 @@ section, not retracted)*:
 - **Whether the pid→transcript descriptor returns after a cleared session takes a turn**
   (`FINDINGS.md#clear-blind`). MOOT for the sensor now, still unmeasured — it decides whether the sensor's
   "session CLEARED" note is permanent or transient.
-- **What the entry does on `resume` or `compact`.** Both fire `SessionStart` with a source never seen here;
-  a payload with no `transcript_path` leaves the old entry standing — the safe direction, not the same as correct.
+- **What the entry does on `resume` or `compact`** — a payload with no `transcript_path` leaves the old
+  entry standing: the safe direction, not the same as correct.
 - **The ledger's 11 defects are all from ONE session, none in the 15-minute window**, and each is dated at
   its commit — the upper bound. `FINDINGS.md#review6-disposal`.
 - **The git guard has never fired outside a fixture** — both field projects were clean when it shipped.
-- **The crossing has happened ONCE** (2026-09-04, one hand, after two lapse warnings). Unverified: that it
-  survives an unattended relaunch, that anyone repeats it, that the arm reaches ten.
+- **The crossing has happened ONCE** (2026-09-04). Unverified: that it survives an unattended relaunch,
+  that anyone repeats it, that the arm reaches ten.
 - **`selftest`'s BEHAVIOUR half is not a gate** — 3 of 6 runs showed the agent not reading the file it was
   pointed at, and 09-11 added a 4th miss in 4 runs. This bus rings bells nobody answers and no gate sees it.
   🟢 Transport green 09-11 with and without `CLAUDE_COMM_AGENT` (`FINDINGS.md#one-suite-hardened`).
