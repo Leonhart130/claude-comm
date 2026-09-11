@@ -28,6 +28,24 @@ already have.
 
 
 
+
+## 2026-09-11.5 — bus print `dd26637a4001` — 2026-09-11
+
+*The bus is now TWO files, and a `--ref` that is not a regular file can no longer hang your turn.*
+
+- 🔴 **BUG, shipped this morning and fixed within the hour: a `--ref` naming a FIFO HUNG the Stop hook
+  forever.** The new delivery-size line reads any ref under 1 MB to count its lines, and a FIFO reports size
+  0, so it was always read — and `readFileSync` on a FIFO blocks. **Every turn boundary after it would have
+  hung, permanently.** A ref that is not a regular file is now reported as one, never read.
+- 🟢 **`bin/who.mjs` — liveness moved out of `bin/comm.mjs`.** Nothing you run changes: `comm who` is
+  byte-identical in behaviour. **But `install.mjs` now ships one more file, and anything of yours that
+  copies `comm.mjs` ALONE will stop working** — copy the whole `.comm/bin/` directory, or re-run the
+  installer, which is what it is for.
+- ⚠️ Why it moved: the bus hit its size cap, and the gate that caps it says *"split it"* while the gate that
+  keeps it a short-lived process forbade importing a sibling. **Both gates were right.** The import rule now
+  allows a relative import of a bus file and checks every bus file by the same rules, so a daemon still
+  cannot hide in one — proved by putting one there and watching it redden.
+
 ## 2026-09-11.4 — bus print `2b40c49595e2` — 2026-09-11
 
 *`launch.mjs --print` now warns about a missing first turn, like the real launch already did.*
