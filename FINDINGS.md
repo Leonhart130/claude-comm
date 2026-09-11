@@ -2372,3 +2372,45 @@ never a stage. Proved by throwing in the installer: *"ABORTED during: startup"*.
 ⚠️ **It remains less dangerous than the `attack` case and the difference is worth keeping straight:** a
 `selftest` abort already exits non-zero and prints a trace, so it was never readable as a clean pass. The
 parity is for the OUTPUT, not for the verdict.
+
+
+## `#split-lands-in-the-active-tab` — the launcher put an expert beside a stranger, and said it had succeeded
+
+**2026-09-11, measured the same day the split shipped.** `kitten @ launch --type=window` places the new
+window in whichever tab is **ACTIVE**, which is not necessarily the caller's. Measured: a concurrent process
+opened an OS window, and a split launched from a session sitting in tab 1 landed in **tab 65**.
+
+🔴 **And the failure mode is the expensive one — it does not look like a failure.** The window IS created,
+an id IS returned, the mark IS set, the agent starts and works. Only the *placement* is wrong, and placement
+is the entire reason the split exists: the owner asked for it because *"un environnement intense et autonome
+risque d'avoir beaucoup de fenêtres"*. **A leader launching four experts while windows come and go around it
+is exactly the case where "active" is wrong**, and exactly the case this launcher was built for.
+
+🟢 **Fixed by naming the tab through a window we resolved ourselves:** `--match window_id:<caller>`. The
+caller's window is already resolved BEFORE the launch (it has to be — afterwards the tab holds two windows
+and "the current one" is ambiguous), so the fix costs one argv element and no new state. ⚠️ It is omitted
+when there is no caller window: there is then no *"beside"* to mean, and kitty's default is the honest
+fallback rather than a guess.
+
+⭐ **A50 caught it, and only because it asserts the tab rather than the flag.** A `--print` assertion on
+`--type=window` would have been green through all of this. This is the arm's own comment — *"a launcher that
+printed `--type=window` and landed the window in another tab would pass a string assertion perfectly"* —
+turning out to describe a real defect three hours after it was written as a hypothetical.
+
+### 🔴 How it was found: the kitty arms are NOT safe to run concurrently, and `boot --prove-red` runs them
+
+The red came from running `test/attack.mjs` while `bin/boot.mjs --prove-red` was still going — **and
+`--prove-red` runs `attack.mjs` inside its own temp copies, two at a time.** Three suites were therefore
+opening and closing real kitty windows in one instance: two windows carried the same
+`CLAUDE_COMM_LAUNCHED=db` mark, in different tabs, and each run's cleanup could close a window another run
+was still measuring.
+
+⚠️ **So A50/A51/A53 are deterministic only when nothing else is running them.** That was safe while the
+suite touched nothing outside `/tmp`; it stopped being true the day these arms started driving a real
+window manager. 🔴 **Named, not fixed, and it matters more than it looks:** the direction this project is
+building — several agents running their own controls — makes concurrent suite runs the normal case, not the
+accident. ⇒ **do not start `attack.mjs` while `boot --prove-red` is running**, and expect an adversarial
+reviewer running its own controls to collide with the leader's.
+⭐ The honest instrument for this already exists in this repo and is not being used by its own tests:
+`bin/claim.mjs`. It advises rather than blocks, which is enough to make the collision diagnosable instead of
+mysterious — and the author being exempt from his own tool is `LESSONS.md` form **A**, for the second time.

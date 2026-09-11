@@ -157,7 +157,15 @@ if (process.argv[2] !== "session-start") {
 			spawnSync(process.execPath, [wake, "--root", projectRoot], { timeout: 10000, stdio: "ignore" })
 		}
 	} catch { /* a doorbell must never break a turn boundary */ }
-	process.exit(stopped.status ?? 0)
+	// Same rule as the session-start exit at the foot of this file, and I fixed that one
+	// first while assuming it was the only one — it is not. THE STOP PATH IS THE HOT ONE:
+	// it runs at every turn boundary, so a bus that cannot start breaks every turn until
+	// somebody notices. The bus exits 0 on every hook decision (the block travels as stdout
+	// JSON), so a non-zero here means it never RAN.
+	if (stopped.status) {
+		process.stderr.write(\`claude-comm: the bus could not RUN (exit \${stopped.status}) — the hook path exits 0 on every decision, so this is a broken or half-installed bus, not a verdict. Your mail is untouched and this turn is not blocked. Re-run the installer.\\n\`)
+	}
+	process.exit(0)
 }
 
 // SESSION-START. The payload can be read only ONCE and the bus is no longer its only
@@ -433,7 +441,18 @@ try {
 	} catch {}
 } catch { /* an instrument must never break a session */ }
 
-process.exit(delivered.status ?? 0)
+// 🔴 EXIT 0, ALWAYS — and say why when it is not zero. The bus's own main() wraps the
+// hook in try/catch and exits 0 on every path, INCLUDING the block, which it signals with
+// stdout JSON rather than a status. So a non-zero here cannot be a decision: it means the
+// bus process never RAN — a missing module, a truncated file, a syntax error mid-install.
+// Propagating it broke the turn, which is the one thing this project says a broken bus must
+// never do. Measured 2026-09-11 on a half-installed tree: exit 1 and a Node stack trace.
+// ⚠️ Loud AND non-breaking: the child's stderr is inherited, so its trace is already on
+// screen; this line names what the status meant. Silence would be the worse defect.
+if (delivered.status) {
+	process.stderr.write(\`claude-comm: the bus could not RUN (exit \${delivered.status}) — the hook path exits 0 on every decision, so this is a broken or half-installed bus, not a verdict. Your mail is untouched and this turn is not blocked. Re-run the installer.\\n\`)
+}
+process.exit(0)
 `
 
 /**
@@ -883,7 +902,9 @@ if (ADD.length) {
 
 if (!CHECK) mkdirSync(join(commDir, "bin"), { recursive: true })
 const busSrc = readFileSync(join(HERE, "bin", "comm.mjs"), "utf8")
-write(join(commDir, "bin", "comm.mjs"), busSrc, results)
+// comm.mjs is written LAST, below, because it now IMPORTS a sibling: written first, an
+// interrupted install leaves a bus that cannot load. See the loop under this block.
+const busSrcForLastWrite = busSrc
 // The two instruments travel WITH the bus rather than being reached by an absolute
 // path into this checkout. An absolute path breaks every field hook the day the
 // checkout moves, and breaks it silently — hooks exit 0 by design. A copy can go
@@ -896,6 +917,13 @@ write(join(commDir, "bin", "comm.mjs"), busSrc, results)
 for (const f of BUS_FILES.filter((f) => f !== "comm.mjs")) {
 	write(join(commDir, "bin", f), readFileSync(join(HERE, "bin", f), "utf8"), results)
 }
+// 🔴 DEPENDENCIES FIRST. `comm.mjs` imports `who.mjs` since the 2026-09-11 split, so writing
+// it before its sibling leaves a window in which the installed bus CANNOT LOAD. Measured:
+// new comm.mjs with who.mjs absent -> the hook exits 1 with a module-not-found trace; the
+// reverse order (old comm.mjs beside the new who.mjs) delivers normally and exits 0. The
+// window is milliseconds and the stub no longer breaks the turn either way — this makes the
+// bad state unreachable through an ordinary update rather than merely survivable.
+write(join(commDir, "bin", "comm.mjs"), busSrcForLastWrite, results)
 
 // The notice, and the channel it points at. A feedback path an agent cannot find is a
 // feedback path that does not exist, so the directory is CREATED here rather than
