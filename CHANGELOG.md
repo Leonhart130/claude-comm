@@ -24,6 +24,26 @@ already have.
 
 
 
+
+## 2026-09-11.1 — bus print `8c961882cceb` — 2026-09-11
+
+*Launching an agent no longer costs you a window, and an agent can put its own away.*
+
+- **`launch.mjs` now opens a PANE IN YOUR CURRENT TAB**, not a separate OS window. `--os-window` is the
+  opt-out. If you launch several experts in a session, this is the difference between a tab and a desktop
+  full of windows.
+- **`launch.mjs` REFUSES a launch it cannot name.** It used to check kitten's exit status and report
+  success; it now captures the window id and refuses without one. A session nothing can address is a
+  session no closer, wake or bell will ever reach.
+- 🟢 **NEW — `node .comm/bin/close.mjs`: an agent closes its OWN window.** Run it after your report is
+  written and the bell is rung. **It refuses more often than it closes**, and that is the feature:
+  a window no program launched (a person's terminal), anything that is not the session itself (a
+  `claude -p` you spawned resolves to YOUR window), and any close over **waiting mail or a claim you still
+  hold** — `--force` closes anyway and records that it was forced.
+- ⚠️ **It cannot verify its own effect** — closing the window destroys the terminal it would print to. A
+  detached probe writes the outcome to `.comm/close/<agent>.json`, so a close that was attempted and did
+  NOT happen leaves a record instead of leaving nothing.
+
 ## 2026-09-10.5 — bus print `cba021431144` — 2026-09-10
 
 *Le refus de \`claim.mjs\` dit maintenant sous quel nom TU demandais.*

@@ -75,7 +75,13 @@ export function windows() {
 		let tree = []
 		try { tree = JSON.parse(r.stdout) } catch { continue }
 		for (const osw of tree) for (const tab of osw.tabs || []) for (const w of tab.windows || []) {
-			out.push({ sock, osWindow: osw.id, id: w.id, shellPid: w.pid,
+			// `tab` and `vars` are carried for bin/close.mjs, which has to answer two
+			// questions this list is the only source for: did the split land in the
+			// CURRENT tab, and was this window opened by launch.mjs at all. Adding them
+			// here rather than reading `ls` a second time keeps one implementation of
+			// "which kitty window is that" - the rule this file's own rule 2 states.
+			out.push({ sock, osWindow: osw.id, tab: tab.id, id: w.id, shellPid: w.pid,
+				vars: w.user_vars || {},
 				fg: (w.foreground_processes || []).map((p) => p.pid) })
 		}
 	}
