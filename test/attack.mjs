@@ -3064,6 +3064,14 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	const bare = spawnSync(process.execPath, [L53, "db", "--prompt"], { cwd: r53, encoding: "utf8", env: env53 })
 	const refusesBare = bare.status !== 0 && /needs text after it/.test(bare.stderr)
 
+	// ②a --print MUST CARRY THE SAME WARNING. Reported by the field 2026-09-11: --print is the
+	//    mode used to CHECK a launch before making it, and it was the one mode that omitted the
+	//    consequence. The positive control is --print WITH a prompt, which must be silent —
+	//    without it this passes for a launcher that warns unconditionally, which is noise.
+	const printQuiet = spawnSync(process.execPath, [L53, "db", "--print"], { cwd: r53, encoding: "utf8", env: env53 })
+	const printLoud = spawnSync(process.execPath, [L53, "db", "--print", "--prompt", "x"], { cwd: r53, encoding: "utf8", env: env53 })
+	const printWarns = /NO --prompt/.test(printQuiet.stderr) && !/NO --prompt/.test(printLoud.stderr)
+
 	// ② WITHOUT a prompt the launcher must SAY SO. Silence here is the whole defect: the
 	//    launcher is the one place a reader is certainly looking when the session is born.
 	let warnsWhenSilent = false, quietId = null
@@ -3112,8 +3120,10 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	}
 
 	check("A53 a launched agent is given a first turn, or told plainly that it will take none",
-		refusesBare && !!caller53 && warnsWhenSilent && ranWithPrompt && landed && quietArgvEmpty,
+		refusesBare && printWarns && !!caller53 && warnsWhenSilent && ranWithPrompt && landed && quietArgvEmpty,
 		`a bare --prompt -> REFUSED=${refusesBare}; ` +
+		`--print warns when there is no prompt and is SILENT when there is one=${printWarns} ` +
+		`(the check-before-you-launch mode was the one that omitted it); ` +
 		`launched with no prompt -> the launcher NAMES the consequence=${warnsWhenSilent} ` +
 		`(silence here is the failure that does not look like one); ` +
 		`--prompt reaches the launched PROCESS's own argv=${landed} (read from the child, not from --print); ` +
