@@ -27,6 +27,15 @@ already have.
 
 
 
+
+## 2026-09-11.4 — bus print `2b40c49595e2` — 2026-09-11
+
+*`launch.mjs --print` now warns about a missing first turn, like the real launch already did.*
+
+- 🟢 **`--print` is the mode you use to CHECK a launch before making it, and it was the only mode that did
+  not tell you the session would take no turn.** It does now, and it stays silent when you did pass a
+  `--prompt`. Reported by the `getajob` leader within an hour of installing.
+
 ## 2026-09-11.3 — bus print `fdb5b70f43b4` — 2026-09-11
 
 *The delivery notice now tells you how big the file is that the note is standing in front of.*
