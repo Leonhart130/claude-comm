@@ -47,6 +47,24 @@ const MODEL = "claude-haiku-4-5-20251001"
 const log = (s) => console.log(s)
 const fail = (s) => { console.error(`\n✗ ${s}`); process.exit(1) }
 
+// 🔴 THIS SUITE MUST SAY WHERE IT STOPPED. Parity with test/attack.mjs, added the same day
+// and for the reason recorded in FINDINGS.md#one-suite-hardened: **a fix applied to one
+// member of a family is a fix and a new asymmetry.** attack.mjs was taught to report an
+// abort after it died at arm 11 of 56 printing no ✗ at all; this file spawns REAL sessions,
+// so a throw here is MORE likely (a model call, a timeout, a missing binary) and its stack
+// trace names a line, never a stage. `stage()` is the only state this adds, and the abort
+// handlers exist because guessing which one fires is how a handler ends up never running.
+let STAGE = "startup"
+const stage = (s) => { STAGE = s; return s }
+const onAbort = (e) => {
+	console.error(`\n✗ SELFTEST ABORTED during: ${STAGE}`)
+	console.error(`  ${String((e && e.message) || e).split("\n")[0]}`)
+	console.error(`  An abort is NOT a pass — the stages after this one never ran.`)
+	process.exit(1)
+}
+process.on("uncaughtException", onAbort)
+process.on("unhandledRejection", onAbort)
+
 // ── stand up a scratch project ──────────────────────────────────────────────
 // HERMETIC REGISTRY, before any child is spawned. This spawns REAL sessions running the
 // REAL stub, which since 2026-09-04 invalidates the registry entry for the session pid it
@@ -124,6 +142,7 @@ const runAgent = (label) => {
 }
 
 // ── ARM B: negative control — no mail ───────────────────────────────────────
+stage('ARM B (negative control, no mail)')
 log(`\n── ARM B (no mail) ─────────────────────────────`)
 const rowsB0 = logRows().length
 const outB = runAgent("ARM_B_DONE")
@@ -133,6 +152,7 @@ log(`  TRANSPORT  log rows added: ${drainedB}   ${drainedB === 0 ? "✓ nothing 
 log(`  behaviour  token present: ${sawB}   ${sawB ? "⚠ the agent read REVIEW.md unprompted" : "(absent, as expected)"}`)
 
 // ── ARM A: mail sent by the leader ──────────────────────────────────────────
+stage('ARM A (a real session must deliver at its turn boundary)')
 log(`\n── ARM A (leader sends a nudge) ────────────────`)
 const snd = spawnSync(process.execPath, [bus, "send", "app", "--from", "leader", "--ref", "docs/REVIEW.md", "--note", "correction at end of file"],
 	{ cwd: root, encoding: "utf8" })
@@ -152,6 +172,7 @@ log(`             ${transportOK ? "✓ the hook fired at the turn boundary and d
 log(`  behaviour  token present: ${sawA}   ${sawA ? "the agent read the file it was pointed at" : "the agent did NOT read the file (allowed — see header)"}`)
 
 // ── hub enforcement (pure logic, no model call) ─────────────────────────────
+stage('hub enforcement')
 log(`\n── hub enforcement ─────────────────────────────`)
 writeFileSync(join(root, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app", other: "app" } }, null, 2))
 const peer = spawnSync(process.execPath, [bus, "send", "other", "--from", "app", "--ref", "docs/REVIEW.md"], { cwd: root, encoding: "utf8" })
@@ -159,6 +180,7 @@ const refused = peer.status !== 0 && /hub-enforced/.test(peer.stdout + peer.stde
 log(`  peer-to-peer send refused: ${refused ? "✓" : "✗"}`)
 
 // ── verdict ─────────────────────────────────────────────────────────────────
+stage("verdict")
 log(`\n────────────────────────────────────────────────`)
 if (PROVE_RED) {
 	if (transportOK) fail(`--prove-red FAILED: the mail was still delivered with the hook removed.\n` +
