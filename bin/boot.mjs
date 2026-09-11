@@ -1359,8 +1359,18 @@ function askBus(sessionPidForCwd) {
 					: same ? " on these bytes" : " on DIFFERENT bytes"))
 	} else {
 		const t0 = Date.now()
-		const g = spawnSync("node", [join(ROOT, "test", "attack.mjs")], { encoding: "utf8" })
+		// 🔴 A CEILING. Review #10 C6: the suite can HANG — a render exception leaves the
+		// inbox undrained by design, and a loop waiting for it to empty never ends. Without
+		// a timeout that hang is inherited by EVERY boot, and boot runs at every session
+		// start, so one bad commit would make the project unstartable. 300 s is ~7× the
+		// suite's measured 25-40 s; it is a ceiling, not a budget.
+		const GATE_CEILING_MS = 300_000
+		const g = spawnSync("node", [join(ROOT, "test", "attack.mjs")], { encoding: "utf8", timeout: GATE_CEILING_MS })
 		const out = `${g.stdout || ""}${g.stderr || ""}`
+		// A TIMEOUT IS NOT A FAILING SUITE and must not be reported as one: the arms that
+		// did run say nothing about the arms that never did. Named separately, or a reader
+		// goes looking for a red case that does not exist.
+		const hung = !!(g.error && g.error.code === "ETIMEDOUT")
 		// F5 (review #5): `\s` matches a NEWLINE, so under /m the blank line before
 		// test/attack.mjs's summary let `^\s+✓` swallow the banner itself - the row claimed
 		// 31 where the suite ran 30, and that inflated number then propagated into CLAUDE.md
@@ -1370,7 +1380,12 @@ function askBus(sessionPidForCwd) {
 		const pass = (out.match(/^[^\S\n]+✓/gm) || []).length
 		const fails = out.split("\n").filter((l) => /^\s+✗/.test(l))
 		const secs = ((Date.now() - t0) / 1000).toFixed(1)
-		if (g.status === 0 && pass > 0) {
+		if (hung) {
+			row("gate", RED, `attack HUNG — killed at ${GATE_CEILING_MS / 1000}s after ${secs}s of output. The ${pass} arm(s) that ` +
+				`ran are not a verdict on the ones that never did. A render exception leaves the inbox ` +
+				`undrained BY DESIGN, and a loop waiting for it to empty then never ends. ` +
+				`FINDINGS.md#suite-abort-reads-clean`)
+		} else if (g.status === 0 && pass > 0) {
 			// A green recorded over inputs that could not be read would be a cached green
 			// covering less than the row claims, consulted by every --fast boot afterwards.
 			if (fpBlind.length) row("gate", WARN, `attack ${pass}/${pass} in ${secs}s - but the fingerprint is BLIND to ${fpBlind.join(", ")}; this green is NOT being recorded`)

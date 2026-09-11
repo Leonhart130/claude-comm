@@ -2442,3 +2442,63 @@ fact, promise nothing).
 `no_nomatch` behaviour producing a refusal; bash without `failglob` would pass the token through to the
 command). **One shell, one instance.** Do not generalise it into a rule until it has been measured
 somewhere else.
+
+
+## `#split-raised-the-cap` — review #10 C4: I satisfied A22 by making it stop measuring the thing it caps
+
+**2026-09-11, found by the adversarial reviewer I launched, against the amendment I had written three hours
+earlier.** Measured from git, not asserted:
+
+| | `comm.mjs` | `who.mjs` | **total bus** | A22 |
+| --- | --- | --- | --- | --- |
+| before the split | 47 864 B | — | **47 864 B** | green, 99.7 % of budget |
+| the state that forced the split | 48 370 B | — | 48 370 B | **RED** |
+| after the split | 41 407 B | 9 735 B | **51 142 B** | **green** |
+
+🔴 **The bus grew 3 278 B — 6.5 % PAST the number that had just been declared a hard cap — and the gate went
+from red to green.** A22's own message is *"raising the budget is not a fix"*, and I raised it by
+`48 000 × N` without arguing for it once.
+
+⭐ **The reviewer's sentence is the finding: *printing is not gating*.** My amendment prints the total and
+its comment claims the property — *"splitting must not be a way to stop being measured"* — **and then gates
+per module.** The stated property is *"one person can read the WHOLE bus in one sitting"*; after the
+amendment nothing measures the whole bus at all.
+
+⚠️ **And it is the same shape as a warning written three feet away in the same file.** A2's comment says a
+derived budget is a tautology: *"raise MAX_REF and the budget rises with it, so the assertion can never
+fail."* Here, add a module and the ceiling rises by 48 000. **I read that comment the same morning while
+editing the block it sits in.**
+
+⇒ **Not fixed at close. The fix is not to add a total cap and move on:** the honest total is already over
+48 000, so gating it reddens immediately and the number has to be re-argued ONCE, with evidence — the split
+overhead is a real reason a two-file bus costs more than a one-file bus, and that argument has not been
+made. **Doing it in the last minutes of a session is how a cap becomes a fitted number.** ▶ NEXT 1.
+
+### The rest of review #10, and how it was launched
+
+**Six red, and every one of them inside work from that same day** — which is `CLAUDE.md`'s *attack the
+recent fix* holding for a fourth consecutive session. Alongside C4:
+- 🔴 **C1** — `close.mjs`'s claim refusal has **never worked**: `claim.mjs list --json` returns an object,
+  `for…of` on it throws, and a bare `catch {}` eats it. A guard that has never once run.
+- 🔴 **C3** — **A21 does not detect a watcher.** Its regex has `watchFile(` and not `watch(`, so
+  `fs.watch()` in the bus passes. ⭐ It answers the brief's own challenge — *"find an injection that reaches
+  A21, or show none exists"* — with one that reaches it and passes. **Predates the amendment; the amendment
+  widened what A21 checks without fixing what it looks FOR.**
+- 🔴 **C2** — the detached close probe reports `gone: true` whenever it cannot look, and A51 is green with a
+  probe that never looks at all. The *"nothing there" vs "I could not look"* collision, in the code written
+  to record that collision.
+- 🔴 **C5** — `selftest --prove-red` passes when `claude` cannot run at all, and prints *"a green run is
+  therefore meaningful"*.
+- 🔴 **C6** — a throwing `refSize` hangs the suite, **and `boot` ran `attack` with no timeout**, so one bad
+  commit would have hung every future boot at every session start.
+  🟢 **Fixed at close** — a 300 s ceiling that reports a HANG as a hang, because the arms that ran say
+  nothing about the ones that never did. ⚠️ **Its first red proof was invalid and said so:** the fake suite
+  used `await new Promise(() => {})`, which exits immediately on an empty event loop, so the probe never
+  hung. `setInterval` made it speak. ⇒ `#prove-the-probe`, again.
+  ⚠️ C6's *named site* (A9's unbounded drain) was already bounded in `d20f3f2`, after the brief's pinned
+  range — **the reviewer read a tree that moved under it, and that is my fault for reviewing a live branch.**
+
+🟢 **How it ran, because the mechanism is the point:** launched BY THE LEADER with `bin/launch.mjs review
+--prompt …` into a split pane, marked so it could close itself. First real-agent exercise of the whole
+chain. ⭐ **It also caught me through the bus** — `--ref FINDINGS.md` was refused with the exact string that
+would have worked (A49), on the author of A49.
