@@ -502,7 +502,11 @@ and only some of those are declared. ⇒ the arm fills when the trigger ships, n
       (`--dangerously-load-development-channels`) — undocumented, dev-flagged, unverified.
 
 
-## 🔴 Asked by the owner 2026-09-10 — a launch that splits, and a session that closes itself
+## ✅ Asked by the owner 2026-09-10 — a launch that splits, and a session that closes itself — BUILT 2026-09-11
+
+> 🟢 **Both halves shipped 2026-09-11** as bus release `2026-09-11.1` (print `8c961882cceb`), armed as
+> **A50** and **A51**, each proved red on its own clause. **Three sentences of the design below were refuted
+> by building it, and they are struck through in place rather than deleted** — `FINDINGS.md#self-close`.
 
 Both come from the same observation, and it is the right one: *"c'est super d'ouvrir une fenêtre et lancer
 un agent, mais ce serait aussi super de pouvoir fermer celle-ci lorsqu'il a fini, sinon dans un
@@ -529,20 +533,29 @@ which is what `ctrl+shift+enter` does by hand. That is the whole change; the res
 `bin/launch.mjs`'s own rule already settles the policy: *an agent may close ITSELF, never a sibling. This
 tool therefore only opens.* So the closer is a separate verb the CHILD invokes.
 
-- `launch.mjs` passes the id it got as `CLAUDE_COMM_WINDOW` in the child's built environment, beside
-  `CLAUDE_COMM_AGENT`. ⚠️ **Scrub it in the control harnesses** the way `CLAUDE_COMM_AGENT` now is (A48):
-  every child inherits it, and a fixture that closed a real window would be the worst measurement trap this
-  repo has ever shipped.
-- 🔴 **The id from the environment is EVIDENCE, never authority** — this is review #8 C4 exactly. A child
-  inherits its parent's environment, so a `claude -p` spawned by the session would carry the SAME id and
-  could close its parent's window. ⇒ resolve the window from `kitten @ ls` by the process's own pid and
-  **require it to match** the variable; refuse on any disagreement, and refuse when either is absent.
+- ~~`launch.mjs` passes the id it got as `CLAUDE_COMM_WINDOW` in the child's built environment~~ 🔴 **FALSE,
+  and building it is what showed it: the id does not exist until AFTER the child is spawned**, by which time
+  its environment is fixed. 🟢 **Built instead as a kitty USER VARIABLE on the window**
+  (`CLAUDE_COMM_LAUNCHED`), which is stronger for this section's own reason — a user variable belongs to the
+  window and is inherited by nothing, so the C4 trap below is closed by construction rather than by a
+  cross-check. **No harness scrub is needed, because there is nothing in the environment to inherit.**
+  `FINDINGS.md#self-close`.
+- 🔴 **The C4 trap is real and this section's proposed fix does NOT close it.** *"Resolve the window by the
+  process's own pid and require it to match the variable"* separates nothing: a `claude -p` inherits the
+  variable AND is a descendant of the same window's shell, so both halves answer the parent's window for the
+  child exactly as for the parent. 🟢 **What does separate them, measured 2026-09-11: the session must BE the
+  window's own process** (`sessionPid() === window.pid`), which holds exactly for a session `launch.mjs`
+  opened and for nothing that session spawns. ⚠️ *"or its direct child"* was tried and rejected — a
+  `claude -p` IS one. `FINDINGS.md#self-close`.
 - 🔴 **Refuse to close with mail waiting.** `comm inbox` non-empty means somebody is expecting this agent to
   act; a window that closes on unread mail loses it until the agent is relaunched. Same for a claim it still
   holds — release or refuse, never close over it.
-- **Gate the effect, never the exit code.** `kitten @ close-window` will exit 0 having done nothing, exactly
-  like `send-key` does. The arm must re-query `kitten @ ls` and assert the window is GONE, with a positive
-  control that it was there a moment before.
+- **Gate the effect, never the exit code.** ✅ Done, and the arm carries the positive control.
+  ⚠️ **The stated reason was wrong and the rule is right anyway:** measured 2026-09-11,
+  `close-window --match` on a missing id exits **1** and names it — it does NOT behave like `send-key`. The
+  generalisation from `send-text` to "every kitty `--match` verb lies" was never measured. 🔴 **And the
+  closer cannot run this check for itself** — the pty dies with the window, measured — so the outcome is
+  written by a detached probe to `.comm/close/<agent>.json`.
 - **The charter tells the agent to call it** (`review/CLAUDE.md`, and the generated field README): *when you
   have written your report and rung the bell, close yourself.* An agent that does not know the verb exists
   will not use it — `LESSONS.md` §1.

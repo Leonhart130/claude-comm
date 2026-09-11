@@ -1,4 +1,4 @@
-# STATUS — claude-comm, 2026-09-10 (sessions 4–16)
+# STATUS — claude-comm, 2026-09-11 (sessions 4–17)
 
 Design and gates are in `README.md`; **this file is only what is OPEN.** Keep it short — when it grows,
 fold the settled parts into the README.
@@ -8,10 +8,9 @@ fold the settled parts into the README.
 *(2026-09-10. **Reviews #8 and #9 both ran.** #9 was launched BY A PROGRAM from `review/` — a first —
 and aimed at #8's own fixes: **two were half-done, one killed its own process group.** All repaired.)*
 
-**1 — 🔴 RUN THE CONTROLS FIRST.** `test/attack.mjs` (**50**) and the long one. ⚠️ **`systemd-run` returns
-exit 0 whatever happens — read the suite's LAST LINE**, and **capture the full output**: one case failed once
-today and its name was lost to a re-run. ⚠️ Run it with `CLAUDE_COMM_AGENT` **set too** — that is what
-`launch.mjs` injects, it silently broke every suite here (#9 C1), and A48 guards it.
+**1 — 🔴 RUN THE CONTROLS FIRST**, with `CLAUDE_COMM_AGENT` set (A48; #9 C1) and the output **redirected to
+a file, never piped** — a case failed twice on 09-10 and both names died in a `tail`. Read the LAST LINE:
+`systemd-run` exits 0 whatever happens. *(09-11: 52/52 green, ~40 s. The twice-failing case is still unnamed.)*
 
 **2 — 🟡 WHAT REVIEWS #8 AND #9 LEFT OPEN**, all minor, measurements in the reports: **#9 A3** the
 crossing arm consumes `handoffLogs` without re-checking the guard above it · **C7** `status` ⚠ on a fresh
@@ -22,11 +21,13 @@ never fires leaves the registry naming a DEAD transcript with both uuids agreein
 and the cleared-note discriminator goes quiet if the session owning the inherited uuid has itself ended.
 **Do not "fix" either with a better guess.**
 
-**4 — 🔴 ASKED BY THE OWNER 2026-09-10, NOT BUILT: a launch that SPLITS the tab, and a session that
-CLOSES ITSELF when done.** *"un environnement intense et autonome risque d avoir beaucoup de fenêtres."*
-Full design, both halves, in `DESIGN-autonomy.md` — including the trap that decides it: the window id in
-the environment is EVIDENCE, never authority, or a `claude -p` child closes its parent s window (review #8
-C4 again). **Gate the close on the window being GONE, never on kitten s exit code.**
+**4 — 🟢 BUILT 2026-09-11: the launcher SPLITS, and an agent CLOSES ITSELF.** `launch.mjs` opens a pane in
+the caller's tab (`--os-window` opts out) and now REFUSES a launch it cannot name; 🟢 **new `bin/close.mjs`**,
+armed as **A50/A51**, five red proofs, each on its own clause. Release `2026-09-11.1`, installed HERE only.
+🔴 **Building it refuted three sentences of its own design** — the env var that cannot exist, a guard resting
+on the harness, and an arm reddening for the wrong property: `FINDINGS.md#self-close`.
+🔴 **NOT verified: a REAL agent invoking it** — every arm uses a `node` named `claude`. Whether an agent runs
+the verb, and when, is BEHAVIOUR ⇒ `selftest`, unasked.
 
 **5 — 🟡 THE LETTER TO THE FIELD LEADER OF `work` IS WRITTEN AND UNREAD** (`exchange/work-leader/out/2026-09-10-
 correction-...md`): my citation named a function that does not exist, and the advice added confidence, not
@@ -39,13 +40,10 @@ them **was false and is fixed** (#8 C6).
 note, in that order, 4 arms). **It refuses to arm a note behind a failed handoff**, and it does NOT relaunch:
 `launch.mjs` refuses an agent already alive (A17) and the caller is that agent, so the last step is named
 and left to it. This session's own handoff is at `.comm/handoff/leader.md`, verified.
-🔴 **Why no trigger. Measured here, 168 sessions, 45 923 opens:** the re-open share rises monotonically to
-**85 %** — their signal reproduces — **but it is already 52-59 % by the second decile and the curve has no
-knee**, so the design's *"no magic number"* is not supported and any trigger from it carries a threshold.
-The numbers are in `DESIGN-autonomy.md`, with the caveat that the measurement over-collects. **And the
-ledger still says UNKNOWN.** Automating a restart before knowing whether one costs a defect would be
-automating an unmeasured decision. ⇒ **use `restart.mjs` for real restarts; the arm fills, then decide.**
-⚠️ `DESIGN-autonomy.md` claimed the field records no starts — **false, 58**, corrected there.
+🔴 **Why no trigger:** measured here (168 sessions, 45 923 opens) the re-open share rises to **85 %** — their
+signal reproduces — **but it is 52-59 % by the second decile and has no knee**, so *"no magic number"* is not
+supported and any trigger carries a threshold. **And the ledger still says UNKNOWN.** ⇒ **use `restart.mjs`;
+the arm fills, then decide.** Numbers and the over-collection caveat in `DESIGN-autonomy.md`.
 🟢 **Both SHIPPED to the field 2026-09-10** (bus `0e8c6abc8a13`, release `2026-09-10.2`) — a delivery
 change, gated by `selftest` green in both directions before AND after, and the generated README now teaches
 the restart. **That is what makes the arm fillable: the restarts happen there, not here.** 🟢 The `review` session did its work and the OWNER closed it, hours later — `comm who` says
@@ -78,17 +76,17 @@ the restart. **That is what makes the arm fillable: the restarts happen there, n
    predates it and has not been re-measured. The wake does not deliver — it makes a turn happen.
 
 4. **🟢 Holding a machine resource — `bin/claim.mjs`, IN PRODUCTION**, 17 arms, A38, three field trees.
-   **It advises; it opens nothing, kills nothing, blocks nothing.** In production unprompted, including a
-   NON-port resource with a purpose and a duration.
-   🟡 **PARTIAL FIELD MEASUREMENT 2026-09-10** (getajob, a real shared vite port): the refusal is clean
-   and scriptable — **exit 3**, holder + pid + purpose + since, nothing changed — and **discrimination is on
-   PROCESS identity, not agent name**, so an agent that lost track of what it held is refused too. ⭐ He
-   wrote himself that this is NARROWER: both sides carried the same agent name, and he told me not to close
-   the line on it. His `extension` expert is running the real one.
-   🔴 **STILL NOT MEASURED: two real SESSIONS contending.** `FINDINGS.md:1090` never stopped
-   saying so and the 09-08 rewrite of this file **deleted** the line that did — review #8's worst finding,
-   and the whole story is at `LESSONS.md` §2. ⇒ the correction to him is ▶ NEXT 5.
+   **It advises; it opens nothing, kills nothing, blocks nothing.**
+   🟢 **CLOSED 2026-09-10 BY THE `getajob` FIELD** — the measurement open since 09-05, made by someone not
+   looking for it: two real SESSIONS, two names, one real vite server (three pids, none confused) ⇒
+   **refused, exit 3, nothing changed**, and both names in ONE line. Its first transcript did NOT close it
+   (it predated the fix and proved the claimant by an attached `whoami` — evidence about a shell).
+   🔴 The name in the record is the CALLER'S DIRECTORY (`claim.mjs:405-425`): a `cd` changes it, only the
+   pid identifies who acted. 🟢 A third property neither of us had listed: `release` REFUSES while the
+   holder process still LIVES. All of it, and what it does not close, at `FINDINGS.md#claim-file`.
    ⚠️ Claims live in one project's `.comm/`, so a resource shared ACROSS projects is visible to nobody.
+   ⭐ Their verdict, accepted as the honest scope: *a claim makes sharing visible; the first answer is not
+   to share* — they isolated the ports instead, and kept the claim for what cannot be isolated.
 
 5. **🟡 `who` reports TWO states and there are THREE — half shipped, in the wrong command.** A leader lost
    **2 h 30** reading `running` for four sessions sitting at their prompt. ✅ `context.mjs --sessions` prints

@@ -1087,11 +1087,49 @@ reddens — the other six stay green, which is exactly the picture that existed 
 ⇒ **The lesson is not "write more arms". It is that eight arms sharing one fixture idiom share one blind
 spot**, and the cheapest thing that does not share it is running the tool against a real project once.
 
-⚠️ **What is NOT verified:** no two real agents have contended through it. The demonstration used one session
-taking both sides, which the tool correctly treated as one holder refreshing its own claim — the refusal was
-shown only against a fabricated second holder (`--pid 1`). **Two live sessions in one tree is the measurement
-that matters and it has not been made.** Nor has anything been claimed by a real dev server: `--pid` has never
-carried a server's pid outside a fixture.
+⚠️ **What was NOT verified, and now is — measured 2026-09-10 by the `getajob` field, not here.** For five days
+this block said *"two live sessions in one tree is the measurement that matters and it has not been made"*. It
+has been made, by someone who was not looking for it. `port:5173`, held by a **real shared vite server**
+(pid 2464935 — so `--pid` has now carried a server's pid outside a fixture, and the block's second sentence
+closes too). Holder recorded as `leader` (pid 2206808). Claimant `extension`, **its own session, launched by
+`launch.mjs`** (pid 1405733). Three processes, none confused. Result: **refused, exit 3, nothing changed**, and
+`list` returns ONE entry from the spoke as from the root — a single registry.
+
+🔴 **And the FIRST transcript of it did not close anything.** It was taken 3 min 42 s before release
+`2026-09-10.5` reached that tree, so the refusal named only the holder, and the claimant's name was carried by
+an attached `whoami` — evidence about a *shell*, not about the line. Their expert bounded her own measurement
+there before her leader re-read it. The re-run on the current build puts **both names in one line** —
+`HELD by leader (pid 2464935) … - you are asking as "extension"` — and that is what closes this block: not the
+measurement, the **self-sufficient** measurement.
+⇒ **The rule it leaves: a transcript that needs a second command to prove who spoke has measured the shell,
+not the tool.** Same shape as *a guard that is right and whose output carries nothing you can act on*.
+
+🔴 **What the closure does NOT close — the name in the record is chosen by the CALLER'S DIRECTORY.** Reported
+by the field, verified here at `bin/claim.mjs:405-425`: `by` is whatever the bus answers about the cwd, so a
+`cd` is enough to change it. Their leader's own session wrote `{"by":"extension", … "pid":2206808}` — its own
+pid under another agent's name, having done nothing but change directory. **The pid is the identity; the name
+is a label.** This is right for a diagnostic and should not be "fixed", but it means **a line reading
+`you are asking as "extension"` proves the request came FROM that folder, never that that session made it** —
+the pid beside it is what does. Both halves together close this block; the name alone would not have, and a
+less careful reader would have believed it did.
+
+🟢 **A third property neither side had listed:** `release` REFUSES to release a claim whose holder process is
+still ALIVE — `… is held by extension (pid 2515289) … and that process is alive — --force if you mean it`.
+Found because their expert released before killing her server. **The tool guards both ends, not only the
+take**, and releasing under a live server would have lied to the next agent.
+
+⚠️ **Intelligence, not a defect here: an integrator that BUILDS the `.comm` path itself loses `findRoot`.**
+Their probe resolved `../../.comm/` from `banc/`, landed on a directory that does not exist, and printed
+*"no claim on port:5173 (or the registry is unavailable)"* — **"nothing is held" and "I could not look"
+rendered identically**, the worst failure mode. `claim.mjs` cannot do this (it walks up, and refuses the
+implicit no-project case), but anything that WRAPS it can. Their fix was three states, not two:
+`held` · `free` · 🔴 `NOT CONSULTED`.
+
+⭐ **The field's verdict on the tool, which belongs here because it bounds what open item 4 is for:** *"a claim
+makes sharing visible; the first answer is not to share."* After all of the above they did not adopt
+`claim.mjs` as the main defence — each bench now starts its own server on its own port under `--strictPort`
+(web 5178, extension 5179) — and the claim stays for what CANNOT be isolated. Accepted, and recorded as the
+honest scope rather than argued with.
 
 
 ## `#review6-disposal` — disposing review #6, and the four defects the disposal itself produced
@@ -1959,3 +1997,79 @@ leader put it better than we did: *« juste l'horodatage, pour que je puisse le 
 `comm.mjs` **cannot reach `session-registry.mjs`**, and a second pid→transcript implementation is the defect
 `who --json` exists to prevent. Moving it into the bus costs an A21 amendment **and** a real split under
 A22, which is at 94 % (45 026 / 48 000). Named in `STATUS.md`, not smuggled.
+
+
+## `#self-close` — an agent closes its own window, and three things the design got wrong
+
+**2026-09-11.** `DESIGN-autonomy.md` §A/§B, asked by the owner on 2026-09-10, built here. The design was
+complete enough to build from, and **building it refuted three of its own sentences.** None of them would
+have been caught by re-reading it — which is why the rule is *build the thing, then attack what you built*.
+
+### 🔴 1. `CLAUDE_COMM_WINDOW` in the child's environment was DESIGNED AND CANNOT EXIST
+
+> *"`launch.mjs` passes the id it got as `CLAUDE_COMM_WINDOW` in the child's built environment, beside
+> `CLAUDE_COMM_AGENT`."*
+
+**The id does not exist at that moment.** `kitten @ launch` answers with a window id only AFTER the child is
+spawned, and by then the child's environment is fixed. There is no ordering that produces it.
+
+🟢 **The mark goes on the WINDOW instead, as a kitty user variable** (`kitten @ set-user-vars`, visible in
+`kitten @ ls`), set immediately after the launch. ⭐ **That is strictly stronger than what the design asked
+for, and for the design's own reason.** §B's whole worry was review #8 C4: *an environment variable is
+inherited by every child a session spawns, so a `claude -p` would carry it.* **A user variable belongs to the
+window and is inherited by nothing.** The trap is closed by construction instead of by a cross-check
+somebody has to remember to write. ⇒ **the thing that could not be built was replaced by something better,
+which is an argument for building designs rather than only refining them.**
+
+### 🔴 2. THE FIRST GUARD WAS RESTING ON A PROPERTY OF THE HARNESS, NOT OF THE CODE
+
+The first version required the session to appear in the window's `foreground_processes`, reasoning that a
+`claude -p` would not. **Measured, it does.** `spawnSync` keeps its caller's process group, so kitty lists a
+grandchild in the foreground list as readily as the session itself. The guard *appeared* to work only
+because Claude Code's Bash tool puts its shell in a NEW process group — **so the protection was a property
+of the tool running the test, and would have gone silently wrong for anyone spawning `claude -p` directly.**
+
+🟢 **The rule that actually holds: the session must BE the window's own process.** `launch.mjs` runs
+`claude` as the window's process (`kitten @ launch … claudeBin`), so `sessionPid() === window.pid` holds
+exactly for every window this tool may act on. Measured: a window launched this way reports `pid 55606` and
+`foreground_processes [55606]` — the same number.
+⚠️ **"or its direct child" was tried and rejected between two runs of the arm**: a `claude -p` the session
+spawns IS a direct child of the window's process, so the looser rule readmitted the exact shape the file
+exists to refuse. The strict form costs nothing — a hand-started session (whose parent is the window's
+shell) has no launch mark and is refused a line later anyway.
+
+### 🔴 3. THE ARM WENT RED FOR THE WRONG PROPERTY, AND THAT IS HOW BOTH OF THE ABOVE WERE FOUND
+
+A51's first version ran the `claude -p` shape from the SUITE'S OWN window. It went red when the guard was
+removed, so it looked armed. **It was reddening for the MARK guard** — the suite's window carries no launch
+mark, so the close was refused a line later for a different reason, and the depth guard was never the thing
+under test. **The trap only bites where a close would otherwise SUCCEED**, so the arm now runs the nested
+`claude` *inside the marked window that closes itself moments later*: one variable differs between the two
+halves — whether the caller is the window's process or something that process spawned — and the mark,
+the cwd and the code are identical.
+
+⇒ **This is CLAUDE.md's 2026-09-04 amendment finding its fifth and sixth instances, in a file written the
+same day by someone who had just read it.** *A gate that CAN redden is not yet one that reddens for the
+property in its own title.* Both defects above were found by asking that question, not by review.
+
+### 🟢 What is measured, and what could not be
+
+- **The effect, never the exit code.** The close is gated on the window being GONE from `kitten @ ls`, with
+  a positive control that it was there a moment earlier.
+- ⭐ **A closer CANNOT verify its own effect, and this is measured rather than argued:** the in-window
+  process was given a file to write its result to, and **the file was never written** — the pty died with
+  the window first. A `closed ✓` printed just before a close would be a claim, not a measurement. ⇒ the
+  outcome is written by a DETACHED probe to `.comm/close/<agent>.json`, intent first and outcome after, so
+  **a close that was attempted and did not happen leaves a record saying so instead of leaving nothing.**
+  Measured latency between intent and outcome: ~120 ms.
+- ⚠️ **A standing assumption of this project turned out to be narrower than it was being applied.**
+  `bin/wake.mjs` rule 1 records that `kitten @ send-text --match` **exits 0 when it matches nothing**, and
+  that has been generalised here to "kitty's `--match` verbs lie". Measured 2026-09-11:
+  `close-window --match id:9999` exits **1** and names the failure. **The effect gate stays anyway** — it
+  costs nothing and the next verb may not be honest — but the general claim should not be repeated as if
+  it were measured for all of them. It was measured for one.
+- 🔴 **NOT verified: any of this under a REAL `claude` session.** Every arm uses a `node` named `claude`,
+  which is faithful for `sessionPid()` (it keys on argv[0]) and for kitty (it sees a process, not a
+  product). **What no arm has seen is a real agent invoking `close.mjs` at the end of real work** — whether
+  it runs it at all, and whether it runs it before or after writing its report. That is a BEHAVIOUR
+  question, it belongs to `test/selftest.mjs`, and it has not been asked.

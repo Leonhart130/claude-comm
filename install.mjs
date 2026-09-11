@@ -529,7 +529,28 @@ const NOTICE = (here, root) => [
 	"sessions genuinely must share one directory. `CLAUDE_COMM_AGENT=none` is not that answer: an off-bus",
 	"session receives nothing **and cannot send either**.",
 	"",
-	"## 🔴 Never commit `.comm/` — it is live state, not source",
+	"## Closing yourself when you are done — and the window you must never close",
+	"",
+	"`node .comm/bin/launch.mjs <agent>` opens a **pane in the current tab**, not a separate OS window",
+	"(`--os-window` is the opt-out). The reason is the owner's: *an autonomy design that only ever opens",
+	"fills the screen.*",
+	"",
+	"**So close yourself once your work is written down:** `node .comm/bin/close.mjs`. Run it AFTER the report",
+	"is written and the bell is rung — the file is the artifact, and a window closing hands nothing over.",
+	"",
+	"🔴 **It refuses more often than it closes, and each refusal is the point:**",
+	"",
+	"- **a window nobody launched** — no `CLAUDE_COMM_LAUNCHED` mark means a person opened it, and closing",
+	"  somebody's own terminal is the one thing this must never do;",
+	"- **anything that is not the session itself** — a `claude -p` you spawn resolves to YOUR window and would",
+	"  close it. It is refused by identity (it is not the window's process), never by trust;",
+	"- **mail waiting, or a claim you still hold** — somebody expects you to act, and a window that closes over",
+	"  unread mail loses it until you are relaunched. `--force` closes anyway and records that it was forced.",
+	"",
+	"⚠️ **It cannot verify its own effect** — closing the window destroys the terminal it would print to. A",
+	"detached probe writes the outcome to `.comm/close/<agent>.json` instead, so a close that was attempted and",
+	"did NOT happen leaves a record saying so rather than leaving nothing.",
+	"",	"## 🔴 Never commit `.comm/` — it is live state, not source",
 	"",
 	"`.comm/` holds inboxes, a delivery log, a lifecycle ledger and per-machine runtime notes. **It changes",
 	"every turn.** Committing it puts another agent's mail in your history, makes branches conflict over a",
@@ -733,7 +754,7 @@ function write(path, content, results) {
 // restarts happen HERE - 53 cold starts in one field tree against 5 declared reboots - and
 // the ledger verdict stays UNKNOWN until declared restarts exist to count. A tool only the
 // maintainer can run cannot fill an arm the field is the source of.
-const BUS_FILES = ["comm.mjs", "session-registry.mjs", "ledger.mjs", "wake.mjs", "restart-signal.mjs", "claim.mjs", "launch.mjs", "handoff.mjs", "restart.mjs"]
+const BUS_FILES = ["comm.mjs", "session-registry.mjs", "ledger.mjs", "wake.mjs", "restart-signal.mjs", "claim.mjs", "launch.mjs", "close.mjs", "handoff.mjs", "restart.mjs"]
 const CHANGELOG = join(HERE, "CHANGELOG.md")
 function busPrint() {
 	const h = createHash("sha256")

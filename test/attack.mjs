@@ -16,7 +16,7 @@
  * result, which is this project's signature failure mode.
  */
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync, statSync, symlinkSync, cpSync, utimesSync } from "node:fs"
-import { join } from "node:path"
+import { join, delimiter } from "node:path"
 import { execFileSync, spawnSync, spawn } from "node:child_process"
 import { createHash } from "node:crypto"
 import { pathToFileURL } from "node:url"
@@ -2720,6 +2720,248 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		`node RUNS with only the built PATH in its environment=${hookWorks}; ` +
 		`positive control, node ABSENT from kitty's own PATH=${kittyIsBroken} ` +
 		`(if this were false the line above would pass for a launcher that inherits kitty's env, which is the defect)`)
+}
+
+// A50 — the launcher SPLITS the caller's tab, captures the window id, and marks the window.
+//
+// Asked by the owner 2026-09-10: an autonomy design that only ever opens fills the screen.
+// Three properties, and the first two are the ones that could be faked by a string check:
+//
+// 🔴 The arm runs the REAL launcher against a REAL kitty. `--print` cannot reach any of
+// this -- a launcher that printed `--type=window` and landed the window in another tab
+// would pass a string assertion perfectly. The child is a fake `claude` placed on PATH, so
+// `resolveClaude()` resolves it by its own ordinary rule and no test seam is needed.
+//
+// 🔴 And the id guard is armed by a kitten that answers NOTHING: the launcher must refuse,
+// because a window it cannot name is one no closer, wake or bell can ever reach.
+{
+	const r50 = mkdtempSync(join(tmpdir(), "comm-attack-split-"))
+	const opened = []
+	const sockOf = () => { try { return readdirSync("/tmp").filter((f) => /^kitty-\d+$/.test(f)).map((f) => `/tmp/${f}`) } catch { return [] } }
+	// EVERY window this arm opens is closed again, including on a throw: a suite that
+	// leaves panes behind is the "beaucoup de fenetres" failure it exists to prevent.
+	process.on("exit", () => {
+		for (const [sock, id] of opened)
+			try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
+		try { rmSync(r50, { recursive: true, force: true }) } catch {}
+	})
+	mkdirSync(join(r50, ".comm", "bin"), { recursive: true })
+	mkdirSync(join(r50, "db"), { recursive: true })
+	writeFileSync(join(r50, ".comm", "config.json"),
+		JSON.stringify({ leader: "leader", agents: { leader: ".", db: "db" } }))
+	for (const f of ["comm.mjs", "launch.mjs", "wake.mjs", "session-registry.mjs", "close.mjs", "claim.mjs"])
+		cpSync(join(PKG, "bin", f), join(r50, ".comm", "bin", f))
+	const L50 = join(r50, ".comm", "bin", "launch.mjs")
+
+	// a `claude` that is cheap, on a PATH of our own -- resolveClaude() finds it the same
+	// way it finds the real one, so the launcher under test is not modified at all
+	const fakeBin = join(r50, "fakebin")
+	mkdirSync(fakeBin, { recursive: true })
+	writeFileSync(join(fakeBin, "claude"), "#!/bin/sh\nexec sleep 120\n", { mode: 0o755 })
+	const env50 = { ...process.env, PATH: `${fakeBin}${delimiter}${process.env.PATH}` }
+
+	// ① THE ID GUARD, armed: a kitten that exits 0 and prints no id at all.
+	const mute = join(r50, "mutebin")
+	mkdirSync(mute, { recursive: true })
+	writeFileSync(join(mute, "kitten"), "#!/bin/sh\nexit 0\n", { mode: 0o755 })
+	writeFileSync(join(mute, "claude"), "#!/bin/sh\nexec sleep 120\n", { mode: 0o755 })
+	const noId = spawnSync(process.execPath, [L50, "db"],
+		{ cwd: r50, encoding: "utf8", env: { ...process.env, PATH: `${mute}${delimiter}${process.env.PATH}` } })
+	const refusesNoId = noId.status !== 0 && /no window id/.test(noId.stderr)
+
+	// ② THE SPLIT. Where is the suite sitting? The launcher answers this the same way, so
+	// the arm asks the same module rather than a second implementation of the question.
+	const wk = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
+	const { sessionPid: sp50 } = await import(pathToFileURL(join(PKG, "bin", "session-registry.mjs")).href)
+	const callerR = wk.resolveWindow(sp50(), wk.windows())
+	const caller = callerR.ok && callerR.how === "foreground process" ? callerR.win : null
+
+	let splitOk = false, marked = false, sameTab = false, idEchoed = false, ranReal = false
+	if (caller) {
+		const run = spawnSync(process.execPath, [L50, "db"], { cwd: r50, encoding: "utf8", env: env50 })
+		ranReal = run.status === 0
+		const id = Number((run.stdout.match(/window: (\d+)/) || [])[1])
+		idEchoed = Number.isInteger(id) && id > 0
+		if (idEchoed) {
+			opened.push([caller.sock, id])
+			const w = wk.windows().find((x) => x.id === id && x.sock === caller.sock)
+			splitOk = !!w
+			sameTab = !!w && w.tab === caller.tab
+			marked = !!w && w.vars.CLAUDE_COMM_LAUNCHED === "db"
+		}
+	}
+
+	// ③ POSITIVE CONTROL for the tab check: the opt-out must land SOMEWHERE ELSE. Without
+	// it, `sameTab` would pass for a launcher that ignored --os-window and always split --
+	// and equally for a box where every window happens to be in one tab.
+	let optOutElsewhere = false
+	if (caller) {
+		const run = spawnSync(process.execPath, [L50, "db", "--os-window"], { cwd: r50, encoding: "utf8", env: env50 })
+		const id = Number((run.stdout.match(/window: (\d+)/) || [])[1])
+		if (Number.isInteger(id) && id > 0) {
+			opened.push([caller.sock, id])
+			const w = wk.windows().find((x) => x.id === id)
+			optOutElsewhere = !!w && !(w.sock === caller.sock && w.tab === caller.tab)
+		}
+	}
+
+	check("A50 the launcher splits the CALLER'S tab, refuses a window it cannot name, and marks what it opened",
+		refusesNoId && !!caller && ranReal && idEchoed && splitOk && sameTab && marked && optOutElsewhere,
+		`kitten answering with no id -> REFUSED=${refusesNoId}; ` +
+		`caller window resolved=${!!caller}${caller ? ` (tab ${caller.tab})` : " — THE ARM COULD NOT RUN: no kitty window for this suite"}; ` +
+		`real launch exit 0=${ranReal}, id echoed=${idEchoed}, window EXISTS in kitty=${splitOk} (re-read, not assumed); ` +
+		`landed in the caller's tab=${sameTab}; marked CLAUDE_COMM_LAUNCHED=db=${marked}; ` +
+		`positive control, --os-window lands OUTSIDE that tab=${optOutElsewhere} ` +
+		`(without it "same tab" would pass for a launcher that ignores the opt-out, and on any box with one tab)`)
+}
+
+// A51 — an agent closes its OWN window, and every other shape is refused.
+//
+// 🔴 THE TRAP (review #8 C4, and building it is what proved the design's own fix does not
+// work): a `claude -p` a session spawns inherits its environment AND is a descendant of the
+// same window's shell, so neither an env var nor an ancestor walk separates the two. What
+// does: kitty's `foreground_processes`, matched against `sessionPid()` -- which from a
+// `claude -p` returns THAT CHILD, and a child is in no window's foreground list.
+//
+// 🔴 And the effect is gated on the WINDOW BEING GONE, never on an exit code. The closer
+// cannot do this for itself -- closing the window destroys the pty it prints to -- which
+// this arm also measures: the in-window process is expected NOT to have reported.
+{
+	const r51 = mkdtempSync(join(tmpdir(), "comm-attack-close-"))
+	const opened51 = []
+	process.on("exit", () => {
+		for (const [sock, id] of opened51)
+			try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
+		try { rmSync(r51, { recursive: true, force: true }) } catch {}
+	})
+	mkdirSync(join(r51, ".comm", "bin"), { recursive: true })
+	mkdirSync(join(r51, "db"), { recursive: true })
+	writeFileSync(join(r51, ".comm", "config.json"),
+		JSON.stringify({ leader: "leader", agents: { leader: ".", db: "db" } }))
+	for (const f of ["comm.mjs", "launch.mjs", "wake.mjs", "session-registry.mjs", "close.mjs", "claim.mjs"])
+		cpSync(join(PKG, "bin", f), join(r51, ".comm", "bin", f))
+	const C51 = join(r51, ".comm", "bin", "close.mjs")
+
+	// a stand-in for `claude`: sessionPid() keys on argv[0], so a node named `claude` has
+	// exactly the identity shape the guard reasons about, at no cost
+	const fake51 = join(r51, "claude")
+	try { symlinkSync(process.execPath, fake51) } catch {}
+
+	const wk51 = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
+	const { sessionPid: sp51 } = await import(pathToFileURL(join(PKG, "bin", "session-registry.mjs")).href)
+	const cr = wk51.resolveWindow(sp51(), wk51.windows())
+	const caller51 = cr.ok && cr.how === "foreground process" ? cr.win : null
+
+	// ① is armed INSIDE the marked window, below. Running it from the suite's own window
+	// proved nothing: that window carries no mark, so the refusal came from the MARK guard
+	// and the arm went red for a property that is not in its title (CLAUDE.md's amendment,
+	// caught here on 2026-09-11). The trap only bites where a close would otherwise SUCCEED.
+	let trapRefused = false, trapNamedTheWindow = false
+
+	// ② AN UNMARKED WINDOW IS SOMEBODY'S — and it has to be a window where EVERYTHING ELSE
+	// passes, or the refusal proves nothing about the mark. Run from the suite's own window
+	// this reddened for DEPTH instead (the suite is not its window's process), which is the
+	// same "right answer, wrong property" mistake in miniature. So: a window opened by hand
+	// through kitten, whose process IS the session shape, and no mark set on it.
+	let refusesUnmarked = false, unmarkedRan = false
+	if (caller51) {
+		const uf = join(r51, "unmarked.json")
+		const us = join(r51, "unmarked.cjs")
+		writeFileSync(us,
+			`const{spawnSync}=require("node:child_process"),fs=require("node:fs");` +
+			`const r=spawnSync(process.execPath,[${JSON.stringify(C51)},"--dry-run"],{encoding:"utf8",cwd:${JSON.stringify(r51)}});` +
+			`fs.writeFileSync(${JSON.stringify(uf)},JSON.stringify({s:r.status,e:r.stderr,o:r.stdout}));` +
+			`setTimeout(()=>{},20000)`)
+		const uid = Number(spawnSync("kitten", ["@", "--to", `unix:${caller51.sock}`, "launch", "--type=window",
+			"--keep-focus", `--cwd=${r51}`, fake51, us], { encoding: "utf8", timeout: 10000 }).stdout)
+		if (Number.isInteger(uid) && uid > 0) {
+			opened51.push([caller51.sock, uid])
+			const until = Date.now() + 10000
+			while (Date.now() < until) {
+				if (existsSync(uf)) break
+				spawnSync(process.execPath, ["-e", "setTimeout(()=>{},200)"])
+			}
+			try {
+				const j = JSON.parse(readFileSync(uf, "utf8"))
+				unmarkedRan = true
+				refusesUnmarked = j.s !== 0 && /no CLAUDE_COMM_LAUNCHED mark/.test(j.e || "") && !/would_close/.test(j.o || "")
+			} catch {}
+		}
+	}
+
+	// ③ THE POSITIVE CONTROL: a window that really does close itself. Same code, one
+	// variable moved -- it is marked, and its foreground process IS the `claude`.
+	let closedItself = false, probeSaid = null, selfCouldNotReport = false, existedFirst = false
+	if (caller51) {
+		const outFile = join(r51, "in-window.json")
+		const trapFile = join(r51, "nested.json")
+		const script = join(r51, "selfclose.cjs")
+		// Both halves run in the SAME marked window, trap first. That is what makes them a
+		// matched pair: one variable differs between them — whether the caller IS the
+		// window's process or something that process spawned — and everything else, the
+		// mark included, is identical.
+		writeFileSync(script,
+			`const{spawnSync}=require("node:child_process"),fs=require("node:fs");` +
+			`const n=spawnSync(${JSON.stringify(fake51)},["-e",` +
+			`  'const{spawnSync}=require(\"node:child_process\");' +` +
+			`  'const r=spawnSync(process.execPath,[' + ${JSON.stringify(JSON.stringify(C51))} + ',\"--dry-run\"],{encoding:\"utf8\",cwd:' + ${JSON.stringify(JSON.stringify(r51))} + '});' +` +
+			`  'process.stdout.write(JSON.stringify({s:r.status,e:r.stderr,o:r.stdout}))'` +
+			`],{encoding:"utf8",cwd:${JSON.stringify(r51)}});` +
+			`fs.writeFileSync(${JSON.stringify(trapFile)},n.stdout||JSON.stringify({s:null,e:String(n.stderr)}));` +
+			`const r=spawnSync(process.execPath,[${JSON.stringify(C51)}],{encoding:"utf8",cwd:${JSON.stringify(r51)}});` +
+			`fs.writeFileSync(${JSON.stringify(outFile)},JSON.stringify({s:r.status}));` +
+			`setTimeout(()=>{},20000)`)
+		const id = Number(spawnSync("kitten", ["@", "--to", `unix:${caller51.sock}`, "launch", "--type=window",
+			"--keep-focus", `--cwd=${r51}`, fake51, script], { encoding: "utf8", timeout: 10000 }).stdout)
+		if (Number.isInteger(id) && id > 0) {
+			opened51.push([caller51.sock, id])
+			spawnSync("kitten", ["@", "--to", `unix:${caller51.sock}`, "set-user-vars", "--match", `id:${id}`,
+				"CLAUDE_COMM_LAUNCHED=db"], { timeout: 5000 })
+			existedFirst = wk51.windows().some((w) => w.sock === caller51.sock && w.id === id)
+			// wait for the EFFECT, with a ceiling. A ceiling reached is "I did not know how
+			// to wait", never "it worked" -- the getajob leader's phrasing, 2026-09-10.
+			const until = Date.now() + 10000
+			while (Date.now() < until) {
+				if (!wk51.windows().some((w) => w.sock === caller51.sock && w.id === id)) { closedItself = true; break }
+				spawnSync(process.execPath, ["-e", "setTimeout(()=>{},200)"])
+			}
+			// The probe is DETACHED, so it finishes on its own clock — measured ~120 ms after
+			// the window goes. Reading its record the instant the window vanishes raced it and
+			// read `null`, which would have been indistinguishable from "the probe never ran".
+			// A ceiling reached here is "I did not know how to wait", never "it did not work".
+			{
+				const untilP = Date.now() + 8000
+				while (Date.now() < untilP) {
+					try { probeSaid = JSON.parse(readFileSync(join(r51, ".comm", "close", "db.json"), "utf8")).gone } catch {}
+					if (probeSaid !== null && probeSaid !== undefined) break
+					spawnSync(process.execPath, ["-e", "setTimeout(()=>{},150)"])
+				}
+			}
+			// ① read back: the nested `claude` ran against THIS window, which is marked and
+			// which the session itself closed moments later — so the only thing that refused
+			// it is the depth guard.
+			try {
+				const j = JSON.parse(readFileSync(trapFile, "utf8"))
+				trapRefused = j.s !== 0 && !/would_close/.test(j.o || "")
+				trapNamedTheWindow = /not the window's own\n?\s*process/.test(j.e || "") || /is running INSIDE window \d+/.test(j.e || "")
+			} catch {}
+			// the closer could NOT report its own success: the pty went with the window.
+			// This is the reason the detached probe exists, asserted rather than assumed.
+			selfCouldNotReport = !existsSync(outFile)
+		}
+	}
+
+	check("A51 an agent closes its OWN window, and a subprocess of it cannot",
+		trapRefused && trapNamedTheWindow && unmarkedRan && refusesUnmarked && !!caller51 && existedFirst &&
+		closedItself && probeSaid === true && selfCouldNotReport,
+		`a nested 'claude' INSIDE the marked window (where a close would otherwise succeed) -> REFUSED=${trapRefused}, ` +
+		`and refused for DEPTH, naming the window it was in=${trapNamedTheWindow} ` +
+		`(run from an unmarked window instead, this reddens for the mark guard and proves nothing about its own title); ` +
+		`an UNMARKED window whose process IS the session (a person's window) -> ran=${unmarkedRan}, REFUSED for the MARK=${refusesUnmarked}; ` +
+		`positive control: a marked window whose foreground IS the session -> existed first=${existedFirst}, ` +
+		`window GONE from kitten @ ls=${closedItself} (the effect, not the exit code), detached probe recorded gone=${probeSaid}; ` +
+		`and the closer could NOT report its own success=${selfCouldNotReport} — the pty died with the window, ` +
+		`which is why the probe is detached${caller51 ? "" : " — THE ARM COULD NOT RUN: no kitty window for this suite"}`)
 }
 
 console.log(`\n${failed ? `✗ ${failed} adversarial check(s) FAILED` : "✓ all adversarial checks passed"}`)
