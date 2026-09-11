@@ -65,16 +65,18 @@ put itself away.** Still: do not close a window you did not open.
 
 ## ⏭️ OPEN
 1. **🔴 Latency is a mailbox, not an interrupt.** Re-derive with `node test/latency.mjs <log>`; never
-   transcribe the table. 26 real deliveries: leader→expert median **1462 s**, expert→leader **586 s** — the
+   transcribe the table. 26 deliveries: leader→expert median **1462 s**, expert→leader **586 s** — the
    asymmetry is structural, mail lands at the recipient's *turn boundary*. **An agent alive but idle never
-   receives its mail**, which is the whole justification for item 3. `who` showing "running" does not mean
-   reachable. Never call this bus real-time. Gated by A16; `HISTORY.md`.
+   receives its mail** (the justification for item 3), and `who` saying "running" does not mean reachable.
+   Never call this bus real-time. A16; `HISTORY.md`.
 
-2. **`--reply-to <id>` (threading).** Field-requested, then field-deprioritised: it adds identity surface
-   while the substance already lives in the file.
+2. **`--reply-to <id>` (threading).** Field-requested, then field-deprioritised: the substance lives in the
+   file.
 
-3. ✅ **The wake is BUILT** (`bin/wake.mjs`, A32, `FINDINGS.md#wake-doorbell`). 🔴 Item 1's latency table
-   predates it and has not been re-measured. The wake does not deliver — it makes a turn happen.
+3. ✅ **The wake is BUILT** (`bin/wake.mjs`, A32) and 09-11 its TEXT was rewritten — it gave a conduct order
+   in the owner's own channel and promised a delivery it cannot keep (`FINDINGS.md#doorbell-text`). 🔴 Item
+   1's latency table predates the wake and has not been re-measured. ⚠️ A wake inside `QUIET_MS` rings
+   nobody and nothing catches up: it prints `○ rung 104s ago`, which reads like a success.
 
 4. **🟢 Holding a machine resource — `bin/claim.mjs`, IN PRODUCTION**, 17 arms, A38, three field trees.
    **It advises; it opens nothing, kills nothing, blocks nothing.**
@@ -97,23 +99,23 @@ put itself away.** Still: do not close a window you did not open.
    sample each, so no threshold from it. 🔴 All of it belongs in `comm who` and cannot go there — A21 forbids
    the import ⇒ an A21 amendment **and a split; `comm.mjs` is now AT A22's cap, not near it.**
 
-6. **🟢 A reply must NAME what it answers** — `Answers:` in a front-matter block on **line 1**, anchored to
-   the first byte so a quotation cannot forge one (review #8 C1: a pasted marker used to count, and to print
-   *"it says so"*). Stateless, no read receipt. A failed scan says `CANNOT SAY`; an unreadable channel still
-   prints a row (C2). Contract: `exchange/README.md`. `FINDINGS.md#answered-mtime`. 🔴 Residue: ▶ NEXT 1.
+6. **🟢 A reply must NAME what it answers** — `Answers:` in front matter on **line 1**, anchored to the
+   first byte so a quotation cannot forge one (#8 C1). Stateless, no read receipt; a failed scan says
+   `CANNOT SAY`. Contract: `exchange/README.md`. `FINDINGS.md#answered-mtime`.
 
 7. **🟢 A program launches an agent, and the agent puts its own window away.** `launch.mjs` (A46) builds the
    child's `PATH` rather than inheriting kitty's and resolves the runtime absolutely; 🟢 **09-11 it SPLITS
    the caller's tab, refuses a launch it cannot name, and `--prompt` gives the new session a first turn** —
-   without one it sits inert while `who` says `running`. 🟢 **`close.mjs` (A51)**: an agent closes ITSELF,
-   never a sibling, and refuses over waiting mail or a held claim. `FINDINGS.md#self-close`,
-   `#hookless-launch`.
+   without one it sits inert while `who` says `running` — **and `--print`, the mode used to CHECK a launch,
+   was the only one that omitted that warning** (field, within an hour of install). 🟢 **`close.mjs` (A51)**:
+   an agent closes ITSELF, never a sibling, and refuses over waiting mail or a held claim.
+   `FINDINGS.md#self-close`, `#hookless-launch`.
 
-8. **🟡 The autonomy mandate — self-launching experts, a self-rebooting leader.** Given 2026-09-04.
-   **Everything settled is in [`DESIGN-autonomy.md`](DESIGN-autonomy.md)** — do not re-derive it here. The
-   finding that shapes it: the consumer's defects are **BOOT defects, not crowding defects**, so the design
-   effort belongs in the fifteen minutes AFTER a restart. 🟢 A program launched an expert onto the bus, and
-   the declared restart is built. 🔴 **Open: a REAL restart arming the arm, and the trigger — ▶ NEXT 7.**
+8. **🟡 The autonomy mandate — self-launching experts, a self-rebooting leader.** Given 2026-09-04; settled
+   parts in [`DESIGN-autonomy.md`](DESIGN-autonomy.md), **do not re-derive them here.** The finding that
+   shapes it: the consumer's defects are **BOOT defects, not crowding defects**, so the effort belongs in
+   the fifteen minutes AFTER a restart. 🟢 A program launches an expert, gives it a first turn, and it can
+   close itself. 🔴 **Open: a REAL restart arming the arm, and the trigger — ▶ NEXT 7.**
 
 **Carried forward, unchanged and still open** *(moved here from ▶ NEXT on 2026-09-08 — cut from that
 section, not retracted)*:
@@ -123,12 +125,11 @@ section, not retracted)*:
   is dated at its commit — the upper bound. Not a result.
 - **The restart TTL lapsed on a human TWICE; the clock is the wrong instrument.** Try armer-gone AND not
   ancient, TTL as a backstop. `claim.mjs` already ships the (pid, start, boot) test. Not built.
-- **Standing test debt from review #4, none of it gated:** `FINDINGS.md#test-debt`.
+- **Test debt from review #4, none of it gated:** `FINDINGS.md#test-debt`.
 - **`#A20` from 2026-09-04 is still unexplained.** The 09-05 instance was triaged and fixed
   (`#update-signal`); the original is not. **Run gates unfiltered.**
-- **The erosion counter WAS discharged** on 2026-09-08 — one entry in `.boot-state.json`, `from: 9` (not 8;
-  two sections of this file said 8 and review #8 D3 caught all three disagreements). 🔴 **Its design flaw is
-  untouched and is ▶ NEXT 4:** the count keys on a ROW, and a row warns for several causes.
+- **The erosion counter WAS discharged** 2026-09-08 (`from: 9`, review #8 D3). 🟢 Its design flaw — one row,
+  several causes — was fixed 09-10; the stale "▶ NEXT 4" pointer here was cut 09-11, not retracted.
 
 ## ⚠️ What was NOT verified
 
