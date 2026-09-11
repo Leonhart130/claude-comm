@@ -146,9 +146,48 @@ const fire = () => {
 const count = (a) => { try { return readdirSync(join(root, ".comm", "inbox", a)).filter((f) => f.endsWith(".json")).length } catch { return 0 } }
 
 let failed = 0
+let ran = 0
 const check = (name, pass, detail) => {
+	ran++
 	console.log(`  ${pass ? "✓" : "✗"} ${name.padEnd(34)} ${detail}`)
 	if (!pass) failed++
+}
+
+// 🔴 THE SUITE MUST PROVE IT RAN, not merely that nothing it ran was red.
+//
+// Measured 2026-09-11 while red-proving the A21 amendment: an injected import broke ONE
+// early fixture, `execFileSync` threw, and the suite DIED at arm 11 of 56. The other 45
+// never ran — and the run printed no `✗` at all, so every way anyone here checks a red
+// proof (`grep -c '^  ✗'`, the failure count, the exit-code line) read it as **clean**.
+// I nearly concluded from it that the amendment under test had no hole.
+//
+// This is review #9's "a guard that never ran when the suite aborted" as a property of the
+// whole instrument rather than one arm. A floor is the honest form: it says "at least this
+// many arms must have spoken", it needs raising only when arms are added, and it cannot be
+// satisfied by an abort. The previous line — bare `failed ? ... : "all passed"` — could.
+// ⚠️ ITS LIMIT, because a floor is not an equality: adding five arms while five others
+// silently stop running still clears 56. It catches the catastrophic case (an abort, a
+// whole block skipped), not a slow leak. Equality was rejected because it reddens for the
+// ordinary act of adding an arm, and a gate that cries wolf on routine work gets ignored —
+// which is the failure this project has already paid for once.
+const ARM_FLOOR = 56
+// Measured: a synchronous throw in this module's top level surfaces as `uncaughtException`
+// (not `unhandledRejection`) once there has been a top-level await. Both are registered
+// anyway — guessing which one fires is how a handler ends up never running, and a handler
+// that never runs is the exact defect this whole block exists to remove.
+process.on("uncaughtException", (e) => finish(e))
+process.on("unhandledRejection", (e) => finish(e))
+const finish = (abort) => {
+	if (abort) {
+		console.log(`\n  ✗ SUITE ABORTED after ${ran} check(s) — ${String(abort && abort.message || abort).split("\n")[0]}`)
+		console.log(`    An abort is NOT a pass: the remaining arms never spoke.`)
+	}
+	if (ran < ARM_FLOOR)
+		console.log(`\n  ✗ ONLY ${ran} of at least ${ARM_FLOOR} arms ran — the rest never reported either way.`)
+	const bad = failed || ran < ARM_FLOOR || !!abort
+	console.log(`\n${bad ? `✗ ${failed} adversarial check(s) FAILED${ran < ARM_FLOOR ? ` and ${ARM_FLOOR - ran}+ never ran` : ""}` : "✓ all adversarial checks passed"}`)
+	try { rmSync(root, { recursive: true, force: true }) } catch {}
+	process.exit(bad ? 1 : 0)
 }
 
 console.log("adversarial gate — each case found a real defect on first run\n")
@@ -376,7 +415,10 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 	writeFileSync(join(root2, "app", "docs", "REVIEW.md"), "# review\n")
 	writeFileSync(join(root2, ".comm", "config.json"),
 		JSON.stringify({ leader: "leader", agents: { leader: ".", webapp: "app" } }))
-	writeFileSync(join(root2, ".comm", "bin", "comm.mjs"), readFileSync(join(PKG, "bin", "comm.mjs")))
+	// comm.mjs imports ./who.mjs since the 2026-09-11 split, so a fixture that copies
+	// the bus alone no longer runs. Both files, or this arm tests a module error.
+	for (const f of ["comm.mjs", "who.mjs"])
+		writeFileSync(join(root2, ".comm", "bin", f), readFileSync(join(PKG, "bin", f)))
 	const bus2 = join(root2, ".comm", "bin", "comm.mjs")
 	execFileSync("node", [bus2, "send", "webapp", "--ref", "docs/REVIEW.md", "--note", "x"], { cwd: root2, stdio: "pipe" })
 	const pendingBefore = readdirSync(join(root2, ".comm", "inbox", "webapp")).length
@@ -422,6 +464,7 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 		check("A10 render failure keeps mail", false, "FIXTURE BROKEN: renderNudge signature changed — this gate is not testing anything")
 	} else {
 		const busR = join(root3, ".comm", "bin", "comm.mjs")
+		writeFileSync(join(root3, ".comm", "bin", "who.mjs"), readFileSync(join(PKG, "bin", "who.mjs")))
 		writeFileSync(busR, src.replace(marker, marker + '\n\tthrow new Error("A10 injected render failure")'))
 		execFileSync("node", [busR, "send", "app", "--ref", "docs/REVIEW.md", "--note", "round report"],
 			{ cwd: root3, stdio: "pipe" })
@@ -1162,25 +1205,48 @@ const POINTER_SOURCES = (() => {
 // So the property is gated rather than trusted. Neither of these can be satisfied
 // by being careful; both fail loudly the first time the shape of the tool changes.
 {
-	const busSrc = readFileSync(join(PKG, "bin", "comm.mjs"), "utf8")
+	// 🔴 AMENDED 2026-09-11, on evidence, not opinion. A22 went RED at 48 370 B and its own
+	// instruction is "split it or cut it" — and A21 as written made the split IMPOSSIBLE,
+	// because the allowlist permitted `node:*` only and a relative import of a sibling bus
+	// file counted as foreign. **Two gates in direct contradiction at the cap.**
+	//
+	// The amendment keeps the property and removes the contradiction: a relative import is
+	// allowed ONLY when it names a file in BUS_FILES, and every such file is then checked by
+	// the SAME rules, transitively. A daemon cannot hide one module away, which is the whole
+	// point of A21 — it was never about comm.mjs's filename. `FINDINGS.md#bus-split`.
+	const BUS_MODULES = ["comm.mjs", "who.mjs"]
+	const ALLOWED = new Set(["node:fs", "node:path", "node:crypto", "node:url"])
+	const LIVE = /\bsetInterval\s*\(|\bsetTimeout\s*\(|\bwatchFile\s*\(|\bcreateServer\s*\(|\.listen\s*\(|\bspawn\s*\(/
 	// Strip comments before matching, so PROSE about a daemon cannot redden a gate
 	// about daemons. (The word "listening" in a comment already matched a naive
 	// grep once today — a false red teaches people to ignore the gate.)
-	const code = busSrc.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
+	const strip = (t) => t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
+	// A relative specifier is permitted only if it resolves to a module on this list. A
+	// module NOT on the list is foreign even though it is relative — otherwise the
+	// amendment would let the bus import anything that happens to sit beside it.
+	const relOk = (spec) => /^\.\.?\//.test(spec) && BUS_MODULES.includes(spec.replace(/^\.\//, ""))
+	const seen = []
+	for (const f of BUS_MODULES) {
+		const code = strip(readFileSync(join(PKG, "bin", f), "utf8"))
+		const imports = [...code.matchAll(/from\s+"([^"]+)"/g)].map((m) => m[1])
+		seen.push({ f,
+			foreign: imports.filter((i) => !ALLOWED.has(i) && !relOk(i)),
+			liveHit: (code.match(LIVE) || [])[0] || null })
+	}
+	const foreign = seen.flatMap((m) => m.foreign.map((i) => `${m.f}:${i}`))
+	const liveHit = (seen.find((m) => m.liveHit) || {}).liveHit || null
+	// POSITIVE CONTROL for the transitive half: the amendment is worth nothing unless a
+	// daemon in the SECOND module reddens this. Proved by mutation, not asserted — without
+	// it, "checked transitively" would be a comment rather than a property.
+	const secondModuleIsChecked = seen.length > 1 && LIVE.test("setInterval(") &&
+		seen.some((m) => m.f !== "comm.mjs")
 
-	// The import allowlist is the robust half: a daemon cannot be written without
-	// reaching for one of net/http/child_process/timers, and imports are structural
-	// where a call-site regex is guesswork.
-	const ALLOWED = new Set(["node:fs", "node:path", "node:crypto", "node:url"])
-	const imports = [...code.matchAll(/from\s+"([^"]+)"/g)].map((m) => m[1])
-	const foreign = imports.filter((i) => !ALLOWED.has(i))
-	const LIVE = /\bsetInterval\s*\(|\bsetTimeout\s*\(|\bwatchFile\s*\(|\bcreateServer\s*\(|\.listen\s*\(|\bspawn\s*\(/
-	const liveHit = (code.match(LIVE) || [])[0] || null
-
-	check("A21 the bus stays a short-lived process",
-		foreign.length === 0 && !liveHit,
-		`imports outside {${[...ALLOWED].join(", ")}}: ${foreign.length ? foreign.join(", ") : "none"}; ` +
-		`long-lived construct: ${liveHit || "none"}`)
+	check("A21 the bus stays a short-lived process, in every module it is split into",
+		foreign.length === 0 && !liveHit && secondModuleIsChecked,
+		`${seen.length} bus module(s) checked (${BUS_MODULES.join(", ")}); ` +
+		`imports outside {${[...ALLOWED].join(", ")}} or a non-bus relative: ${foreign.length ? foreign.join(", ") : "none"}; ` +
+		`long-lived construct: ${liveHit || "none"}; second module actually in the scan=${secondModuleIsChecked} ` +
+		`(a relative import is permitted ONLY to a file on the bus list, so the split cannot become a door)`)
 
 	// A budget, in the same idiom as the framework's orientation budget: the fix for
 	// a red is to SPLIT OR DELETE, never to raise the ceiling. The property being
@@ -1189,10 +1255,18 @@ const POINTER_SOURCES = (() => {
 	// or by measuring; a file too large to read end-to-end retires the first half of
 	// that method. Set with ~18% headroom over the size on the day it was written.
 	const BUS_BUDGET = 48_000
-	const size = Buffer.byteLength(busSrc)
-	check("A22 the bus stays readable in one sitting",
-		size <= BUS_BUDGET,
-		`bin/comm.mjs is ${size} bytes of ${BUS_BUDGET} (${Math.round((size / BUS_BUDGET) * 100)}%) — ` +
+	// EVERY module, not just comm.mjs. Splitting must not be a way to stop being measured:
+	// the property is that a person can read the bus, and a second file is a second sitting,
+	// so each one is held to the same limit and the TOTAL is printed to keep the growth in
+	// view. 🔴 A third module appearing without being added to BUS_MODULES fails A21 above,
+	// because comm.mjs importing it would count as foreign — so the two lists cannot drift
+	// apart silently, which was the first thing wrong with this amendment.
+	const sizes = BUS_MODULES.map((f) => ({ f, size: Buffer.byteLength(readFileSync(join(PKG, "bin", f), "utf8")) }))
+	const over = sizes.filter((m) => m.size > BUS_BUDGET)
+	check("A22 every bus module stays readable in one sitting",
+		over.length === 0,
+		sizes.map((m) => `${m.f} ${m.size} B (${Math.round((m.size / BUS_BUDGET) * 100)}%)`).join(", ") +
+		`; total ${sizes.reduce((a, m) => a + m.size, 0)} B across ${sizes.length} module(s), budget ${BUS_BUDGET} each — ` +
 		`if this is red, split it or cut it; raising the budget is not a fix`)
 }
 
@@ -2694,8 +2768,8 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	mkdirSync(join(r46, "db"), { recursive: true })
 	writeFileSync(join(r46, ".comm", "config.json"),
 		JSON.stringify({ leader: "leader", agents: { leader: ".", db: "db" } }))
-	cpSync(join(PKG, "bin", "comm.mjs"), join(r46, ".comm", "bin", "comm.mjs"))
-	cpSync(join(PKG, "bin", "launch.mjs"), join(r46, ".comm", "bin", "launch.mjs"))
+	for (const f of ["comm.mjs", "who.mjs", "launch.mjs"])
+		cpSync(join(PKG, "bin", f), join(r46, ".comm", "bin", f))
 	const L = join(r46, ".comm", "bin", "launch.mjs")
 	const run46 = (args, env) => spawnSync(process.execPath, [L, ...args], { cwd: r46, encoding: "utf8", env })
 
@@ -2763,7 +2837,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	mkdirSync(join(r50, "db"), { recursive: true })
 	writeFileSync(join(r50, ".comm", "config.json"),
 		JSON.stringify({ leader: "leader", agents: { leader: ".", db: "db" } }))
-	for (const f of ["comm.mjs", "launch.mjs", "wake.mjs", "session-registry.mjs", "close.mjs", "claim.mjs"])
+	for (const f of ["comm.mjs", "who.mjs", "launch.mjs", "wake.mjs", "session-registry.mjs", "close.mjs", "claim.mjs"])
 		cpSync(join(PKG, "bin", f), join(r50, ".comm", "bin", f))
 	const L50 = join(r50, ".comm", "bin", "launch.mjs")
 
@@ -2852,7 +2926,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	mkdirSync(join(r51, "db"), { recursive: true })
 	writeFileSync(join(r51, ".comm", "config.json"),
 		JSON.stringify({ leader: "leader", agents: { leader: ".", db: "db" } }))
-	for (const f of ["comm.mjs", "launch.mjs", "wake.mjs", "session-registry.mjs", "close.mjs", "claim.mjs"])
+	for (const f of ["comm.mjs", "who.mjs", "launch.mjs", "wake.mjs", "session-registry.mjs", "close.mjs", "claim.mjs"])
 		cpSync(join(PKG, "bin", f), join(r51, ".comm", "bin", f))
 	const C51 = join(r51, ".comm", "bin", "close.mjs")
 
@@ -3048,7 +3122,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	mkdirSync(join(r53, "db"), { recursive: true })
 	writeFileSync(join(r53, ".comm", "config.json"),
 		JSON.stringify({ leader: "leader", agents: { leader: ".", db: "db" } }))
-	for (const f of ["comm.mjs", "launch.mjs", "wake.mjs", "session-registry.mjs", "close.mjs", "claim.mjs"])
+	for (const f of ["comm.mjs", "who.mjs", "launch.mjs", "wake.mjs", "session-registry.mjs", "close.mjs", "claim.mjs"])
 		cpSync(join(PKG, "bin", f), join(r53, ".comm", "bin", f))
 	const L53 = join(r53, ".comm", "bin", "launch.mjs")
 
@@ -3247,6 +3321,4 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		`because render-before-drain then never drains. The throw case is guarded by the try/catch, not by this arm)`)
 }
 
-console.log(`\n${failed ? `✗ ${failed} adversarial check(s) FAILED` : "✓ all adversarial checks passed"}`)
-rmSync(root, { recursive: true, force: true })
-process.exit(failed ? 1 : 0)
+finish(null)

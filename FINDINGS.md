@@ -2270,3 +2270,94 @@ controls: a real sentence accepted, a fabricated one refused, **a sentence taken
 refused** — the last is the one that matters) and says it belongs in the bus rather than his repo.
 **Open design questions before it ships:** whitespace and line-wrap normalisation, what it does for a
 non-text ref, and whether a refusal blocks the dismissal or only annotates it.
+
+
+## `#bus-split` — two gates in direct contradiction at the cap, and the amendment that removed it
+
+**2026-09-11.** `bin/comm.mjs` reached **48 370 B against A22's 48 000**. A22's own message is
+*"if this is red, split it or cut it; raising the budget is not a fix"* — **and A21 made the split
+impossible.** Its import allowlist is `{node:fs, node:path, node:crypto, node:url}` and it treats every
+other specifier as foreign, so `comm.mjs` could not import a sibling module. **One gate demanded a remedy
+the other forbade**, and neither was wrong about its own property.
+
+### What A21 is actually for, which is what decided the amendment
+
+A21 exists because the owner asked for *"performant, compact and secure by default"* and worried about
+leaks. The honest answer was that a leak is **architecturally** impossible in a process that starts, does
+file I/O and exits in 61 ms — and that this stops being true the moment someone adds a daemon, a timer or a
+watcher. **The property is "the bus cannot become a daemon". It was never "the bus is one file".** The
+filename was the implementation of the check, and the check had quietly become the property.
+
+🟢 **Amended: a relative import is allowed ONLY when it names a file on the bus module list, and every
+module on that list is then checked by the SAME rules, transitively.** A daemon cannot hide one module away.
+⚠️ **And a relative import to a file NOT on the list stays foreign** — otherwise the amendment would license
+importing anything that happens to sit beside the bus, which is a door, not a split.
+🟢 **A22 now checks EVERY module and prints the total**, so splitting cannot become a way to stop being
+measured: the property is that a person can read the bus, and a second file is a second sitting.
+🔴 **The two lists cannot drift apart silently**: a third module that is not on the list makes `comm.mjs`'s
+import of it foreign, so A21 reddens. That coupling was the first thing wrong with the amendment as drafted.
+
+### The seam was chosen by an open item, not by size
+
+Anything would have fitted under the cap. **`liveness` was taken because STATUS open item 5 has said since
+2026-09-08 that `who` reports two states where there are more, and that the missing ones *"cannot go there —
+A21 forbids the bus that import ⇒ an A21 amendment AND a split"*.** Liveness is the part of the bus that
+reads the MACHINE rather than the mailbox, so it is the part that keeps wanting imports the bus must not
+have. ⇒ `bin/who.mjs`, and the dependency runs one way: it imports nothing from `comm.mjs`, which passes
+`whoami`, `findRoot`, `clock` and `pending` in. A circular import would have worked in Node and would have
+been a trap for the next reader.
+
+### 🔴 What the split broke, which is the part worth recording
+
+**Five arms went red, and four of them for the same structural reason:** fixtures that copied `comm.mjs`
+into a scratch project **alone**. That worked while the bus was one file and stops working the moment it is
+two. ⚠️ **None of them would have failed loudly in the field** — `install.mjs` copies the whole
+`BUS_FILES` list — so the breakage was visible only because the suite builds its own fixtures by hand.
+⇒ **a file that other code copies standalone has a standalone-ness that is load-bearing and undeclared**,
+and the only thing that found it was running the suite.
+
+⚠️ **NOT verified:** that a field tree mid-update, holding the OLD `comm.mjs` and the NEW `who.mjs` or the
+reverse, degrades safely. `install.mjs` writes files one at a time and a hook can fire between two writes.
+The window is milliseconds and the failure mode is a module-not-found inside a hook that exits 0 anyway —
+but it is reasoning, not a measurement.
+
+
+## `#suite-abort-reads-clean` — the suite died at arm 11 of 56 and every way of reading it said "clean"
+
+**2026-09-11, found while red-proving the A21 amendment of `#bus-split`.** The proof injected a relative
+import of a non-bus module into `bin/comm.mjs`, expecting A21 to redden. **A21 never printed at all.**
+
+One early fixture copies the bus into a scratch project, and that fixture does not carry
+`session-registry.mjs`, so the injected import failed to resolve, `execFileSync` **threw**, and the suite
+died at arm **11 of 56**. 🔴 **The run contained no `✗`.** Every way this project actually reads a red
+proof — `grep -c '^  ✗'`, the failure counter, the final line — reported it as a clean pass. **I had
+already written down "red=0" and was one step from concluding that the amendment under test had no hole.**
+
+⭐ **The amendment was fine.** A21's predicate was verified separately, in isolation, and classifies
+`./session-registry.mjs` as foreign exactly as intended. **The defect was in the instrument, not the thing
+being measured** — and it is only visible because the red proof was run rather than assumed.
+
+### Why this is not just review #9's finding again
+
+Review #9 found *"a guard that never ran when the suite aborted"* as a property of ONE arm. **This is the
+same shape raised to the whole instrument:** the suite had no way to say *"I did not finish"*, so silence
+about an arm was indistinguishable from that arm passing. ⇒ **the same collision this repo keeps finding —
+"nothing to report" rendering identically to "I could not look"** — sitting inside the thing whose job is
+to find it.
+
+### 🟢 The fix, and what it does not cover
+
+The suite now **proves it ran**: `uncaughtException` and `unhandledRejection` both route to one `finish()`
+that prints `✗ SUITE ABORTED after N check(s)` with the failing command, and an `ARM_FLOOR` that fails the
+run when fewer arms spoke than the floor. Measured on the same injection: **exit 1, three `✗` lines,
+`ONLY 11 of at least 56 arms ran`**, against a completely silent pass before.
+
+⚠️ **A floor is not an equality and the difference is deliberate.** Adding five arms while five others
+silently stop running still clears 56. It catches the catastrophic case, not a slow leak. Equality was
+rejected because it reddens for the ordinary act of adding an arm, and a gate that cries wolf on routine
+work gets ignored — which this project has paid for once already.
+
+⚠️ **`test/selftest.mjs` has no equivalent** and has the same shape: it `fail()`s early on the first
+problem. Not fixed here; named. It is the second control suite, and the lesson of
+`#one-suite-hardened` — *a fix applied to one member of a family is a fix and a new asymmetry* — was
+recorded ten hours ago in this same file.
