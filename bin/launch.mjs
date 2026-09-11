@@ -94,8 +94,27 @@ const printOnly = process.argv.includes("--print")
 // owner named the failure that decides it: an intense session launches several agents, and
 // many OS windows is the thing that goes wrong.
 const osWindow = process.argv.includes("--os-window")
-if (!agent || agent.startsWith("--")) die(`usage: launch.mjs <agent> [--print] [--os-window]\n` +
-	`  default: a pane in the CURRENT tab. --os-window opens a separate OS window instead.`)
+// 🔴 THE FIRST TURN. Reported by the `getajob` field leader 2026-09-11, after it cost his
+// owner two mornings: this launcher started `claude` with NO ARGUMENTS, so the session came
+// up and sat at its prompt. **The failure does not look like one** — the window is there,
+// the PATH is right, the mail was delivered, `comm who` says `running` — and nothing works.
+// It is STATUS item 5's third state arriving by the front door: a session that has taken no
+// turn has no transcript at all, and `who` reports it exactly like a working one.
+//
+// `claude` takes a prompt positionally, so this is one element of argv. The CALLER decides
+// the content: there is no default text here and no default in config.json, because a
+// launcher that writes an agent's first instruction is a launcher with an opinion about
+// the work. What it does instead is REFUSE TO BE QUIET about the consequence — see the
+// closing lines, which say plainly that a promptless session will sit inert.
+const pi = process.argv.indexOf("--prompt")
+const prompt = pi > -1 ? process.argv[pi + 1] : null
+if (pi > -1 && (prompt === undefined || prompt.startsWith("--")))
+	die(`--prompt needs text after it. A bare --prompt would launch a session that takes no turn,\n` +
+	    `  which is the exact failure the flag exists to remove.`)
+if (!agent || agent.startsWith("--")) die(`usage: launch.mjs <agent> [--prompt "<first turn>"] [--print] [--os-window]\n` +
+	`  default: a pane in the CURRENT tab. --os-window opens a separate OS window instead.\n` +
+	`  --prompt is what makes the new session TAKE A TURN. Without it, it sits at its prompt\n` +
+	`  and does nothing, while 'comm who' reports it as running.`)
 
 // ── the roster is the only source of a launchable name ───────────────────────
 let root = process.cwd()
@@ -144,13 +163,14 @@ const childPath = [dirname(nodeBin), dirname(claudeBin), ...(process.env.PATH ||
 	.filter((d, i, a) => a.indexOf(d) === i).join(delimiter)
 const cwd = join(root, cfg.agents[agent] ?? ".")
 const argv = ["@", "launch", `--type=${osWindow ? "os-window" : "window"}`, "--keep-focus", `--cwd=${cwd}`,
-	`--env=PATH=${childPath}`, `--env=CLAUDE_COMM_AGENT=${agent}`, claudeBin]
+	`--env=PATH=${childPath}`, `--env=CLAUDE_COMM_AGENT=${agent}`, claudeBin,
+	...(prompt ? [prompt] : [])]
 
 if (printOnly) {
 	// Same resolution, same refusals, same argv — only the spawn is skipped, so a
 	// control that uses it travels the code the real launch travels.
 	console.log(JSON.stringify({ agent, cwd, node: nodeBin, claude: claudeBin, path: childPath, argv,
-		type: osWindow ? "os-window" : "window" }, null, 2))
+		type: osWindow ? "os-window" : "window", prompt }, null, 2))
 	process.exit(0)
 }
 
@@ -216,3 +236,12 @@ console.log(`  window: ${winId} (${split ? "split" : "os-window"})` +
 console.log(marked
 	? `  marked CLAUDE_COMM_LAUNCHED=${agent} on the window — this is what lets it close ITSELF (bin/close.mjs)`
 	: `  ⚠ NOT marked (${markWhy}) — the session is up and fine, but it will REFUSE to close itself`)
+// SAY THE CONSEQUENCE, EVERY TIME. A launch with no first turn is the failure that does not
+// look like one, so the launcher that created it is the one place a reader is certain to be
+// looking. This is deliberately not a refusal: an interactive session a human will type into
+// is a legitimate thing to launch, and only the caller knows which this is.
+console.log(prompt
+	? `  first turn: ${JSON.stringify(prompt.length > 60 ? prompt.slice(0, 57) + "..." : prompt)} — it will act on this immediately`
+	: `  ⚠ NO --prompt: this session will sit at its prompt and take NO TURN. 'comm who' will still say\n` +
+	  `    'running', and mail delivered at its start will sit in its context unread. Give it a first\n` +
+	  `    turn with --prompt, or type into the window yourself.`)

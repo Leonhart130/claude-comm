@@ -130,9 +130,42 @@ function noteWake(root, agent, rec) {
  *
  * The whole point is that the agent does NOT fetch its own mail. It takes a turn; the
  * turn ends; the Stop hook delivers. So the text asks for nothing at all.
+ *
+ * ── 🔴 AND FOR ONE RELEASE IT DID, WHICH THE COMMENT ABOVE FLATLY DENIED ───────────────
+ *
+ * The shipped text was:
+ *
+ *   "…Nothing to do and nothing to fetch: acknowledge briefly and end your turn, and the
+ *    bus will hand it to you as this turn closes."
+ *
+ * **It asked for two things and promised a third**, directly under a comment saying it
+ * asked for nothing at all — and nothing tested it: `NUDGE` appeared at its definition and
+ * its use, in no arm. Reported 2026-09-11 by the `getajob` field leader, who paid for both
+ * halves:
+ *
+ * 1. 🔴 **A CONDUCT INSTRUCTION ARRIVING IN THE OWNER'S CHANNEL.** The doorbell is typed
+ *    into the session's input, where the human's words appear. *"acknowledge briefly and
+ *    end your turn"* is indistinguishable from the owner saying so, and **a well-disciplined
+ *    agent obeys its owner.** He obeyed it twice. ⭐ The text was exploiting the very
+ *    discipline that makes an agent useful.
+ * 2. 🔴 **A PROMISE THE BUS CANNOT KEEP.** *"the bus will hand it to you as this turn
+ *    closes"* holds only at a CLEAN turn boundary. When turns run together — the owner
+ *    speaks, another doorbell lands — that boundary never arrives and the mail sits. His
+ *    report waited hours, and it carried 29 offers already written to a database and five
+ *    decisions waiting on him: **work already done that he did not know he had.**
+ *    ⚠️ **An unkept promise is worse than silence, because it excuses the reader from
+ *    checking.** That sentence is his, and it is the whole finding.
+ *
+ * ⇒ The text now states a FACT, names the BUS as its source so it cannot be read as the
+ * owner's instruction, and **names a verb that does not consume** — because removing the
+ * promise without naming a way to check would be this project's own signature defect, a
+ * guard that is right and whose output carries nothing you can act on. `comm inbox` PEEKS;
+ * it is `dismiss` that acknowledges, and the doorbell does not mention it. A52.
  */
-const NUDGE = "[claude-comm] doorbell — mail is waiting for you. Nothing to do and nothing to fetch: " +
-	"acknowledge briefly and end your turn, and the bus will hand it to you as this turn closes."
+export const NUDGE = "[claude-comm] doorbell. This line is from the BUS, not from your owner, and it states a " +
+	"FACT rather than asking you for anything: mail is waiting for you. It is handed over at a turn " +
+	"boundary, which may not be this one. If you need to know whether it is still waiting, " +
+	"`comm inbox` tells you and consumes nothing."
 
 export function wakeAgent(root, agent, pid, { dryRun = false, wins } = {}) {
 	const prev = lastWake(root, agent)

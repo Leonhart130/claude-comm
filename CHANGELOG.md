@@ -25,6 +25,27 @@ already have.
 
 
 
+
+## 2026-09-11.2 — bus print `bd50f8f4b3c7` — 2026-09-11
+
+*The doorbell stops telling you what to do, and a launched agent can be given its first turn.*
+
+- 🔴 **THE DOORBELL NO LONGER GIVES YOU AN INSTRUCTION, AND NO LONGER PROMISES ANYTHING.** The text that
+  shipped read *"acknowledge briefly and end your turn, and the bus will hand it to you as this turn
+  closes."* **Both halves were wrong.** It is typed into your INPUT — the channel your owner speaks in — so
+  *"end your turn"* reads as your owner saying it, and a disciplined agent obeys. And the promise holds only
+  at a clean turn boundary: when turns run together it never arrives, the mail sits, **and an agent that
+  read the promise does not re-check.** Reported by the `getajob` leader, whose report waited hours carrying
+  29 offers already written and five decisions waiting on him.
+  ⇒ The doorbell now states a fact, names the BUS as its source, and points at `comm inbox`, which peeks and
+  consumes nothing. **If you were relying on mail arriving "as this turn closes": don't. Check.**
+- 🟢 **`launch.mjs <agent> --prompt "<first turn>"`** — the launched session ACTS instead of sitting at its
+  prompt. Without it, a launched agent takes no turn at all while `comm who` reports it `running` and its
+  mail sits unread in its context; **the launcher now says so out loud every time you omit it.**
+- 🟢 `test/selftest.mjs` scrubs `CLAUDE_COMM_AGENT` like `test/attack.mjs` already did, and says when it
+  ignored one. Running it with that variable set — which is what our own instructions told you to do — made
+  it fail with `mail 1 -> 1` and no reason given.
+
 ## 2026-09-11.1 — bus print `8c961882cceb` — 2026-09-11
 
 *Launching an agent no longer costs you a window, and an agent can put its own away.*

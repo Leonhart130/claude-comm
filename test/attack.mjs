@@ -2964,6 +2964,203 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		`which is why the probe is detached${caller51 ? "" : " — THE ARM COULD NOT RUN: no kitty window for this suite"}`)
 }
 
+// A52 — the doorbell states a fact. It gives no conduct instruction and makes no promise.
+//
+// Reported by the `getajob` field leader, 2026-09-11, after paying for both halves. The
+// shipped text read "...acknowledge briefly and end your turn, and the bus will hand it to
+// you as this turn closes" -- sitting directly under a comment in wake.mjs asserting that
+// "the text asks for nothing at all". Nothing tested it: NUDGE appeared at its definition
+// and its use, in no arm, so the string and its own documentation disagreed for a release.
+//
+// 🔴 Why each half costs. The doorbell is typed into the session's INPUT, the same channel
+// the owner speaks in -- so an imperative there is obeyed as the owner's, and a disciplined
+// agent is the one most likely to obey it. And a promise of delivery "as this turn closes"
+// holds only at a CLEAN boundary; when turns run together it never arrives, and an agent
+// that read the promise does not re-check. His report sat for hours carrying 29 offers
+// already written and five decisions waiting on him.
+//
+// The POSITIVE CONTROL is the old text itself: every check below must FAIL on it. Without
+// that, these would pass for any string at all -- including an empty one.
+{
+	const { NUDGE } = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
+	const SHIPPED_AND_WRONG = "[claude-comm] doorbell — mail is waiting for you. Nothing to do and nothing to fetch: " +
+		"acknowledge briefly and end your turn, and the bus will hand it to you as this turn closes."
+
+	// ① no conduct instruction: nothing telling the reader to end, stop or wrap up a turn
+	const ordersConduct = (t) => /\b(end|finish|close|wrap up|stop)\b[^.]{0,24}\byour (turn|response|reply)\b/i.test(t) ||
+		/\backnowledge\b/i.test(t)
+	// ② no promise about what will happen to the mail on this turn
+	const promises = (t) => /\bwill (hand|deliver|give)\b/i.test(t) || /\bas this turn closes\b/i.test(t)
+	// ③ it says where it comes from, so it cannot be read as the owner speaking
+	const namesItsSource = (t) => /\bbus\b/i.test(t) && /\bnot from your owner\b/i.test(t)
+	// ④ it names something the reader can DO that does not consume the mail -- removing the
+	//    promise without this would be a guard whose output carries nothing actionable
+	const namesASafeVerb = (t) => /comm inbox/.test(t) && !/\bdismiss\b/.test(t)
+
+	const shippedOrders = ordersConduct(SHIPPED_AND_WRONG)
+	const shippedPromises = promises(SHIPPED_AND_WRONG)
+	const shippedNamesSource = namesItsSource(SHIPPED_AND_WRONG)
+
+	check("A52 the doorbell states a fact: no conduct instruction, no promise, and it says it is not the owner",
+		!ordersConduct(NUDGE) && !promises(NUDGE) && namesItsSource(NUDGE) && namesASafeVerb(NUDGE) &&
+		shippedOrders && shippedPromises && !shippedNamesSource,
+		`current text: orders conduct=${ordersConduct(NUDGE)}, promises delivery=${promises(NUDGE)}, ` +
+		`names the BUS as its source=${namesItsSource(NUDGE)}, names a verb that consumes nothing=${namesASafeVerb(NUDGE)}; ` +
+		`POSITIVE CONTROL, the text that shipped and cost two mornings -> orders conduct=${shippedOrders}, ` +
+		`promises=${shippedPromises}, names its source=${shippedNamesSource} ` +
+		`(if those three were not true-true-false these checks would pass for any string, an empty one included)`)
+}
+
+// A53 — a launched agent is GIVEN a first turn, or told plainly that it will not take one.
+//
+// Reported by the `getajob` field leader 2026-09-11, after it cost his owner two mornings
+// in a row: the launcher started `claude` with no arguments, so the session came up and sat
+// at its prompt. 🔴 **The failure does not look like a failure** -- window present, PATH
+// correct, mail delivered, `comm who` saying `running`, and zero work. It is STATUS item 5's
+// third state arriving by the front door.
+//
+// 🔴 The prompt is measured where it LANDS, not where it is printed: the launched process
+// writes its own argv to a file. A --print assertion would pass for a launcher that composed
+// the argument and dropped it, which is the defect one layer down.
+{
+	const r53 = mkdtempSync(join(tmpdir(), "comm-attack-prompt-"))
+	const opened53 = []
+	process.on("exit", () => {
+		for (const [sock, id] of opened53)
+			try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
+		try { rmSync(r53, { recursive: true, force: true }) } catch {}
+	})
+	mkdirSync(join(r53, ".comm", "bin"), { recursive: true })
+	mkdirSync(join(r53, "db"), { recursive: true })
+	writeFileSync(join(r53, ".comm", "config.json"),
+		JSON.stringify({ leader: "leader", agents: { leader: ".", db: "db" } }))
+	for (const f of ["comm.mjs", "launch.mjs", "wake.mjs", "session-registry.mjs", "close.mjs", "claim.mjs"])
+		cpSync(join(PKG, "bin", f), join(r53, ".comm", "bin", f))
+	const L53 = join(r53, ".comm", "bin", "launch.mjs")
+
+	// a `claude` that records what it was actually handed, then stays alive
+	const bin53 = join(r53, "fakebin")
+	mkdirSync(bin53, { recursive: true })
+	const argvFile = join(r53, "argv.json")
+	writeFileSync(join(bin53, "claude"),
+		`#!/bin/sh\nprintf '%s\\n' "$@" > ${JSON.stringify(argvFile)}\nexec sleep 120\n`, { mode: 0o755 })
+	const env53 = { ...process.env, PATH: `${bin53}${delimiter}${process.env.PATH}` }
+
+	// ① a bare --prompt is refused: it would launch exactly the inert session the flag exists to remove
+	const bare = spawnSync(process.execPath, [L53, "db", "--prompt"], { cwd: r53, encoding: "utf8", env: env53 })
+	const refusesBare = bare.status !== 0 && /needs text after it/.test(bare.stderr)
+
+	// ② WITHOUT a prompt the launcher must SAY SO. Silence here is the whole defect: the
+	//    launcher is the one place a reader is certainly looking when the session is born.
+	let warnsWhenSilent = false, quietId = null
+	const wk53 = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
+	const { sessionPid: sp53 } = await import(pathToFileURL(join(PKG, "bin", "session-registry.mjs")).href)
+	const cr53 = wk53.resolveWindow(sp53(), wk53.windows())
+	const caller53 = cr53.ok && cr53.how === "foreground process" ? cr53.win : null
+	if (caller53) {
+		const run = spawnSync(process.execPath, [L53, "db"], { cwd: r53, encoding: "utf8", env: env53 })
+		quietId = Number((run.stdout.match(/window: (\d+)/) || [])[1])
+		if (Number.isInteger(quietId) && quietId > 0) opened53.push([caller53.sock, quietId])
+		warnsWhenSilent = /NO --prompt/.test(run.stdout) && /take NO TURN/.test(run.stdout)
+	}
+
+	// ③ THE MEASUREMENT: the prompt reaches the launched PROCESS's argv.
+	let landed = false, ranWithPrompt = false
+	if (caller53) {
+		try { rmSync(argvFile, { force: true }) } catch {}
+		const TEXT = "read BRIEF-7.md and report to leader"
+		const run = spawnSync(process.execPath, [L53, "db", "--prompt", TEXT], { cwd: r53, encoding: "utf8", env: env53 })
+		ranWithPrompt = run.status === 0
+		const id = Number((run.stdout.match(/window: (\d+)/) || [])[1])
+		if (Number.isInteger(id) && id > 0) opened53.push([caller53.sock, id])
+		const until = Date.now() + 10000
+		while (Date.now() < until) {
+			if (existsSync(argvFile)) break
+			spawnSync(process.execPath, ["-e", "setTimeout(()=>{},200)"])
+		}
+		try { landed = readFileSync(argvFile, "utf8").split("\n").includes(TEXT) } catch {}
+	}
+
+	// ④ POSITIVE CONTROL: with no --prompt, that same file must come back with NO arguments.
+	//    Without this, ③ would pass for a launcher that always appended something.
+	let quietArgvEmpty = false
+	if (caller53) {
+		try { rmSync(argvFile, { force: true }) } catch {}
+		const run = spawnSync(process.execPath, [L53, "db"], { cwd: r53, encoding: "utf8", env: env53 })
+		const id = Number((run.stdout.match(/window: (\d+)/) || [])[1])
+		if (Number.isInteger(id) && id > 0) opened53.push([caller53.sock, id])
+		const until = Date.now() + 10000
+		while (Date.now() < until) {
+			if (existsSync(argvFile)) break
+			spawnSync(process.execPath, ["-e", "setTimeout(()=>{},200)"])
+		}
+		try { quietArgvEmpty = readFileSync(argvFile, "utf8").trim() === "" } catch {}
+	}
+
+	check("A53 a launched agent is given a first turn, or told plainly that it will take none",
+		refusesBare && !!caller53 && warnsWhenSilent && ranWithPrompt && landed && quietArgvEmpty,
+		`a bare --prompt -> REFUSED=${refusesBare}; ` +
+		`launched with no prompt -> the launcher NAMES the consequence=${warnsWhenSilent} ` +
+		`(silence here is the failure that does not look like one); ` +
+		`--prompt reaches the launched PROCESS's own argv=${landed} (read from the child, not from --print); ` +
+		`positive control, the same child launched with no prompt receives NO arguments=${quietArgvEmpty} ` +
+		`(without it the line above would pass for a launcher that always appends something)` +
+		`${caller53 ? "" : " — THE ARM COULD NOT RUN: no kitty window for this suite"}`)
+}
+
+// A54 — EVERY control suite scrubs the operator's identity, not just the one that was bitten.
+//
+// 🔴 Review #9 C1 (2026-09-10) found that bin/launch.mjs injects CLAUDE_COMM_AGENT into every
+// session it starts, and that a suite inheriting it measures the operator's world instead of
+// its own. The fix was applied HERE and not to test/selftest.mjs -- the suite that spawns REAL
+// `claude -p` sessions, and therefore the one where the leak does the most damage: the child
+// answers as the operator's agent instead of as the fixture's, and mail addressed to the
+// fixture is never its mail.
+//
+// ⚠️ Measured 2026-09-11: STATUS.md ▶ NEXT 1 tells the operator to run the controls WITH the
+// variable set, so following this repo's own written instruction made selftest fail twice with
+// `mail 1 -> 1` and no explanation, while the same run unset was green. **A half-applied fix
+// is the shape review #9 found in review #8's fixes, reproduced one file over.**
+//
+// 🔴 This arm is TEXTUAL and says so. It cannot run selftest (real sessions, minutes), so it
+// asserts the invariant at the source: the scrub exists, and it happens BEFORE the suite
+// spawns anything. That catches the two regressions that actually happened -- the line missing,
+// and a scrub added after the spawns -- and would not catch a scrub that runs but is undone
+// later. The positive control is the same source with the line removed.
+{
+	const SUITES = ["attack.mjs", "selftest.mjs"]
+	// 🔴 ANCHORED TO THE START OF A LINE, and that is not fussiness. The first version of this
+	// arm used an unanchored regex and stayed GREEN when the scrub was COMMENTED OUT -- it
+	// matched `// delete process.env.CLAUDE_COMM_AGENT` exactly as happily as the real line.
+	// Found by running this arm's own red proof, which is the only reason it is not still
+	// wrong: the arm reddened for nothing at all. Sixth instance of CLAUDE.md's amendment, in
+	// the arm written to catch the fifth.
+	const SCRUB = /^[ \t]*delete[ \t]+process\.env\.CLAUDE_COMM_AGENT/m
+	// the first thing either suite does that a child could inherit from
+	const FIRST_SPAWN = /\b(spawnSync|execFileSync|spawn)\s*\(/
+	const verdicts = SUITES.map((f) => {
+		const src = readFileSync(join(PKG, "test", f), "utf8")
+		const m = SCRUB.exec(src)
+		const sp = FIRST_SPAWN.exec(src)
+		return { f, has: !!m, beforeSpawn: !!m && (!sp || m.index < sp.index) }
+	})
+	const allScrub = verdicts.every((v) => v.has && v.beforeSpawn)
+
+	// POSITIVE CONTROL: strip the line from a copy of each suite and the same test must fail.
+	// Without it this passes for a regex that matches anything, an empty file included.
+	const controlFails = SUITES.every((f) => {
+		const src = readFileSync(join(PKG, "test", f), "utf8").replace(SCRUB, "/* removed */")
+		return !SCRUB.test(src)
+	})
+
+	check("A54 every control suite scrubs the operator's identity before it spawns anything",
+		allScrub && controlFails,
+		verdicts.map((v) => `${v.f}: scrubs=${v.has}, before the first spawn=${v.beforeSpawn}`).join("; ") +
+		`; positive control, the same sources with the line removed stop matching=${controlFails} ` +
+		`(textual by necessity — selftest spawns real sessions and cannot run inside this gate; ` +
+		`it catches the line going missing and the line moving after the spawns, which are the two that happened)`)
+}
+
 console.log(`\n${failed ? `✗ ${failed} adversarial check(s) FAILED` : "✓ all adversarial checks passed"}`)
 rmSync(root, { recursive: true, force: true })
 process.exit(failed ? 1 : 0)

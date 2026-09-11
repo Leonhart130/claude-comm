@@ -2073,3 +2073,120 @@ property in its own title.* Both defects above were found by asking that questio
   product). **What no arm has seen is a real agent invoking `close.mjs` at the end of real work** — whether
   it runs it at all, and whether it runs it before or after writing its report. That is a BEHAVIOUR
   question, it belongs to `test/selftest.mjs`, and it has not been asked.
+
+
+## `#doorbell-text` — the doorbell gave an order and made a promise, and its own comment denied both
+
+**2026-09-11, reported by the `getajob` field leader, who paid for it twice.** The text `bin/wake.mjs`
+typed into a woken session read:
+
+> *"…Nothing to do and nothing to fetch: acknowledge briefly and end your turn, and the bus will hand it to
+> you as this turn closes."*
+
+**It asked for two things and promised a third — directly beneath a comment in the same file asserting that
+"the text asks for nothing at all".** 🔴 **And nothing tested it:** `NUDGE` appeared at its definition and
+at its use, in no arm. A string and its own documentation disagreed for a whole release, in a file whose
+header is five numbered rules about exactly this kind of care.
+
+### 🔴 1. A CONDUCT INSTRUCTION ARRIVING IN THE OWNER'S CHANNEL
+
+The doorbell is typed into the session's **input** — the same channel the human speaks in. *"acknowledge
+briefly and end your turn"* is indistinguishable from the owner saying so, and **a well-disciplined agent
+obeys its owner**. He obeyed it twice, without judgement, exactly as an agent should.
+⭐ **The text was exploiting the discipline that makes an agent useful.** That is the part worth keeping:
+the failure mode of a well-behaved agent is that anything shaped like an instruction from its principal
+gets executed, so **anything a tool types into that channel must be shaped as a fact.**
+
+### 🔴 2. A PROMISE THE BUS CANNOT KEEP
+
+*"the bus will hand it to you as this turn closes"* is true only at a CLEAN turn boundary. When turns run
+together — the owner speaks, another doorbell lands mid-turn — that boundary never arrives and the mail
+sits. His report waited hours. It carried **29 offers already written to a database and five decisions
+waiting on him: work already done that he did not know he had.**
+
+⭐ **His sentence, and it is the whole finding: *an unkept promise is worse than silence, because it excuses
+the reader from checking.*** ⚠️ And removing the promise without naming a way to check would have been this
+project's own signature defect — a guard that is right and whose output carries nothing you can act on — so
+the text now names `comm inbox`, which PEEKS. It is `dismiss` that acknowledges, and the doorbell does not
+mention it. **Armed as A52, with the shipped text as the positive control: every check must FAIL on it, or
+they would pass for any string including an empty one.**
+
+⇒ **The general rule this leaves, and it is wider than the doorbell:** every path that writes into a
+session's input channel — `wake.mjs`, `exchange-bell.mjs`, any future one — is writing where the owner
+writes. **It may state facts and carry pointers. It may not instruct, and it may not promise anything it
+does not itself perform.** `exchange-bell.mjs` already obeys the second half by construction (its text is
+fixed and carries only a path it has just confirmed exists); it had never been asked about the first.
+
+### 🔴 `who` says "running" for a session that has taken no turn and for one that is working
+
+**Measured by the field, same day**, after it nearly cost him two live sessions he was about to kill:
+
+| | cumulative CPU | elapsed |
+| --- | --- | --- |
+| a session genuinely at rest | **1 s** | 1 h 10 |
+| a session that has just taken its turn | **21 s** | 2 min 51 |
+
+⚠️ **He first counted MODIFIED FILES and got zero after 151 s** — because an agent READS for minutes before
+it writes anything. *"0 files changed"* does not separate *at rest* from *reading*: **two opposite states
+under one output**, which is the shape this repo keeps finding. 🟢 **Cumulative CPU separates them and the
+gap is not subtle — 21× in a twentieth of the elapsed time.**
+
+⇒ This is a **fourth** state for STATUS open item 5, and the cheapest covariate anyone has proposed for it:
+`who` already reads `/proc` for liveness, and `/proc/<pid>/stat` carries the CPU time in the same read.
+🔴 **Not built, and not to be built by guessing a threshold** — the two numbers above are one sample each.
+
+
+## `#one-suite-hardened` — the fix went into one control suite, and the repo's own instruction broke the other
+
+**2026-09-11.** Review #9 C1 found on 2026-09-10 that `bin/launch.mjs` injects `CLAUDE_COMM_AGENT` into
+every session it starts, so a control suite inheriting it measures the operator's world instead of its own.
+**The fix — one `delete process.env.CLAUDE_COMM_AGENT` — went into `test/attack.mjs` and never into
+`test/selftest.mjs`.**
+
+🔴 **And selftest is the suite where the leak does the most damage**, because it is the one that spawns REAL
+sessions: `runAgent` starts `claude -p` inside `app/`, the child inherits the variable, and that session
+then answers as the OPERATOR's agent instead of as `app`. Mail addressed to `app` is not its mail, and the
+turn boundary delivers nothing.
+
+⚠️ **It is not a latent hazard. `STATUS.md` ▶ NEXT 1 instructs the operator to run the controls WITH the
+variable set** — correctly, for `attack`. So **following this repo's own written instruction made this suite
+fail**, twice, reporting `mail 1 -> 1` with no cause given:
+
+| `CLAUDE_COMM_AGENT` | result |
+| --- | --- |
+| `=leader` (what ▶ NEXT 1 says to set) | ✗ FAILED, twice — `mail 1 -> 1`, nothing logged |
+| unset | ✓ green — `mail 1 -> 0, via=hook` |
+
+⭐ **Triage order matters here and this is the one that was followed:** the suite was NOT suspected first.
+The delivery path was reproduced by hand — send, a real `claude -p`, `1 -> 0`, `via: "hook"`, correct ref —
+and a second cycle in the same project, both green. **Only a control that green-lights the code it measures
+earns the right to be doubted itself.** ⇒ `FINDINGS.md#A20`'s rule, applied in the direction it is usually
+not: the gate reddened, the world had changed, and the change was in the gate's own environment.
+
+🟢 **Fixed, and the scrub is ANNOUNCED rather than silent:** a suite that quietly ignores a variable the
+operator set on purpose leaves them believing it applied. It now prints
+`⚠ CLAUDE_COMM_AGENT=<x> was set and has been IGNORED for this run`. Verified end to end: with the variable
+set, selftest is green and prints that line.
+
+### 🔴 And the arm written to catch it was green over its own red proof
+
+`A54` asserts both suites scrub the variable before they spawn anything. Its first detector was
+`/delete\s+process\.env\.CLAUDE_COMM_AGENT/` — **unanchored, so it matched the line COMMENTED OUT exactly as
+happily as the real one.** The red proof removed the scrub from `selftest.mjs` by commenting it, and A54
+reported `scrubs=true` and stayed green.
+
+⇒ **Sixth instance of CLAUDE.md's 2026-09-04 amendment, inside the arm written to record the fifth**, and it
+was caught only because the red proof was actually run rather than assumed. The detector is now anchored to
+the start of a line. ⚠️ **The arm is TEXTUAL and says so in its own output**: it cannot run `selftest` (real
+sessions, minutes), so it checks the invariant at the source. It catches the line going missing and the line
+moving after the spawns — the two regressions that actually happened — and would not catch a scrub that runs
+and is undone afterwards.
+
+### The general form, which is the part worth keeping
+
+**A fix applied to one member of a family is not a fix; it is a fix and a new asymmetry.** Review #9 found
+exactly this shape in review #8's fixes — *"two were half-done"* — and this is the same shape one file over,
+committed by the session that read that sentence. ⇒ **when a guard is added because a class of tool was
+found vulnerable, the next question is which OTHER members of that class exist**, and the answer belongs in
+an arm that names them all. A54 names both suites; a third suite would have to be added to it by hand, and
+that is the weakness it ships with.
