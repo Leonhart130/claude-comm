@@ -114,9 +114,16 @@ const NO_PROMPT_WARNING =
 	`    turn with --prompt, or type into the window yourself.`
 const pi = process.argv.indexOf("--prompt")
 const prompt = pi > -1 ? process.argv[pi + 1] : null
-if (pi > -1 && (prompt === undefined || prompt.startsWith("--")))
-	die(`--prompt needs text after it. A bare --prompt would launch a session that takes no turn,\n` +
-	    `  which is the exact failure the flag exists to remove.`)
+// 🔴 ONE dash, not two. Review #10 A3: the guard was `startsWith("--")` and a single dash walked
+// through it — and the realistic shape is not an attack, it is a MARKDOWN BULLET. A leader
+// composing a first turn from its notes writes `--prompt "- read REVIEW-10.md first"`, and
+// `claude -p` is print mode: the session answers once and exits, which is precisely the
+// "takes no turn" failure this flag exists to remove, arriving through the flag itself.
+if (pi > -1 && (prompt === undefined || prompt.startsWith("-")))
+	die(`--prompt needs TEXT after it, and text that does not begin with "-".\n` +
+	    `  ${prompt === undefined ? "A bare --prompt" : `A prompt starting with "-" is read by claude as a FLAG (\`-p\` is print mode), so it`}\n` +
+	    `  would launch a session that takes no turn — the exact failure this flag exists to remove.\n` +
+	    `  If you meant a bullet, drop the leading "- " or start with the word.`)
 if (!agent || agent.startsWith("--")) die(`usage: launch.mjs <agent> [--prompt "<first turn>"] [--print] [--os-window]\n` +
 	`  default: a pane in the CURRENT tab. --os-window opens a separate OS window instead.\n` +
 	`  --prompt is what makes the new session TAKE A TURN. Without it, it sits at its prompt\n` +
@@ -172,9 +179,20 @@ const argv = ["@", "launch", `--type=${osWindow ? "os-window" : "window"}`, "--k
 	`--env=PATH=${childPath}`, `--env=CLAUDE_COMM_AGENT=${agent}`, claudeBin,
 	...(prompt ? [prompt] : [])]
 
+const wake = await import(new URL("wake.mjs", import.meta.url))
+const { sessionPid } = await import(new URL("session-registry.mjs", import.meta.url))
+const before = wake.windows()
+const mine = wake.resolveWindow(sessionPid(), before)
+const myTab = mine.ok && mine.how === "foreground process" ? mine.win : null
+if (!osWindow && myTab) argv.splice(2, 0, "--match", `window_id:${myTab.id}`)
+if (myTab) argv.splice(1, 0, "--to", `unix:${myTab.sock}`)
+
 if (printOnly) {
 	// Same resolution, same refusals, same argv — only the spawn is skipped, so a
 	// control that uses it travels the code the real launch travels.
+	// 🔴 INCLUDING THE PLACEMENT FLAGS. They used to be spliced in BELOW this exit, so
+	// `--print` showed an argv the real launch never used — the same "the checking mode is
+	// quieter than the thing it checks" defect A53 exists to forbid, one flag-pair over.
 	console.log(JSON.stringify({ agent, cwd, node: nodeBin, claude: claudeBin, path: childPath, argv,
 		type: osWindow ? "os-window" : "window", prompt }, null, 2))
 	// 🔴 THE WARNING BELONGS HERE TOO. Reported by the `getajob` field leader 2026-09-11:
@@ -193,11 +211,6 @@ if (printOnly) {
 // A launcher run from outside any kitty window resolves nothing here, which is not an
 // error — it just means there is no current tab to compare against, and the check below
 // says so rather than inventing one.
-const wake = await import(new URL("wake.mjs", import.meta.url))
-const { sessionPid } = await import(new URL("session-registry.mjs", import.meta.url))
-const before = wake.windows()
-const mine = wake.resolveWindow(sessionPid(), before)
-const myTab = mine.ok && mine.how === "foreground process" ? mine.win : null
 
 // 🔴 SPLIT BESIDE THE CALLER, NOT INTO "THE ACTIVE TAB". `kitten @ launch --type=window`
 // targets whichever tab is ACTIVE, and that is not necessarily the caller's: measured
@@ -208,7 +221,11 @@ const myTab = mine.ok && mine.how === "foreground process" ? mine.win : null
 // `--match window_id:<caller>` names the tab by a window we resolved ourselves. Omitted
 // when there is no caller window: there is then no "beside" to mean, and kitty's default
 // is the honest fallback.
-if (!osWindow && myTab) argv.splice(2, 0, "--match", `window_id:${myTab.id}`)
+// 🔴 NAME THE INSTANCE. Review #10 A2: the caller is resolved across EVERY socket (wake.mjs
+// rule 3) and this was the only kitty call in the repo that then trusted the ambient
+// $KITTY_LISTEN_ON — `set-user-vars` two lines below passes --to, so does close.mjs, so does
+// wake.mjs. When the two disagree, `--match window_id:` names a window the target instance
+// has never heard of.
 const r = spawnSync("kitten", argv, { encoding: "utf8" })
 if (r.status !== 0) die(`kitten @ launch failed (exit ${r.status}): ${(r.stderr || "").trim()}`)
 
