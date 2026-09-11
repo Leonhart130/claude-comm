@@ -2414,3 +2414,31 @@ reviewer running its own controls to collide with the leader's.
 ⭐ The honest instrument for this already exists in this repo and is not being used by its own tests:
 `bin/claim.mjs`. It advises rather than blocks, which is enough to make the collision diagnosable instead of
 mysterious — and the author being exempt from his own tool is `LESSONS.md` form **A**, for the second time.
+
+
+## `#doorbell-shares-the-human-s-line` — a wake landed inside a command the owner was typing
+
+**2026-09-11, reported by the `getajob` field leader, who explicitly declined to attribute it to me.** It is
+mine. `bin/wake.mjs` types into a window's INPUT, and that input is shared with the human: while the owner
+was typing a command, the doorbell text was spliced into his line —
+`…db/jeu-essai.mjs[claude-comm]` — and the shell refused it with `no matches found`.
+
+🟢 **Nothing ran and the refusal was loud.** ⚠️ **That was luck, not a guard.**
+
+🔴 **It cannot be cleanly fixed, so it is recorded as a LIMIT rather than a bug awaiting a patch.** The
+mechanism is to write into the only input channel a session has, and the human writes into the same one.
+There is no side to put the bell on. `wake.mjs`'s five rules cover resolution, rate limiting and substance;
+**none of them covers the fact that the channel has two writers.**
+
+⇒ **The implication nobody had written down: a wake can land in the middle of a half-typed command, so the
+doorbell text must be HARMLESS when pasted into arbitrary input.** The current text opens with
+`[claude-comm]` in brackets — which is exactly what made the shell's glob fail, loudly, instead of the text
+being swallowed into a running command. ⭐ **Accidentally the right property.** It is written here so it
+stops being accidental: **anything that types into a session's input must be inert if it is read by a
+shell.** That is now a second constraint on that text, alongside the two from `#doorbell-text` (state a
+fact, promise nothing).
+
+⚠️ **NOT verified:** whether a leading `[` is reliably inert across shells (this box is zsh with
+`no_nomatch` behaviour producing a refusal; bash without `failglob` would pass the token through to the
+command). **One shell, one instance.** Do not generalise it into a rule until it has been measured
+somewhere else.
