@@ -26,6 +26,27 @@ already have.
 
 
 
+
+## 2026-09-11.3 — bus print `fdb5b70f43b4` — 2026-09-11
+
+*The delivery notice now tells you how big the file is that the note is standing in front of.*
+
+- 🔴 **A GOOD NOTE MAKES YOU SKIP THE FILE, and that is measured, not theorised.** A field leader closed an
+  expert's round citing a 240-character note without opening the report; **the file's next sentence reversed
+  his decision.** Twice in three hours, and his owner spotted it both times. ⭐ His formulation:
+  *a faithful summary placed in front of a source does not save time — it makes the source disappear, and
+  the better the summary, the more completely.*
+- 🟢 **So the notice now sizes what you are not reading**, on the line you were already going to read:
+
+  ```
+      read: docs/RAPPORT.md   (relative to you) — 488 lines, 10.4 KB, written just now
+      sender's note (103 chars, NOT the artifact): "12 of 64 controls ran on PRODUCTION …"
+  ```
+
+  **Nothing is forbidden and nothing is stored.** The gap is simply in front of you at the moment you decide.
+- ⚠️ **A ref that cannot be read says so** — `COULD NOT BE READ (ENOENT) — which is not the same as empty` —
+  and the message is still delivered and still drained. Silence there would render exactly like a small file.
+
 ## 2026-09-11.2 — bus print `bd50f8f4b3c7` — 2026-09-11
 
 *The doorbell stops telling you what to do, and a launched agent can be given its first turn.*

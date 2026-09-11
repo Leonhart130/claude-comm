@@ -2190,3 +2190,83 @@ committed by the session that read that sentence. ⇒ **when a guard is added be
 found vulnerable, the next question is which OTHER members of that class exist**, and the answer belongs in
 an arm that names them all. A54 names both suites; a third suite would have to be added to it by hand, and
 that is the weakness it ships with.
+
+
+## `#note-eats-the-file` — the better the note, the more completely it replaces the file
+
+**2026-09-11, reported by the `getajob` field leader, measured on himself twice in three hours.** The rule
+it defeats is this project's first one and he knew it by heart: *a message may only ever point at a file;
+the file is the artifact.* **Knowing it did not hold him.**
+
+An expert delivered a report and rang. The `--note` was 240 characters, dense and accurate — written by
+someone who had just done the work. He wrote a decision closing that expert's round, citing the note's three
+numbers, **without opening the file.** The file's next sentence reversed the decision: he was asking for a
+pass on an EMPTY database believing emptiness was the opportunity, and the report said *an `update` over 0
+rows SUCCEEDS: the control would LIE.* ⭐ **He had the right verdict and the wrong reason, and had passed it
+to his owner.** It was the owner who noticed, both times, not him.
+
+### Why the format invites it, which is the part that is ours
+
+| | |
+| --- | --- |
+| **The note is FREE** | it is already in context at delivery. The file costs a tool call |
+| **The note is GOOD** | 240 dense characters from someone who just did the work. **A bad note sends you to the file; a good note keeps you** |
+| **Nothing separates the two states** | what you produce after reading the note and after reading the file has the same shape |
+| **And our duplicate guard pushes the same way** | it refuses a sender who points at content the recipient has already read — correctly. **But it watches only the SENDER. Nobody watches the RECEIVER** |
+
+⭐ **The general form, and it is not specific to this bus:** *a faithful summary placed in front of a source
+does not save time — it makes the source disappear, and the better the summary, the more completely.*
+
+### 🟢 What was built, and why the cheapest option was the right one
+
+**The delivery notice now sizes the file the note stands in front of** (A55):
+
+```
+    read: docs/RAPPORT.md   (relative to you) — 488 lines, 10.4 KB, written just now
+    sender's note (103 chars, NOT the artifact): "12 of 64 controls ran on PRODUCTION …"
+```
+
+**It forbids nothing and stores nothing.** It puts the gap in front of the reader *at the moment of the
+temptation* — 488 lines against 103 characters — which is the only place the decision is actually taken.
+⚠️ **An unreadable ref SAYS SO** (`COULD NOT BE READ (ENOENT) — which is not the same as empty`), because
+silence there renders identically to a small file: the same *"nothing held" vs "I could not look"*
+collision the same field reported on 09-10.
+
+🔴 **And it cost more than two lines, which is worth recording.** The added text is per-message framing, so
+it moved A2's orientation budget: 7320 → over, at the documented maxima. **The fix was not to raise the
+budget** but to merge the size onto the `read:` line, and then to account for the genuinely new framing in
+`SCAFFOLD` — the constant that exists for exactly that — while leaving `CEILING` untouched. ⚠️ **The same
+render is now 7535 of a hard 8000: the documented maxima clear the absolute limit by 465 characters and not
+much more.** And `bin/comm.mjs` is 47 864 B of A22's 48 000. **Both say the same thing: the next addition
+here is a split, not an addition.**
+
+### 🔴 The arm cannot cover the worst case, and says so
+
+`refSize` touches the filesystem on **every delivery**, which puts a nonexistent ref on the delivery path
+for the first time. The `try/catch` is therefore load-bearing, and proving it is where the red proof stopped
+being routine: with the catch replaced by `throw e`, the suite did not redden — **it HUNG.** `renderNudge`
+throws, and `bin/comm.mjs`'s deliberate render-before-drain ordering (which exists so a render exception
+cannot destroy the message) means the inbox is never drained, so an earlier arm's `while (count("app"))
+fire()` spins forever.
+
+⚠️ **So A55's positive control covers a `refSize` that returns junk, and NOT one that throws** — the check
+is never reached. That is recorded in the arm's own output rather than left for a reader to discover, and it
+is a cousin of review #9's *"a guard that never ran when the suite aborted"*: here the suite does not abort,
+it stops. 🔴 **The unbounded `while (count) fire()` loops are the real weakness**, and they predate this
+change: any render exception turns any of them into a hang. Not fixed here, and named as open.
+
+### 🔴 Not built, and the one worth building next
+
+His owner proposed message statuses. ⚠️ **The status already exists — `pending` → `dismissed`, logged, never
+erased — and it LIED:** he dismissed a message whose ref he had not opened. **A status set by the recipient
+records their BELIEF, not a fact.**
+
+⭐ **The form that would carry something: `dismiss --citing "<phrase>"`, refusing when the phrase is not in
+the ref.** The recipient cannot produce the proof without having opened the file. **It is not a read
+receipt** — nothing is consumed, nothing is observed from outside, no state is added that another session
+could race — **the closing gesture simply carries its own evidence.** That is why it does not collide with
+this project's refusal of consumable signals. He has built it in his own tree (`fermer-tour.sh`, three
+controls: a real sentence accepted, a fabricated one refused, **a sentence taken from the bell's note
+refused** — the last is the one that matters) and says it belongs in the bus rather than his repo.
+**Open design questions before it ships:** whitespace and line-wrap normalisation, what it does for a
+non-text ref, and whether a refusal blocks the dismissal or only annotates it.

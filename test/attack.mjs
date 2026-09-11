@@ -211,7 +211,16 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 	const { reason } = fire()
 	// Per-message scaffolding scales with MAX_RENDER, so it belongs INSIDE the
 	// multiplication — a flat frame allowance was itself a fitted number.
-	const SCAFFOLD = 200 // "• from … at <ts>", "read: …", the note label
+	// "• from … at <ts>", "read: … (relative to you) — <size>", the note label.
+	// 🔴 Raised 200 -> 230 on 2026-09-11 when the read line gained its size clause (A55),
+	// and this is NOT the tautology the note below warns about. That warning is about
+	// ATTACKER-controlled growth: raise MAX_NOTE or MAX_REF and a derived budget rises to
+	// meet it, so the gate can never fail. SCAFFOLD is the TOOL's own framing — fixed text,
+	// bounded at ~45 chars for the size clause whatever the file — and accounting for it
+	// here is the honest bookkeeping this constant exists to do. ⚠️ CEILING is untouched,
+	// which is the guard that actually holds: the same render is 7535 of 8000, so the
+	// documented maxima now clear the absolute limit by 465 chars and not much more.
+	const SCAFFOLD = 230
 	const FRAME = 600    // header + trailer, fixed
 	const budget = MAX_RENDER * (MAX_NOTE + MAX_REF + SCAFFOLD) + FRAME
 	// ⚠️ A DERIVED BUDGET ALONE IS ANOTHER TAUTOLOGY, and importing the constants
@@ -309,7 +318,12 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 	const lines = reason.split("\n")
 	const forged = lines.some((l) => l.trim().startsWith("[SYSTEM]"))
 	const onOwnLine = lines.filter((l) => l.includes("[SYSTEM]")).length === 1
-	const quoted = lines.some((l) => l.trim().startsWith("sender's one-line description:") && l.includes("[SYSTEM]"))
+	// The label changed with A55 ("sender's one-line description:" -> "sender's note (N chars,
+	// NOT the artifact):"), and A8 caught it by going red — which is the right outcome: this
+	// arm asserts the note is CONFINED to its own labelled line, so it has to know that line
+	// when it sees it. Matched on the stable prefix, not the whole label, so the char count
+	// inside the parentheses does not re-break it.
+	const quoted = lines.some((l) => l.trim().startsWith("sender's note (") && l.includes("[SYSTEM]"))
 	check("A8 note cannot forge structure", !forged && onOwnLine && quoted, `forged directive line=${forged}, confined+quoted=${quoted}`)
 }
 
@@ -3159,6 +3173,68 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		`; positive control, the same sources with the line removed stop matching=${controlFails} ` +
 		`(textual by necessity — selftest spawns real sessions and cannot run inside this gate; ` +
 		`it catches the line going missing and the line moving after the spawns, which are the two that happened)`)
+}
+
+// A55 — the delivery notice shows the SIZE of the file the note is standing in front of.
+//
+// Reported by the `getajob` leader 2026-09-11, measured on himself twice in three hours:
+// an expert's 240-character note was good, dense, and already in his context, while the
+// file cost a tool call. He closed a round citing the note's three numbers -- and the file's
+// next sentence reversed his decision. ⭐ His formulation is the finding: **a faithful
+// summary placed in front of a source does not save time, it makes the source disappear,
+// and the better the summary the more completely.**
+//
+// 🔴 This forbids nothing and adds no state. It puts the gap in front of the reader at the
+// moment of the temptation -- 488 lines beside 103 characters.
+//
+// 🔴 And an unreadable ref must SAY SO. Silence there renders identically to a small file,
+// which is the "no claim / could not look" collision the same field reported on 09-10.
+{
+	const r55 = mkdtempSync(join(tmpdir(), "comm-attack-size-"))
+	process.on("exit", () => { try { rmSync(r55, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(r55, "app", "docs"), { recursive: true })
+	mkdirSync(join(r55, ".comm", "inbox"), { recursive: true })
+	writeFileSync(join(r55, ".comm", "config.json"),
+		JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app" } }))
+	execFileSync("node", [join(PKG, "install.mjs"), r55], { stdio: "pipe" })
+	const bus55 = join(r55, ".comm", "bin", "comm.mjs")
+	const big = "# REVIEW\n" + Array.from({ length: 487 }, (_, i) => `line ${i} content`).join("\n")
+	writeFileSync(join(r55, "app", "docs", "REVIEW.md"), big)
+	const NOTE = "12 of 64 controls ran on PRODUCTION (0 red, 0 writes)"
+	const fire = () => {
+		const h = spawnSync("node", [join(r55, "app", ".claude", "comm-hook.mjs"), "stop"], {
+			cwd: join(r55, "app"), encoding: "utf8",
+			input: JSON.stringify({ cwd: join(r55, "app"), hook_event_name: "Stop", stop_hook_active: false }) })
+		try { return JSON.parse(h.stdout).reason || "" } catch { return "" }
+	}
+
+	// ① the present file: lines AND the note's own length, so the asymmetry is visible
+	spawnSync("node", [bus55, "send", "app", "--from", "leader", "--ref", "docs/REVIEW.md", "--note", NOTE],
+		{ cwd: r55, encoding: "utf8" })
+	const shown = fire()
+	const namesLines = shown.includes("(relative to you) — 488 lines,")
+	const namesNoteLen = shown.includes(`sender's note (${NOTE.length} chars, NOT the artifact)`)
+
+	// ② THE UNREADABLE REF SAYS SO. Same message, file removed — one variable.
+	spawnSync("node", [bus55, "send", "app", "--from", "leader", "--ref", "docs/REVIEW.md", "--note", "second"],
+		{ cwd: r55, encoding: "utf8" })
+	rmSync(join(r55, "app", "docs", "REVIEW.md"), { force: true })
+	const missing = fire()
+	const saysUnreadable = /COULD NOT BE READ \(ENOENT\)/.test(missing) && /not the same as empty/.test(missing)
+	// POSITIVE CONTROL: the notice still delivered -- an unreadable ref must not cost the
+	// message. Without this, a refSize() that threw would pass ② by killing the delivery.
+	const stillDelivered = /message arrived for 'app'/.test(missing) &&
+		readdirSync(join(r55, ".comm", "inbox", "app")).filter((f) => f.endsWith(".json")).length === 0
+
+	check("A55 the delivery notice sizes the file the note stands in front of, and says when it cannot",
+		namesLines && namesNoteLen && saysUnreadable && stillDelivered,
+		`a 488-line ref -> named as lines=${namesLines}, and the note's own length shown beside it=${namesNoteLen} ` +
+		`(the gap is the point: 488 lines against ${NOTE.length} chars); ` +
+		`the same ref REMOVED -> says COULD NOT BE READ and that this differs from empty=${saysUnreadable}; ` +
+		`positive control, that delivery still happened and the inbox still drained=${stillDelivered} ` +
+		`(it covers a refSize() that returns junk; it does NOT cover one that THROWS — measured 2026-09-11, ` +
+		`that HANGS the suite in an earlier arm's "while (count) fire()" rather than reddening here, ` +
+		`because render-before-drain then never drains. The throw case is guarded by the try/catch, not by this arm)`)
 }
 
 console.log(`\n${failed ? `✗ ${failed} adversarial check(s) FAILED` : "✓ all adversarial checks passed"}`)

@@ -374,6 +374,19 @@ function pending(root, agent) {
  * instruction. Notes are re-sanitised here (defence in depth) and the batch is
  * capped so a flood cannot consume the recipient's orientation budget.
  */
+/** How big is what the note stands in front of? Never throws; an unreadable ref is
+ *  REPORTED, because "nothing said" reads as "nothing there". */
+function refSize(root, cfg, m) {
+	try {
+		const p = join(root, cfg.agents[m.to_agent || m.to] ?? ".", refForRecipient(root, cfg, m))
+		const st = statSync(p)
+		const mins = Math.round((Date.now() - st.mtimeMs) / 60000)
+		const age = mins < 1 ? "just now" : mins < 90 ? `${mins} min ago` : `${Math.round(mins / 60)} h ago`
+		const lc = st.size < 1_000_000 ? `${readFileSync(p, "utf8").split("\n").length} lines, ` : ""
+		return `${lc}${Math.round(st.size / 102.4) / 10} KB, written ${age}`
+	} catch (e) { return `COULD NOT BE READ (${e.code || e.message}) — which is not the same as empty` }
+}
+
 function renderNudge(root, cfg, msgs, me, quarantined = 0, event = "stop") {
 	const shown = msgs.slice(0, MAX_RENDER)
 	const hidden = msgs.length - shown.length
@@ -390,9 +403,14 @@ function renderNudge(root, cfg, msgs, me, quarantined = 0, event = "stop") {
 	]
 	for (const m of shown) {
 		lines.push(`  • from '${String(m.from).slice(0, 40)}' (${KINDS[m.kind] ? `${m.kind} — ${KINDS[m.kind]}` : "unknown kind"}) at ${m.ts}`)
-		lines.push(`    read: ${safeRef(refForRecipient(root, cfg, m))}   (relative to your own directory)`)
+		lines.push(`    read: ${safeRef(refForRecipient(root, cfg, m))}   (relative to you) — ${refSize(root, cfg, m)}`)
+		// THE SIZE OF WHAT YOU ARE NOT READING. The note is free, the file costs a tool
+		// call, so a faithful summary makes the source disappear — the better it is, the
+		// more completely. Twice in three hours on one field leader, and the file's next
+		// sentence reversed the decision he had just written from the note. Forbids
+		// nothing: it puts the gap in front of the reader. FINDINGS.md#note-eats-the-file
 		const note = sanitizeNote(m.note)
-		if (note) lines.push(`    sender's one-line description: ${JSON.stringify(note)}`)
+		if (note) lines.push(`    sender's note (${note.length} chars, NOT the artifact): ${JSON.stringify(note)}`)
 	}
 	if (hidden > 0) lines.push(`  • …and ${hidden} more — run: node .comm/bin/comm.mjs inbox`)
 	if (quarantined > 0) {
