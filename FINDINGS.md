@@ -2294,8 +2294,13 @@ module on that list is then checked by the SAME rules, transitively.** A daemon 
 importing anything that happens to sit beside the bus, which is a door, not a split.
 🟢 **A22 now checks EVERY module and prints the total**, so splitting cannot become a way to stop being
 measured: the property is that a person can read the bus, and a second file is a second sitting.
-🔴 **The two lists cannot drift apart silently**: a third module that is not on the list makes `comm.mjs`'s
-import of it foreign, so A21 reddens. That coupling was the first thing wrong with the amendment as drafted.
+🔴 **The two lists cannot drift apart silently in the direction that matters**: a third module that
+`comm.mjs` IMPORTS but that is not on the list makes that import foreign, so A21 reddens.
+⚠️ **One direction only, and the first draft of this section overclaimed it as both** — a file added to
+`install.mjs`'s `BUS_FILES` that `comm.mjs` does not import ships without ever being checked here. That is
+already true of `wake.mjs`, `claim.mjs` and every other shipped tool, so it is A21's **pre-existing scope**
+rather than something the split introduced: A21 has always been about the bus, not about everything the
+installer carries. Written down because the overclaim was mine, made in the same hour as the amendment.
 
 ### The seam was chosen by an open item, not by size
 
