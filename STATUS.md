@@ -9,7 +9,8 @@ fold the settled parts into the README.
 effort — shipped; "the inbox saturates" — never observed, the load test found delivery did, fixed; and, relayed
 by getajob's leader, a cold expert should restart fresh instead of resuming 600 k uncached — item 0.)*
 
-**0 — 🔴 ASKED BY THE OWNER, AWAITING HIS GO: RESTART A COLD, BIG, IDLE AGENT FRESH BEFORE RINGING IT.**
+**0 — 🔴 BUILD FIRST — THE OWNER SAID GO 2026-09-13 ("Build it, opt-in"): RESTART A COLD, BIG, IDLE AGENT FRESH
+BEFORE RINGING IT.** The whole plan, what is settled and what to measure first: `DESIGN-fresh-restart.md`.
 `FINDINGS.md#cache-lives-an-hour`: every session writes the 1 h cache; cold resumes re-wrote ≈ 13.5 M tokens,
 6.4 M in contexts > 300 k, mostly `work`. Proposed to getajob (their question: wake or the agent? — mine: wake):
 `/clear` when opted in (`config.json`), idle, last call > 60 min, context over a per-agent threshold still to
