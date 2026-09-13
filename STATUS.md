@@ -22,16 +22,21 @@ BROKEN"; a new arm → 62 of 62, green; an abort after A1 → the 59 silent arms
 C1/C2/C3/C5 (A58, A59, A21, selftest), each proved red · the tier is the caller's: `launch.mjs --model --effort`,
 required (A57), measured end to end by the field · a notice drained 100 messages and showed 8 — now only what it
 shows (A60, `#overflow-drained-unseen`); "the inbox saturates" was never observed and the load test found nothing
-else · 32 exit listeners → one. 🟡 **Unexplained:** why ~31 listeners were silent until A59 made 32. ⚠️ A `Stop`
+else · 32 exit listeners → one · an unknown flag refuses — `dismiss --help` had cleared a field inbox (A61, release .4). 🟡 **Unexplained:** why ~31 listeners were silent until A59 made 32. ⚠️ A `Stop`
 continuation still delivers nothing: the rest wait for the next real turn.
+
+**1b — 🔴 BUILD NEXT: A WAKE LANDS INSIDE A RUNNING TURN.** Measured in getajob's transcripts 2026-09-13: **18 of
+35 doorbells** arrived with Claude Code's "sent a new message while you were working" — one interrupted `cv` the
+instant its leader woke `web`. `wake` presses Enter and cannot tell busy from idle: `who`'s missing fourth state,
+now with a cost. And **"pending" means NOT ACKNOWLEDGED, not unseen**: `cv` peeked 3.4 s after its bell and stayed
+pending 5 min 35. Measure busy vs idle (CPU, transcript tail) on more than one sample before choosing a signal.
 
 **2 — ⚠️ `bin/context.mjs` READS ONE TURN BEHIND.** Measured today: a 9.7 KB read moved it only a turn later
 (+1 683, then +4 617). A before/after with it needs a turn in between. **Not yet named at its site.**
 
-**3 — ⚠️ A DOORBELL NOBODY RECORDS RINGING.** 12:50:25Z today, `wake.mjs`'s text in this leader's input; `comm
-inbox` empty, no wake record in any tree at that time, no `wake`/`kitten` tool call in any getajob or claude-comm
-transcript 12:47–12:51Z. Both leaders are kitty **window 1** (instances 12670 and 14341), and a wake record
-stores the window id WITHOUT its socket — a candidate path, not a proven one. Measure before touching wake.
+**3 — ⚠️ A DOORBELL NOBODY RECORDS RINGING:** 12:50:25Z in this leader's input — no wake record in any tree, and no
+getajob session rang at that second. Both leaders are kitty window 1 and a wake record stores no socket: a
+candidate, not a proof. Asked getajob's leader for a trace. Measure before touching wake.
 
 **4 — 🔴 RUN THE CONTROLS FIRST**, `CLAUDE_COMM_AGENT` set (A48), output **to a file**; read the suite's LAST
 LINE, never a wrapper's exit code. ⚠️ **Never two suites at once** — they share kitty and make reds that look
@@ -42,8 +47,7 @@ like findings; a runner in copies waits on a done-file. 🔴 **zsh:** quote glob
 `comm wait --for` · context.mjs's two `/clear` limits (do not "fix" with a guess) · the letter to `work`'s
 leader still unread, two `zz-` claims there held by dead pids · the automatic restart trigger (ledger
 UNKNOWN) · boot's `channel:` row says a letter "arrived 13h ago" that came in under an hour earlier: it
-ages by the filename's date, deliberately (review #8 C3) — the word "arrived" is wrong, not the rule. A fresh review: `launch.mjs review --model opus --effort xhigh --prompt "…"` — the field's rule
-says never Sonnet for review.
+ages by the filename's date, deliberately (review #8 C3) — the word "arrived" is wrong, not the rule. A fresh review runs on Opus: the field's rule says never Sonnet for review.
 **Later, in the owner's order (2026-09-13):** agents reaching for the bus unprompted (MCP and/or skill — measure
 where they failed first) → the Rust port → what the tool can earn him, worked out with getajob's leader.
 
