@@ -74,27 +74,56 @@ const die = (msg, code = 2) => { console.error(`close: ${msg}`); process.exit(co
 
 // ── the detached probe: the only part that can see the window go ─────────────────────
 // Runs as its own process group so kitty's close does not take it with the window.
+//
+// 🔴 THREE STATES, NOT TWO — review #10 C2. This comment always said "I could not look" must never
+// render as "it worked", and the code wrote `gone: true` for both: `wake.windows()` DROPS a socket
+// whose `kitten @ ls` fails, so kitten off PATH, or an `ls` timed out under two control suites, read
+// as "window absent" — and the `if` meant to tell them apart was dead code. Measured by the reviewer
+// on an OPEN window: kitten unreachable -> `gone: true`, exit 0. A51 stayed green with a probe
+// mutated never to look at all, because it only ever runs the success direction.
+//
+// So the probe runs its own `ls` on the ONE socket it was handed, and records what it SAW:
+//   gone: true   the socket answered and the window is not in it — or the socket file is gone:
+//                kitty unlinks it when the instance exits, and closing an instance's last window
+//                can do that before the first look, so the window went with it
+//   gone: false  the socket answered and the window is still there
+//   gone: null   it never managed to look — kitten unreachable, `ls` failed or timed out, or
+//                answered no JSON. Neither "it worked" nor "it did not". Exit 2.
+// ⚠️ NOT COVERED: a socket path that NEVER existed reads as gone (the reviewer's row C). Only a
+// caller bug produces one — close.mjs hands over the socket it has just listed the window on — so
+// it is named here rather than guessed at. A59.
 if (ARGV[0] === "--verify") {
 	const [, sock, id, statePath] = ARGV
-	const wake = await import(new URL("wake.mjs", import.meta.url))
+	let why = "", blind = 0
+	const look = () => {
+		if (!existsSync(sock)) return "gone"
+		const r = spawnSync("kitten", ["@", "--to", `unix:${sock}`, "ls"], { encoding: "utf8", timeout: 5000 })
+		if (r.error || r.status !== 0 || !r.stdout) { why = r.error ? r.error.code : `kitten @ ls exit ${r.status}`; return "blind" }
+		let tree
+		try { tree = JSON.parse(r.stdout) } catch { why = "kitten @ ls answered no JSON"; return "blind" }
+		for (const osw of tree) for (const tab of osw.tabs || []) for (const w of tab.windows || [])
+			if (String(w.id) === String(id)) return "there"
+		return "gone"
+	}
 	const deadline = Date.now() + 8000
-	let gone = false
+	let seen = null
 	while (Date.now() < deadline) {
-		const wins = wake.windows()
-		// A socket that has itself vanished means the whole kitty instance went with the
-		// window — that is gone, not unknown. Distinguishing them matters: "I could not
-		// look" must never render as "it worked", which is the failure mode the getajob
-		// field named in its own probe on 2026-09-10.
-		const reachable = wins.some((w) => w.sock === sock)
-		if (!wins.some((w) => w.sock === sock && String(w.id) === String(id))) { gone = true; break }
-		if (!reachable) { gone = true; break }
+		const s = look()
+		if (s === "gone") { seen = s; break }
+		if (s === "there") seen = s
+		else blind++
 		spawnSync(process.execPath, ["-e", "setTimeout(()=>{},250)"])
 	}
+	const gone = seen === "gone" ? true : seen === "there" ? false : null
+	// An intent record that cannot be read is written over rather than skipped: the outcome is the
+	// part that matters, and a bare catch here used to lose it silently.
+	let prev
+	try { prev = JSON.parse(readFileSync(statePath, "utf8")) } catch { prev = { intent_unreadable: true } }
 	try {
-		const prev = JSON.parse(readFileSync(statePath, "utf8"))
-		writeFileSync(statePath, JSON.stringify({ ...prev, verified_at: new Date().toISOString(), gone }, null, 1) + "\n")
+		writeFileSync(statePath, JSON.stringify({ ...prev, verified_at: new Date().toISOString(), gone,
+			...(gone === null ? { could_not_look: why } : {}), blind_looks: blind }, null, 1) + "\n")
 	} catch {}
-	process.exit(gone ? 0 : 1)
+	process.exit(gone === true ? 0 : gone === false ? 1 : 2)
 }
 
 // ── who am I, and which window is mine ───────────────────────────────────────────────

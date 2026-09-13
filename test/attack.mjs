@@ -3165,6 +3165,63 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		`${caller58 ? "" : " — THE ARM COULD NOT RUN: no kitty window for this suite"}`)
 }
 
+// A59 — the close probe records what it SAW: gone, still there, or could not look.
+//
+// 🔴 Review #10 C2: `--verify` wrote `gone: true` whenever it could not look — kitten off PATH, an
+// `ls` that failed or timed out — because `wake.windows()` drops a socket that does not answer, and
+// the `if` meant to tell them apart was dead code. A51 could not see it: it runs only the success
+// direction, and stayed green with a probe mutated never to look at all.
+//
+// The probe is run DIRECTLY against this suite's own window, which stays open throughout, so the
+// window's real state is never in question. One variable per case, the probe byte-identical:
+//   ① POSITIVE CONTROL, it CAN say false: kitten reachable, a window that is there -> gone:false
+//   ② THE DEFECT: the same window, kitten unreachable -> gone:null, NEVER true
+//   ③ POSITIVE CONTROL, it CAN say true: the same socket, a window id that is not there -> gone:true
+// Without ① the probe could be a constant null; without ③ a constant false would pass ② as well.
+// The three run at once: ① and ② each take the probe's full 8 s deadline.
+{
+	const r59 = mkdtempSync(join(tmpdir(), "comm-attack-probe-"))
+	process.on("exit", () => { try { rmSync(r59, { recursive: true, force: true }) } catch {} })
+	const wk59 = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
+	const { sessionPid: sp59 } = await import(pathToFileURL(join(PKG, "bin", "session-registry.mjs")).href)
+	const cr59 = wk59.resolveWindow(sp59(), wk59.windows())
+	const caller59 = cr59.ok && cr59.how === "foreground process" ? cr59.win : null
+	const C59 = join(PKG, "bin", "close.mjs")
+	// EVERY PATH entry holding a kitten is removed, node needs none (it is run absolutely): one
+	// variable. And it is CHECKED that kitten really is gone under that PATH, not assumed.
+	const pathDirs = (process.env.PATH || "").split(delimiter).filter(Boolean)
+	const noKittenPath = pathDirs.filter((d) => !existsSync(join(d, "kitten"))).join(delimiter)
+	const kittenMoved = pathDirs.some((d) => existsSync(join(d, "kitten"))) &&
+		!noKittenPath.split(delimiter).some((d) => d && existsSync(join(d, "kitten")))
+	const probe59 = (name, winId, env) => new Promise((resolve) => {
+		const f = join(r59, `${name}.json`)
+		writeFileSync(f, JSON.stringify({ agent: "db", gone: null }) + "\n")
+		const c = spawn(process.execPath, [C59, "--verify", caller59.sock, String(winId), f], { env, stdio: "ignore" })
+		c.on("exit", (code) => { let j = null; try { j = JSON.parse(readFileSync(f, "utf8")) } catch {} resolve({ code, j }) })
+	})
+	let there = null, blindRun = null, absent = null
+	if (caller59 && kittenMoved) {
+		;[there, blindRun, absent] = await Promise.all([
+			probe59("there", caller59.id, process.env),
+			probe59("blind", caller59.id, { ...process.env, PATH: noKittenPath }),
+			probe59("absent", 2147483000, process.env),
+		])
+	}
+	const saysFalse = !!there && there.code === 1 && there.j?.gone === false
+	const blindIsNull = !!blindRun && blindRun.code === 2 && blindRun.j?.gone === null && typeof blindRun.j?.could_not_look === "string"
+	const saysTrue = !!absent && absent.code === 0 && absent.j?.gone === true
+	const stillOpen = !!caller59 && wk59.windows().some((w) => w.sock === caller59.sock && w.id === caller59.id)
+
+	check("A59 the close probe records what it SAW — gone, still there, or could not look",
+		!!caller59 && kittenMoved && saysFalse && blindIsNull && saysTrue && stillOpen,
+		`positive control, a window that IS there -> gone ${there?.j?.gone} exit ${there?.code}, want false and 1=${saysFalse}; ` +
+		`the SAME window with kitten unreachable (verified off PATH=${kittenMoved}) -> gone ${blindRun?.j?.gone} exit ${blindRun?.code}, ` +
+		`want null and 2, never true=${blindIsNull}; ` +
+		`positive control, a window id that is NOT there -> gone ${absent?.j?.gone} exit ${absent?.code}, want true and 0=${saysTrue}; ` +
+		`the window stayed open throughout=${stillOpen}` +
+		`${caller59 ? "" : " — THE ARM COULD NOT RUN: no kitty window for this suite"}`)
+}
+
 // A52 — the doorbell states a fact. It gives no conduct instruction and makes no promise.
 //
 // Reported by the `getajob` field leader, 2026-09-11, after paying for both halves. The
