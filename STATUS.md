@@ -153,7 +153,7 @@ where they failed first) → the Rust port → what the tool can earn him, worke
 ## Two conventions that erode silently
 
 **Measurement traps** — a control not travelling the arms' code validates nothing; one that writes into, or
-INHERITS, the world it measures is not a control. **Seven instances.** `FINDINGS.md#measurement-traps`.
+INHERITS, the world it measures is not a control. **Ten instances.** `FINDINGS.md#measurement-traps`.
 
 **Acknowledgements amend the protocol** — `FINDINGS.md#ack-amendment`. First discharge 2026-09-08.
 🟢 **A21 was amended this way on 2026-09-11**, on evidence: `FINDINGS.md#bus-split`.
