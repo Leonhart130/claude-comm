@@ -2627,6 +2627,7 @@ log's outcome for every enqueue (`remove absorbed_mid_turn` against `dequeue` �
 | candidate signal | result |
 | --- | --- |
 | how long the transcript has been quiet | useless: a mid-turn doorbell's p90 is **36 s** of silence, a resting one's p10 **38 s** |
+| CPU time of the `claude` process | useless: sampled every 2 s for 45 min over 5 live sessions — **350 of 359 working intervals sat under the resting p99** (228 ms/s). A model waiting on the API burns almost nothing |
 | last row is `turn_duration` | 58 of 277 resting doorbells misread busy (away summaries and bookkeeping written after the close) |
 | last user/assistant row is an `end_turn` | 0 false idle on typed input — but a Stop hook that BLOCKED shows exactly that shape while the model answers it (257 windows, p99 16 s, max 23 s): **it rings into those** |
 | **the last DECISIVE row, in FILE order** (`rowVerdict`) | **478 / 478 queued inputs read busy; no absorbed doorbell reads idle; 1 of 1 228 prompts reads busy** (a prompt that never got a reply) |
