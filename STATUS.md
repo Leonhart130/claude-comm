@@ -9,6 +9,13 @@ fold the settled parts into the README.
 effort — shipped; "the inbox saturates" — never observed, delivery did, fixed; a cold expert restarts fresh
 instead of resuming 600 k uncached — **shipped as `.6`**, item 0.)*
 
+**A — 🔴 FIRST: AMEND THE LAPSED-NOTE ROW.** The close printed *AMEND THE PROTOCOL* for `field:getajob@f59780`:
+acked 3× on 09-13 for one cause — "restart note LAPSED" while that leader (pid 13764) was alive and working (idle
+18:49Z, rung at rest 19:33Z, busy after). **Not `--amended` by flag: nothing it measures has changed yet.** The note
+holds `by_pid` only (`restart-signal.mjs:92`, TTL 900 s) ⇒ record `by_start` + `by_boot` at arm (bus file → release),
+then judge *armer gone* with `claim.mjs:112` `holderState`, TTL a backstop; old notes fall back to the TTL and say so.
+Read side: `boot.mjs:1013/1051/1056` (field) and `:492-497` (own tree). Arm both, `boot --prove-red`.
+
 **0 — 🟢 SHIPPED 2026-09-13 (`.6`, print `f7c3807cc42e`, all 3 trees): A COLD, BIG, IDLE, OPTED-IN AGENT IS CLEARED
 BEFORE ITS RING.** Rule 7 in `wake.mjs`, A63 (red 6 ways in copies), ring history `.comm/wake/rings.jsonl`.
 Threshold 300 000, age > 60 min, both measured; live end to end in a throwaway: `FINDINGS.md#fresh-restart`.
@@ -120,7 +127,7 @@ where they failed first) → the Rust port → what the tool can earn him, worke
   same shape, unarmed. `FINDINGS.md#generated-in-their-tree`.
 - **The 15-minute window is untested and my own timestamps are why:** each defect is dated at its commit,
   the upper bound. Not a result.
-- **The restart TTL lapsed on a human TWICE; the clock is the wrong instrument.** Try armer-gone AND not
+- **The restart TTL lapsed on a human TWICE, then 3 acks on 09-13 — now ▶ NEXT A.** Try armer-gone AND not
   ancient, TTL as a backstop — `claim.mjs` already ships the (pid, start, boot) test. Not built.
 - **Test debt from review #4, none of it gated:** `FINDINGS.md#test-debt`.
 - **`#A20` from 2026-09-04 is still unexplained** (the 09-05 instance was fixed, `#update-signal`).
