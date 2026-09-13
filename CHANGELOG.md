@@ -35,6 +35,21 @@ already have.
 
 
 
+
+## 2026-09-13.5 — bus print `65d515a66082` — 2026-09-13
+
+- 🔴 **The doorbell no longer lands inside a turn you are working on.** `wake` reads the target session's
+  transcript through the session registry and rings only a session at rest, or one whose reply has just ended.
+  A working session is skipped — `○ <agent>: mid-turn, not rung (last transcript row: …)` — and no ring is
+  recorded, so the next hook that fires looks again. Before: 18 of 35 doorbells in one field day arrived as
+  "sent a new message while you were working".
+- Nothing to do on your side. Your mail still arrives at your turn end; over 107 measured mid-turn doorbells,
+  skipping them would not have delayed one delivery.
+- ⚠️ When the registry cannot answer for a session, `wake` rings as before and says `turn state unknown`.
+- ⚠️ Still true: a `Stop` continuation delivers nothing, so mail that arrives while your turn is already
+  continuing waits for the next ring at rest.
+- `wake --resolve <pid>` also prints that session's turn state.
+
 ## 2026-09-13.4 — bus print `0d8b32a0d9fa` — 2026-09-13
 
 - 🔴 **A flag a command does not know now REFUSES instead of acting on everything.** `comm dismiss --help` used to
