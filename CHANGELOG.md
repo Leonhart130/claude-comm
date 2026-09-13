@@ -36,6 +36,27 @@ already have.
 
 
 
+
+## 2026-09-13.6 — bus print `f7c3807cc42e` — 2026-09-13
+
+- 🔴 **Opt-in: an idle expert whose cache has expired is restarted fresh before its doorbell.** Name the agents that
+  may be cleared at the top of `.comm/config.json`: `"freshRestart": ["cv", "web"]`. When mail waits for one of them,
+  it is at rest, its last API call is **over 60 min** old (the 1 h prompt cache has expired) and its context is **at
+  least 300 000 tokens**, `wake` types `/clear` into its window, confirms it (the session registry names a new
+  transcript for the same process), then rings. The process is kept: model, effort and window survive, and the
+  waiting mail is handed to the fresh session as it starts.
+- 🔴 **A leader is never cleared, even if the list names it** — the `leader` of `config.json`, or the agent at `"."`.
+- ⚠️ **A clear drops everything the agent has not written down.** Opt an agent in only if it rebuilds from its files.
+- ⚠️ **`/clear` is typed into the agent's input line, like the doorbell.** Measured: a half-typed `hello` went out as
+  the prompt `hello/clear`. When a clear is not confirmed and the agent is now working, no doorbell goes on top.
+- After a clear the doorbell says so: *the bus restarted this session fresh because it had been idle past its cache
+  lifetime*. No instruction, as before.
+- Not in the list, or anything but a list of names: nothing changes. `wake --dry-run` says `would restart it fresh
+  first (…)` or `no fresh restart: …` for an opted-in agent.
+- At most one clear per `wake` run; the next waits for the cleared agent's own turn end.
+- **Every ring is now appended to `.comm/wake/rings.jsonl`** — who was rung, cleared or not, and the command line
+  that spawned the ring, Stop hooks included. Before, one record per agent was overwritten by whoever rang.
+
 ## 2026-09-13.5 — bus print `65d515a66082` — 2026-09-13
 
 - 🔴 **The doorbell no longer lands inside a turn you are working on.** `wake` reads the target session's

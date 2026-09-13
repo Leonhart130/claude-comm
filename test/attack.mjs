@@ -3539,6 +3539,121 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		`"last reply ended" ${c2.length} (${c2interrupts.length} by ringing a busy session)`)
 }
 
+// A63 — a cold, big, idle agent is restarted fresh before it is rung: only if it opted in, never a leader, and
+// never claimed unless the registry names a NEW transcript. And every ring, whoever rings, is appended to a history.
+//
+// Asked by the owner 2026-09-13 through getajob's leader ("si tu bosses tu rappelles 1 h après un agent qui a 600k,
+// ça va nous ruiner pour rien"); his answer to the design: "Build it, opt-in". The thresholds are measured and their
+// evidence sits at rule 7 in wake.mjs - the 1 h cache (0 of 315 resumes cold inside the hour, 53 of 55 past it), and
+// 300 000, the most the first 10 calls of a fresh start cost across 82 field-expert starts. FINDINGS.md#fresh-restart
+//
+// POSITIVE CONTROLS through the same table: "clear on every bell" and "never clear" must each fail it, and so must a
+// rule blind to the leader - the guard getajob asked for by name. The effect proof's control is the fake registry
+// that NEVER changes: a clear claimed on it would be the send-text-exits-0 lie. And the history's is an overwrite:
+// the first ring must survive five later ones, which the per-agent quiet record does not.
+{
+	const wake = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
+	const NOW = Date.parse("2026-09-13T20:00:00Z"), MIN = 60_000, BIG = 667_717
+	const cfgF = { leader: "leader", agents: { leader: ".", cv: "apps/cv", web: "apps/web", boss: "." }, freshRestart: ["cv", "leader", "boss"] }
+	const T = (state, minAgo, context) => ({ state, why: "x", call: minAgo === null ? null : { at: NOW - minAgo * MIN, context } })
+	const TABLE = [
+		["opted in, idle, cold and big", "cv", cfgF, T("idle", 61, 300_000), true],
+		["one token under the threshold", "cv", cfgF, T("idle", 61, 299_999), false],
+		["the cache still warm at 59 min", "cv", cfgF, T("idle", 59, BIG), false],
+		["exactly 60 min, still inside the TTL", "cv", cfgF, T("idle", 60, BIG), false],
+		["busy", "cv", cfgF, T("busy", 90, BIG), false],
+		["a reply just ended", "cv", cfgF, T("ending", 90, BIG), false],
+		["turn unknown", "cv", cfgF, T("unknown", 90, BIG), false],
+		["no API call in the transcript yet", "cv", cfgF, T("idle", null), false],
+		["not opted in, however big and cold", "web", cfgF, T("idle", 600, 900_000), false],
+		["the leader, opted in by name", "leader", cfgF, T("idle", 600, 900_000), false],
+		["an agent at the project root, opted in", "boss", cfgF, T("idle", 600, 900_000), false],
+		["no freshRestart key", "cv", { leader: "leader", agents: cfgF.agents }, T("idle", 600, BIG), false],
+		["freshRestart a string", "cv", { ...cfgF, freshRestart: "cv" }, T("idle", 600, BIG), false],
+		["freshRestart an object", "cv", { ...cfgF, freshRestart: { cv: true } }, T("idle", 600, BIG), false],
+		["no config readable", "cv", null, T("idle", 600, BIG), false],
+	]
+	const failsOf = (rule) => TABLE.filter(([, agent, cfg, turn, want]) => rule(agent, cfg, turn) !== want)
+	const wrongT = failsOf((a, c, t) => wake.freshDecision(a, c, t, { now: NOW }).clear)
+	const everyBell = failsOf(() => true), never = failsOf(() => false)
+	const leaderBlind = failsOf((a, c, t) => wake.freshDecision(a === "leader" || a === "boss" ? "cv" : a, c, t, { now: NOW }).clear)
+
+	// The instrument: the last REAL call, found behind a 300 KB subagent row and a synthetic error reply.
+	const dirF = mkdtempSync(join(tmpdir(), "comm-attack-fresh-"))
+	atExit(() => { try { rmSync(dirF, { recursive: true, force: true }) } catch {} })
+	const at0 = "2026-09-13T18:00:00.000Z"
+	const usage = (i, r, c) => ({ input_tokens: i, cache_read_input_tokens: r, cache_creation_input_tokens: c, output_tokens: 9 })
+	const U = (text) => ({ type: "user", timestamp: at0, message: { role: "user", content: text } })
+	const closedF = [U("do it"),
+		{ type: "assistant", timestamp: at0, message: { id: "m1", role: "assistant", model: "claude-opus-5", stop_reason: "end_turn", usage: usage(5, 600_000, 67_712), content: [{ type: "text", text: "done" }] } },
+		{ type: "system", subtype: "stop_hook_summary", timestamp: at0 }, { type: "system", subtype: "turn_duration", timestamp: at0 }]
+	const jsonl = (rows) => rows.map((r) => JSON.stringify(r)).join("\n") + "\n"
+	writeFileSync(join(dirF, "instrument.jsonl"), jsonl([...closedF,
+		{ type: "assistant", timestamp: "2026-09-13T18:05:00.000Z", isSidechain: true, message: { id: "s1", role: "assistant", model: "claude-haiku-4-5", stop_reason: "end_turn", usage: usage(1, 0, 900_000), content: [{ type: "text", text: "x".repeat(300_000) }] } },
+		U("again"),
+		{ type: "assistant", timestamp: "2026-09-13T18:06:00.000Z", isApiErrorMessage: true, message: { id: "e1", role: "assistant", model: "<synthetic>", stop_reason: "stop_sequence", usage: usage(0, 0, 0), content: [{ type: "text", text: "API Error: 529" }] } }]))
+	const inst = wake.readTurn(1, () => ({ ok: true, transcript: join(dirF, "instrument.jsonl") }))
+	const instOk = inst.state === "idle" && !!inst.call && inst.call.context === 667_717 && inst.call.at === Date.parse(at0)
+
+	// The effect: kitty and the registry faked, the code under test untouched.
+	const rootF = mkdtempSync(join(tmpdir(), "comm-attack-fresh-root-"))
+	atExit(() => { try { rmSync(rootF, { recursive: true, force: true }) } catch {} })
+	const fg = [{ sock: "/tmp/kitty-attack", id: 7, shellPid: 1, fg: [5151] }]
+	const opted = (agent) => ({ leader: "leader", agents: { leader: ".", [agent]: `apps/${agent}` }, freshRestart: [agent, "leader"] })
+	const run = (agent, { cfg = opted(agent), changes = false, halfLine = false, miss = false, dryRun = false, allowClear = true } = {}) => {
+		const transcript = join(dirF, `${agent}.jsonl`)
+		writeFileSync(transcript, jsonl(closedF))
+		let current = transcript
+		const typed = []
+		const sendText = (_win, text) => {
+			typed.push(text)
+			if (text === "\r" && typed.at(-2) === "/clear") {
+				if (changes) current = join(dirF, `${agent}-fresh.jsonl`)
+				if (halfLine) writeFileSync(transcript, jsonl([...closedF, U("hello/clear")]))
+			}
+			return { status: 0, stderr: "" }
+		}
+		const lookup = () => miss ? { ok: false, why: "pid 5151 is not in the session registry" } : { ok: true, transcript: current }
+		// `fresh.now` is the table's clock. Omitted on the first run, every call read "cache still warm" against the
+		// REAL clock and this arm went red typing NUDGE everywhere - red on the clock, not on the property it names.
+		const r = wake.wakeAgent(rootF, agent, 5151, { wins: fg, turn: T("idle", 90, BIG), cfg, lookup, sendText, confirmMs: 300, dryRun, allowClear, fresh: { now: NOW } })
+		return { r, seq: typed.map((x) => x === wake.NUDGE ? "NUDGE" : x === wake.FRESH_NUDGE ? "FRESH" : x === "\r" ? "⏎" : x).join(" ") }
+	}
+	const confirmed = run("a1", { changes: true })
+	const unconfirmed = run("a2")
+	const halfLine = run("a3", { halfLine: true })
+	const notOpted = run("a4", { cfg: { leader: "leader", agents: { leader: ".", a4: "apps/a4" }, freshRestart: [] } })
+	const leaderRun = run("leader")
+	const miss = run("a5", { miss: true })
+	const dry = run("a6", { dryRun: true })
+	const deferred = run("a7", { allowClear: false })
+	const effectOk = confirmed.seq === "/clear ⏎ FRESH ⏎" && confirmed.r.sent && confirmed.r.cleared === true &&
+		unconfirmed.seq === "/clear ⏎ NUDGE ⏎" && unconfirmed.r.sent && unconfirmed.r.cleared === false && /not confirmed/.test(unconfirmed.r.clearWhy) &&
+		halfLine.seq === "/clear ⏎" && !halfLine.r.sent && /half-typed/.test(halfLine.r.why) &&
+		notOpted.seq === "NUDGE ⏎" && notOpted.r.cleared === null &&
+		leaderRun.seq === "NUDGE ⏎" && leaderRun.r.cleared === null &&
+		miss.seq === "NUDGE ⏎" && miss.r.cleared === false && /could not be proved/.test(miss.r.clearWhy) &&
+		dry.seq === "" && dry.r.wouldClear === true &&
+		deferred.seq === "" && deferred.r.deferred === true && !deferred.r.sent
+
+	let hist = []
+	try { hist = readFileSync(wake.historyPath(rootF), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)) } catch {}
+	const survives = (lines) => lines.map((h) => h.agent).join(",") === "a1,a2,a3,a4,leader,a5"
+	const histOk = survives(hist) && hist[0].cleared === true && hist[0].text === "fresh" && hist[2].rang === false &&
+		hist.every((h) => Object.prototype.hasOwnProperty.call(h, "caller"))
+	const overwriteCaught = !survives(hist.slice(-1))
+
+	check("A63 a cold, big, idle agent is restarted fresh before it is rung - opted in, never a leader, never claimed unproved",
+		wrongT.length === 0 && instOk && effectOk && histOk && everyBell.length > 0 && never.length > 0 && leaderBlind.length > 0 && overwriteCaught,
+		`${TABLE.length - wrongT.length}/${TABLE.length} decisions right${wrongT.length ? ` — WRONG: ${wrongT.map(([n]) => n).join("; ")}` : ""}; ` +
+		`last real call read behind a 300 KB subagent row and a synthetic reply=${instOk} (${inst.state}, ${inst.call && inst.call.context}); ` +
+		`typed: confirmed "${confirmed.seq}", unconfirmed "${unconfirmed.seq}", half-typed line "${halfLine.seq}", not opted "${notOpted.seq}", ` +
+		`leader "${leaderRun.seq}", registry miss "${miss.seq}", dry-run "${dry.seq}" wouldClear=${dry.r.wouldClear}, second clear in a run "${deferred.seq}"; ` +
+		`history ${hist.map((h) => h.agent).join(",") || "EMPTY"}, first ring intact=${histOk}; ` +
+		`POSITIVE CONTROLS fail the table: every bell ${everyBell.length}, never ${never.length}, leader-blind ${leaderBlind.length}; ` +
+		`an overwrite store loses the first ring=${overwriteCaught}`)
+}
+
 // A52 — the doorbell states a fact. It gives no conduct instruction and makes no promise.
 //
 // Reported by the `getajob` field leader, 2026-09-11, after paying for both halves. The
@@ -3557,7 +3672,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 // The POSITIVE CONTROL is the old text itself: every check below must FAIL on it. Without
 // that, these would pass for any string at all -- including an empty one.
 {
-	const { NUDGE } = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
+	const { NUDGE, FRESH_NUDGE } = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
 	const SHIPPED_AND_WRONG = "[claude-comm] doorbell — mail is waiting for you. Nothing to do and nothing to fetch: " +
 		"acknowledge briefly and end your turn, and the bus will hand it to you as this turn closes."
 
@@ -3578,7 +3693,11 @@ process.stdout.write(JSON.stringify({ ops, res }))
 
 	check("A52 the doorbell states a fact: no conduct instruction, no promise, and it says it is not the owner",
 		!ordersConduct(NUDGE) && !promises(NUDGE) && namesItsSource(NUDGE) && namesASafeVerb(NUDGE) &&
+		// the text rung after a fresh restart (A63) is typed into the same channel and owes the same four
+		!ordersConduct(FRESH_NUDGE) && !promises(FRESH_NUDGE) && namesItsSource(FRESH_NUDGE) && namesASafeVerb(FRESH_NUDGE) &&
 		shippedOrders && shippedPromises && !shippedNamesSource,
+		`fresh-restart text: orders=${ordersConduct(FRESH_NUDGE)}, promises=${promises(FRESH_NUDGE)}, ` +
+		`names the bus=${namesItsSource(FRESH_NUDGE)}, safe verb=${namesASafeVerb(FRESH_NUDGE)}; ` +
 		`current text: orders conduct=${ordersConduct(NUDGE)}, promises delivery=${promises(NUDGE)}, ` +
 		`names the BUS as its source=${namesItsSource(NUDGE)}, names a verb that consumes nothing=${namesASafeVerb(NUDGE)}; ` +
 		`POSITIVE CONTROL, the text that shipped and cost two mornings -> orders conduct=${shippedOrders}, ` +

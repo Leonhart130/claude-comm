@@ -36,6 +36,13 @@ expert* verified, not something text injected into their session blurred.
 `stop_hook_active` guards the block-loop. **Every hook path exits 0 on any internal error** — a broken bus
 must never break a session.
 
+**An idle agent is rung, never delivered to.** When mail waits for someone else, a `Stop` hook spawns
+`bin/wake.mjs`, which types a doorbell into that agent's window so it takes a turn — and never into a running
+turn (A62). **Opt-in fresh restart** (A63): with `"freshRestart": ["cv", "web"]` in `.comm/config.json`, `wake`
+first types `/clear` into an agent that is idle, whose last API call is over 60 min old (the cache has expired) and
+whose context is at least 300 000 tokens — never a leader, and a clear counts only when the session registry names a
+new transcript. Every ring, whoever caused it, is appended to `.comm/wake/rings.jsonl`. `FINDINGS.md#fresh-restart`.
+
 ⭐ **An agent's identity comes from its hook stub's location, never from the session's cwd.** The stub is
 installed one per agent at `<agentRoot>/.claude/comm-hook.mjs` and passes that path to the bus. This was a
 measured defect, and the worst one found so far: the Stop payload's `cwd` follows the **Bash tool's**
@@ -199,6 +206,9 @@ too — it is how a check gets disabled wholesale a week later.*
 ## Known limits, stated rather than discovered
 
 - **Turn-boundary delivery, not interrupt** (above).
+- **The doorbell and the fresh restart type into the human's input line.** Whatever is half-typed there is
+  submitted with them — measured with `/clear`: `hello/clear` went out as a prompt. The screen cannot tell a
+  half-typed line from the placeholder, so nothing guards it; a leader is never cleared for that reason.
 - **`comm who` is Linux-only** — it reads `/proc`. Elsewhere it degrades to "not running" for everyone,
   which is safe but useless; `send` still queues correctly.
 - **Identity is not a security boundary.** Every agent runs as the same Unix user, so cwd-derived identity

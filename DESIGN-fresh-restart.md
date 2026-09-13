@@ -1,7 +1,9 @@
 # DESIGN — restart a cold, big, idle agent fresh before ringing it
 
-**Status: GO from the owner, 2026-09-13 — his answer: "Build it, opt-in". NOT BUILT.** Written by the session that
-measured it, for a session that remembers none of it. Read `FINDINGS.md#cache-lives-an-hour` and
+**Status: BUILT 2026-09-13 — rule 7 in `bin/wake.mjs`, gated by A63, with the ring history (`.comm/wake/rings.jsonl`).
+What the build measured, settled and left open: `FINDINGS.md#fresh-restart`.** The owner's answer was "Build it,
+opt-in". Written by the session that measured it, for a session that remembers none of it; the sections below are
+the plan as it stood before the build, kept for how the decision was reached. Read `FINDINGS.md#cache-lives-an-hour` and
 `#wake-mid-turn` first; this file does not repeat their tables.
 
 ## Where the ask came from
@@ -87,6 +89,21 @@ and a brief: `cv` ≈ 667 717 → ≈ 90 234, `web` ≈ 585 561 → ≈ 125 052.
   that changes → cleared;
 - an agent not opted in is never cleared, whatever its size;
 - proved red in copies, the suite byte-identical — as A62 was.
+
+## What the build settled (2026-09-13)
+
+- **The key:** `"freshRestart": ["db", "web", "extension", "cv", "review"]` at the top of `.comm/config.json`. Anything
+  but a list of names opts nobody in, and says so. A leader — `cfg.leader`, or the agent at `"."` — never, even named.
+- **Threshold 300 000**, the costliest of 82 measured fresh starts; **age > 60 min**, not ≥.
+- **Unverified list above, closed by measurement:** `SessionStart` fires on a typed `/clear` with a new transcript
+  (560 ms); the slash command runs; model and effort survive; `install.mjs` rewrites `config.json` only on
+  `--add-agent`, as parse → add → stringify, and no reader rejects an unknown top-level key (read, and checked live
+  on the throwaway). **The half-typed line: submitted as a prompt** — an unconfirmed clear therefore re-reads the
+  turn before ringing.
+- **One clear per run**, because the Stop hook kills `wake` at 10 s; the next agent's clear waits for the cleared
+  agent's own turn end.
+- After a confirmed clear the ring is `FRESH_NUDGE`: same four properties as the doorbell (A52), and it says the bus
+  restarted the session, so a cleared agent does not mistake its empty conversation for a crash.
 
 ## After it ships
 

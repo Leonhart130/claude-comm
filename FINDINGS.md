@@ -2728,3 +2728,89 @@ their files, `cv` went from ≈ 667 717 to ≈ 90 234 and `web` from ≈ 585 561
 ⚠️ **Not measured:** the overage case, where the TTL is documented to drop to 5 min — no call here wrote that
 bucket, so this box has never been observed in it. And what a fresh start costs per agent beyond getajob's two
 numbers: that is the threshold the proposal in `STATUS.md` still needs.
+
+## `#fresh-restart` — a cold, big, idle agent is cleared before its ring: what was measured before building it
+
+**2026-09-13, built on the owner's "Build it, opt-in"** (`DESIGN-fresh-restart.md`, `#cache-lives-an-hour`). Rule 7
+in `bin/wake.mjs`, gated by A63, the ring history beside it.
+
+### What a fresh start costs — the threshold, measured
+
+Every transcript starts fresh (startup or `/clear`); its context at the **10th call** is the protocol re-read and
+the brief taken — getajob's hand measure landed there (`cv` ≈ 90 k, `web` ≈ 125 k; the corpus has `web`'s
+post-clear start at 125 052 on its 5th call).
+
+| field experts | fresh starts | context at call 10, median | p90 |
+| --- | --- | --- | --- |
+| getajob `cv` · `web` · `review` · `db` · `extension` | 4 · 4 · 5 · 2 · 1 | 106 k · 118 k · 126 k · 90 k · 82 k | 161 k · 141 k · 184 k · – · – |
+| work `HartEdge` · `admin` · `customer` · `db` | 37 · 8 · 8 · 11 | 81 k · 87 k · 86 k · 89 k | 95 k · 97 k · 92 k · 115 k |
+
+A clear pays when a fresh start's first 10 calls cost less than the cold resume's re-write. Priced at the
+published multipliers (1 h cache write 2×, read 0.1×, output 5× input — **read, not measured here**), over 82
+expert starts that break-even context is median 104 k, p90 143 k, **max 300 k** (getajob `review`, 40 k of output
+in those calls; its real post-`/clear` start is second, 293 k). **300 000 is the threshold**: above it a clear
+pays on every start measured — and the comparison ignores what the resumed session would re-read on every later
+call, so it errs toward NOT clearing. That is the permitted direction: a clear also drops what an agent failed
+to write down.
+
+⚠️ At 20 calls the same break-even is median 199 k, max 614 k. **Where "the boot" ends is a choice** backed by two
+hand measures, not a measurement of the boot's end.
+
+### Live, in a throwaway project (`.comm/fresh-probe`, sonnet / low) — every step judged on its effect
+
+- `/clear` typed the way `wake` types (`send-text "/clear"`, then `"\r"`) **ran the command**: the registry named
+  a new transcript, `source: "clear"`, **560 ms** later, and the old transcript never received `/clear` as a prompt.
+- **Model and effort survive**: `claude-sonnet-5` and `"effort":"low"` in the new transcript — the process is kept.
+- 🔴 **A half-typed line**: `hello`, then `/clear` + Enter, was **submitted as the prompt `hello/clear`**; the agent
+  answered it and the registry did not change. ⇒ an unconfirmed clear re-reads the turn and rings nothing on top
+  of a turn it started. The exposure is the doorbell's own (`#doorbell-shares-the-human-s-line`): the line is
+  submitted once either way.
+- ⚠️ `kitten @ get-text` returned the input box's **placeholder** (`❯ what's the status of the repo`) exactly like
+  typed text: the screen cannot tell a half-typed line from an empty one. Not attempted as a guard.
+- 🔴 **The probe wrote into the world it measured.** A throwaway under `claude-comm/` loads THIS repo's `CLAUDE.md` as
+  a parent, and the cleared agent obeyed it: `cd ~/Dev/claude-comm && node bin/boot.mjs --fast`, which rewrote this
+  repo's `.boot-state.json` (`reportBytes` 3 335 → 3 417, read field by field; start counts and the ledger unchanged).
+  Benign — the next boot rewrites it — but trusted-and-hookless is not the same as isolated: the parent's hooks do
+  not fire, its instructions do.
+
+- 🟢 **End to end through the INSTALLED `wake.mjs`**, age and size overridden by the function's options: a real
+  message queued (`inbox 1`) → `wakeAgent` cleared the idle agent, confirmed **302 ms** → the fresh session's
+  `SessionStart` hook delivered it (`via: "hook"`, 280 ms after the ring was stamped; inbox 0; the notice in its
+  context) → `FRESH_NUDGE` typed → the agent read `app/brief.md` and replied as it asked. `rings.jsonl` holds both
+  rings with `cleared`, `context`, `lastCallAt` and `caller`. And `install --add-agent` kept `freshRestart` intact.
+- ⚠️ **The first end-to-end run proved nothing about delivery, and read as if it had**: its `--ref` resolved against
+  the spoke and was refused, no mail was pending, and the probe — calling `wakeAgent` directly, past `main`'s
+  pending check — cleared and rang anyway: `FRESH_NUDGE` then stated mail that did not exist. `main` rings only
+  agents with mail pending, so the shipped path cannot; the probe's bypass could.
+
+### Where a throwaway can live — two facts from the corpus
+
+- **Folder trust is inherited from a parent.** `getajob/apps/cv` and `claude-comm/review` ran launched interactive
+  sessions with no trust entry of their own in `~/.claude.json`. A new `/tmp` directory still stops at the prompt
+  (`#wake-doorbell`) — so the probe lived under `claude-comm/.comm/`, trusted and gitignored.
+- **A parent's project hooks do not fire in a subdirectory session**: `claude-comm/review`'s transcript carries
+  one `SessionStart` hook event and none of the root's boot output — so the probe could not write this repo's ledger.
+
+### The arm reddened on the clock first
+
+A63's first run was red with every sequence `NUDGE ⏎`: the decision table passed its fixed `now`, the effect runs
+did not, and every call read "cache still warm" against the real clock. **Red for a variable other than its
+title** — `CLAUDE.md`'s amendment, caught before shipping only because the arm prints what it typed. And the first
+smoke run printed `context 300 k, under the 300 k` for 299 999 — a line naming a number it did not test; exact now.
+
+**Proved red in copies, 2026-09-13, `attack.mjs` byte-identical (sha `7be4ac41a6f1dee9`)**: the unmutated copy is
+green; each mutation of `wake.mjs` reddens A63 alone, each for its own property — leader guard removed → *the
+leader, opted in by name; an agent at the project root*; confirmation always true → unconfirmed and half-typed read
+`/clear ⏎ FRESH ⏎`; `<=` → `<` on the age → *exactly 60 min*; the threshold one token lower → *one token under*;
+`appendFileSync` → `writeFileSync` → history `a5`, first ring lost; the half-line re-read removed → `/clear ⏎ NUDGE ⏎`.
+
+### Not verified
+
+- **The real 60-min path, end to end.** The live run overrode age and size through the function's options; the
+  CLI's thresholds are armed, not observed.
+- **A clear done by a Stop-hook-spawned wake** — `caller` is recorded in `rings.jsonl`, never yet seen from a hook.
+- **The hook's 10 s timeout against a slow confirmation** — one clear per run is the guard; 560 ms is one sample.
+- **What a bus-driven clear does to the ledger** — its `SessionStart` records a `clear` start, scored as cold.
+- **Overage's 5-minute TTL** — never observed on this box.
+- **An opted-in agent that had NOT written its state down** — the opt-in rests on getajob's reading of their
+  experts' `CLAUDE.md`, not on anything a clear can check.

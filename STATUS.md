@@ -6,15 +6,15 @@ fold the settled parts into the README.
 ## ▶ NEXT
 
 *(2026-09-13. **The owner handed over the whole project.** His asks: the leader picks each expert's model and
-effort — shipped; "the inbox saturates" — never observed, the load test found delivery did, fixed; and, relayed
-by getajob's leader, a cold expert should restart fresh instead of resuming 600 k uncached — item 0.)*
+effort — shipped; "the inbox saturates" — never observed, delivery did, fixed; a cold expert restarts fresh
+instead of resuming 600 k uncached — **shipped as `.6`**, item 0.)*
 
-**0 — 🔴 BUILD FIRST — THE OWNER SAID GO 2026-09-13 ("Build it, opt-in"): RESTART A COLD, BIG, IDLE AGENT FRESH
-BEFORE RINGING IT.** The whole plan, what is settled and what to measure first: `DESIGN-fresh-restart.md`.
-`FINDINGS.md#cache-lives-an-hour`: every session writes the 1 h cache; cold resumes re-wrote ≈ 13.5 M tokens,
-6.4 M in contexts > 300 k, mostly `work`. Proposed to getajob (their question: wake or the agent? — mine: wake):
-`/clear` when opted in (`config.json`), idle, last call > 60 min, context over a per-agent threshold still to
-measure; proven by the registry naming a NEW transcript, else ring as before. Risk: typed in the owner's line.
+**0 — 🟢 SHIPPED 2026-09-13 (`.6`, print `f7c3807cc42e`, all 3 trees): A COLD, BIG, IDLE, OPTED-IN AGENT IS CLEARED
+BEFORE ITS RING.** Rule 7 in `wake.mjs`, A63 (red 6 ways in copies), ring history `.comm/wake/rings.jsonl`.
+Threshold 300 000, age > 60 min, both measured; live end to end in a throwaway: `FINDINGS.md#fresh-restart`.
+**Owed, in order:** ① getajob sets `"freshRestart"` (letter sent, key named) — then read ITS `rings.jsonl` after a
+day: the real 60-min path and a hook-spawned clear were never observed; ② offer it to `work` (4.3 M of the waste),
+whose channel still holds our unread 09-08 letter; ③ a per-agent threshold only if a field start measures > 300 k.
 
 **1 — 🟢 SETTLED 2026-09-13, detail in `CHANGELOG.md` / `FINDINGS.md`:** review #10 closed (A22 = the whole bus in
 one Read call, 58 000 B; A1 two-way arm self-scan) · model + effort per launch (A57) · overflow drain (A60) ·
@@ -27,10 +27,9 @@ outlived their turn for that reason and waited ~2 min for a ring at rest. `excha
 **2 — ⚠️ `bin/context.mjs` READS ONE TURN BEHIND.** Measured today: a 9.7 KB read moved it only a turn later
 (+1 683, then +4 617). A before/after with it needs a turn in between. **Not yet named at its site.**
 
-**3 — ⚠️ A DOORBELL NOBODY RECORDS RINGING** (12:50:25Z, wake's own text). `wake` OVERWRITES one record per
-agent, whoever called it; a record OLDER than the event clears claude-comm, work, electio. getajob cleared itself,
-hooks included: no turn ended there then. A hook-spawned wake leaves NO transcript (getajob's catch) ⇒ the ring
-history must be written BY `wake`, append-only. Unchecked: kitty itself, a hand.
+**3 — ⚠️ A DOORBELL NOBODY RECORDS RINGING** (12:50:25Z). 🟢 **The history exists since `.6`**: every ring,
+append-only, with the parent's command line — so the NEXT unexplained ring is attributable. That one stays
+unexplained: kitty itself and a hand were never checked.
 
 **4 — 🔴 RUN THE CONTROLS FIRST**, `CLAUDE_COMM_AGENT` set (A48), output **to a file**; read the suite's LAST
 LINE, never a wrapper's exit code. ⚠️ **Never two suites at once** — they share kitty and make reds that look
