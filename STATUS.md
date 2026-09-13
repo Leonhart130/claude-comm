@@ -5,9 +5,8 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-09-13. **The owner handed over the whole project.** His asks: the leader picks each expert's model and
-effort — shipped; "the inbox saturates" — never observed, delivery did, fixed; a cold expert restarts fresh
-instead of resuming 600 k uncached — **shipped as `.6`**, item 0.)*
+*(2026-09-13. **The owner handed over the whole project**; all three of his asks shipped. The field is getajob —
+work is dormant for a while.)*
 
 **A — 🔴 FIRST: AMEND THE LAPSED-NOTE ROW.** The close printed *AMEND THE PROTOCOL* for `field:getajob@f59780`:
 acked 3× on 09-13 for one cause — "restart note LAPSED" while that leader (pid 13764) was alive and working (idle
@@ -16,29 +15,15 @@ holds `by_pid` only (`restart-signal.mjs:92`, TTL 900 s) ⇒ record `by_start` +
 then judge *armer gone* with `claim.mjs:112` `holderState`, TTL a backstop; old notes fall back to the TTL and say so.
 Read side: `boot.mjs:1013/1051/1056` (field) and `:492-497` (own tree). Arm both, `boot --prove-red`.
 
-**0 — 🟢 SHIPPED 2026-09-13 (`.6`, print `f7c3807cc42e`, all 3 trees): A COLD, BIG, IDLE, OPTED-IN AGENT IS CLEARED
-BEFORE ITS RING.** Rule 7 in `wake.mjs`, A63 (red 6 ways in copies), ring history `.comm/wake/rings.jsonl`.
-Threshold 300 000, age > 60 min, both measured; live end to end in a throwaway: `FINDINGS.md#fresh-restart`.
-**Owed, in order:** ① getajob SET the key (read 09-13, 5 experts) — read ITS `rings.jsonl` after a day: the real
-60-min path and a hook-spawned clear were never observed. 🟢 **Their catch, form K, fixed in `.8`:** `--dry-run` now
-reports the decision for every listed agent, mail or not (A66, `#dry-run-hid-the-decision`);
-② `work`: **DEFERRED** — the owner is not running it for a while (09-13), getajob is the field; ③ a per-agent threshold only if a field start measures > 300 k.
+**0 — 🟢 `.6`–`.8` SHIPPED, all 3 trees: fresh restart (A63, A66), ring history, continuation delivery (A65), bell
+turn guard (A64)** — `FINDINGS.md#fresh-restart`, `#stop-continuation`, `#bell-mid-turn`, `#dry-run-hid-the-decision`.
+**Owed, in getajob after a field day:** read its `rings.jsonl` (the real 60-min path and a hook-spawned clear were
+never observed) · recount queued doorbells (A62) and continuation deliveries (A65). `work`: deferred. A per-agent
+threshold only if a field start measures > 300 k.
 
-**1 — 🟢 SETTLED 2026-09-13, detail in `CHANGELOG.md` / `FINDINGS.md`:** review #10 closed (A22 = the whole bus in
-one Read call, 58 000 B; A1 two-way arm self-scan) · model + effort per launch (A57) · overflow drain (A60) ·
-unknown flags refuse (A61, .4) · **`wake` no longer types into a running turn** (A62, .5, `#wake-mid-turn`, in all
-3 trees; owed: a field recount of queued doorbells after a day). 🟡 Unexplained: ~31 silent listeners until A59.
-
-**1b — 🟢 SHIPPED 2026-09-13 (`.7`, all 3 trees): a `Stop` continuation delivers mail that arrived during it**,
-bounded at `STOP_CHAIN` = 3 per turn end, counted per session, fail-closed (A65, red 4 ways; live `claude -p`: the
-old bus left the mail, the new one delivered it; selftest green both ways). 49 of 258 blocks had waited, max 10.5 h.
-**Owed:** recount after a field day. `FINDINGS.md#stop-continuation`. 🟢 **`exchange-bell` no longer rings a peer
-mid-turn** (A64, 09-13): its ring is now a function the arm executes, not a script only a live peer could reach.
-`FINDINGS.md#bell-mid-turn`.
-
-**2 — 🟢 NAMED 2026-09-13: `bin/context.mjs` reads one API call behind, by construction** — a usage row is its
-request's input, so it excludes that request's own tool results (8 calls > 8 KB: the NEXT call grew by the result
-plus the output). Named at `lastUsage`. A before/after needs a call in between.
+**1 — 🟢 SETTLED 2026-09-13** (`CHANGELOG.md`, `FINDINGS.md`): review #10 · model + effort per launch (A57) ·
+overflow drain (A60) · unknown flags refuse (A61) · no ring mid-turn (A62) · `context.mjs`'s one-call lag named at
+`lastUsage`. 🟡 Unexplained: ~31 silent listeners until A59.
 
 **3 — ⚠️ A DOORBELL NOBODY RECORDS RINGING** (12:50:25Z). 🟢 **The history exists since `.6`**: every ring,
 append-only, with the parent's command line — so the NEXT unexplained ring is attributable. That one stays
