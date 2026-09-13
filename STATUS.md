@@ -51,7 +51,8 @@ like findings; a runner in copies waits on a done-file. 🔴 **zsh:** quote glob
 **6 — 🟡 CARRIED:** #9 A3 · C7 · #8 A3 (minor) · `who`'s third and fourth states · `dismiss --citing` ·
 `comm wait --for` · context.mjs's two `/clear` limits (do not "fix" with a guess) · the letter to `work`'s
 leader still unread, two `zz-` claims there held by dead pids · the automatic restart trigger (ledger
-UNKNOWN). A fresh review: `launch.mjs review --model opus --effort xhigh --prompt "…"` — the field's rule
+UNKNOWN) · boot's `channel:` row says a letter "arrived 13h ago" that came in under an hour earlier: it
+ages by the filename's date, deliberately (review #8 C3) — the word "arrived" is wrong, not the rule. A fresh review: `launch.mjs review --model opus --effort xhigh --prompt "…"` — the field's rule
 says never Sonnet for review.
 
 ## Where it stands
