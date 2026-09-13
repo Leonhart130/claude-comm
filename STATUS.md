@@ -22,10 +22,9 @@ unknown flags refuse (A61, .4) · **`wake` no longer types into a running turn**
 3 trees; owed: a field recount of queued doorbells after a day). 🟡 Unexplained: ~31 silent listeners until A59.
 
 **1b — 🔴 BUILD NEXT: a `Stop` continuation delivers nothing** (`comm.mjs:480`): 39 of 107 mid-turn mails
-outlived their turn for that reason and waited ~2 min for a ring at rest. 🔴 **`exchange-bell` still rings mid-turn**
-— re-checked 09-13: no turn read anywhere in it, `--dry-run` prints none. Until fixed, read `node bin/wake.mjs
---resolve <peer pid>` first (the `.6` letter was rung that way, idle 169 s). Fix shape: its ring as a function with
-injectable windows / lookup / send, like `wakeAgent`, so the arm EXECUTES it — A35 once gated this file's source.
+outlived their turn for that reason and waited ~2 min for a ring at rest. 🟢 **`exchange-bell` no longer rings a peer
+mid-turn** (A64, 09-13): its ring is now a function the arm executes, not a script only a live peer could reach.
+`FINDINGS.md#bell-mid-turn`.
 
 **2 — ⚠️ `bin/context.mjs` READS ONE TURN BEHIND.** Measured today: a 9.7 KB read moved it only a turn later
 (+1 683, then +4 617). A before/after with it needs a turn in between. **Not yet named at its site.**
