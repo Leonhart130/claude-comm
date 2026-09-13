@@ -72,7 +72,8 @@ sessions. Boot deliberately does not run them.
 
 ## Shape, and what may not be simplified away
 
-- `bin/comm.mjs` is the bus: no dependencies, short-lived, gated to 48 KB (A22) and to an import allowlist
+- `bin/comm.mjs` is the bus: no dependencies, short-lived, the WHOLE bus gated to one Read call of the reviewing
+  model (58 KB, A22) and to an import allowlist
   (A21). `bin/boot.mjs` and `bin/context.mjs` are **not** the bus — they spawn, and are outside both gates
   by design.
 - A message carries a **pointer**, never content: `--ref` is required, there is no `--body`. The same rule

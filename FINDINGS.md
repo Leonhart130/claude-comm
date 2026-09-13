@@ -2560,3 +2560,32 @@ no longer lost.
 over its backlog. With 32 left pending, A3 went red at 7 623 chars rendering 8 of A2's leftovers — not its
 own note — and A4 found 18 good messages "left". A2 now clears its backlog, bounded. The overflow line itself
 was cut to fit A2's render budget (+11 chars of a 25-char margin): a red there is paid in words, not budget.
+
+## `#bus-read-in-one-call` — the cap re-argued once: the whole bus in one Read call of the reviewing model
+
+**2026-09-13, review #10 C4.** A22 capped each module at 48 000 B — a number set *"with ~18 % headroom over the
+size on the day it was written"* — and the 09-11 split turned it into `48 000 × N`: the bus reached 51 142 B
+while the gate went from red to green (`#split-raised-the-cap`). The instruction left in STATUS was to re-argue
+the number ONCE, with evidence, and never fit it to today's size.
+
+**"One sitting", made mechanical:** the whole bus comes back from ONE Read call entire, not as a page marked
+*"Do NOT answer from this page alone"*. Measured the same day:
+
+| quantity | value | how |
+| --- | --- | --- |
+| Read call cap | 25 000 tokens | the tool's own note on files over it — it now PAGES; older versions refused (4 transcripts) |
+| it is the READER's tokenizer | `boot.mjs`: 79 410 tokens to Opus 5, 60 572 to Haiku 4.5 | same bytes, a `claude -p` per model; an Opus `-p` reproduced this session's 79 410 as the control |
+| Opus 5 bytes per token, this repo's JS | `attack.mjs` 2.32 · `boot.mjs` 2.42 · the bus 2.44 | the bus doubled (42 079 tokens) so the tool would print a count at all |
+| the bus | 51 379 B ≈ 21 040 Opus-5 tokens | 84 % of one call |
+| how the review sessions read it | in slices 18 times, whole 3 | their Bash reads |
+
+⇒ **A22 gates the TOTAL at 25 000 × 2.32 = 58 000 B.** The lowest ratio measured is used, so the byte gate errs
+toward red by the spread actually observed. The budget binds on Opus: review runs on Opus by the field's own
+rule, and Opus tokenises densest. **No per-module cap** — a total bounds every module, and a split cannot escape
+it. Re-measure when the reviewing model changes. For the Rust port the property transfers unchanged; only the
+ratio is re-measured.
+
+Proved red in copies, 2026-09-13, the gate byte-identical: the control is green at 51 379 B (89 %);
+`comm.mjs` grown past the total → 58 383 B, red; **a third module — the split escape, every module under the old
+48 000 — → 58 401 B, red**; growth that stays under → 57 383 B, green, so the threshold sits where it is argued and
+not at "anything bigger than today". A21 green throughout.

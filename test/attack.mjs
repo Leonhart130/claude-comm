@@ -1321,25 +1321,49 @@ const POINTER_SOURCES = (() => {
 	// protected is not disk space — it is that one person can still read the whole
 	// bus in one sitting. Every defect this project has found was found by reading
 	// or by measuring; a file too large to read end-to-end retires the first half of
-	// that method. Set with ~18% headroom over the size on the day it was written.
-	const BUS_BUDGET = 48_000
-	// EVERY module, not just comm.mjs. Splitting must not be a way to stop being measured:
-	// the property is that a person can read the bus, and a second file is a second sitting,
-	// so each one is held to the same limit and the TOTAL is printed to keep the growth in
-	// view. 🔴 A third module that comm.mjs IMPORTS cannot escape: A21 above counts an
+	// that method.
+	//
+	// 🔴 RE-ARGUED 2026-09-13, ONCE, ON MEASUREMENT — review #10 C4. This was `48_000` PER MODULE, set
+	// "with ~18% headroom over the size on the day it was written", and the 09-11 split made it a
+	// ceiling that rose by 48 000 with every module: the bus reached 51 142 B while the gate went from
+	// red to green. Printing the total was not gating it. FINDINGS.md#bus-read-in-one-call
+	//
+	// THE PROPERTY, made mechanical: the WHOLE bus comes back from ONE Read call of the model that
+	// reviews it — entire, not a page marked "Do NOT answer from this page alone". Two measured
+	// quantities, neither of them the bus's own size:
+	//   · READ_CALL_TOKENS — the Read tool pages every file at 25 000 tokens, counted in the READING
+	//     model's tokenizer: boot.mjs is 79 410 tokens to Opus 5 and 60 572 to Haiku 4.5, so the budget
+	//     binds on the model that tokenises densest — and review runs on Opus by the field's own rule
+	//   · BYTES_PER_TOKEN — Opus 5 on this repo's JS: attack.mjs 2.32, boot.mjs 2.42, the bus itself
+	//     2.44. The LOWEST is used, so the byte gate errs toward red by the spread actually observed.
+	//     Re-measure when the reviewing model changes; for the Rust port only this ratio moves.
+	// No per-module cap: a total bounds every module, and a split can no longer escape it.
+	const READ_CALL_TOKENS = 25_000
+	const BYTES_PER_TOKEN = 2.32
+	// round, not floor: 25 000 × 2.32 is 57 999.999… in floating point, and floor printed a budget one
+	// byte short of the 58 000 that CLAUDE.md and FINDINGS state — a gate disagreeing with its own doc
+	const BUS_TOTAL_BUDGET = Math.round(READ_CALL_TOKENS * BYTES_PER_TOKEN)
+	// 🔴 A third module that comm.mjs IMPORTS cannot escape: A21 above counts an
 	// unlisted relative specifier as foreign, so adding one without listing it reddens.
 	// ⚠️ THAT IS ONE DIRECTION ONLY, and the first draft of this comment overclaimed it as
 	// both. A file added to install.mjs's BUS_FILES that comm.mjs does NOT import ships
 	// without ever being seen here — already true of wake.mjs, claim.mjs and the rest, so it
 	// is A21's pre-existing scope, not something the split introduced: A21 has always been
 	// about the BUS, not about every file the installer carries.
+	const overBudget = (moduleSizes) => moduleSizes.reduce((a, s) => a + s, 0) > BUS_TOTAL_BUDGET
 	const sizes = BUS_MODULES.map((f) => ({ f, size: Buffer.byteLength(readFileSync(join(PKG, "bin", f), "utf8")) }))
-	const over = sizes.filter((m) => m.size > BUS_BUDGET)
-	check("A22 every bus module stays readable in one sitting",
-		over.length === 0,
-		sizes.map((m) => `${m.f} ${m.size} B (${Math.round((m.size / BUS_BUDGET) * 100)}%)`).join(", ") +
-		`; total ${sizes.reduce((a, m) => a + m.size, 0)} B across ${sizes.length} module(s), budget ${BUS_BUDGET} each — ` +
-		`if this is red, split it or cut it; raising the budget is not a fix`)
+	const total = sizes.reduce((a, m) => a + m.size, 0)
+	// CONTROLS, through the SAME predicate the real bus goes through: the escape the old rule allowed — a
+	// bus over budget, split into modules each under it — must redden, and a bus exactly at budget must
+	// not. Without the second, a predicate that reddens on everything would pass the first.
+	const splitEscapeCaught = overBudget([BUS_TOTAL_BUDGET / 2 + 1, BUS_TOTAL_BUDGET / 2 + 1])
+	const atBudgetPasses = !overBudget([BUS_TOTAL_BUDGET])
+	check("A22 the whole bus stays readable in one sitting",
+		!overBudget(sizes.map((m) => m.size)) && splitEscapeCaught && atBudgetPasses,
+		`${sizes.map((m) => `${m.f} ${m.size} B`).join(" + ")} = ${total} B of ${BUS_TOTAL_BUDGET} ` +
+		`(${Math.round((total / BUS_TOTAL_BUDGET) * 100)}%, ~${Math.round(total / 2.44)} Opus-5 tokens of a ${READ_CALL_TOKENS}-token Read call); ` +
+		`control, a split into modules each under budget still reddens=${splitEscapeCaught}; a bus exactly at budget passes=${atBudgetPasses} — ` +
+		`if this is red, cut, or move narrative to FINDINGS.md; raising the budget without re-measuring is not a fix`)
 }
 
 // A29 — the field hook records the session start in BOTH instruments, and delivery is
