@@ -12,8 +12,9 @@ instead of resuming 600 k uncached — **shipped as `.6`**, item 0.)*
 **0 — 🟢 SHIPPED 2026-09-13 (`.6`, print `f7c3807cc42e`, all 3 trees): A COLD, BIG, IDLE, OPTED-IN AGENT IS CLEARED
 BEFORE ITS RING.** Rule 7 in `wake.mjs`, A63 (red 6 ways in copies), ring history `.comm/wake/rings.jsonl`.
 Threshold 300 000, age > 60 min, both measured; live end to end in a throwaway: `FINDINGS.md#fresh-restart`.
-**Owed, in order:** ① getajob sets `"freshRestart"` (letter sent, key named) — then read ITS `rings.jsonl` after a
-day: the real 60-min path and a hook-spawned clear were never observed; ② offer it to `work` (4.3 M of the waste),
+**Owed, in order:** ① getajob SET the key (read 09-13, 5 experts) — read ITS `rings.jsonl` after a day: the real
+60-min path and a hook-spawned clear were never observed. 🔴 **Their catch, form K:** `wake --dry-run` computes the
+decision only for agents with mail, so an opted-in leader cannot check it — report it for every listed agent; ② offer it to `work` (4.3 M of the waste),
 whose channel still holds our unread 09-08 letter; ③ a per-agent threshold only if a field start measures > 300 k.
 
 **1 — 🟢 SETTLED 2026-09-13, detail in `CHANGELOG.md` / `FINDINGS.md`:** review #10 closed (A22 = the whole bus in
