@@ -2589,3 +2589,27 @@ Proved red in copies, 2026-09-13, the gate byte-identical: the control is green 
 `comm.mjs` grown past the total → 58 383 B, red; **a third module — the split escape, every module under the old
 48 000 — → 58 401 B, red**; growth that stays under → 57 383 B, green, so the threshold sits where it is argued and
 not at "anything bigger than today". A21 green throughout.
+
+## `#unknown-flag-acts-on-all` — `dismiss --help` acknowledged a whole inbox
+
+**Reported by the `getajob` field leader, 2026-09-13**, who wanted the syntax of `--id` and typed
+`comm dismiss --help`: *"✓ dismissed 2 message(s)"* — an unread `web` report acknowledged. Nothing was lost:
+`delivered/` and `log.jsonl` keep every message whole, which is exactly what "move, never delete" is for.
+
+Measured in a fixture the same day, one command at a time, the inbox refilled before each:
+
+| command | before the fix |
+| --- | --- |
+| `dismiss --help` | inbox 2 → 0, exit 0 |
+| `dismiss --idd abc` — a one-letter typo of `--id` | inbox 2 → 0, exit 0 |
+| `dismiss --id nosuch` (control) | inbox 2 → 2 |
+| `send app --ref R.md --notte hello` — a typo of `--note` | sent, the note dropped, exit 0 |
+| `dismiss -h` | refused, by accident: `-h` was read as an agent name |
+
+**Mechanism:** `firstPositional` skips any unknown `--flag` together with the token after it, so a writing
+command given a flag it does not know finds no agent and acts on the caller's WHOLE inbox. The read-only
+commands (`inbox`, `sent`, `log`) ignored unknown flags harmlessly.
+
+⇒ Every subcommand checks its flags against a list: an unknown flag exits 2 and does nothing, `--help` / `-h`
+print the usage and do nothing, and a value after a flag that takes one (`--note "-text"`) is never a flag.
+Every in-repo caller and every field use found (29 + 8 + 7 files) stays inside the lists. Gated by A61.

@@ -560,6 +560,21 @@ function main() {
 	const cfg = loadConfig(root)
 	const me = whoami(root, cfg)
 
+	// AN UNKNOWN FLAG REFUSES; --help ACTS ON NOTHING. `dismiss --help` cleared a whole inbox, and so did
+	// `dismiss --idd x`, a typo of --id: firstPositional skipped the flag, found no agent, and the command
+	// acted on everything (getajob field, 2026-09-13). FINDINGS.md#unknown-flag-acts-on-all
+	const FLAGS = { send: ["--ref", "--note", "--kind", "--from", "--force"], dismiss: ["--id", "--force"], inbox: [],
+		sent: ["--n"], log: ["--n"], who: ["--json", "--all"], whoami: ["--agent-root"] }
+	const VALUED = new Set(["--ref", "--note", "--kind", "--from", "--id", "--n", "--agent-root"])
+	if (FLAGS[cmd]) {
+		if (rest.includes("--help") || rest.includes("-h")) return dispatch(root, cfg, me, "help", [])
+		const unknown = rest.filter((a, i) => a.startsWith("-") && !FLAGS[cmd].includes(a) && !VALUED.has(rest[i - 1]))
+		if (unknown.length) {
+			console.error(`✗ comm ${cmd}: unknown flag ${unknown.join(" ")} — nothing was done.\n  ${cmd} takes: ${FLAGS[cmd].join(" ") || "no flags"} · comm ${cmd} --help`)
+			process.exit(2)
+		}
+	}
+
 	try { dispatch(root, cfg, me, cmd, rest) }
 	catch (e) {
 		// A refused send is a normal outcome (hub enforcement, bad recipient,

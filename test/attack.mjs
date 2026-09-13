@@ -3381,6 +3381,71 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		`the next turn end -> shown ${n.shown}, left ${nLeft}, logged ${nLogged} in all=${secondOk}`)
 }
 
+// A61 — a flag a subcommand does not know REFUSES, and --help acts on nothing.
+//
+// Reported by the getajob field leader, 2026-09-13: `comm dismiss --help` printed "✓ dismissed 2 message(s)" —
+// an unread report acknowledged while the leader looked up the syntax of --id. Measured in a fixture the same
+// day: `dismiss --idd abc`, a one-letter typo of --id, cleared everything too, and `send --notte x` dropped the
+// note with exit 0. firstPositional skips an unknown flag, finds no agent, and the command acts on the caller's
+// whole inbox. FINDINGS.md#unknown-flag-acts-on-all
+//
+// One fixture, refilled before each case, the bus byte-identical:
+//   ① dismiss --help -> usage, exit 0, inbox untouched
+//   ② dismiss --idd abc -> exit 2 naming --idd, inbox untouched
+//   ③ send --notte hello -> exit 2, nothing queued
+//   ④ POSITIVE CONTROLS: dismiss --id <a real id> removes exactly that one; a note that BEGINS with "-" is
+//      accepted (a value is not a flag); `who --json` still answers. Without them ①-③ pass for a bus that
+//      refuses everything.
+{
+	const r61 = mkdtempSync(join(tmpdir(), "comm-attack-flags-"))
+	atExit(() => { try { rmSync(r61, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(r61, ".comm", "bin"), { recursive: true })
+	for (const a of ["leader", "app"]) mkdirSync(join(r61, ".comm", "inbox", a), { recursive: true })
+	mkdirSync(join(r61, "app"), { recursive: true })
+	writeFileSync(join(r61, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app" } }))
+	for (const f of ["comm.mjs", "who.mjs"]) cpSync(join(PKG, "bin", f), join(r61, ".comm", "bin", f))
+	const B61 = join(r61, ".comm", "bin", "comm.mjs")
+	const bus61 = (cwd, args) => spawnSync(process.execPath, [B61, ...args], { cwd, encoding: "utf8" })
+	const box61 = (a) => readdirSync(join(r61, ".comm", "inbox", a)).filter((f) => f.endsWith(".json"))
+	// the expert fills the leader's inbox; a ref resolves against the expert's spoke
+	const fill61 = () => {
+		for (let k = 0; k < 2; k++) {
+			writeFileSync(join(r61, "app", "R.md"), `report ${k} ${Math.random()}\n`)
+			bus61(join(r61, "app"), ["send", "leader", "--ref", "R.md"])
+		}
+		return box61("leader").length
+	}
+	const clear61 = () => bus61(r61, ["dismiss"])
+
+	const f1 = fill61(); const help = bus61(r61, ["dismiss", "--help"]); const helpLeft = box61("leader").length; clear61()
+	const f2 = fill61(); const typo = bus61(r61, ["dismiss", "--idd", "abc"]); const typoLeft = box61("leader").length; clear61()
+	writeFileSync(join(r61, "app", "R.md"), "brief\n")
+	const appBefore = box61("app").length
+	const notte = bus61(r61, ["send", "app", "--ref", "R.md", "--notte", "hello"])
+	const notteQueued = box61("app").length - appBefore
+	// ④ the controls
+	const f4 = fill61()
+	const oneId = (box61("leader")[0] || "").replace(/\.json$/, "")
+	const byId = bus61(r61, ["dismiss", "--id", oneId]); const idLeft = box61("leader").length; clear61()
+	writeFileSync(join(r61, "app", "R.md"), "brief 2\n")
+	const dashNote = bus61(r61, ["send", "app", "--ref", "R.md", "--note", "-starts with a dash"])
+	const whoJson = bus61(r61, ["who", "--json"])
+	let whoOk = false
+	try { whoOk = whoJson.status === 0 && !!JSON.parse(whoJson.stdout).agents } catch {}
+
+	const helpOk = f1 === 2 && help.status === 0 && /claude-comm/.test(help.stdout) && helpLeft === 2
+	const typoOk = f2 === 2 && typo.status === 2 && /--idd/.test(typo.stderr) && typoLeft === 2
+	const notteOk = notte.status === 2 && /--notte/.test(notte.stderr) && notteQueued === 0
+	const controlsOk = f4 === 2 && byId.status === 0 && idLeft === 1 && dashNote.status === 0 && whoOk
+	check("A61 a flag a subcommand does not know refuses, and --help acts on nothing",
+		helpOk && typoOk && notteOk && controlsOk,
+		`dismiss --help -> exit ${help.status}, inbox ${f1} -> ${helpLeft}, usage printed=${helpOk}; ` +
+		`dismiss --idd abc -> exit ${typo.status}, inbox ${f2} -> ${typoLeft}, names --idd=${typoOk} (before the fix: 2 -> 0, exit 0); ` +
+		`send --notte hello -> exit ${notte.status}, queued ${notteQueued}=${notteOk} (before: sent, note dropped); ` +
+		`positive controls, dismiss --id <real> leaves 1 of 2, a note starting with "-" is accepted, who --json answers=${controlsOk} ` +
+		`(without them the lines above pass for a bus that refuses everything)`)
+}
+
 // A52 — the doorbell states a fact. It gives no conduct instruction and makes no promise.
 //
 // Reported by the `getajob` field leader, 2026-09-11, after paying for both halves. The
