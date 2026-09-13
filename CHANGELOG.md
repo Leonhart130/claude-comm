@@ -31,6 +31,21 @@ already have.
 
 
 
+
+## 2026-09-13.1 — bus print `f8e8b56deb97` — 2026-09-13
+
+- 🔴 **`launch.mjs` now REQUIRES `--model` and `--effort`, and refuses without them.** Until today it passed
+  neither, so every expert inherited the machine's tier — on the box this was built on, Opus at `xhigh`,
+  chosen by nobody. Type: `node .comm/bin/launch.mjs <agent> --model <model> --effort <level> --prompt "<first turn>"`.
+  `--model`: `opus` · `sonnet` · `haiku` · `fable`, or a full id such as `claude-sonnet-5`. `--effort`: `low` ·
+  `medium` · `high` · `xhigh` · `max`. A flag-shaped or unknown value is refused, never passed through.
+- `--print` shows the `model` and `effort` it would launch with — check a launch before you make it.
+- **Choose for the task, not for the agent.** There is no default anywhere, `config.json` included. The first
+  rule of choice, from the `getajob` field, is in `.comm/README.md` — an indication from one session, not a measurement.
+- Verified where it lands: a session launched this way records `"model"` and `"effort"` in its own transcript.
+  That transcript, not the launcher's output, is what it actually ran on.
+- `restart.mjs prepare` prints the relaunch line with the tier in it.
+
 ## 2026-09-11.7 — bus print `cf5efbcf46c5` — 2026-09-11
 
 *Two fixes from an adversarial review, and one of them is a trap you would have walked into.*

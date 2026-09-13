@@ -95,7 +95,8 @@ function prepare() {
 		`  ${(p.stdout || "").trim().split("\n")[0]}\n\n` +
 		`  The last step is yours, and this tool will not take it: launch.mjs refuses an agent\n` +
 		`  that is already alive (A17), and you are it. Exit, then:\n\n` +
-		`      node ${join(HERE, "launch.mjs")} ${agent}\n\n` +
+		`      node ${join(HERE, "launch.mjs")} ${agent} --model <model> --effort <level> --prompt "<first turn>"\n\n` +
+		`  (the tier is yours to choose and has no default - launch.mjs refuses without it)\n\n` +
 		`  Or relaunch by hand in this project. The next session reads:\n` +
 		`      node ${join(HERE, "handoff.mjs")} verify\n`)
 }

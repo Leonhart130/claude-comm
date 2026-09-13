@@ -2,7 +2,7 @@
 /**
  * claude-comm LAUNCH — start an agent's session, or REFUSE. Never both.
  *
- *   node bin/launch.mjs <agent> [--print]
+ *   node bin/launch.mjs <agent> --model <m> --effort <e> [--prompt "<first turn>"] [--print] [--os-window]
  *
  * WHY THIS REFUSES INSTEAD OF TRYING. `kitten @ launch` starts the child from the
  * KITTY process, so the child inherits kitty's environment — and kitty here was
@@ -67,7 +67,7 @@
  * by construction rather than by a cross-check that has to be remembered.
  */
 import { existsSync, accessSync, constants, readFileSync } from "node:fs"
-import { join, dirname, delimiter } from "node:path"
+import { join, dirname, delimiter, relative } from "node:path"
 import { spawnSync } from "node:child_process"
 import { homedir } from "node:os"
 
@@ -124,7 +124,8 @@ if (pi > -1 && (prompt === undefined || prompt.startsWith("-")))
 	    `  ${prompt === undefined ? "A bare --prompt" : `A prompt starting with "-" is read by claude as a FLAG (\`-p\` is print mode), so it`}\n` +
 	    `  would launch a session that takes no turn — the exact failure this flag exists to remove.\n` +
 	    `  If you meant a bullet, drop the leading "- " or start with the word.`)
-if (!agent || agent.startsWith("--")) die(`usage: launch.mjs <agent> [--prompt "<first turn>"] [--print] [--os-window]\n` +
+if (!agent || agent.startsWith("--")) die(`usage: launch.mjs <agent> --model <model> --effort <level> [--prompt "<first turn>"] [--print] [--os-window]\n` +
+	`  --model and --effort are REQUIRED: the tier is chosen for each task, never inherited.\n` +
 	`  default: a pane in the CURRENT tab. --os-window opens a separate OS window instead.\n` +
 	`  --prompt is what makes the new session TAKE A TURN. Without it, it sits at its prompt\n` +
 	`  and does nothing, while 'comm who' reports it as running.`)
@@ -141,6 +142,49 @@ if (!cfg.agents[agent]) {
 	die(`unknown agent '${agent}'. Known: ${Object.keys(cfg.agents).join(", ")}\n` +
 	    `  A launchable name comes from .comm/config.json, never from message text.`)
 }
+
+// ── THE TIER: which model, at which effort — chosen by the CALLER, on every launch ──
+//
+// Asked by the owner 2026-09-13: *"j'ai bossé avec des agents sous opus 5 avec l'effort en xhigh, les
+// résultats sont super, mais ça me coûte trop d'usage"* — so a leader picks each expert's tier FOR THE
+// TASK, Sonnet when the work is execution against a precise brief. Measured the same day:
+// ~/.claude/settings.json sets `model: opus` and `effortLevel: xhigh` for the whole machine, and this
+// file passed neither flag — so every expert any leader launched ran on the most expensive tier, and
+// nobody had chosen it. The failure that does not look like one, again: the session works, and the
+// cost is paid silently on every turn it takes.
+//
+// 🔴 REQUIRED, never defaulted — and not in config.json either. The tier belongs to the TASK, not to
+// the agent: the same `db` expert runs a migration one hour and designs a schema the next. A default
+// is exactly how the expensive tier got picked without anyone picking it. A refusal costs one retry and
+// names the flags; a silent default costs every turn of every launch.
+//
+// VERIFIED WHERE IT LANDS, 2026-09-13: `claude -p --model sonnet --effort low` wrote
+// "model":"claude-sonnet-5" and "effort":"low" into its own transcript, while an unflagged field session
+// wrote claude-opus-5 / xhigh. The transcript is what a session ACTUALLY ran on; this file only asks.
+//
+// Both values become argv elements of the child, so they are VALIDATED, never passed through: an
+// unchecked `--model --dangerously-skip-permissions` would ride into claude as a flag of its own. A57.
+const EFFORTS = ["low", "medium", "high", "xhigh", "max"]   // `claude --help`, 2026-09-13
+const MODEL_RE = /^(opus|sonnet|haiku|fable|claude-[a-z0-9][a-z0-9.-]*)(\[1m\])?$/
+const flagValue = (flag) => { const i = process.argv.indexOf(flag); return i > -1 ? (process.argv[i + 1] ?? "") : null }
+const model = flagValue("--model"), effort = flagValue("--effort")
+const TIER_HELP =
+	`  --model  opus | sonnet | haiku | fable, or a full id such as claude-sonnet-5\n` +
+	`  --effort ${EFFORTS.join(" | ")}\n` +
+	`  Choose for the TASK. First field rule (getajob, 2026-09-13): sonnet for a bounded task whose output an\n` +
+	`  external check REFUSES; never for adversarial review, law, or the leader. Effort high by default,\n` +
+	`  xhigh for review and law. An indication, not a measurement: .comm/README.md. No default, on purpose.`
+if (model === null || effort === null)
+	die(`no ${[model === null && "--model", effort === null && "--effort"].filter(Boolean).join(" and no ")}: this launch would inherit the machine's\n` +
+	    `  default tier from ~/.claude/settings.json — which is how every expert came to run on the most\n` +
+	    `  expensive one without anyone choosing it. REFUSING. Type:\n` +
+	    `    node ${relative(process.cwd(), new URL(import.meta.url).pathname)} ${agent} --model <model> --effort <level> <the rest of your arguments, unchanged>\n` +
+	    TIER_HELP)
+const flagShaped = (v) => v.startsWith("-") ? ` A value beginning with "-" would reach claude as a FLAG.` : ""
+if (!MODEL_RE.test(model))
+	die(`--model ${JSON.stringify(model)} is not a model name — REFUSING.${flagShaped(model)}\n` + TIER_HELP)
+if (!EFFORTS.includes(effort))
+	die(`--effort ${JSON.stringify(effort)} is not an effort level — REFUSING.${flagShaped(effort)}\n` + TIER_HELP)
 
 // ── refuse to launch what is already alive (A17) ─────────────────────────────
 // comm.mjs is resolved RELATIVE TO THIS FILE, never rebuilt from the project root:
@@ -177,6 +221,7 @@ const childPath = [dirname(nodeBin), dirname(claudeBin), ...(process.env.PATH ||
 const cwd = join(root, cfg.agents[agent] ?? ".")
 const argv = ["@", "launch", `--type=${osWindow ? "os-window" : "window"}`, "--keep-focus", `--cwd=${cwd}`,
 	`--env=PATH=${childPath}`, `--env=CLAUDE_COMM_AGENT=${agent}`, claudeBin,
+	"--model", model, "--effort", effort,
 	...(prompt ? [prompt] : [])]
 
 const wake = await import(new URL("wake.mjs", import.meta.url))
@@ -194,7 +239,7 @@ if (printOnly) {
 	// `--print` showed an argv the real launch never used — the same "the checking mode is
 	// quieter than the thing it checks" defect A53 exists to forbid, one flag-pair over.
 	console.log(JSON.stringify({ agent, cwd, node: nodeBin, claude: claudeBin, path: childPath, argv,
-		type: osWindow ? "os-window" : "window", prompt }, null, 2))
+		type: osWindow ? "os-window" : "window", model, effort, prompt }, null, 2))
 	// 🔴 THE WARNING BELONGS HERE TOO. Reported by the `getajob` field leader 2026-09-11:
 	// --print is the mode someone uses to CHECK a launch before making it, and it was the one
 	// mode that omitted the consequence of launching with no first turn. An absent prompt is
@@ -284,6 +329,7 @@ console.log(`  window: ${winId} (${split ? "split" : "os-window"})${wantSock ? "
 console.log(marked
 	? `  marked CLAUDE_COMM_LAUNCHED=${agent} on the window — this is what lets it close ITSELF (bin/close.mjs)`
 	: `  ⚠ NOT marked (${markWhy}) — the session is up and fine, but it will REFUSE to close itself`)
+console.log(`  tier:   --model ${model} --effort ${effort} — the caller's choice; the child's transcript records what it actually ran on`)
 // SAY THE CONSEQUENCE, EVERY TIME. A launch with no first turn is the failure that does not
 // look like one, so the launcher that created it is the one place a reader is certain to be
 // looking. This is deliberately not a refusal: an interactive session a human will type into
