@@ -719,6 +719,17 @@ found the same way: a count in the boot report moved with no reason to.
 path writes — an arm, or a person at a prompt. `CLAUDE_COMM_RUNTIME` was already the seam for the registry and `--field` for the field scan;
 the LEDGER's root had no seam, so nothing stopped the write and nothing announced it.
 
+**Three more, 2026-09-13, in one investigation — two caught by the `getajob` field leader, one by me**
+(`#wake-mid-turn`, `STATUS.md` item 3):
+- a record OVERWRITTEN on every event was read as a history: *"no wake record in any tree at 12:50"* could not see a
+  ring that a later one erased. Only a record OLDER than the event proves anything;
+- a search of every transcript for ring CALLS was read as a search for RINGS: a hook spawns `wake` with
+  `stdio: "ignore"` and leaves no transcript at all;
+- a rule was scored by TIMESTAMP when a reader at ring time holds FILE order — Claude Code writes a message when it
+  ends, stamped when it began — which flattered the rule until the measurement was redone.
+
+⇒ Same shape each time: **the instrument's view was not the view of the thing being judged.**
+
 ## `#tier0-calibration` — the tier-0 cap counts bytes; here is what a byte is worth
 
 Prompted 2026-09-04 by the `~/Dev/work` leader, who found the same class of defect in his own instrument and
