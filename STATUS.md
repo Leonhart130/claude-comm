@@ -34,14 +34,10 @@ pending 5 min 35. Measure busy vs idle (CPU, transcript tail) on more than one s
 **2 — ⚠️ `bin/context.mjs` READS ONE TURN BEHIND.** Measured today: a 9.7 KB read moved it only a turn later
 (+1 683, then +4 617). A before/after with it needs a turn in between. **Not yet named at its site.**
 
-**3 — ⚠️ A DOORBELL NOBODY RECORDS RINGING:** 12:50:25Z in this leader's input, wake's own text (only `wake.mjs`
-emits it). 🔴 **The first proof was a probe that could not fire** (caught by getajob's leader): `wake.mjs:117`
-OVERWRITES one file per agent, so "no wake record in any tree" was blind to any ring a later one erased. What
-still holds: a record OLDER than the event proves no ring after it ⇒ claude-comm, work, electio cleared;
-**getajob is the only blind tree**. Measured 2026-09-13 across every transcript active 12:43–12:52Z: one ring
-call (getajob's 12:43:33); two selftests ended 12:46:20 and never call wake; nothing in wake sleeps. ⇒ **a ring
-from outside any session — by hand or a process with no transcript — and nothing records it.** Stop digging:
-the fix is an append-only ring history, built with 1b. Not checked: getajob's hooks, the kitty windows.
+**3 — ⚠️ A DOORBELL NOBODY RECORDS RINGING** (12:50:25Z, wake's own text). 🔴 My first proof could not fire:
+`wake.mjs:117` OVERWRITES one record per agent. A record OLDER than the event still clears claude-comm, work,
+electio; getajob is blind. No transcript active 12:43–12:52Z rang but getajob's 12:43:33 ⇒ rung from outside
+any session, unrecorded. Fix: an append-only ring history, with 1b. Unchecked: getajob's hooks, kitty.
 
 **4 — 🔴 RUN THE CONTROLS FIRST**, `CLAUDE_COMM_AGENT` set (A48), output **to a file**; read the suite's LAST
 LINE, never a wrapper's exit code. ⚠️ **Never two suites at once** — they share kitty and make reds that look
