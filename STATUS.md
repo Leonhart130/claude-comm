@@ -11,7 +11,7 @@ work is dormant for a while.)*
 **A — 🔴 FIRST: AMEND THE LAPSED-NOTE ROW.** The close printed *AMEND THE PROTOCOL* for `field:getajob@f59780`:
 acked 3× on 09-13 for one cause — "restart note LAPSED" while that leader (pid 13764) was alive and working (idle
 18:49Z, rung at rest 19:33Z, busy after). **Not `--amended` by flag: nothing it measures has changed yet.** The note
-holds `by_pid` only (`restart-signal.mjs:92`, TTL 900 s) ⇒ record `by_start` + `by_boot` at arm (bus file → release),
+holds `by_pid` only (`restart-signal.mjs:92`, TTL 900 s) — 🔴 and it is the ARMING CLI's pid, dead at once (armed 20:39Z: 1033917, session 663779): use `sessionPid()`, or every note reads armer-gone at birth ⇒ record `by_start` + `by_boot` at arm (bus file → release),
 then judge *armer gone* with `claim.mjs:112` `holderState`, TTL a backstop; old notes fall back to the TTL and say so.
 Read side: `boot.mjs:1013/1051/1056` (field) and `:492-497` (own tree). Arm both, `boot --prove-red`.
 
