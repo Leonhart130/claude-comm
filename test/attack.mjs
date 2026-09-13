@@ -156,8 +156,11 @@ const count = (a) => { try { return readdirSync(join(root, ".comm", "inbox", a))
 
 let failed = 0
 let ran = 0
+const reportedArms = new Set()
 const check = (name, pass, detail) => {
 	ran++
+	const id = (String(name).match(/^A\d+/) || [])[0]
+	if (id) reportedArms.add(id)
 	console.log(`  ${pass ? "✓" : "✗"} ${name.padEnd(34)} ${detail}`)
 	if (!pass) failed++
 }
@@ -171,15 +174,20 @@ const check = (name, pass, detail) => {
 // I nearly concluded from it that the amendment under test had no hole.
 //
 // This is review #9's "a guard that never ran when the suite aborted" as a property of the
-// whole instrument rather than one arm. A floor is the honest form: it says "at least this
-// many arms must have spoken", it needs raising only when arms are added, and it cannot be
-// satisfied by an abort. The previous line — bare `failed ? ... : "all passed"` — could.
-// ⚠️ ITS LIMIT, because a floor is not an equality: adding five arms while five others
-// silently stop running still clears 56. It catches the catastrophic case (an abort, a
-// whole block skipped), not a slow leak. Equality was rejected because it reddens for the
-// ordinary act of adding an arm, and a gate that cries wolf on routine work gets ignored —
-// which is the failure this project has already paid for once.
-const ARM_FLOOR = 57
+// whole instrument rather than one arm.
+//
+// 🔴 IT WAS A FLOOR, AND THE FLOOR WENT STALE AS ITS OWN LIMIT PREDICTED — review #10 A1. `ARM_FLOOR`
+// was 56 against 58 arms the morning it was reviewed and 57 against 61 on 2026-09-13: four arms could
+// stop reporting and this suite still printed "all passed". The reviewer proposed a ratchet on the last
+// recorded pass; that needs state a fresh clone lacks, and a discharge for every deliberate removal.
+// So the SOURCE is asked instead, in both directions:
+//   · every arm id declared in a `check("A…")` call in this file must REPORT — adding or removing an
+//     arm moves both sides at once, and an arm that silently stops is NAMED;
+//   · every id that reports must have been DECLARED — the scan's own control, and it has already paid:
+//     the first draft stripped `/* … */` with a regex, a `/*` inside a string swallowed code, and A29,
+//     A30 and A32 reported while the scan said they did not exist. So only `//` lines are dropped.
+const DECLARED_ARMS = new Set([...readFileSync(new URL(import.meta.url), "utf8").split("\n")
+	.filter((l) => !/^\s*\/\//.test(l)).join("\n").matchAll(/\bcheck\(\s*["`](A\d+)\b/g)].map((m) => m[1]))
 // Measured: a synchronous throw in this module's top level surfaces as `uncaughtException`
 // (not `unhandledRejection`) once there has been a top-level await. Both are registered
 // anyway — guessing which one fires is how a handler ends up never running, and a handler
@@ -191,10 +199,16 @@ const finish = (abort) => {
 		console.log(`\n  ✗ SUITE ABORTED after ${ran} check(s) — ${String(abort && abort.message || abort).split("\n")[0]}`)
 		console.log(`    An abort is NOT a pass: the remaining arms never spoke.`)
 	}
-	if (ran < ARM_FLOOR)
-		console.log(`\n  ✗ ONLY ${ran} of at least ${ARM_FLOOR} arms ran — the rest never reported either way.`)
-	const bad = failed || ran < ARM_FLOOR || !!abort
-	console.log(`\n${bad ? `✗ ${failed} adversarial check(s) FAILED${ran < ARM_FLOOR ? ` and ${ARM_FLOOR - ran}+ never ran` : ""}` : "✓ all adversarial checks passed"}`)
+	const silent = [...DECLARED_ARMS].filter((id) => !reportedArms.has(id))
+	const undeclared = [...reportedArms].filter((id) => !DECLARED_ARMS.has(id))
+	const scanBroken = undeclared.length > 0 || DECLARED_ARMS.size === 0
+	if (silent.length)
+		console.log(`\n  ✗ ${silent.length} arm(s) declared in this file NEVER REPORTED: ${silent.join(", ")} — they did not run, so they passed nothing.`)
+	if (scanBroken)
+		console.log(`\n  ✗ THE SELF-SCAN IS BROKEN: ${DECLARED_ARMS.size ? `${undeclared.join(", ")} reported, and the scan of this file did not find them` : "it found no arms at all"} — the line above cannot be trusted.`)
+	const bad = failed || silent.length || scanBroken || !!abort
+	if (!bad) console.log(`\n  ${reportedArms.size} of ${DECLARED_ARMS.size} declared arms reported`)
+	console.log(`\n${bad ? `✗ ${failed} adversarial check(s) FAILED${silent.length ? ` and ${silent.length} never ran` : ""}` : "✓ all adversarial checks passed"}`)
 	try { rmSync(root, { recursive: true, force: true }) } catch {}
 	process.exit(bad ? 1 : 0)
 }
