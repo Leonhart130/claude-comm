@@ -306,6 +306,10 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 	// reported ✓ on 0 chars.
 	check("A2 bulk injection capped", reason.length > 500 && reason.length < budget && reason.length < CEILING,
 		`40 pending, notes at MAX_NOTE -> ${reason.length} chars (~${Math.round(reason.length / 4)} tok), budget ${budget}, ceiling ${CEILING}`)
+	// A notice acknowledges only what it shows (A60), so 32 of these 40 are still pending. Cleared HERE,
+	// bounded, or A3 and A4 measure A2's backlog instead of their own message — measured: A3 went red at
+	// 7623 chars rendering 8 of A2's leftovers, and A4 found 18 good messages "left".
+	for (let i = 0; i < 10 && count("app") > 0; i++) fire()
 }
 
 // A3 — one note must not blow the budget. 50 000 chars injected 12 614 tokens.
@@ -3271,6 +3275,72 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		`positive control, a window id that is NOT there -> gone ${absent?.j?.gone} exit ${absent?.code}, want true and 0=${saysTrue}; ` +
 		`the window stayed open throughout=${stillOpen}` +
 		`${caller59 ? "" : " — THE ARM COULD NOT RUN: no kitty window for this suite"}`)
+}
+
+// A60 — a notice never acknowledges what it did not show.
+//
+// Measured 2026-09-13 by a load test written for the owner's question ("4 or 5 agents for hours, does
+// the inbox saturate?"): 100 messages pending at one turn boundary -> the notice rendered 8 refs and
+// "…and 92 more — run: comm inbox", and the SAME hook drained all 100 into the log. The inbox was then
+// empty, so the command the hint named answered "empty": 92 messages acknowledged and never shown.
+// Latency, disk and a 100-send parallel burst were all fine; this was the one thing that saturated.
+// FINDINGS.md#overflow-drained-unseen
+//
+// One fixture, the hook byte-identical, ONE variable between cases: how many messages are waiting.
+//   ① 12 waiting -> 8 named, the other 4 said to be NOT acknowledged, exactly 4 left pending and listed
+//      by `comm inbox`, and 8 deliveries logged — not 12
+//   ② the next turn end delivers those 4 and empties the inbox
+//   ③ POSITIVE CONTROL, run first: 5 waiting -> all 5 shown, all drained, no overflow line. Without it
+//      ① would pass for a hook that never drains anything at all.
+{
+	const r60 = mkdtempSync(join(tmpdir(), "comm-attack-overflow-"))
+	atExit(() => { try { rmSync(r60, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(r60, ".comm", "bin"), { recursive: true })
+	for (const a of ["leader", "db"]) mkdirSync(join(r60, ".comm", "inbox", a), { recursive: true })
+	mkdirSync(join(r60, "db"), { recursive: true })
+	writeFileSync(join(r60, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", db: "db" } }))
+	for (const f of ["comm.mjs", "who.mjs"]) cpSync(join(PKG, "bin", f), join(r60, ".comm", "bin", f))
+	const B60 = join(r60, ".comm", "bin", "comm.mjs")
+	const env60 = { ...process.env }
+	delete env60.CLAUDE_COMM_AGENT
+	// a ref resolves against the EXPERT's spoke, whoever sends — the bus's own refusal says so
+	const send60 = (k) => {
+		writeFileSync(join(r60, "db", "REPORT.md"), `report ${k}\n`)
+		return spawnSync(process.execPath, [B60, "send", "leader", "--ref", "REPORT.md", "--kind", "done"],
+			{ cwd: join(r60, "db"), env: env60, encoding: "utf8" }).status === 0
+	}
+	const waiting = () => readdirSync(join(r60, ".comm", "inbox", "leader")).filter((f) => f.endsWith(".json")).length
+	const rows = () => { try { return readFileSync(join(r60, ".comm", "log.jsonl"), "utf8").trim().split("\n").filter(Boolean).length } catch { return 0 } }
+	const stop = () => {
+		const r = spawnSync(process.execPath, [B60, "hook", "stop", "--agent-root", r60], { cwd: r60, env: env60, encoding: "utf8", input: "{}" })
+		let reason = ""
+		try { reason = JSON.parse(r.stdout).reason || "" } catch {}
+		return { reason, shown: reason.split("\n").filter((l) => /^\s*• from /.test(l)).length, overflow: /…and \d+ more/.test(reason) }
+	}
+	let sentAll = true
+	// ③ the positive control, first
+	for (let k = 0; k < 5; k++) sentAll = send60(`c${k}`) && sentAll
+	const c = stop()
+	const cLeft = waiting(), cRows = rows()
+	const controlOk = c.shown === 5 && cLeft === 0 && cRows === 5 && !c.overflow
+	// ① 12 waiting
+	for (let k = 0; k < 12; k++) sentAll = send60(`o${k}`) && sentAll
+	const o = stop()
+	const oLeft = waiting(), oLogged = rows() - cRows
+	const inboxOut = spawnSync(process.execPath, [B60, "inbox"], { cwd: r60, env: env60, encoding: "utf8" }).stdout || ""
+	const firstOk = o.shown === 8 && oLeft === 4 && oLogged === 8 &&
+		/4 more NOT acknowledged/.test(o.reason) && /inbox 'leader': 4 pending/.test(inboxOut)
+	// ② the next turn end
+	const n = stop()
+	const nLeft = waiting(), nLogged = rows() - cRows
+	const secondOk = n.shown === 4 && nLeft === 0 && nLogged === 12 && !n.overflow
+
+	check("A60 a notice never acknowledges what it did not show",
+		sentAll && controlOk && firstOk && secondOk,
+		`every send landed=${sentAll}; positive control, 5 waiting -> shown ${c.shown}, left ${cLeft}, logged ${cRows}, no overflow line=${controlOk}; ` +
+		`12 waiting -> shown ${o.shown}, left pending ${oLeft}, logged ${oLogged}, says the rest are NOT acknowledged and 'comm inbox' lists 4=${firstOk} ` +
+		`(before the fix: shown 8, left 0, logged 12, and 'comm inbox' said empty); ` +
+		`the next turn end -> shown ${n.shown}, left ${nLeft}, logged ${nLogged} in all=${secondOk}`)
 }
 
 // A52 — the doorbell states a fact. It gives no conduct instruction and makes no promise.
