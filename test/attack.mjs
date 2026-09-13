@@ -24,6 +24,15 @@ import { tmpdir } from "node:os"
 import { MAX_NOTE, MAX_RENDER, MAX_REF } from "../bin/comm.mjs"
 
 const PKG = new URL("..", import.meta.url).pathname
+
+// ONE exit listener for the whole suite. Every arm registers its cleanup here, never on `process`
+// directly: 32 direct registrations made Node print "MaxListenersExceededWarning: Possible
+// EventEmitter memory leak detected" into every run — a false leak alarm, printed by the suite whose
+// A21 exists to catch real ones. Raising Node's limit would only silence the next true one.
+// Each hook is isolated, so one cleanup that throws cannot stop the ones after it.
+const exitHooks = []
+const atExit = (f) => { exitHooks.push(f) }
+process.once("exit", () => { for (const f of exitHooks) { try { f() } catch {} } })
 const root = mkdtempSync(join(tmpdir(), "comm-attack-"))
 mkdirSync(join(root, "app", "docs"), { recursive: true })
 mkdirSync(join(root, ".comm", "inbox"), { recursive: true })
@@ -104,7 +113,7 @@ const realBefore = snapshotReal()
 // G5: an aborted suite is the run whose effect on the world is LEAST known, and a check()
 // in the normal flow is silent on exactly it. This fires on every exit path there is.
 let a31Ran = false
-process.on("exit", () => {
+atExit(() => {
 	if (a31Ran) return
 	const d = registryDiff(realBefore, snapshotReal(), root)
 	// Same attribution as A31: an abort must not accuse the suite of a session somebody
@@ -132,7 +141,7 @@ const bus = join(root, ".comm", "bin", "comm.mjs")
 
 // Clean up on EVERY exit path, not just the happy one: a gate that aborts
 // used to leave its scratch project behind, and they accreted silently in /tmp.
-process.on("exit", () => { try { rmSync(root, { recursive: true, force: true }) } catch {} })
+atExit(() => { try { rmSync(root, { recursive: true, force: true }) } catch {} })
 
 
 const send = (args, cwd = root) => spawnSync("node", [bus, "send", ...args], { cwd, encoding: "utf8" })
@@ -420,7 +429,7 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 // exact failure mode this project exists to prevent.
 {
 	const root2 = mkdtempSync(join(tmpdir(), "comm-attack-alias-"))
-	process.on("exit", () => { try { rmSync(root2, { recursive: true, force: true }) } catch {} })
+	atExit(() => { try { rmSync(root2, { recursive: true, force: true }) } catch {} })
 	mkdirSync(join(root2, "app", "docs"), { recursive: true })
 	mkdirSync(join(root2, ".comm", "inbox", "webapp"), { recursive: true })
 	mkdirSync(join(root2, ".comm", "inbox", "leader"), { recursive: true })
@@ -462,7 +471,7 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 // the code comment states — no nudge means the mail must still be there.
 {
 	const root3 = mkdtempSync(join(tmpdir(), "comm-attack-render-"))
-	process.on("exit", () => { try { rmSync(root3, { recursive: true, force: true }) } catch {} })
+	atExit(() => { try { rmSync(root3, { recursive: true, force: true }) } catch {} })
 	mkdirSync(join(root3, "app", "docs"), { recursive: true })
 	mkdirSync(join(root3, ".comm", "inbox", "app"), { recursive: true })
 	mkdirSync(join(root3, ".comm", "inbox", "leader"), { recursive: true })
@@ -505,7 +514,7 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 // to be untouched.
 {
 	const root4 = mkdtempSync(join(tmpdir(), "comm-attack-cwd-"))
-	process.on("exit", () => { try { rmSync(root4, { recursive: true, force: true }) } catch {} })
+	atExit(() => { try { rmSync(root4, { recursive: true, force: true }) } catch {} })
 	mkdirSync(join(root4, "app", "docs"), { recursive: true })
 	mkdirSync(join(root4, ".comm"), { recursive: true })
 	writeFileSync(join(root4, "app", "docs", "REVIEW.md"), "# review\n")
@@ -538,7 +547,7 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 // also a second, indistinguishable explanation for the long latency tail.
 {
 	const root7 = mkdtempSync(join(tmpdir(), "comm-attack-nonagent-"))
-	process.on("exit", () => { try { rmSync(root7, { recursive: true, force: true }) } catch {} })
+	atExit(() => { try { rmSync(root7, { recursive: true, force: true }) } catch {} })
 	mkdirSync(join(root7, "app", "docs"), { recursive: true })
 	mkdirSync(join(root7, "docs"), { recursive: true })
 	mkdirSync(join(root7, ".comm"), { recursive: true })
@@ -572,7 +581,7 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 // A session that is not on the bus declares so and must then drain nothing.
 {
 	const root8 = mkdtempSync(join(tmpdir(), "comm-attack-declare-"))
-	process.on("exit", () => { try { rmSync(root8, { recursive: true, force: true }) } catch {} })
+	atExit(() => { try { rmSync(root8, { recursive: true, force: true }) } catch {} })
 	mkdirSync(join(root8, "app", "docs"), { recursive: true })
 	mkdirSync(join(root8, ".comm"), { recursive: true })
 	writeFileSync(join(root8, "app", "docs", "REVIEW.md"), "# review\n")
@@ -613,7 +622,7 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 // notice back); this case pins the parts that can be checked deterministically.
 {
 	const root9 = mkdtempSync(join(tmpdir(), "comm-attack-sessionstart-"))
-	process.on("exit", () => { try { rmSync(root9, { recursive: true, force: true }) } catch {} })
+	atExit(() => { try { rmSync(root9, { recursive: true, force: true }) } catch {} })
 	mkdirSync(join(root9, "app", "docs"), { recursive: true })
 	mkdirSync(join(root9, ".comm"), { recursive: true })
 	writeFileSync(join(root9, "app", "docs", "REVIEW.md"), "# review\n")
@@ -759,7 +768,7 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 // by following the tool's own remediation text.
 {
 	const root6 = mkdtempSync(join(tmpdir(), "comm-attack-flag-"))
-	process.on("exit", () => { try { rmSync(root6, { recursive: true, force: true }) } catch {} })
+	atExit(() => { try { rmSync(root6, { recursive: true, force: true }) } catch {} })
 	mkdirSync(join(root6, "app", "docs"), { recursive: true })
 	mkdirSync(join(root6, ".comm"), { recursive: true })
 	writeFileSync(join(root6, "app", "docs", "REVIEW.md"), "# review\n")
@@ -785,7 +794,7 @@ const REF_AT_MAX = "docs/" + "r".repeat(MAX_REF - 12) + ".md"
 // [SYSTEM] line in the two commands the leader reads.
 {
 	const root5 = mkdtempSync(join(tmpdir(), "comm-attack-audit-"))
-	process.on("exit", () => { try { rmSync(root5, { recursive: true, force: true }) } catch {} })
+	atExit(() => { try { rmSync(root5, { recursive: true, force: true }) } catch {} })
 	mkdirSync(join(root5, "app", "docs"), { recursive: true })
 	mkdirSync(join(root5, ".comm"), { recursive: true })
 	writeFileSync(join(root5, "app", "docs", "REVIEW.md"), "# review\n")
@@ -1353,7 +1362,7 @@ const POINTER_SOURCES = (() => {
 //     true is the COST: a lookup and a compare, never a write per turn.
 {
 	const rootA = mkdtempSync(join(tmpdir(), "comm-attack-instruments-"))
-	process.on("exit", () => { try { rmSync(rootA, { recursive: true, force: true }) } catch {} })
+	atExit(() => { try { rmSync(rootA, { recursive: true, force: true }) } catch {} })
 	mkdirSync(join(rootA, "app", "docs"), { recursive: true })
 	mkdirSync(join(rootA, ".comm"), { recursive: true })
 	writeFileSync(join(rootA, "app", "docs", "REVIEW.md"), "# review\n")
@@ -1490,7 +1499,7 @@ const POINTER_SOURCES = (() => {
 {
 	const pa = mkdtempSync(join(tmpdir(), "comm-attack-whoami-a-"))
 	const pb = mkdtempSync(join(tmpdir(), "comm-attack-whoami-b-"))
-	process.on("exit", () => { for (const d of [pa, pb]) { try { rmSync(d, { recursive: true, force: true }) } catch {} } })
+	atExit(() => { for (const d of [pa, pb]) { try { rmSync(d, { recursive: true, force: true }) } catch {} } })
 	for (const [d, cfg] of [[pa, { leader: "alpha", agents: { alpha: ".", gamma: "sub" } }],
 		[pb, { leader: "beta", agents: { beta: ".", delta: "sub" } }]]) {
 		mkdirSync(join(d, "sub"), { recursive: true })
@@ -1526,7 +1535,7 @@ const POINTER_SOURCES = (() => {
 	// And the doorbell must never cost a delivery. Mail waits for `app`; the LEADER ends a
 	// turn; its own delivery and its exit code must be exactly what they were.
 	const rootW = mkdtempSync(join(tmpdir(), "comm-attack-wake-"))
-	process.on("exit", () => { try { rmSync(rootW, { recursive: true, force: true }) } catch {} })
+	atExit(() => { try { rmSync(rootW, { recursive: true, force: true }) } catch {} })
 	mkdirSync(join(rootW, "app", "docs"), { recursive: true })
 	mkdirSync(join(rootW, ".comm"), { recursive: true })
 	writeFileSync(join(rootW, "app", "docs", "REVIEW.md"), "# review\n")
@@ -1567,7 +1576,7 @@ const POINTER_SOURCES = (() => {
 // produce, and carries the control that proves it was armed at all.
 {
 	const rootS = mkdtempSync(join(tmpdir(), "comm-attack-restart-"))
-	process.on("exit", () => { try { rmSync(rootS, { recursive: true, force: true }) } catch {} })
+	atExit(() => { try { rmSync(rootS, { recursive: true, force: true }) } catch {} })
 	mkdirSync(join(rootS, "app", "docs"), { recursive: true })
 	mkdirSync(join(rootS, ".comm"), { recursive: true })
 	writeFileSync(join(rootS, "app", "docs", "REVIEW.md"), "# review\n")
@@ -1988,7 +1997,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 // off the bus, or this row would just have stopped saying it.
 {
 	const rootB = mkdtempSync(join(tmpdir(), "comm-attack-selfid-"))
-	process.on("exit", () => { try { rmSync(rootB, { recursive: true, force: true }) } catch {} })
+	atExit(() => { try { rmSync(rootB, { recursive: true, force: true }) } catch {} })
 	mkdirSync(join(rootB, "db"), { recursive: true })
 	mkdirSync(join(rootB, ".comm"), { recursive: true })
 	writeFileSync(join(rootB, ".comm", "config.json"),
@@ -2078,7 +2087,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	// Installed, not merely shipped in this checkout. A29's fixture is a full install, so
 	// the honest question is whether a field project's `.comm/bin/` actually has the file.
 	const rootC = mkdtempSync(join(tmpdir(), "comm-attack-claim-install-"))
-	process.on("exit", () => { try { rmSync(rootC, { recursive: true, force: true }) } catch {} })
+	atExit(() => { try { rmSync(rootC, { recursive: true, force: true }) } catch {} })
 	mkdirSync(join(rootC, "app"), { recursive: true })
 	mkdirSync(join(rootC, ".comm"), { recursive: true })
 	writeFileSync(join(rootC, ".comm", "config.json"),
@@ -2114,7 +2123,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 // anything but a pointer, and that is what these arms hold shut.
 {
 	const rootE = mkdtempSync(join(tmpdir(), "comm-attack-bell-"))
-	process.on("exit", () => { try { rmSync(rootE, { recursive: true, force: true }) } catch {} })
+	atExit(() => { try { rmSync(rootE, { recursive: true, force: true }) } catch {} })
 	// A fixture exchange root, so this case never touches the live correspondence.
 	const ex = join(rootE, "exchange")
 	const out = join(ex, "peer", "out")
@@ -2240,7 +2249,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 // nobody is told about is a rule that will be broken by someone acting reasonably.
 {
 	const rootG = mkdtempSync(join(tmpdir(), "comm-attack-git-"))
-	process.on("exit", () => { try { rmSync(rootG, { recursive: true, force: true }) } catch {} })
+	atExit(() => { try { rmSync(rootG, { recursive: true, force: true }) } catch {} })
 	mkdirSync(join(rootG, "app", "docs"), { recursive: true })
 	writeFileSync(join(rootG, "app", "docs", "NOTE.md"), "# note\n")
 	mkdirSync(join(rootG, ".comm"), { recursive: true })
@@ -2310,7 +2319,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	// is a project outside git. The fixture below moves ONE variable against ARM 1 — how
 	// deep the bus sits — and holds the repository and the tracked state identical.
 	const deep = mkdtempSync(join(tmpdir(), "comm-attack-git-deep-"))
-	process.on("exit", () => { try { rmSync(deep, { recursive: true, force: true }) } catch {} })
+	atExit(() => { try { rmSync(deep, { recursive: true, force: true }) } catch {} })
 	const busRoot = join(deep, "nested")
 	mkdirSync(join(busRoot, "app"), { recursive: true })
 	mkdirSync(join(busRoot, ".comm"), { recursive: true })
@@ -2589,7 +2598,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 // control here is a project with no prettier config, which must be left alone.
 {
 	const root43 = mkdtempSync(join(tmpdir(), "comm-attack-fmt-"))
-	process.on("exit", () => { try { rmSync(root43, { recursive: true, force: true }) } catch {} })
+	atExit(() => { try { rmSync(root43, { recursive: true, force: true }) } catch {} })
 	mkdirSync(join(root43, ".comm"), { recursive: true })
 	mkdirSync(join(root43, "styled"), { recursive: true })
 	mkdirSync(join(root43, "plain"), { recursive: true })
@@ -2688,7 +2697,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 // one that errors) on the SENDER's side, and A9 only ever fixed the recipient's.
 {
 	const r44 = mkdtempSync(join(tmpdir(), "comm-attack-base-"))
-	process.on("exit", () => { try { rmSync(r44, { recursive: true, force: true }) } catch {} })
+	atExit(() => { try { rmSync(r44, { recursive: true, force: true }) } catch {} })
 	mkdirSync(join(r44, ".comm"), { recursive: true })
 	mkdirSync(join(r44, "db"), { recursive: true })
 	writeFileSync(join(r44, ".comm", "config.json"),
@@ -2713,7 +2722,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	// Without this the arm passes for a tool that prints the notice unconditionally,
 	// and a notice that fires for everybody is how a real signal gets skipped.
 	const r44c = mkdtempSync(join(tmpdir(), "comm-attack-base-ctl-"))
-	process.on("exit", () => { try { rmSync(r44c, { recursive: true, force: true }) } catch {} })
+	atExit(() => { try { rmSync(r44c, { recursive: true, force: true }) } catch {} })
 	mkdirSync(join(r44c, ".comm"), { recursive: true })
 	writeFileSync(join(r44c, ".comm", "config.json"),
 		JSON.stringify({ leader: "leader", agents: { leader: ".", pair: "." } }))
@@ -2767,7 +2776,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 // this is a limiter that fires for everyone and passes every test it is given.
 {
 	const r45 = mkdtempSync(join(tmpdir(), "comm-attack-stale-"))
-	process.on("exit", () => { try { rmSync(r45, { recursive: true, force: true }) } catch {} })
+	atExit(() => { try { rmSync(r45, { recursive: true, force: true }) } catch {} })
 	mkdirSync(join(r45, ".comm"), { recursive: true })
 	mkdirSync(join(r45, "db"), { recursive: true })
 	writeFileSync(join(r45, ".comm", "config.json"),
@@ -2822,7 +2831,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 // kitty's environment, which is the entire defect.
 {
 	const r46 = mkdtempSync(join(tmpdir(), "comm-attack-launch-"))
-	process.on("exit", () => { try { rmSync(r46, { recursive: true, force: true }) } catch {} })
+	atExit(() => { try { rmSync(r46, { recursive: true, force: true }) } catch {} })
 	mkdirSync(join(r46, ".comm", "bin"), { recursive: true })
 	mkdirSync(join(r46, "db"), { recursive: true })
 	writeFileSync(join(r46, ".comm", "config.json"),
@@ -2892,7 +2901,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	const sockOf = () => { try { return readdirSync("/tmp").filter((f) => /^kitty-\d+$/.test(f)).map((f) => `/tmp/${f}`) } catch { return [] } }
 	// EVERY window this arm opens is closed again, including on a throw: a suite that
 	// leaves panes behind is the "beaucoup de fenetres" failure it exists to prevent.
-	process.on("exit", () => {
+	atExit(() => {
 		for (const [sock, id] of opened)
 			try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
 		try { rmSync(r50, { recursive: true, force: true }) } catch {}
@@ -2983,7 +2992,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 {
 	const r51 = mkdtempSync(join(tmpdir(), "comm-attack-close-"))
 	const opened51 = []
-	process.on("exit", () => {
+	atExit(() => {
 		for (const [sock, id] of opened51)
 			try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
 		try { rmSync(r51, { recursive: true, force: true }) } catch {}
@@ -3134,7 +3143,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 {
 	const r58 = mkdtempSync(join(tmpdir(), "comm-attack-closeclaim-"))
 	const opened58 = []
-	process.on("exit", () => {
+	atExit(() => {
 		for (const [sock, id] of opened58)
 			try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
 		try { rmSync(r58, { recursive: true, force: true }) } catch {}
@@ -3223,7 +3232,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 // The three run at once: ① and ② each take the probe's full 8 s deadline.
 {
 	const r59 = mkdtempSync(join(tmpdir(), "comm-attack-probe-"))
-	process.on("exit", () => { try { rmSync(r59, { recursive: true, force: true }) } catch {} })
+	atExit(() => { try { rmSync(r59, { recursive: true, force: true }) } catch {} })
 	const wk59 = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
 	const { sessionPid: sp59 } = await import(pathToFileURL(join(PKG, "bin", "session-registry.mjs")).href)
 	const cr59 = wk59.resolveWindow(sp59(), wk59.windows())
@@ -3325,7 +3334,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 {
 	const r53 = mkdtempSync(join(tmpdir(), "comm-attack-prompt-"))
 	const opened53 = []
-	process.on("exit", () => {
+	atExit(() => {
 		for (const [sock, id] of opened53)
 			try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
 		try { rmSync(r53, { recursive: true, force: true }) } catch {}
@@ -3438,7 +3447,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 {
 	const r57 = mkdtempSync(join(tmpdir(), "comm-attack-tier-"))
 	const opened57 = []
-	process.on("exit", () => {
+	atExit(() => {
 		for (const [sock, id] of opened57)
 			try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
 		try { rmSync(r57, { recursive: true, force: true }) } catch {}
@@ -3578,7 +3587,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 // which is the "no claim / could not look" collision the same field reported on 09-10.
 {
 	const r55 = mkdtempSync(join(tmpdir(), "comm-attack-size-"))
-	process.on("exit", () => { try { rmSync(r55, { recursive: true, force: true }) } catch {} })
+	atExit(() => { try { rmSync(r55, { recursive: true, force: true }) } catch {} })
 	mkdirSync(join(r55, "app", "docs"), { recursive: true })
 	mkdirSync(join(r55, ".comm", "inbox"), { recursive: true })
 	writeFileSync(join(r55, ".comm", "config.json"),
@@ -3642,7 +3651,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 // line SAYING the bus could not run (silence here is this project's signature defect).
 {
 	const r56 = mkdtempSync(join(tmpdir(), "comm-attack-halfbus-"))
-	process.on("exit", () => { try { rmSync(r56, { recursive: true, force: true }) } catch {} })
+	atExit(() => { try { rmSync(r56, { recursive: true, force: true }) } catch {} })
 	mkdirSync(join(r56, "app", "docs"), { recursive: true })
 	mkdirSync(join(r56, ".comm", "inbox"), { recursive: true })
 	writeFileSync(join(r56, ".comm", "config.json"),
