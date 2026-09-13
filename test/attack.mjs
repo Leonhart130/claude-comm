@@ -3076,6 +3076,95 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		`which is why the probe is detached${caller51 ? "" : " — THE ARM COULD NOT RUN: no kitty window for this suite"}`)
 }
 
+// A58 — close REFUSES over a claim this agent holds, and over claims it cannot read.
+//
+// 🔴 Review #10 C1: this refusal had NEVER RUN. `claim list --json` answers an object, the loop
+// iterated it, `for…of` threw, a bare `catch {}` ate it — and behind that, `pid`/`by` were read one
+// level too high. A51 stayed green throughout because not one of its cases involves a claim.
+//
+// Armed INSIDE a marked window whose process IS the session, so every other guard passes and the
+// only variable between cases is the claim. The window waits for a GO file written after the mark
+// is READ BACK: a dry-run that raced the mark would be refused for the MARK and read as a claim
+// refusal. Both halves of the attribution are armed — this session's pid, and this agent's name
+// under a foreign live pid — and each refusal is matched on the claim it names, never on exit alone.
+// POSITIVE CONTROL: the same window with both released -> would_close. Then ONE variable more:
+// claim.mjs moved away -> the list cannot be read, and that must be a block, never "none held".
+{
+	const r58 = mkdtempSync(join(tmpdir(), "comm-attack-closeclaim-"))
+	const opened58 = []
+	process.on("exit", () => {
+		for (const [sock, id] of opened58)
+			try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
+		try { rmSync(r58, { recursive: true, force: true }) } catch {}
+	})
+	mkdirSync(join(r58, ".comm", "bin"), { recursive: true })
+	mkdirSync(join(r58, "db"), { recursive: true })
+	writeFileSync(join(r58, ".comm", "config.json"),
+		JSON.stringify({ leader: "leader", agents: { leader: ".", db: "db" } }))
+	for (const f of ["comm.mjs", "who.mjs", "wake.mjs", "session-registry.mjs", "close.mjs", "claim.mjs"])
+		cpSync(join(PKG, "bin", f), join(r58, ".comm", "bin", f))
+	const C58 = join(r58, ".comm", "bin", "close.mjs")
+	const K58 = join(r58, ".comm", "bin", "claim.mjs")
+	const fake58 = join(r58, "claude")
+	try { symlinkSync(process.execPath, fake58) } catch {}
+	const go58 = join(r58, "go"), out58 = join(r58, "out.json")
+
+	const wk58 = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
+	const { sessionPid: sp58 } = await import(pathToFileURL(join(PKG, "bin", "session-registry.mjs")).href)
+	const cr58 = wk58.resolveWindow(sp58(), wk58.windows())
+	const caller58 = cr58.ok && cr58.how === "foreground process" ? cr58.win : null
+
+	let res = null, marked58 = false
+	if (caller58) {
+		const script = join(r58, "claimclose.cjs")
+		const J = JSON.stringify
+		writeFileSync(script,
+			`const{spawnSync}=require("node:child_process"),fs=require("node:fs");` +
+			`const nap=(ms)=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms);` +
+			`for(let i=0;i<100&&!fs.existsSync(${J(go58)});i++)nap(100);` +
+			`const run=(f,a,cwd)=>{const r=spawnSync(process.execPath,[f,...a],{encoding:"utf8",cwd});return{s:r.status,e:r.stderr||"",o:r.stdout||""}};` +
+			`const dry=()=>run(${J(C58)},["--dry-run"],${J(r58)});const K=${J(K58)};const out={};` +
+			`out.takePid=run(K,["take","zz-a58-pid","--purpose","a58"],${J(r58)});out.heldPid=dry();` +
+			`out.relPid=run(K,["release","zz-a58-pid"],${J(r58)});` +
+			`out.takeBy=run(K,["take","zz-a58-by","--pid","1","--purpose","a58"],${J(join(r58, "db"))});out.heldBy=dry();` +
+			`out.relBy=run(K,["release","zz-a58-by","--force"],${J(r58)});out.free=dry();` +
+			`fs.renameSync(K,K+".away");out.blind=dry();fs.renameSync(K+".away",K);` +
+			`fs.writeFileSync(${J(out58)},JSON.stringify(out));setTimeout(()=>{},20000)`)
+		const id = Number(spawnSync("kitten", ["@", "--to", `unix:${caller58.sock}`, "launch", "--type=window",
+			"--keep-focus", `--cwd=${r58}`, fake58, script], { encoding: "utf8", timeout: 10000 }).stdout)
+		if (Number.isInteger(id) && id > 0) {
+			opened58.push([caller58.sock, id])
+			const mark = spawnSync("kitten", ["@", "--to", `unix:${caller58.sock}`, "set-user-vars", "--match", `id:${id}`,
+				"CLAUDE_COMM_LAUNCHED=db"], { timeout: 5000 })
+			marked58 = mark.status === 0 &&
+				wk58.windows().some((w) => w.sock === caller58.sock && w.id === id && w.vars.CLAUDE_COMM_LAUNCHED === "db")
+			if (marked58) writeFileSync(go58, "")
+			const until = Date.now() + 30000
+			while (Date.now() < until && !existsSync(out58)) spawnSync(process.execPath, ["-e", "setTimeout(()=>{},200)"])
+			try { res = JSON.parse(readFileSync(out58, "utf8")) } catch {}
+		}
+	}
+	const r = res || {}
+	const refusedFor = (d, name) => !!d && d.s === 3 && new RegExp(`still holding ${name}\\b`).test(d.e) && !/would_close/.test(d.o)
+	const tookBoth = !!res && r.takePid.s === 0 && r.takeBy.s === 0 && r.relPid.s === 0 && r.relBy.s === 0
+	const heldPid = refusedFor(r.heldPid, "zz-a58-pid")
+	const heldBy = refusedFor(r.heldBy, "zz-a58-by")
+	const freeCloses = !!r.free && r.free.s === 0 && /"would_close": true/.test(r.free.o)
+	const blindBlocks = !!r.blind && r.blind.s === 3 && /could not read the claims/.test(r.blind.e) && !/would_close/.test(r.blind.o)
+
+	check("A58 close REFUSES over a claim this agent holds, and over claims it cannot read",
+		!!caller58 && marked58 && tookBoth && heldPid && heldBy && freeCloses && blindBlocks,
+		`ran in a marked window whose process IS the session=${!!res} (mark read back=${marked58}); ` +
+		`claims taken and released=${tookBoth}` +
+		`${res && !tookBoth ? ` (stderr: ${JSON.stringify([r.takePid, r.relPid, r.takeBy, r.relBy].map((x) => x && x.e.slice(0, 70)))})` : ""}; ` +
+		`a claim held by THIS session's pid -> REFUSED naming it=${heldPid}; ` +
+		`a claim recorded for THIS agent under another live pid -> REFUSED naming it=${heldBy}; ` +
+		`positive control, the same window with both released -> would_close=${freeCloses} ` +
+		`(without it the two refusals would pass for a closer that refuses everything); ` +
+		`one variable more, claim.mjs unreachable -> a BLOCK saying it could not read, never "none held"=${blindBlocks}` +
+		`${caller58 ? "" : " — THE ARM COULD NOT RUN: no kitty window for this suite"}`)
+}
+
 // A52 — the doorbell states a fact. It gives no conduct instruction and makes no promise.
 //
 // Reported by the `getajob` field leader, 2026-09-11, after paying for both halves. The
