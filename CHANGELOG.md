@@ -32,6 +32,18 @@ already have.
 
 
 
+
+## 2026-09-13.2 — bus print `eea9bf6ff98e` — 2026-09-13
+
+- 🔴 **`close.mjs` now really refuses to close over a claim you still hold.** That refusal had never run: it
+  read `claim list --json` as an array, threw, and swallowed it. It now blocks on a claim held by your session
+  or recorded under your agent name, and **a claim list it cannot read is a block too** — "could not read the
+  claims" is not "none held". Release the claim, or `--force` (still recorded as forced).
+- **The close record `.comm/close/<agent>.json` has a third value.** `gone: true` the window closed, `false`
+  it is still there, and now `null` with `could_not_look: "<why>"` when the probe could not ask kitty — it used
+  to write `true` for that. Probe exit 0 / 1 / 2. Treat `null` as unknown, never as closed.
+- ⚠️ Not covered: a kitty socket path that never existed still reads as gone. Only a caller bug produces one.
+
 ## 2026-09-13.1 — bus print `f8e8b56deb97` — 2026-09-13
 
 - 🔴 **`launch.mjs` now REQUIRES `--model` and `--effort`, and refuses without them.** Until today it passed
