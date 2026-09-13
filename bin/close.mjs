@@ -163,16 +163,26 @@ if (root) {
 	else if (!/\bempty\b/.test(box.stdout) && /\bpending\b/.test(box.stdout))
 		blocks.push(`mail is waiting: ${(box.stdout.match(/^inbox.*$/m) || [""])[0].trim()} — somebody expects this agent to act, and a window that closes on unread mail loses it until the agent is relaunched`)
 
+	// 🔴 REVIEW #10 C1: THIS REFUSAL HAD NEVER RUN. `claim list --json` answers an OBJECT,
+	// `{ root, claims: [...] }`, and this loop iterated it directly: `for…of` on an object throws,
+	// a bare `catch {}` ate it, and `blocks` stayed empty for a claim this very session held —
+	// measured by the reviewer end to end. Behind it sat a second mismatch: `pid` and `by` live in
+	// `c.rec`, not on `c`. The header promised two housekeeping guards and shipped one.
+	// NOT KNOWING IS NOT "NONE HELD" — the rule the inbox probe above already follows: a list that
+	// fails or does not parse is a block of its own, never a silent pass. A58.
 	const claimBin = fileURLToPath(new URL("claim.mjs", import.meta.url))
 	const cl = spawnSync(process.execPath, [claimBin, "list", "--json"], { cwd: root, encoding: "utf8", timeout: 5000 })
+	let claims = null
 	if (cl.status === 0) {
-		try {
-			for (const c of JSON.parse(cl.stdout) || []) {
-				if (c.state === "gone") continue
-				if (String(c.pid) === String(me) || c.by === launchedFor)
-					blocks.push(`still holding ${c.resource} (${c.purpose || "no purpose recorded"}) — release it or --force; a claim outliving its holder reads as a crash to the next agent`)
-			}
-		} catch {}
+		try { const j = JSON.parse(cl.stdout); if (j && Array.isArray(j.claims)) claims = j.claims } catch {}
+	}
+	if (claims === null)
+		blocks.push(`could not read the claims (claim list exit ${cl.status}) — not the same as holding none`)
+	else for (const c of claims) {
+		if (c.state === "gone" || c.state === "free") continue
+		const rec = c.rec || {}
+		if (String(rec.pid) === String(me) || rec.by === launchedFor)
+			blocks.push(`still holding ${c.resource} (${rec.purpose || "no purpose recorded"}) — release it or --force; a claim outliving its holder reads as a crash to the next agent`)
 	}
 }
 
