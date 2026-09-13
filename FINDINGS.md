@@ -2814,3 +2814,27 @@ leader, opted in by name; an agent at the project root*; confirmation always tru
 - **Overage's 5-minute TTL** — never observed on this box.
 - **An opted-in agent that had NOT written its state down** — the opt-in rests on getajob's reading of their
   experts' `CLAUDE.md`, not on anything a clear can check.
+
+## `#bell-mid-turn` — the exchange bell said it reused wake's rules, and never read the turn
+
+**2026-09-13, found re-reading `bin/exchange-bell.mjs` before ringing getajob's leader with the `.6` letter.**
+`wake` stopped typing into running turns in `.5` (A62, `#wake-mid-turn`). The bell's header still said *"Everything
+else is `bin/wake.mjs`'s five rules, unchanged and reused"* — rules 1–5 by import, rule 6 never: no turn read
+anywhere in the file, and `--dry-run` printed none. A letter rung while a peer leader works lands inside its turn,
+in the window its owner talks in — A62's defect one tool over, outliving the release that fixed it. `STATUS.md` had
+carried it as one clause since `.5`.
+
+**Why it survived: the ring could not be EXECUTED by a gate.** A script with `process.exit` on every path, whose
+ring needs a live peer leader under kitty. A35 reaches what it can — ref validation, the rendered sentence — and
+nothing reached the ring. So the fix is two things: the turn check, and the bell as a function
+`bell(argv, { wins, lookup, send, who })` that the CLI wraps, so A64 runs every line the CLI runs.
+
+**Before the fix:** the `.6` letter was rung on a turn read by hand (`wake.mjs --resolve`, idle 169 s), and its row
+confirmed afterwards in the peer's transcript. **After it**, the first live call refused correctly: getajob's leader
+was reading that letter — `○ leader (pid 13764) is mid-turn — not rung (last transcript row: a tool result, 29s ago)`.
+
+**Proved red in copies, 2026-09-13, `attack.mjs` byte-identical (sha `ed8c4f10bd3f93a1`)**: the unmutated copy is
+green; the busy return removed → A64 red alone (`peer mid-turn -> exit 0, typed 2, bell recorded=true`); the turn never
+read → A64 red alone, the same line. ⚠️ A third mutation — record the bell on a busy skip — was written WRONG: it named
+`quietFile` above its declaration and ABORTED the suite, 25 arms never ran, and the suite said so. It proved nothing
+about A64.

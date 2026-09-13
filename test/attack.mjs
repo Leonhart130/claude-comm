@@ -2277,6 +2277,69 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		`digits outside them=${/\d/.test(carcass) ? "PRESENT" : "none"}`)
 }
 
+// A64 — the exchange bell is never typed into a peer's running turn.
+//
+// A62's rule, one tool over. `wake` stopped pressing Enter into working sessions in `.5`; this bell — whose header
+// said it reused wake's rules — never read the turn at all, so a letter rung while a peer leader works landed INSIDE
+// that turn, in the window its owner talks in. Found 2026-09-13 re-reading the file before ringing getajob with the
+// `.6` letter. FINDINGS.md#bell-mid-turn
+//
+// EXECUTED, not read: A35's history is that a property inferred from this file's source was not the property
+// (review #6 F4). `bell()` runs every line the CLI runs, with kitty, the registry and the peer's `who` injected.
+// POSITIVE CONTROL: the same fixture with the transcript at rest must RING — so the busy run's silence is the turn,
+// and not a refusal for another reason (no window, a quiet period, a bad ref) that would pass this arm for nothing.
+{
+	const eb = await import(pathToFileURL(join(PKG, "bin", "exchange-bell.mjs")).href)
+	const wakeM = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
+	const rootB = mkdtempSync(join(tmpdir(), "comm-attack-bell6-"))
+	atExit(() => { try { rmSync(rootB, { recursive: true, force: true }) } catch {} })
+	const at = new Date(Date.now() - 5000).toISOString()
+	const U = (content) => ({ type: "user", timestamp: at, message: { role: "user", content } })
+	const A = (stop) => ({ type: "assistant", timestamp: at, message: { role: "assistant", model: "claude-opus-5", stop_reason: stop, content: [{ type: stop === "tool_use" ? "tool_use" : "text", text: "x" }] } })
+	const S = (subtype) => ({ type: "system", subtype, timestamp: at })
+	const SHAPES = {
+		busy: [U("do it"), A("tool_use"), U([{ type: "tool_result", tool_use_id: "t1", content: "ok" }])],
+		idle: [U("do it"), A("end_turn"), S("stop_hook_summary"), S("turn_duration")],
+		ending: [U("do it"), A("end_turn")],
+	}
+	const run = async (name, shape, { dry = false, miss = false } = {}) => {
+		const ex = join(rootB, name, "exchange"), out = join(ex, "peer", "out")
+		mkdirSync(out, { recursive: true })
+		mkdirSync(join(ex, "peer", "in"), { recursive: true })
+		const letter = join(out, "LETTER.md")
+		writeFileSync(letter, "# a letter\n")
+		const tr = join(rootB, name, "peer.jsonl")
+		if (shape) writeFileSync(tr, SHAPES[shape].map((r) => JSON.stringify(r)).join("\n") + "\n")
+		const typed = []
+		const r = await eb.bell(["--exchange", ex, "--peer", "peer", "--ref", letter, "--project", join(rootB, name), "--agent", "leader", ...(dry ? ["--dry-run"] : [])], {
+			wins: [{ sock: "/tmp/kitty-attack", id: 9, shellPid: 1, fg: [4242] }],
+			who: () => ({ agents: { leader: { pids: [4242] } } }),
+			lookup: () => miss ? { ok: false, why: "pid 4242 is not in the session registry" } : { ok: true, transcript: tr },
+			send: (_win, t) => { typed.push(t); return { status: 0, stderr: "" } },
+		})
+		return { ...r, typed, recorded: existsSync(join(ex, "peer", ".last-bell.json")) }
+	}
+	const busy = await run("busy", "busy")
+	const dryBusy = await run("drybusy", "busy", { dry: true })
+	const idle = await run("idle", "idle")
+	const ending = await run("ending", "ending")
+	const unknown = await run("unknown", null, { miss: true })
+	const rang = (r) => r.code === 0 && r.typed.length === 2 && r.typed[1] === "\r" && r.recorded
+	const busyOk = busy.code === 3 && busy.typed.length === 0 && !busy.recorded && /mid-turn/.test(busy.out)
+	const dryOk = dryBusy.code === 3 && dryBusy.typed.length === 0 && /mid-turn/.test(dryBusy.out)
+	const controlRings = rang(idle)
+	const restOk = rang(ending) && rang(unknown) && /turn state unknown/.test(unknown.out)
+	// The shapes are A62's; were the reader to stop calling them busy/idle, this arm would pass for nothing.
+	const shapeArmed = wakeM.turnState(SHAPES.busy).state === "busy" && wakeM.turnState(SHAPES.idle).state === "idle"
+	check("A64 the exchange bell is never typed into a peer's running turn",
+		busyOk && dryOk && controlRings && restOk && shapeArmed,
+		`peer mid-turn -> exit ${busy.code}, typed ${busy.typed.length}, bell recorded=${busy.recorded}, says mid-turn=${/mid-turn/.test(busy.out)}; ` +
+		`--dry-run on it -> exit ${dryBusy.code}, typed ${dryBusy.typed.length}; ` +
+		`POSITIVE CONTROL, the same fixture at rest -> exit ${idle.code}, typed ${idle.typed.length}, recorded=${idle.recorded} (rings=${controlRings}); ` +
+		`a reply just ended -> rings=${rang(ending)}; registry miss -> rings=${rang(unknown)}, says unknown=${/turn state unknown/.test(unknown.out)}; ` +
+		`fixture shapes read busy/idle through A62's reader=${shapeArmed}${busy.err || idle.err ? ` — stderr: ${(busy.err + idle.err).trim().slice(0, 160)}` : ""}`)
+}
+
 // A36 — live bus state committed to a project's git, and the notice that explains why not.
 //
 // Measured 2026-09-04. The ~/Dev/work leader put his repo under git and wrote a careful
