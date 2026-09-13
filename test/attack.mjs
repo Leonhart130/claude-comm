@@ -2791,7 +2791,9 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	for (const f of ["comm.mjs", "who.mjs", "launch.mjs", "wake.mjs", "session-registry.mjs"])
 		cpSync(join(PKG, "bin", f), join(r46, ".comm", "bin", f))
 	const L = join(r46, ".comm", "bin", "launch.mjs")
-	const run46 = (args, env) => spawnSync(process.execPath, [L, ...args], { cwd: r46, encoding: "utf8", env })
+	// Every call carries a tier: since 2026-09-13 a launch without one REFUSES (A57), and without the
+	// flags each refusal below would be a refusal for the missing tier, not for the property it names.
+	const run46 = (args, env) => spawnSync(process.execPath, [L, ...args, "--model", "sonnet", "--effort", "low"], { cwd: r46, encoding: "utf8", env })
 
 	// ① a name that is not on the roster is not launchable -- process control obeys the
 	// pointer-not-content rule: the name comes from config.json, never from message text
@@ -2860,6 +2862,8 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	for (const f of ["comm.mjs", "who.mjs", "launch.mjs", "wake.mjs", "session-registry.mjs", "close.mjs", "claim.mjs"])
 		cpSync(join(PKG, "bin", f), join(r50, ".comm", "bin", f))
 	const L50 = join(r50, ".comm", "bin", "launch.mjs")
+	// the tier every launch must now carry (A57) — without it each case below refuses for the missing tier
+	const T50 = ["--model", "sonnet", "--effort", "low"]
 
 	// a `claude` that is cheap, on a PATH of our own -- resolveClaude() finds it the same
 	// way it finds the real one, so the launcher under test is not modified at all
@@ -2873,7 +2877,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	mkdirSync(mute, { recursive: true })
 	writeFileSync(join(mute, "kitten"), "#!/bin/sh\nexit 0\n", { mode: 0o755 })
 	writeFileSync(join(mute, "claude"), "#!/bin/sh\nexec sleep 120\n", { mode: 0o755 })
-	const noId = spawnSync(process.execPath, [L50, "db"],
+	const noId = spawnSync(process.execPath, [L50, "db", ...T50],
 		{ cwd: r50, encoding: "utf8", env: { ...process.env, PATH: `${mute}${delimiter}${process.env.PATH}` } })
 	const refusesNoId = noId.status !== 0 && /no window id/.test(noId.stderr)
 
@@ -2886,7 +2890,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 
 	let splitOk = false, marked = false, sameTab = false, idEchoed = false, ranReal = false
 	if (caller) {
-		const run = spawnSync(process.execPath, [L50, "db"], { cwd: r50, encoding: "utf8", env: env50 })
+		const run = spawnSync(process.execPath, [L50, "db", ...T50], { cwd: r50, encoding: "utf8", env: env50 })
 		ranReal = run.status === 0
 		const id = Number((run.stdout.match(/window: (\d+)/) || [])[1])
 		idEchoed = Number.isInteger(id) && id > 0
@@ -2904,7 +2908,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	// and equally for a box where every window happens to be in one tab.
 	let optOutElsewhere = false
 	if (caller) {
-		const run = spawnSync(process.execPath, [L50, "db", "--os-window"], { cwd: r50, encoding: "utf8", env: env50 })
+		const run = spawnSync(process.execPath, [L50, "db", ...T50, "--os-window"], { cwd: r50, encoding: "utf8", env: env50 })
 		const id = Number((run.stdout.match(/window: (\d+)/) || [])[1])
 		if (Number.isInteger(id) && id > 0) {
 			opened.push([caller.sock, id])
@@ -3145,6 +3149,8 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	for (const f of ["comm.mjs", "who.mjs", "launch.mjs", "wake.mjs", "session-registry.mjs", "close.mjs", "claim.mjs"])
 		cpSync(join(PKG, "bin", f), join(r53, ".comm", "bin", f))
 	const L53 = join(r53, ".comm", "bin", "launch.mjs")
+	// the tier every launch must now carry (A57) — without it each case below refuses for the missing tier
+	const T53 = ["--model", "sonnet", "--effort", "low"]
 
 	// a `claude` that records what it was actually handed, then stays alive
 	const bin53 = join(r53, "fakebin")
@@ -3155,7 +3161,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	const env53 = { ...process.env, PATH: `${bin53}${delimiter}${process.env.PATH}` }
 
 	// ① a bare --prompt is refused: it would launch exactly the inert session the flag exists to remove
-	const bare = spawnSync(process.execPath, [L53, "db", "--prompt"], { cwd: r53, encoding: "utf8", env: env53 })
+	const bare = spawnSync(process.execPath, [L53, "db", ...T53, "--prompt"], { cwd: r53, encoding: "utf8", env: env53 })
 	// Matched on the stable half of the sentence, not its wording: this went red when the
 	// message was reworded for review #10 A3 (a single dash now refuses too), and an arm
 	// that pins prose reddens for edits instead of for behaviour.
@@ -3165,8 +3171,8 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	//    mode used to CHECK a launch before making it, and it was the one mode that omitted the
 	//    consequence. The positive control is --print WITH a prompt, which must be silent —
 	//    without it this passes for a launcher that warns unconditionally, which is noise.
-	const printQuiet = spawnSync(process.execPath, [L53, "db", "--print"], { cwd: r53, encoding: "utf8", env: env53 })
-	const printLoud = spawnSync(process.execPath, [L53, "db", "--print", "--prompt", "x"], { cwd: r53, encoding: "utf8", env: env53 })
+	const printQuiet = spawnSync(process.execPath, [L53, "db", ...T53, "--print"], { cwd: r53, encoding: "utf8", env: env53 })
+	const printLoud = spawnSync(process.execPath, [L53, "db", ...T53, "--print", "--prompt", "x"], { cwd: r53, encoding: "utf8", env: env53 })
 	const printWarns = /NO --prompt/.test(printQuiet.stderr) && !/NO --prompt/.test(printLoud.stderr)
 
 	// ② WITHOUT a prompt the launcher must SAY SO. Silence here is the whole defect: the
@@ -3177,7 +3183,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	const cr53 = wk53.resolveWindow(sp53(), wk53.windows())
 	const caller53 = cr53.ok && cr53.how === "foreground process" ? cr53.win : null
 	if (caller53) {
-		const run = spawnSync(process.execPath, [L53, "db"], { cwd: r53, encoding: "utf8", env: env53 })
+		const run = spawnSync(process.execPath, [L53, "db", ...T53], { cwd: r53, encoding: "utf8", env: env53 })
 		quietId = Number((run.stdout.match(/window: (\d+)/) || [])[1])
 		if (Number.isInteger(quietId) && quietId > 0) opened53.push([caller53.sock, quietId])
 		warnsWhenSilent = /NO --prompt/.test(run.stdout) && /take NO TURN/.test(run.stdout)
@@ -3188,7 +3194,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	if (caller53) {
 		try { rmSync(argvFile, { force: true }) } catch {}
 		const TEXT = "read BRIEF-7.md and report to leader"
-		const run = spawnSync(process.execPath, [L53, "db", "--prompt", TEXT], { cwd: r53, encoding: "utf8", env: env53 })
+		const run = spawnSync(process.execPath, [L53, "db", ...T53, "--prompt", TEXT], { cwd: r53, encoding: "utf8", env: env53 })
 		ranWithPrompt = run.status === 0
 		const id = Number((run.stdout.match(/window: (\d+)/) || [])[1])
 		if (Number.isInteger(id) && id > 0) opened53.push([caller53.sock, id])
@@ -3200,12 +3206,13 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		try { landed = readFileSync(argvFile, "utf8").split("\n").includes(TEXT) } catch {}
 	}
 
-	// ④ POSITIVE CONTROL: with no --prompt, that same file must come back with NO arguments.
-	//    Without this, ③ would pass for a launcher that always appended something.
+	// ④ POSITIVE CONTROL: with no --prompt, that same file must come back with the tier and NOTHING else.
+	//    Without this, ③ would pass for a launcher that always appended something. (It read "NO
+	//    arguments" until 2026-09-13, when the tier became required — A57.)
 	let quietArgvEmpty = false
 	if (caller53) {
 		try { rmSync(argvFile, { force: true }) } catch {}
-		const run = spawnSync(process.execPath, [L53, "db"], { cwd: r53, encoding: "utf8", env: env53 })
+		const run = spawnSync(process.execPath, [L53, "db", ...T53], { cwd: r53, encoding: "utf8", env: env53 })
 		const id = Number((run.stdout.match(/window: (\d+)/) || [])[1])
 		if (Number.isInteger(id) && id > 0) opened53.push([caller53.sock, id])
 		const until = Date.now() + 10000
@@ -3213,7 +3220,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 			if (existsSync(argvFile)) break
 			spawnSync(process.execPath, ["-e", "setTimeout(()=>{},200)"])
 		}
-		try { quietArgvEmpty = readFileSync(argvFile, "utf8").trim() === "" } catch {}
+		try { quietArgvEmpty = readFileSync(argvFile, "utf8").trim() === T53.join("\n") } catch {}
 	}
 
 	check("A53 a launched agent is given a first turn, or told plainly that it will take none",
@@ -3224,9 +3231,94 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		`launched with no prompt -> the launcher NAMES the consequence=${warnsWhenSilent} ` +
 		`(silence here is the failure that does not look like one); ` +
 		`--prompt reaches the launched PROCESS's own argv=${landed} (read from the child, not from --print); ` +
-		`positive control, the same child launched with no prompt receives NO arguments=${quietArgvEmpty} ` +
+		`positive control, the same child launched with no prompt receives the tier and NO other argument=${quietArgvEmpty} ` +
 		`(without it the line above would pass for a launcher that always appends something)` +
 		`${caller53 ? "" : " — THE ARM COULD NOT RUN: no kitty window for this suite"}`)
+}
+
+// A57 — a launch is TOLD its model and effort, refuses without them, and the child receives exactly those.
+//
+// Asked by the owner 2026-09-13: Opus 5 at xhigh costs more usage than they can pay, so a leader picks
+// each expert's tier for the task. The machine default (~/.claude/settings.json) was opus + xhigh and the
+// launcher passed neither flag: every launched expert ran on the top tier, and nobody had chosen it.
+//
+// 🔴 Measured where it LANDS: the fake `claude` writes its own argv, as in A53. A --print assertion would
+// pass for a launcher that composed the flags and dropped them.
+// 🔴 The refusals are proven to be FOR THE TIER: the same command with a valid tier must pass --print.
+// Without it they would pass for a launcher that refuses everything, or refuses for another reason.
+// 🔴 Two launches with DIFFERENT tiers: one launch alone would pass for a launcher that hardcodes one.
+{
+	const r57 = mkdtempSync(join(tmpdir(), "comm-attack-tier-"))
+	const opened57 = []
+	process.on("exit", () => {
+		for (const [sock, id] of opened57)
+			try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
+		try { rmSync(r57, { recursive: true, force: true }) } catch {}
+	})
+	mkdirSync(join(r57, ".comm", "bin"), { recursive: true })
+	mkdirSync(join(r57, "db"), { recursive: true })
+	writeFileSync(join(r57, ".comm", "config.json"),
+		JSON.stringify({ leader: "leader", agents: { leader: ".", db: "db" } }))
+	for (const f of ["comm.mjs", "who.mjs", "launch.mjs", "wake.mjs", "session-registry.mjs", "close.mjs", "claim.mjs"])
+		cpSync(join(PKG, "bin", f), join(r57, ".comm", "bin", f))
+	const L57 = join(r57, ".comm", "bin", "launch.mjs")
+	const bin57 = join(r57, "fakebin")
+	mkdirSync(bin57, { recursive: true })
+	const argv57 = join(r57, "argv.txt")
+	writeFileSync(join(bin57, "claude"),
+		`#!/bin/sh\nprintf '%s\\n' "$@" > ${JSON.stringify(argv57)}\nexec sleep 120\n`, { mode: 0o755 })
+	const env57 = { ...process.env, PATH: `${bin57}${delimiter}${process.env.PATH}` }
+	const run57 = (args) => spawnSync(process.execPath, [L57, "db", ...args], { cwd: r57, encoding: "utf8", env: env57 })
+
+	// ① no tier at all -> REFUSED, naming both flags, and no argv composed
+	const none = run57(["--print", "--prompt", "x"])
+	const refusesNone = none.status !== 0 && /no --model and no --effort/.test(none.stderr) && !/"argv"/.test(none.stdout)
+	// ①b half a tier is not a tier
+	const half = run57(["--print", "--model", "sonnet"])
+	const refusesHalf = half.status !== 0 && /no --effort/.test(half.stderr) && !/"argv"/.test(half.stdout)
+	// ② a flag-shaped model, or an effort claude does not know, never reaches argv
+	const shaped = run57(["--print", "--model", "--dangerously-skip-permissions", "--effort", "low"])
+	const badEffort = run57(["--print", "--model", "sonnet", "--effort", "extreme"])
+	const refusesBad = shaped.status !== 0 && /not a model name/.test(shaped.stderr) && !/"argv"/.test(shaped.stdout) &&
+		badEffort.status !== 0 && /not an effort level/.test(badEffort.stderr) && !/"argv"/.test(badEffort.stdout)
+	// ③ POSITIVE CONTROL for ①②: the same command WITH a valid tier passes --print, and its argv carries it
+	const ok = run57(["--print", "--model", "sonnet", "--effort", "low", "--prompt", "x"])
+	let printCarries = false
+	try {
+		const j = JSON.parse(ok.stdout)
+		printCarries = ok.status === 0 && j.model === "sonnet" && j.effort === "low" && j.argv.join(" ").includes("--model sonnet --effort low")
+	} catch {}
+
+	// ④ WHERE IT LANDS: two real launches, two different tiers, each read back from the child's own argv
+	const wk57 = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
+	const { sessionPid: sp57 } = await import(pathToFileURL(join(PKG, "bin", "session-registry.mjs")).href)
+	const cr57 = wk57.resolveWindow(sp57(), wk57.windows())
+	const caller57 = cr57.ok && cr57.how === "foreground process" ? cr57.win : null
+	const landed57 = (tier) => {
+		try { rmSync(argv57, { force: true }) } catch {}
+		const run = run57([...tier, "--prompt", "report to leader"])
+		const id = Number((run.stdout.match(/window: (\d+)/) || [])[1])
+		if (Number.isInteger(id) && id > 0) opened57.push([caller57.sock, id])
+		const until = Date.now() + 10000
+		while (Date.now() < until && !existsSync(argv57)) spawnSync(process.execPath, ["-e", "setTimeout(()=>{},200)"])
+		try { return readFileSync(argv57, "utf8").trim().split("\n") } catch { return null }
+	}
+	const first = caller57 ? landed57(["--model", "sonnet", "--effort", "low"]) : null
+	const second = caller57 ? landed57(["--model", "opus", "--effort", "max"]) : null
+	const carries = (a, flag, v) => !!a && a.indexOf(flag) > -1 && a[a.indexOf(flag) + 1] === v
+	const landsFirst = carries(first, "--model", "sonnet") && carries(first, "--effort", "low")
+	const landsSecond = carries(second, "--model", "opus") && carries(second, "--effort", "max")
+
+	check("A57 a launch is TOLD its model and effort, refuses without them, and the child receives exactly those",
+		refusesNone && refusesHalf && refusesBad && printCarries && !!caller57 && landsFirst && landsSecond,
+		`no tier -> REFUSED naming both flags=${refusesNone}; only --model -> REFUSED naming --effort=${refusesHalf}; ` +
+		`a flag-shaped --model or an unknown --effort -> REFUSED before any argv=${refusesBad}; ` +
+		`positive control, the same command WITH a valid tier passes --print and its argv carries it=${printCarries} ` +
+		`(without it the refusals would pass for a launcher that refuses everything); ` +
+		`sonnet/low reaches the launched PROCESS's own argv=${landsFirst}; ` +
+		`opus/max reaches it on a second launch=${landsSecond} ` +
+		`(the control for the line before: one launch alone would pass for a launcher that hardcodes a tier)` +
+		`${caller57 ? "" : " — THE ARM COULD NOT RUN: no kitty window for this suite"}`)
 }
 
 // A54 — EVERY control suite scrubs the operator's identity, not just the one that was bitten.
