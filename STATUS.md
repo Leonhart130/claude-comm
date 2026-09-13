@@ -46,7 +46,8 @@ like findings; a runner in copies waits on a done-file. 🔴 **zsh:** quote glob
 `comm wait --for` · context.mjs's two `/clear` limits (do not "fix" with a guess) · the letter to `work`'s
 leader still unread, two `zz-` claims there held by dead pids · the automatic restart trigger (ledger
 UNKNOWN) · boot's `channel:` row dates a letter by its filename (review #8 C3, deliberate): "arrived 13h ago" of one an
-hour old, and on a same-day tie it names readdir's first, not the newest — wording, not verdict. A fresh review runs on Opus: the field's rule says never Sonnet for review.
+hour old, and on a same-day tie it names readdir's first, not the newest — wording, not verdict. 🔴 09-13: it said "arrived 19h ago" of a letter minutes old ON THE ROW THAT
+REFUSED A CLOSE — the one row a reader must act on. Re-open C3 in a fresh session (`boot --prove-red`, ~13 min). A fresh review runs on Opus: the field's rule says never Sonnet for review.
 **Later, in the owner's order (2026-09-13):** agents reaching for the bus unprompted (MCP and/or skill — measure
 where they failed first) → the Rust port → what the tool can earn him, worked out with getajob's leader.
 
