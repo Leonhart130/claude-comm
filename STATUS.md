@@ -1,64 +1,58 @@
-# STATUS — claude-comm, 2026-09-11 (sessions 4–17)
+# STATUS — claude-comm, 2026-09-13 (sessions 4–18)
 
 Design and gates are in `README.md`; **this file is only what is OPEN.** Keep it short — when it grows,
 fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-09-11. **Five field letters, eight releases. Two defects were in code I had written AND documented
-wrong; the bus then hit its cap, A21 forbade the only remedy A22 names, and the split broke a stated
-invariant that only a measurement found.** `FINDINGS.md#doorbell-text`, `#bus-split`.)*
+*(2026-09-13. **The owner handed over the whole project with two asks: let a leader pick each expert's model
+and effort, and "the inbox saturates".** The first shipped the same morning. The second was never observed —
+but the load test built to answer it found the one thing that does saturate, and it was delivery.)*
 
-**0 — 🔴 REVIEW #10: SIX RED, ALL INSIDE THAT DAY'S OWN WORK.** `REVIEW-10.md` · `FINDINGS.md#split-raised-the-cap`.
-**C4 first, the worst and it is mine:** I satisfied A22 by making it stop measuring what it caps — the bus
-grew to **51 142 B**, past a cap declared hours earlier, and the gate went red→green. *Printing is not
-gating.* 🔴 **Do NOT just add a total cap: the honest total is already over, so 48 000 must be re-argued
-ONCE with evidence** — not in a session's last minutes, which is how a cap becomes a fitted number.
-🔴 Still open: **C1** (`close.mjs`'s claim refusal has NEVER run — `claim list --json` returns an object) ·
-**C3** (A21 has `watchFile(` not `watch(`, so `fs.watch()` passes) · **C2** (the close probe says
-`gone:true` when blind) · **C5** (`selftest --prove-red` passes when `claude` cannot run).
-🟢 C6/A2/A3 fixed. 🔴 **A1 is a better design than mine, unbuilt:** replace `ARM_FLOOR` with a RATCHET on
-`.boot-state.json`'s `pass` — redden on a LOSS of arms, silent on a gain.
+**0 — 🔴 C4 IS STILL OPEN, AND NOW HAS ITS EVIDENCE.** A22 caps each module at 48 000 B and nothing caps the
+bus: `comm.mjs` 41 723 + `who.mjs` 9 735 = **51 458 B**, and it grew again today (the overflow fix). Measured
+for the re-argument — not a number yet: reading `who.mjs` whole cost **~4 100 tokens** in-session (~2.65 B
+per token as Read displays it) ⇒ the bus ≈ **20 k tokens**; the Read tool refuses above **25 000 tokens a
+call** (4 transcripts on this box); the review sessions read the bus in **slices 18 times, whole 3**; history
+24 188 → 43 041 → 36 626 (cut) → 46 662 → 51 142 B (split). 🔴 **Argue ONE total from that, gate it, prove it
+red — never fit it to today's size.** 🔴 **A1** (a ratchet on `pass` instead of `ARM_FLOOR`) still unbuilt.
 
-**1 — 🔴 RUN THE CONTROLS FIRST**, `CLAUDE_COMM_AGENT` set (A48), output **to a file, never piped**.
-🔴 **Never trust a wrapper's exit code — `systemd-run` AND the harness's task notice both reported 0 over a
-suite that returned 1** (the `tail`'s). Read the suite's LAST LINE. *(09-11: attack 56/56 ~40 s; selftest
-green, run 3× — it changed delivery three times today.)*
+**1 — 🟢 REVIEW #10's CODE REDS ARE FIXED, each proved red in copies — one variable per mutation, control
+green:** C1 the `close` claim refusal (A58) · C2 the probe records `null` when blind (A59) · C3 A21 sees
+`watch(` and every import shape, its controls through the same scan · C5 `selftest --prove-red` needs a
+session to have run. Plus: 32 exit listeners printed a leak warning into the leak gate — one listener now.
+🟡 **Unexplained, not claimed:** why ~31 registrations were silent until A59 made 32.
 
-**2 — 🟢 THE BUS IS SPLIT: `comm.mjs` 41 407 B + `who.mjs` 9 735 B** (`FINDINGS.md#bus-split`) — **but read
-item 0 first: the cap is NOT cleared, it stopped being measured.** 🔴 **BUILD WHAT THE SPLIT WAS FOR:** open
-item 5's third and fourth `who` states, still not built. ⚠️ Adding `session-registry.mjs` to `BUS_MODULES`
-puts it under A21 too.
+**2 — 🟢 THE TIER IS THE CALLER'S: `launch.mjs --model --effort`, required (A57).** The machine default was
+opus + xhigh and nobody chose it; on 09-12 getajob's `cv` AND `review` ran Sonnet/xhigh unchosen. 🟢 The field
+measured it end to end: two real launches, transcripts carry the requested model and effort. First rule of
+choice is getajob's, in `.comm/README.md`, labelled an indication.
 
-**3 — ⚠️ DO NOT run `attack.mjs` and `boot --prove-red` at once**: `--prove-red` runs the suite in its own
-copies, both drive REAL kitty windows, and they collide into a flake that looks like a finding
-(`FINDINGS.md#split-lands-in-the-active-tab`). It cost me one false red.
-🟡 Older and minor: **#9 A3** the crossing arm consumes `handoffLogs` without re-checking the guard above it ·
-**C7** `status` ⚠ on a fresh clone · **#8 A3** A47 passes `comm whoami`.
+**3 — 🟢 "THE INBOX SATURATES": NOT OBSERVED** (owner: *« j'ai du mal comprendre »*) **— THE LOAD TEST FOUND
+WHAT DOES.** `FINDINGS.md#overflow-drained-unseen`: history to 50 000 messages, delivery flat ~41 ms, `send`
+and `sent` linear (138 / 174 ms at 50 k ≈ a year of field traffic), 100 parallel sends → 100 landed. 🔴 **But
+more than 8 at one turn boundary: the notice showed 8 and drained ALL** — 92 of 100 acknowledged unseen.
+Fixed: only what is shown is drained (A60 — proved red by drain-all, drain-nothing and the old hint); A2/A3/A4 had been leaning on the defect; selftest green both
+ways. ⚠️ A `Stop` continuation still delivers nothing — the rest wait for the next real turn.
 
-**4 — 🔴 TWO LIMITS NO CODE CLOSES**, both named at their site in `bin/context.mjs`. A `/clear` whose hook
-never fires leaves the registry naming a DEAD transcript with both uuids agreeing
-(`FINDINGS.md#clear-blind`); the cleared-note discriminator goes quiet if the session owning the inherited
-uuid has ended. **Do not "fix" either with a better guess.**
+**4 — ⚠️ `bin/context.mjs` READS ONE TURN BEHIND.** Measured today: a 9.7 KB read moved it only a turn later
+(+1 683, then +4 617). A before/after with it needs a turn in between. **Not yet named at its site.**
 
-**5 — 🟡 ASKED BY THE FIELD, DESIGNED, NOT BUILT.** ⇒ **`dismiss --citing "<phrase>"`**, refusing when the
-phrase is not in the `ref` — a recipient-set status records a BELIEF and has already lied
-(`FINDINGS.md#note-eats-the-file`). 🟢 The field settled two of its three open questions by USE: normalise
-case/quotes/NBSP, and BLOCK rather than annotate.
-⇒ **`comm wait --for a,b,c`** — refused inside the bus, accepted beside it, **parked behind a measurement HE
-agreed to make first.** ⇒ **`who`'s FOURTH state**: CPU separates *working* from *idle* (21 s in 2 min 51 vs
-1 s in 1 h 10) and `/proc` already carries it — **one sample each, so no threshold from it.**
+**4b — ⚠️ A DOORBELL NOBODY RECORDS RINGING.** 12:50:25Z today, `wake.mjs`'s text in this leader's input; `comm
+inbox` empty, no wake record in any tree at that time, no `wake`/`kitten` tool call in any getajob or claude-comm
+transcript 12:47–12:51Z. Both leaders are kitty **window 1** (instances 12670 and 14341), and a wake record
+stores the window id WITHOUT its socket — a candidate path, not a proven one. Measure before touching wake.
 
-**6 — 🟡 THE LETTER TO `work`'s LEADER IS STILL UNREAD.** The bell REFUSES cleanly (he is not running), so it
-waits for his `boot.sh` §7. ⚠️ Two `zz-` claims there are held by dead pids; only he releases them.
+**5 — 🔴 RUN THE CONTROLS FIRST**, `CLAUDE_COMM_AGENT` set (A48), output **to a file**; read the suite's LAST
+LINE, never a wrapper's exit code. ⚠️ **Never two suites at once** — they share kitty and make reds that look
+like findings; a runner in copies waits on a done-file. 🔴 **zsh:** quote globs, never `echo ===`, no bare
+`$args` — three silent non-runs today.
 
-**7 — 🟡 THE DECLARED RESTART IS BUILT AND SHIPPED; THE AUTOMATIC ONE IS DELIBERATELY NOT.**
-🟢 `handoff.mjs` + `restart.mjs prepare` (11 arms), in the field since 09-10, refusing to arm a note behind
-a failed handoff. 🔴 **No trigger:** the re-open share reaches 85 % but is 52-59 % by the second decile and
-**has no knee**, so any trigger carries a threshold — **and the ledger still says UNKNOWN.** ⇒ use
-`restart.mjs`; the arm fills, then decide.
-🟢 No `review` session is running. **Launch a fresh one — `launch.mjs review --prompt "…"`, and it can now
-put itself away.** Still: do not close a window you did not open.
+**6 — 🟡 CARRIED:** #9 A3 · C7 · #8 A3 (minor) · `who`'s third and fourth states · `dismiss --citing` ·
+`comm wait --for` · context.mjs's two `/clear` limits (do not "fix" with a guess) · the letter to `work`'s
+leader still unread, two `zz-` claims there held by dead pids · the automatic restart trigger (ledger
+UNKNOWN). A fresh review: `launch.mjs review --model opus --effort xhigh --prompt "…"` — the field's rule
+says never Sonnet for review.
 
 ## Where it stands
 
@@ -71,7 +65,7 @@ put itself away.** Still: do not close a window you did not open.
 | boot | `node bin/boot.mjs` — every gating row armed; `--fast` is injected at session start, contract in `CLAUDE.md` |
 | **ledger** | `node bin/ledger.mjs` — the reboot instrument. Records here AND in the field (`--root ~/Dev/electio`); its arms run inside `attack` as A34. Each start stores `pending`, the peer's covariate (files newer than the last start) — **never inbox depth**: his session #41 had an empty mailbox and the largest real queue of its last five boots |
 | **sensor** | `node bin/context.mjs` — pid → transcript through `bin/session-registry.mjs` (the `SessionStart` hook writes it, keyed on pid + start time + boot id); **refuses on a miss**. `FINDINGS.md#clear-blind` |
-| reviews | #1–#9 **dispositioned**; **#10 launched 2026-09-11 BY THE LEADER** and still running at close — ▶ NEXT 3. #9's worst two were defects in #8's own fixes. #5's amendment stands in `CLAUDE.md`: *a gate that CAN redden is not yet one that reddens for the property in its own title* — **09-11 found its fifth and sixth instances, one of them inside the arm written to record the fifth** |
+| reviews | #1–#9 **dispositioned**; **#10 dispositioned 2026-09-13** except C4 and A1 — ▶ NEXT 0. #9's worst two were defects in #8's own fixes. #5's amendment stands in `CLAUDE.md`: *a gate that CAN redden is not yet one that reddens for the property in its own title* — **09-11 found its fifth and sixth instances, one of them inside the arm written to record the fifth** |
 
 ## ⏭️ OPEN
 1. **🔴 Latency is a mailbox, not an interrupt.** Re-derive with `node test/latency.mjs <log>`; never
@@ -105,7 +99,7 @@ put itself away.** Still: do not close a window you did not open.
    (`FINDINGS.md#no-turn-yet`) — and `launch.mjs --prompt` now stops manufacturing them. 🟢 Fourth, measured
    by the field 09-11: **CPU time separates *working* from *idle*** and `/proc` already carries it; one
    sample each, so no threshold from it. 🔴 All of it belongs in `comm who` and cannot go there — A21 forbids
-   the import ⇒ an A21 amendment **and a split; `comm.mjs` is now AT A22's cap, not near it.**
+   the import ⇒ an A21 amendment **and a split — both done 09-11; the states themselves are not built.**
 
 6. **🟢 A reply must NAME what it answers** — `Answers:` in front matter on **line 1**, anchored to the
    first byte so a quotation cannot forge one (#8 C1). Stateless, no read receipt; a failed scan says
@@ -115,7 +109,7 @@ put itself away.** Still: do not close a window you did not open.
    child's `PATH` and resolves the runtime absolutely; **09-11 it SPLITS the caller's tab, refuses a launch
    it cannot name, and `--prompt` gives the new session a first turn** — without one it sits inert while
    `who` says `running`. 🟢 **`close.mjs` (A51)**: an agent closes ITSELF, never a sibling.
-   🔴 **Review #10 C1/C2: its claim refusal has never run, and its probe reports success when blind.**
+   🟢 **Review #10 C1/C2 fixed 09-13:** the claim refusal runs (A58); the probe records `null` when blind (A59).
    `FINDINGS.md#self-close`, `#split-raised-the-cap`.
 
 8. **🟡 The autonomy mandate — self-launching experts, a self-rebooting leader.** Given 2026-09-04; settled
@@ -139,6 +133,7 @@ put itself away.** Still: do not close a window you did not open.
 
 ## ⚠️ What was NOT verified
 
+- **A launched session's tier over its whole life** — the field measured it ~15 s after start, twice.
 - 🔴 **`attack` failed TWICE on 2026-09-10, case name unknown** — both piped to `tail`. ⇒ **redirect to a
   file, then read it.** *(09-11: 8 clean runs.)*
 - 🔴 **NOTHING VERIFIES `close.mjs` UNDER A REAL AGENT** — every arm uses a `node` named `claude`. BEHAVIOUR

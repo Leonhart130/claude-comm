@@ -33,6 +33,19 @@ already have.
 
 
 
+
+## 2026-09-13.3 — bus print `f13141851068` — 2026-09-13
+
+- 🔴 **Mail beyond 8 at one turn end is no longer acknowledged unseen.** A notice shows at most 8 messages, and
+  it used to drain ALL waiting mail anyway — measured: 100 waiting, 8 shown, 92 acknowledged and logged as
+  delivered, and `comm inbox` then answered `empty`. Now only what the notice shows is acknowledged; the rest
+  stay in your inbox, the notice says `…and N more NOT acknowledged: node .comm/bin/comm.mjs inbox`, and your
+  next turn end delivers them.
+- ⚠️ A `Stop` continuation still delivers nothing: if you go idle right after reading 8, the rest wait for your
+  next real turn — `comm inbox` and the wake both see them.
+- Measured with a leader, 5 experts and 50 000 messages of history: delivery stays ~41 ms, `send` grows to
+  ~140 ms, 100 sends fired at once all land. Nothing needs archiving.
+
 ## 2026-09-13.2 — bus print `eea9bf6ff98e` — 2026-09-13
 
 - 🔴 **`close.mjs` now really refuses to close over a claim you still hold.** That refusal had never run: it
