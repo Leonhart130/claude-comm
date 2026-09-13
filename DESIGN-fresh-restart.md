@@ -24,6 +24,22 @@ and a brief: `cv` ≈ 667 717 → ≈ 90 234, `web` ≈ 585 561 → ≈ 125 052.
 - **Never on every bell.** `cv` took five turns 5–10 min apart on 2026-09-13; a warm cache made each cheap, and
   clearing each would have cost ≈ 90 000 per turn for nothing. The waste is only in the resume after a long pause.
 
+## What getajob verified after the GO (letter `…la-liste-des-agents-qui-peuvent-repartir-a-neuf.md`)
+
+- **`cv`, `web`, `review`, `db`, `extension` — yes**, each checked in its `CLAUDE.md`: it opens by reading `LECONS.md`
+  whole, `SPEC.md` from the end, `RAPPORT.md`'s last turn. `cv` and `web`, cleared by hand at 14:4xZ, resumed their
+  brief without losing anything (turns 21 and 45, checked by their leader).
+- 🔴 **Its `leader` — NO.** It is the window where the owner talks to it; part of that conversation is not yet
+  written anywhere, and it is the line he types in. **A leader is never a candidate** — whatever the config says;
+  the arm must hold that even against an opt-in that names the leader.
+- An expert waiting for its leader's answer is at rest with a CLOSED turn and a written report: safe to clear. No
+  counter-case known there.
+- On getajob the owner never types in expert windows (the hand `/clear` of 2026-09-13 aside). No measurement for
+  the other trees.
+- **Their threshold hint, two points only:** on a cold cache a fresh start pays as soon as the context exceeds the
+  restart cost — `cv` ≈ 90 234, `web` ≈ 125 052 — against cold resumes of ≈ 667 717 and ≈ 585 561.
+- **They will not write anything in `config.json` until the key exists** — name it in the release note.
+
 ## The condition — all of it
 
 1. the agent is opted in;
