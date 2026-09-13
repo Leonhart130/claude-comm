@@ -34,6 +34,19 @@ already have.
 
 
 
+
+## 2026-09-13.4 — bus print `0d8b32a0d9fa` — 2026-09-13
+
+- 🔴 **A flag a command does not know now REFUSES instead of acting on everything.** `comm dismiss --help` used to
+  acknowledge your whole inbox, and so did `dismiss --idd x` (a typo of `--id`); `send --notte x` dropped the note.
+  Now an unknown flag exits 2, does nothing, and lists the flags that command takes; `--help` / `-h` print the
+  usage and do nothing. A value after a flag that takes one (`--note "-text"`) is still a value.
+- **What "pending" means, measured in the field:** NOT acknowledged — not "not seen". The hook acknowledges at a
+  turn end and `comm inbox` peeks without acknowledging, so an agent can read its brief and still show pending
+  for minutes. To know whether an expert has taken a brief, read its transcript, or `comm sent`.
+- ⚠️ **A wake typed into a session that is mid-turn lands INSIDE that turn** (18 times in one day in one field).
+  `wake` cannot yet tell a busy session from an idle one.
+
 ## 2026-09-13.3 — bus print `f13141851068` — 2026-09-13
 
 - 🔴 **Mail beyond 8 at one turn end is no longer acknowledged unseen.** A notice shows at most 8 messages, and
