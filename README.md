@@ -33,8 +33,10 @@ expert* verified, not something text injected into their session blurred.
 | **running agent** | `Stop` hook returns `{decision:"block", reason:<nudge>}` | end of its current **turn** |
 | **stopped / crashed agent** | `SessionStart` hook drains the same inbox | next time you launch it |
 
-`stop_hook_active` guards the block-loop. **Every hook path exits 0 on any internal error** — a broken bus
-must never break a session.
+A continuation (`stop_hook_active`) may block again, `STOP_CHAIN` = 3 times at most, counted per session: mail that
+arrives while an agent answers a notice is delivered in the same turn end, and a drain that fails cannot loop (A65,
+`FINDINGS.md#stop-continuation`). **Every hook path exits 0 on any internal error** — a broken bus must never break a
+session.
 
 **An idle agent is rung, never delivered to.** When mail waits for someone else, a `Stop` hook spawns
 `bin/wake.mjs`, which types a doorbell into that agent's window so it takes a turn — and never into a running

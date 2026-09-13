@@ -15,13 +15,13 @@
  * directives? Measuring the wrong thing produced a confident, plausible, wrong
  * result, which is this project's signature failure mode.
  */
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync, statSync, symlinkSync, cpSync, utimesSync } from "node:fs"
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync, statSync, symlinkSync, cpSync, utimesSync, chmodSync } from "node:fs"
 import { join, delimiter } from "node:path"
 import { execFileSync, spawnSync, spawn } from "node:child_process"
 import { createHash } from "node:crypto"
 import { pathToFileURL } from "node:url"
 import { tmpdir } from "node:os"
-import { MAX_NOTE, MAX_RENDER, MAX_REF } from "../bin/comm.mjs"
+import { MAX_NOTE, MAX_RENDER, MAX_REF, STOP_CHAIN } from "../bin/comm.mjs"
 
 const PKG = new URL("..", import.meta.url).pathname
 
@@ -2338,6 +2338,73 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		`POSITIVE CONTROL, the same fixture at rest -> exit ${idle.code}, typed ${idle.typed.length}, recorded=${idle.recorded} (rings=${controlRings}); ` +
 		`a reply just ended -> rings=${rang(ending)}; registry miss -> rings=${rang(unknown)}, says unknown=${/turn state unknown/.test(unknown.out)}; ` +
 		`fixture shapes read busy/idle through A62's reader=${shapeArmed}${busy.err || idle.err ? ` — stderr: ${(busy.err + idle.err).trim().slice(0, 160)}` : ""}`)
+}
+
+// A65 — a Stop continuation delivers the mail that arrived during it, and a drain that fails cannot loop.
+//
+// Until 2026-09-13 the hook exited at every `stop_hook_active`, the loop guard since the first commit: over the four
+// trees, 49 of 258 blocks were followed by mail queued during the continuation and delivered only after the turn
+// closed — median 150 s, max 10.5 h. The loop that guard feared is precise: a block needs pending mail and drains
+// what it shows, so a second block needs NEW mail — unless the drain fails, and then every Stop sees the same
+// message. So a continuation may block again, STOP_CHAIN times, counted per session. FINDINGS.md#stop-continuation
+//
+// One fixture, the hook byte-identical; the variables are the payload's stop_hook_active and transcript, and the mail.
+// POSITIVE CONTROL for the bound: the inbox made unwritable, so the drain really fails — the message is still there
+// after every Stop (`stuck`) — and eleven Stops must yield 1 + STOP_CHAIN blocks, not eleven. Without `stuck` the
+// bound could be passing a fixture whose drain simply worked.
+{
+	const r65 = mkdtempSync(join(tmpdir(), "comm-attack-chain-"))
+	atExit(() => { try { chmodSync(join(r65, ".comm", "inbox", "leader"), 0o755) } catch {} try { rmSync(r65, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(r65, ".comm", "bin"), { recursive: true })
+	for (const a of ["leader", "db"]) mkdirSync(join(r65, ".comm", "inbox", a), { recursive: true })
+	mkdirSync(join(r65, "db"), { recursive: true })
+	writeFileSync(join(r65, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", db: "db" } }))
+	for (const f of ["comm.mjs", "who.mjs"]) cpSync(join(PKG, "bin", f), join(r65, ".comm", "bin", f))
+	const B65 = join(r65, ".comm", "bin", "comm.mjs")
+	const env65 = { ...process.env }
+	delete env65.CLAUDE_COMM_AGENT
+	const send65 = (k) => {
+		writeFileSync(join(r65, "db", "REPORT.md"), `report ${k}\n`)
+		return spawnSync(process.execPath, [B65, "send", "leader", "--ref", "REPORT.md", "--kind", "done"], { cwd: join(r65, "db"), env: env65, encoding: "utf8" }).status === 0
+	}
+	const waiting65 = () => readdirSync(join(r65, ".comm", "inbox", "leader")).filter((f) => f.endsWith(".json")).length
+	const T65 = join(r65, "session.jsonl")
+	const stop65 = (active, transcript = T65) => {
+		const r = spawnSync(process.execPath, [B65, "hook", "stop", "--agent-root", r65], { cwd: r65, env: env65, encoding: "utf8",
+			input: JSON.stringify({ hook_event_name: "Stop", stop_hook_active: active, transcript_path: transcript }) })
+		try { return JSON.parse(r.stdout).decision === "block" } catch { return false }
+	}
+	const sent = [send65(1)]
+	const first = stop65(false), afterFirst = waiting65()
+	sent.push(send65(2))
+	const cont = stop65(true), afterCont = waiting65()                 // THE DEFECT: this exited, mail 2 waited
+	const empty = stop65(true)
+	let chainBlocks = 1                                                   // `cont` was the first continuation block
+	for (let k = 0; k < STOP_CHAIN + 2; k++) { sent.push(send65(10 + k)); if (stop65(true)) chainBlocks++ }
+	const leftAtCap = waiting65()
+	const natural = stop65(false), afterNatural = waiting65()             // a real turn end resets the chain
+	rmSync(join(r65, ".comm", "stop"), { recursive: true, force: true })
+	sent.push(send65(30))
+	const noRecord = stop65(true)                                         // fail closed: no count, the old exit
+	stop65(false)
+	sent.push(send65(31))
+	const otherSession = stop65(true, join(r65, "other.jsonl"))           // another session's count is not this one's
+	stop65(false)
+	sent.push(send65(40))
+	chmodSync(join(r65, ".comm", "inbox", "leader"), 0o555)
+	let loopBlocks = 0
+	for (let k = 0; k < 11; k++) if (stop65(k > 0)) loopBlocks++
+	const stuck = waiting65()
+	chmodSync(join(r65, ".comm", "inbox", "leader"), 0o755)
+	check("A65 a Stop continuation delivers mail that arrived during it, and a drain that fails cannot loop",
+		sent.every(Boolean) && first && afterFirst === 0 && cont && afterCont === 0 && !empty &&
+		chainBlocks === STOP_CHAIN && leftAtCap === 3 && natural && afterNatural === 0 &&
+		!noRecord && !otherSession && stuck === 1 && loopBlocks === 1 + STOP_CHAIN,
+		`turn end blocks=${first}; a continuation with new mail blocks=${cont} and drains (${afterCont} left); an empty one blocks=${empty}; ` +
+		`continuation blocks in one turn end ${chainBlocks} (want STOP_CHAIN=${STOP_CHAIN}), mail left at the cap ${leftAtCap} (want 3), ` +
+		`the next natural turn end delivers it=${natural && afterNatural === 0}; no count -> blocks=${noRecord}, another session's count -> blocks=${otherSession}; ` +
+		`POSITIVE CONTROL, a drain that fails: the message stays=${stuck === 1}, 11 Stops -> ${loopBlocks} blocks (want ${1 + STOP_CHAIN}); ` +
+		`every send queued=${sent.every(Boolean)}`)
 }
 
 // A36 — live bus state committed to a project's git, and the notice that explains why not.
