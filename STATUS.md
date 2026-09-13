@@ -13,9 +13,9 @@ instead of resuming 600 k uncached — **shipped as `.6`**, item 0.)*
 BEFORE ITS RING.** Rule 7 in `wake.mjs`, A63 (red 6 ways in copies), ring history `.comm/wake/rings.jsonl`.
 Threshold 300 000, age > 60 min, both measured; live end to end in a throwaway: `FINDINGS.md#fresh-restart`.
 **Owed, in order:** ① getajob SET the key (read 09-13, 5 experts) — read ITS `rings.jsonl` after a day: the real
-60-min path and a hook-spawned clear were never observed. 🔴 **Their catch, form K:** `wake --dry-run` computes the
-decision only for agents with mail, so an opted-in leader cannot check it — report it for every listed agent; ② offer it to `work` (4.3 M of the waste),
-whose channel still holds our unread 09-08 letter; ③ a per-agent threshold only if a field start measures > 300 k.
+60-min path and a hook-spawned clear were never observed. 🟢 **Their catch, form K, fixed in `.8`:** `--dry-run` now
+reports the decision for every listed agent, mail or not (A66, `#dry-run-hid-the-decision`);
+② `work`: **DEFERRED** — the owner is not running it for a while (09-13), getajob is the field; ③ a per-agent threshold only if a field start measures > 300 k.
 
 **1 — 🟢 SETTLED 2026-09-13, detail in `CHANGELOG.md` / `FINDINGS.md`:** review #10 closed (A22 = the whole bus in
 one Read call, 58 000 B; A1 two-way arm self-scan) · model + effort per launch (A57) · overflow drain (A60) ·
@@ -29,8 +29,9 @@ old bus left the mail, the new one delivered it; selftest green both ways). 49 o
 mid-turn** (A64, 09-13): its ring is now a function the arm executes, not a script only a live peer could reach.
 `FINDINGS.md#bell-mid-turn`.
 
-**2 — ⚠️ `bin/context.mjs` READS ONE TURN BEHIND.** Measured today: a 9.7 KB read moved it only a turn later
-(+1 683, then +4 617). A before/after with it needs a turn in between. **Not yet named at its site.**
+**2 — 🟢 NAMED 2026-09-13: `bin/context.mjs` reads one API call behind, by construction** — a usage row is its
+request's input, so it excludes that request's own tool results (8 calls > 8 KB: the NEXT call grew by the result
+plus the output). Named at `lastUsage`. A before/after needs a call in between.
 
 **3 — ⚠️ A DOORBELL NOBODY RECORDS RINGING** (12:50:25Z). 🟢 **The history exists since `.6`**: every ring,
 append-only, with the parent's command line — so the NEXT unexplained ring is attributable. That one stays

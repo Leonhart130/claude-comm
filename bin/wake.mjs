@@ -393,6 +393,24 @@ export function freshDecision(agent, cfg, turn, { now = Date.now(), ageMs = FRES
 	return { clear: true, opted: true, why: `context ${n(c.context)}, last call ${min} min ago` }
 }
 
+/**
+ * Rule 7 for EVERY agent `freshRestart` names, mail or not — what `--dry-run` prints. getajob's catch, 2026-09-13: the
+ * decision was computed only for agents with mail waiting, so a leader who had just opted five experts in ran
+ * `--dry-run`, read "nothing is waiting", and could not check it. A name missing from the roster is said, not skipped.
+ * `agents` is `who --json`'s; `turnOf(pid)` is readTurn. A66.
+ */
+export function freshReport(cfg, agents, turnOf, fresh = {}) {
+	const list = cfg ? cfg.freshRestart : undefined
+	if (list === undefined) return []
+	if (!Array.isArray(list) || !list.every((x) => typeof x === "string")) return [{ agent: null, clear: false, why: freshDecision(null, cfg, null).why }]
+	return list.flatMap((agent) => {
+		const a = agents && agents[agent]
+		if (!a) return [{ agent, clear: false, why: "not on the roster in .comm/config.json" }]
+		if (!a.pids || !a.pids.length) return [{ agent, clear: false, why: "not running" }]
+		return a.pids.map((pid) => ({ agent, pid, ...freshDecision(agent, cfg, turnOf(pid), fresh) }))
+	})
+}
+
 const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
 
 /** Type `/clear` and PROVE it: a new transcript for this pid in the registry, or nothing is claimed. */
@@ -503,15 +521,22 @@ async function main() {
 			results.push(r)
 		}
 	}
-	if (has("--json")) console.log(JSON.stringify({ root, results }))
-	else if (!results.length) console.log("wake: nothing is waiting for anyone else")
-	else for (const r of results) {
-		const note = r.turn === "unknown" ? ` · turn state unknown (${r.turnWhy}), rings as before`
-			: r.turn === "ending" ? " · its reply had just ended" : ""
-		const fresh = r.cleared === true ? ` · ${r.clearWhy}` : r.cleared === false ? ` · ⚠ ${r.clearWhy}`
-			: r.wouldClear ? ` · would restart it fresh first (${r.freshWhy})` : r.freshWhy ? ` · no fresh restart: ${r.freshWhy}` : ""
-		console.log(r.sent ? `  ● woke ${r.agent} (pid ${r.pid}) in window ${r.window} — ${r.how}${note}${fresh}`
-			: `  ○ ${r.agent}: ${r.dryRun ? `would wake in window ${r.window} (${r.how})${note}${fresh}` : r.why}`)
+	// A dry run reports rule 7 for every listed agent, mail or not (freshReport, A66). A real run does not: it rings.
+	const report = has("--dry-run") ? freshReport(cfg, state.agents, (pid) => readTurn(pid, lookup)) : []
+	if (has("--json")) console.log(JSON.stringify({ root, results, ...(has("--dry-run") ? { fresh: report } : {}) }))
+	else {
+		if (!results.length) console.log("wake: nothing is waiting for anyone else")
+		for (const r of results) {
+			const note = r.turn === "unknown" ? ` · turn state unknown (${r.turnWhy}), rings as before`
+				: r.turn === "ending" ? " · its reply had just ended" : ""
+			const fresh = r.cleared === true ? ` · ${r.clearWhy}` : r.cleared === false ? ` · ⚠ ${r.clearWhy}`
+				: r.wouldClear ? ` · would restart it fresh first (${r.freshWhy})` : r.freshWhy ? ` · no fresh restart: ${r.freshWhy}` : ""
+			console.log(r.sent ? `  ● woke ${r.agent} (pid ${r.pid}) in window ${r.window} — ${r.how}${note}${fresh}`
+				: `  ○ ${r.agent}: ${r.dryRun ? `would wake in window ${r.window} (${r.how})${note}${fresh}` : r.why}`)
+		}
+		if (report.length) console.log("  fresh restart, for every agent in freshRestart (dry run — nothing typed):\n" +
+			report.map((f) => `    ${f.clear ? "●" : "○"} ${f.agent || "freshRestart"}${f.pid ? ` (pid ${f.pid})` : ""}: ` +
+				(f.clear ? `would restart it fresh first — ${f.why}` : f.why)).join("\n"))
 	}
 }
 

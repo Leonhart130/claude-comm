@@ -84,6 +84,13 @@ const usageOf = (entry) => {
  * but a single JSONL line can be larger than the tail window (one big tool result
  * does it), and a tail that finds no usage must NOT be reported as "no usage". It
  * falls back to the whole file, and says which path it took.
+ *
+ * 🔴 THE NUMBER IS ONE API CALL OLD, BY CONSTRUCTION (STATUS item 2, measured 2026-09-13). A usage row is the INPUT
+ * of the request that wrote it, so it cannot hold what that request is still waiting for: its own tool results, and
+ * every tool issued in the same message. On the leader's own transcript, each of the 8 calls whose tool result
+ * passed 8 KB grew the NEXT call's context by that result at ≈ 2.7 B/token plus the call's own output. ⇒ a
+ * before/after with this sensor needs one API call between the read it measures and the reading; a read and a
+ * reading issued together share one number.
  */
 function lastUsage(path) {
 	const size = statSync(path).size

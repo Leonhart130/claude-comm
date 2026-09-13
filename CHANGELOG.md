@@ -38,6 +38,16 @@ already have.
 
 
 
+
+## 2026-09-13.8 — bus print `69ba247a5e08` — 2026-09-13
+
+- **`wake --dry-run` now shows the fresh-restart decision for every agent in `freshRestart`, mail or not.** Before, it
+  was computed only for agents with mail waiting, so right after opting agents in, a dry run said `nothing is waiting`
+  and showed nothing to check (reported by getajob's leader). Each listed agent now gets a line: `would restart it
+  fresh first — …`, its reason for not, `not running`, or `not on the roster in .comm/config.json` — a misspelt name
+  used to opt in nobody, silently. A real run is unchanged. `--json` adds a `fresh` array on a dry run.
+- Nothing to do on your side; nothing is typed by a dry run.
+
 ## 2026-09-13.7 — bus print `4e9e87ce8f87` — 2026-09-13
 
 - 🔴 **Mail that arrives while you answer a notice is now delivered in the same turn end.** Until now, once a turn end

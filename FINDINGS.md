@@ -2887,3 +2887,22 @@ each mutation of `comm.mjs` reddens A65 alone — the bound removed → `continu
 the old exit reinstated → `a continuation with new mail blocks=false`; any session's count accepted → `another
 session's count -> blocks=true`; the count never written → the fail-closed exit, `a continuation with new mail
 blocks=false` — the direction a broken write is allowed to take.
+
+## `#dry-run-hid-the-decision` — an opted-in leader asked the tool to verify, and it had nothing to show
+
+**2026-09-13, reported by getajob's leader the hour they set `freshRestart`.** `wake --dry-run` answered `wake: nothing
+is waiting for anyone else` and nothing else: rule 7 was decided only inside the loop over agents WITH mail, so with an
+empty inbox there was no decision to print. They wrote *"Non vérifié chez moi, pour cette raison"* — the right call,
+and the tool's fault. **LESSONS form K** — a guard that is right and whose output carries nothing to act on — found by
+the field again, not by me. I answered with the table computed by hand from their installed copy (the leader not
+listed; `cv`, `web` idle with no API call since their hand `/clear`; three not running).
+
+⇒ `freshReport` (A66): a dry run prints the decision for **every name in the list** — decided for a running agent,
+`not running`, `not on the roster` (a misspelt name used to opt in nobody, silently), a leader refused. A real run
+prints nothing more; it rings.
+
+**Proved red in copies, 2026-09-13, `attack.mjs` byte-identical (sha `865970bb00a834ab`)**: the unmutated copy is green;
+each mutation of `wake.mjs` reddens A66 alone — the report limited to agents with mail → `report rows 1 (want 5)` and
+nothing printed by the CLI; a name missing from the roster skipped → `report rows 4`; the report printed on every run
+→ the positive control reddens. Live on getajob, read-only: five rows, `cv` busy, `web` idle with no call since its
+clear, three not running.

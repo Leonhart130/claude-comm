@@ -3784,6 +3784,56 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		`an overwrite store loses the first ring=${overwriteCaught}`)
 }
 
+// A66 — `wake --dry-run` reports the fresh-restart decision for EVERY agent freshRestart names, mail or not.
+//
+// getajob's catch, 2026-09-13, the day they opted five experts in: `--dry-run` answered "nothing is waiting for anyone
+// else" and showed no decision, because rule 7 was computed only inside the loop over agents WITH mail. A leader who
+// asks the tool to verify an opt-in and cannot is LESSONS form K: a guard that is right and whose output carries
+// nothing to act on. FINDINGS.md#dry-run-hid-the-decision
+//
+// Two halves. The report, pure: every listed name gets a row — running (decided), not running, not on the roster,
+// the leader refused. And the CLI, EXECUTED in a fixture with no mail at all: the dry run must print the report.
+// POSITIVE CONTROL: the same fixture run WITHOUT --dry-run prints no report — otherwise "the report is printed" could
+// pass for a CLI that prints it on every run, typing included.
+{
+	const wake = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
+	const NOW = Date.now(), cold = { state: "idle", why: "x", call: { at: NOW - 90 * 60_000, context: 667_717 } }
+	const cfgR = { leader: "leader", agents: { leader: ".", cv: "apps/cv", web: "apps/web", db: "db" }, freshRestart: ["cv", "web", "db", "cvv", "leader"] }
+	const agentsR = { leader: { pids: [1] }, cv: { pids: [2] }, web: { pids: [3] }, db: { pids: [] } }
+	const turns = { 1: cold, 2: cold, 3: { ...cold, state: "busy" } }
+	const rows = wake.freshReport(cfgR, agentsR, (pid) => turns[pid], { now: NOW })
+	const row = (a) => rows.find((r) => r.agent === a) || {}
+	const pureOk = rows.length === 5 && row("cv").clear === true && row("web").clear === false && /only an idle/.test(row("web").why) &&
+		row("db").why === "not running" && /not on the roster/.test(row("cvv").why) && /leader is never/.test(row("leader").why) &&
+		wake.freshReport({ ...cfgR, freshRestart: "cv" }, agentsR, () => cold).length === 1 &&
+		wake.freshReport({ leader: "leader", agents: cfgR.agents }, agentsR, () => cold).length === 0
+
+	const r66 = mkdtempSync(join(tmpdir(), "comm-attack-dryreport-"))
+	atExit(() => { try { rmSync(r66, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(r66, ".comm", "bin"), { recursive: true })
+	for (const a of ["leader", "db"]) mkdirSync(join(r66, ".comm", "inbox", a), { recursive: true })
+	mkdirSync(join(r66, "db"), { recursive: true })
+	writeFileSync(join(r66, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", db: "db" }, freshRestart: ["db"] }))
+	for (const f of ["comm.mjs", "who.mjs", "wake.mjs", "session-registry.mjs"]) cpSync(join(PKG, "bin", f), join(r66, ".comm", "bin", f))
+	const env66 = { ...process.env }
+	delete env66.CLAUDE_COMM_AGENT
+	const cli = (...args) => spawnSync(process.execPath, [join(r66, ".comm", "bin", "wake.mjs"), "--root", r66, ...args], { cwd: r66, env: env66, encoding: "utf8" })
+	const dry = cli("--dry-run"), real = cli(), dryJson = cli("--dry-run", "--json")
+	let fresh = null
+	try { fresh = JSON.parse(dryJson.stdout).fresh } catch {}
+	const cliOk = dry.status === 0 && /nothing is waiting/.test(dry.stdout) && /○ db: not running/.test(dry.stdout) &&
+		Array.isArray(fresh) && fresh.length === 1 && fresh[0].agent === "db"
+	const controlQuiet = real.status === 0 && /nothing is waiting/.test(real.stdout) && !/fresh restart/.test(real.stdout)
+
+	check("A66 wake --dry-run reports the fresh-restart decision for every listed agent, mail or not",
+		pureOk && cliOk && controlQuiet,
+		`report rows ${rows.length} (want 5): ${rows.map((r) => `${r.agent}=${r.clear ? "clear" : r.why}`).join("; ")}; ` +
+		`a malformed list -> ${wake.freshReport({ ...cfgR, freshRestart: "cv" }, agentsR, () => cold).length} row, no key -> none; ` +
+		`CLI with no mail, --dry-run -> exit ${dry.status}, report printed=${/○ db: not running/.test(dry.stdout)}, --json fresh=${JSON.stringify(fresh)}; ` +
+		`POSITIVE CONTROL, the same run without --dry-run -> report printed=${/fresh restart/.test(real.stdout)} (want false)` +
+		`${dry.stderr ? ` — stderr: ${dry.stderr.trim().slice(0, 160)}` : ""}`)
+}
+
 // A52 — the doorbell states a fact. It gives no conduct instruction and makes no promise.
 //
 // Reported by the `getajob` field leader, 2026-09-11, after paying for both halves. The
