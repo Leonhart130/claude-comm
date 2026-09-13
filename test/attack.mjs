@@ -3446,6 +3446,99 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		`(without them the lines above pass for a bus that refuses everything)`)
 }
 
+// A62 — a doorbell is never typed into a running turn.
+//
+// Measured 2026-09-13 in the getajob field: 18 of 35 doorbells in one day landed INSIDE a turn
+// ("sent a new message while you were working"), one interrupting `cv` the instant its leader woke
+// `web`, because `wake` pressed Enter without knowing whether anyone was working. The signal is the
+// transcript's last DECISIVE row in file order, and every shape below is one that measurement named
+// against Claude Code's own verdicts (1 228 typed prompts, 478 queued mid-turn, 697 queue outcomes).
+// FINDINGS.md#wake-mid-turn
+//
+// POSITIVE CONTROL: the two rules measured and REJECTED on the same corpus must each fail this table -
+// "the last row closed a turn" and "the last reply ended" - and the second must fail in the direction
+// that interrupts (a blocked Stop shows an ended reply while the model answers it, up to 23 s).
+// Without that, the table could be one that any plausible rule passes.
+{
+	const wake = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
+	const at = new Date(Date.now() - 5000).toISOString()
+	const U = (text, extra = {}) => ({ type: "user", timestamp: at, message: { role: "user", content: text }, ...extra })
+	const TR = (text = "ok") => ({ type: "user", timestamp: at, message: { role: "user", content: [{ type: "tool_result", tool_use_id: "t1", content: text }] } })
+	const A = (stop, extra = {}) => ({ type: "assistant", timestamp: at, message: { role: "assistant", model: "claude-opus-5", stop_reason: stop, content: [{ type: stop === "tool_use" ? "tool_use" : "text", text: "x" }] }, ...extra })
+	const SYN = (text, extra = {}) => A("stop_sequence", { message: { role: "assistant", model: "<synthetic>", stop_reason: "stop_sequence", content: [{ type: "text", text }] }, ...extra })
+	const S = (subtype) => ({ type: "system", subtype, timestamp: at })
+	const X = (type, extra = {}) => ({ type, timestamp: at, ...extra })
+	const replied = [U("do it"), A("tool_use"), TR(), A("end_turn")]
+	const closed = [...replied, S("stop_hook_summary"), S("turn_duration")]
+	const CASES = [
+		["nothing written yet", [], "idle"],
+		["a prompt just submitted", [U("do it")], "busy"],
+		["a tool running", [U("do it"), A("tool_use")], "busy"],
+		["a tool result, the model thinking", [U("do it"), A("tool_use"), TR()], "busy"],
+		["a queued input waiting mid-turn", [U("do it"), A("tool_use"), TR(), X("attachment", { attachment: { type: "queued_command", prompt: "more" } })], "busy"],
+		["a reply ended, its Stop hook running", replied, "ending"],
+		["a Stop summary written, no turn_duration", [...replied, S("stop_hook_summary")], "busy"],
+		["the Stop hook blocked, the model answering", [...replied, U("Stop hook feedback: [claude-comm] 1 message arrived", { isMeta: true }), X("attachment", { attachment: { type: "hook_blocking_error" } }), S("stop_hook_summary")], "busy"],
+		["the turn closed", closed, "idle"],
+		["closed, then an away summary and bookkeeping", [...closed, S("away_summary"), X("last-prompt"), X("file-history-snapshot"), X("queue-operation", { operation: "enqueue", content: "<task-notification>" })], "idle"],
+		["closed, then a permission granted", [...closed, U("Permission granted for: deploy", { isMeta: true })], "idle"],
+		["closed, then a slash command", [...closed, U("<command-name>/model</command-name>"), U("<local-command-caveat>Caveat: local</local-command-caveat>", { isMeta: true }), S("local_command"), U("<local-command-stdout>Set model</local-command-stdout>")], "idle"],
+		["closed, then a ! shell command", [...closed, U("<bash-input>ls</bash-input>"), U("<bash-stdout>a</bash-stdout><bash-stderr></bash-stderr>")], "busy"],
+		["closed, then a usage-limit resume", [...closed, U("You can continue now. Continue the task you were working on", { isMeta: true })], "busy"],
+		["closed, then a doorbell typed at rest", [...closed, U("[claude-comm] doorbell. This line is from the BUS")], "busy"],
+		["closed, then a subagent's rows", [...closed, { ...A("tool_use"), isSidechain: true }, { ...TR(), isSidechain: true }], "idle"],
+		["ended on an API error", [U("do it"), SYN("API Error: 529 Overloaded", { isApiErrorMessage: true })], "idle"],
+		["ended with a synthetic reply", [U("do it"), SYN("No response requested.")], "idle"],
+		["interrupted during a tool", [U("do it"), A("tool_use"), TR("[Request interrupted by user for tool use]")], "idle"],
+		["interrupted while thinking", [U("do it"), { type: "user", timestamp: at, message: { role: "user", content: [{ type: "text", text: "[Request interrupted by user]" }] } }], "idle"],
+	]
+	const got = CASES.map(([name, rows, want]) => ({ name, want, got: wake.turnState(rows).state }))
+	const wrong = got.filter((c) => c.got !== c.want)
+	const ROLES = new Set(["user", "assistant", "system"])
+	const lastRowClosed = (rows) => { const r = rows.filter((x) => ROLES.has(x.type) && !x.isSidechain).at(-1); return !r || (r.type === "system" && r.subtype === "turn_duration") ? "idle" : "busy" }
+	const lastReplyEnded = (rows) => { const r = rows.filter((x) => (x.type === "user" || x.type === "assistant") && !x.isSidechain).at(-1); return !r || (r.type === "assistant" && r.message?.stop_reason === "end_turn") ? "idle" : "busy" }
+	const rings = (s) => s !== "busy"
+	const failsOf = (rule) => CASES.filter(([, rows, want]) => rings(rule(rows)) !== rings(want))
+	const c1 = failsOf(lastRowClosed), c2 = failsOf(lastReplyEnded)
+	const c2interrupts = c2.filter(([, , want]) => want === "busy")
+
+	// The tail reader: a row larger than the first window must not hide what is under it.
+	const dirT = mkdtempSync(join(tmpdir(), "comm-attack-turn-"))
+	atExit(() => { try { rmSync(dirT, { recursive: true, force: true }) } catch {} })
+	const jsonl = (rows) => rows.map((r) => JSON.stringify(r)).join("\n") + "\n"
+	writeFileSync(join(dirT, "deep.jsonl"), jsonl([...closed, U("again"), A("tool_use"), TR("x".repeat(300_000))]))
+	const lk = (file) => () => ({ ok: true, transcript: join(dirT, file) })
+	const deep = wake.readTurn(1, lk("deep.jsonl"))
+	const unborn = wake.readTurn(1, lk("never-written.jsonl"))
+	const miss = wake.readTurn(1, () => ({ ok: false, why: "pid 1 is not in the session registry" }))
+	const noReg = wake.readTurn(1, null)
+	const readOk = deep.state === "busy" && unborn.state === "idle" && /no turn/.test(unborn.why) && miss.state === "unknown" && noReg.state === "unknown"
+
+	// The decision: busy is skipped before anything resolves; idle, ending and unknown ring as before.
+	const rootK = mkdtempSync(join(tmpdir(), "comm-attack-wake6-"))
+	atExit(() => { try { rmSync(rootK, { recursive: true, force: true }) } catch {} })
+	const fg = [{ sock: "/tmp/kitty-attack", id: 5, shellPid: 1, fg: [4242] }]
+	const ask = (turn) => wake.wakeAgent(rootK, "app", 4242, { dryRun: true, wins: fg, ...(turn ? { turn } : {}) })
+	const onBusy = ask({ state: "busy", why: "last transcript row: a tool result, 3s ago" })
+	const onIdle = ask({ state: "idle", why: "last transcript row: the turn closed, 9s ago" })
+	const onEnding = ask({ state: "ending", why: "last transcript row: a reply ended, its Stop hook still running" })
+	const onUnknown = ask({ state: "unknown", why: "pid 4242 is not in the session registry" })
+	const unasked = ask(null)
+	const decideOk = onBusy.busy === true && onBusy.sent === false && !onBusy.dryRun && /^mid-turn, not rung/.test(onBusy.why) &&
+		onIdle.dryRun === true && onEnding.dryRun === true && onUnknown.dryRun === true && onUnknown.turn === "unknown" &&
+		unasked.dryRun === true && !unasked.busy
+
+	check("A62 a doorbell is never typed into a running turn",
+		wrong.length === 0 && readOk && decideOk && c1.length > 0 && c2interrupts.length > 0,
+		`${CASES.length - wrong.length}/${CASES.length} transcript shapes read right` +
+		`${wrong.length ? ` — WRONG: ${wrong.map((c) => `${c.name} (${c.got}, want ${c.want})`).join("; ")}` : ""}; ` +
+		`tail read past a 300 KB row=${deep.state}, no transcript yet=${unborn.state}, registry miss=${miss.state}, no registry=${noReg.state}; ` +
+		`busy=${onBusy.busy ? "skipped before resolving" : "RANG"}, idle/ending/unknown=${[onIdle, onEnding, onUnknown].map((r) => r.dryRun ? "ring" : "skipped").join("/")}, ` +
+		`no turn read=${unasked.dryRun ? "rings as before" : "skipped"}; ` +
+		`POSITIVE CONTROL, rules rejected on the corpus fail here too: "last row closed a turn" ${c1.length}, ` +
+		`"last reply ended" ${c2.length} (${c2interrupts.length} by ringing a busy session)`)
+}
+
 // A52 — the doorbell states a fact. It gives no conduct instruction and makes no promise.
 //
 // Reported by the `getajob` field leader, 2026-09-11, after paying for both halves. The

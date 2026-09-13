@@ -2613,3 +2613,76 @@ commands (`inbox`, `sent`, `log`) ignored unknown flags harmlessly.
 ⇒ Every subcommand checks its flags against a list: an unknown flag exits 2 and does nothing, `--help` / `-h`
 print the usage and do nothing, and a value after a flag that takes one (`--note "-text"`) is never a flag.
 Every in-repo caller and every field use found (29 + 8 + 7 files) stays inside the lists. Gated by A61.
+
+## `#wake-mid-turn` — `wake` pressed Enter into running turns, and the transcript already knew
+
+**Measured 2026-09-13**, after the `getajob` field counted 18 of 35 doorbells in one day landing *inside* a turn
+(Claude Code: *"sent a new message while you were working"*) — one interrupting `cv` the instant its leader woke
+`web`. `wake.mjs` resolved the window, typed, pressed Enter, and had no way to know whether anyone was working.
+
+**Ground truth is Claude Code's own verdict, three ways, over every transcript on this machine (293):** a typed
+prompt row (submitted at rest — 1 228), an `attachment/queued_command` (arrived mid-turn — 478), and the queue
+log's outcome for every enqueue (`remove absorbed_mid_turn` against `dequeue` — 697).
+
+| candidate signal | result |
+| --- | --- |
+| how long the transcript has been quiet | useless: a mid-turn doorbell's p90 is **36 s** of silence, a resting one's p10 **38 s** |
+| last row is `turn_duration` | 58 of 277 resting doorbells misread busy (away summaries and bookkeeping written after the close) |
+| last user/assistant row is an `end_turn` | 0 false idle on typed input — but a Stop hook that BLOCKED shows exactly that shape while the model answers it (257 windows, p99 16 s, max 23 s): **it rings into those** |
+| **the last DECISIVE row, in FILE order** (`rowVerdict`) | **478 / 478 queued inputs read busy; no absorbed doorbell reads idle; 1 of 1 228 prompts reads busy** (a prompt that never got a reply) |
+
+**File order, not timestamps, and it matters.** Claude Code writes a model message when it ENDS, stamped with when
+it began. At the instant of a ring a reader holds only what was written, so evaluating by timestamp flatters any
+rule — this measurement's own first pass did exactly that and was redone.
+
+**The shapes the rule had to learn, each measured, none guessed** — every row the rule ignored while reading idle,
+and whether a model turn followed with no prompt:
+- `<bash-input>` / `<bash-stdout>` — a `!` command — **starts a model turn every time** (~30 of ~30). Slash
+  commands never do.
+- meta `You can continue now…` (6/6) and `Your claude.ai usage limit has reset…` (3/3) resume a turn on their own;
+  meta `Stop hook feedback:` (257) is a block. Every other meta row (a permission granted, a rename) is written at rest.
+- `<task-notification>` enqueued at rest starts nothing (0 of 50): it waits for the next prompt.
+- a synthetic reply (API error, usage limit, `No response requested.`) and `[Request interrupted by user…]` end a
+  turn with no `turn_duration`.
+- a queue `dequeue` as a turn-starter was tried and REJECTED: every typed prompt passes through the queue ~20 ms
+  before its row, so it misread 135 prompts busy.
+
+**`ending` is its own state, and ringable:** a reply has ended and its Stop hook has not reported. A bell rung then
+is queued and REPLAYED as the next prompt once the turn closes — 5 of 5 such enqueues dequeued, and 6 doorbells
+were the first input 50–82 ms after `turn_duration`. It lands inside nothing.
+
+**What skipping costs, measured before deciding** — the 107 mid-turn doorbells that had mail waiting:
+
+| what happened to the mail | n | would a skip have lost it? |
+| --- | --- | --- |
+| delivered by the interrupted turn's own Stop | 35 | no |
+| taken by the agent during the turn | 31 | no — the turn had not been blocked, so its Stop would have delivered |
+| **outlived the turn: it had been blocked once already**, so its later Stops ran with `stop_hook_active` and delivered nothing (`comm.mjs:480`) | **39** | **no** — the mid-turn doorbell did nothing either; a LATER ring at rest, ~126 s on (just past `QUIET_MS`), delivered |
+| other | 2 | — |
+
+⇒ `wake` reads the target's turn through the registry and **skips a busy session without recording a ring**, so
+the next hook that fires looks again. `unknown` (a registry miss, no registry) rings as before and says so —
+skipping on a guess would strand an idle agent's mail, the failure `wake` exists to remove. No transcript at all
+reads idle (`#no-turn-yet`). Gated by A62, whose positive control is the two rejected rules failing its table.
+Re-measure with `node test/turn-corpus.mjs`, which runs the SHIPPED `turnState` over every transcript here. Its
+first run, 2026-09-13, CLI 2.1.229 … 2.1.270: 1 230 resting prompts, 1 read busy; 478 queued mid-turn, 0 read
+ringable; 700 queue outcomes, 0 typed inputs absorbed while read ringable. Its control — the same reader with the
+`!` and usage-limit starters hidden — finds 2, so this corpus can tell the two readers apart.
+
+Proved red in copies, 2026-09-13, `attack.mjs` byte-identical: the unmutated copy is green; the busy skip deleted →
+A62 red on `busy=RANG`; `<bash-` made non-decisive → red on "closed, then a ! shell command (idle, want busy)"; the
+tail read stopped at its first window → red on `tail read past a 300 KB row=idle`. Each red on A62 alone, each for
+the property its mutation removed.
+
+🔴 **Not verified, or not fixed:**
+- **A Stop continuation still delivers nothing** — the 39 above. The skip does not make them worse and does not fix
+  them. The fix belongs to the Stop hook, not the doorbell.
+- **A session that hangs mid-turn reads busy forever** and is never rung.
+- **A prompt submitted and escaped before any reply** reads busy until the next turn (1 of 1 228).
+- **The flush race:** a row half-written, or a prompt submitted and not yet on disk, at the instant of the read. The
+  rule was measured on row order, never on the file as it stood at a given millisecond.
+- **Claude Code's row vocabulary is not a contract.** Every shape above comes from CLI 2.1.229–2.1.270 on this box. A
+  new resume message, or `!` commands that stop starting turns, would misread silently — re-run `turn-corpus` when the
+  CLI moves.
+- **`exchange-bell.mjs` does not read the turn** and still rings a peer leader mid-turn (6 of 15 cross-project
+  doorbells landed mid-turn).
