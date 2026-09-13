@@ -1229,7 +1229,10 @@ const POINTER_SOURCES = (() => {
 	// point of A21 — it was never about comm.mjs's filename. `FINDINGS.md#bus-split`.
 	const BUS_MODULES = ["comm.mjs", "who.mjs"]
 	const ALLOWED = new Set(["node:fs", "node:path", "node:crypto", "node:url"])
-	const LIVE = /\bsetInterval\s*\(|\bsetTimeout\s*\(|\bwatchFile\s*\(|\bcreateServer\s*\(|\.listen\s*\(|\bspawn\s*\(/
+	// 🔴 REVIEW #10 C3: `watch(` was missing — THE common fs watcher — while the polling legacy
+	// `watchFile(` was listed, so `import { watch } from "node:fs"` + `watch(dir, cb)` in comm.mjs passed
+	// 58/58 printing "long-lived construct: none". `fork(`, `execFile(` and `setImmediate(` join it.
+	const LIVE = /\bsetInterval\s*\(|\bsetTimeout\s*\(|\bsetImmediate\s*\(|\bwatch\s*\(|\bwatchFile\s*\(|\bcreateServer\s*\(|\.listen\s*\(|\bspawn\s*\(|\bfork\s*\(|\bexecFile\s*\(/
 	// Strip comments before matching, so PROSE about a daemon cannot redden a gate
 	// about daemons. (The word "listening" in a comment already matched a naive
 	// grep once today — a false red teaches people to ignore the gate.)
@@ -1238,27 +1241,66 @@ const POINTER_SOURCES = (() => {
 	// module NOT on the list is foreign even though it is relative — otherwise the
 	// amendment would let the bus import anything that happens to sit beside it.
 	const relOk = (spec) => /^\.\.?\//.test(spec) && BUS_MODULES.includes(spec.replace(/^\.\//, ""))
-	const seen = []
-	for (const f of BUS_MODULES) {
-		const code = strip(readFileSync(join(PKG, "bin", f), "utf8"))
-		const imports = [...code.matchAll(/from\s+"([^"]+)"/g)].map((m) => m[1])
-		seen.push({ f,
-			foreign: imports.filter((i) => !ALLOWED.has(i) && !relOk(i)),
-			liveHit: (code.match(LIVE) || [])[0] || null })
+	// 🔴 REVIEW #10 C3, THE SCAN. It matched `from "x"` and nothing else, so three import shapes were
+	// invisible, each measured passing: a dynamic `import("node:child_process")`, a bare
+	// `import "node:child_process"`, and any specifier in single quotes. Every specifier is now read
+	// whatever introduces it and however it is quoted — ANCHORED to a statement that opens a line,
+	// because the bus's own notice text holds ` from '${m.from}'` inside a template literal, and the
+	// first draft of this scan read that as an import. A dynamic import whose argument is not a
+	// literal cannot be judged at all, so it is foreign by rule.
+	const Q = "['\"`]"
+	const SPEC = [
+		new RegExp(`^\\s*(?:import|export)\\b[^;'"\`]*?\\bfrom\\s*(${Q})([^'"\`]+)\\1`, "gm"),
+		new RegExp(`^\\s*import\\s*(${Q})([^'"\`]+)\\1`, "gm"),
+		new RegExp(`\\bimport\\s*\\(\\s*(${Q})([^'"\`]+)\\1`, "g"),
+	]
+	const COMPUTED = /\bimport\s*\(\s*(?!['"`])([^)\s]{1,40})/g
+	const scan = (raw) => {
+		const code = strip(raw)
+		const specs = SPEC.flatMap((re) => [...code.matchAll(re)].map((m) => m[2]))
+		const computed = [...code.matchAll(COMPUTED)].map((m) => `import(${m[1]}) — not a literal`)
+		return { foreign: [...specs.filter((i) => !ALLOWED.has(i) && !relOk(i)), ...computed],
+			liveHit: (code.match(LIVE) || [])[0] || null }
 	}
+	const seen = BUS_MODULES.map((f) => ({ f, ...scan(readFileSync(join(PKG, "bin", f), "utf8")) }))
 	const foreign = seen.flatMap((m) => m.foreign.map((i) => `${m.f}:${i}`))
 	const liveHit = (seen.find((m) => m.liveHit) || {}).liveHit || null
-	// POSITIVE CONTROL for the transitive half: the amendment is worth nothing unless a
-	// daemon in the SECOND module reddens this. Proved by mutation, not asserted — without
-	// it, "checked transitively" would be a comment rather than a property.
-	const secondModuleIsChecked = seen.length > 1 && LIVE.test("setInterval(") &&
-		seen.some((m) => m.f !== "comm.mjs")
+	// POSITIVE CONTROL, through the SAME `scan` the real modules go through: every shape review #10
+	// measured passing must redden it, and the shapes that already reddened must still. The old
+	// control was `LIVE.test("setInterval(")` — a string against a regex — which never travelled the
+	// import half at all, and the import half is exactly where this gate was blind.
+	const MUST_REDDEN = {
+		"fs.watch": `import { watch } from "node:fs"\nexport function w(d) { return watch(d, () => {}) }`,
+		"dynamic import": `const cp = await import("node:child_process")`,
+		"single-quoted import": `import { spawnSync as s } from 'node:child_process'`,
+		"bare import": `import "node:child_process"`,
+		"re-export": `export { spawn } from "node:child_process"`,
+		"computed dynamic import": `const m = "node:child_" + "process"\nawait import(m)`,
+		"createRequire": `import { createRequire } from "node:module"`,
+		"setInterval": `setInterval(() => {}, 1000)`,
+		"a relative import off the bus list": `import { x } from "./../bin/who.mjs"`,
+	}
+	const missed = Object.entries(MUST_REDDEN)
+		.filter(([, src]) => { const r = scan(src); return r.foreign.length === 0 && !r.liveHit }).map(([k]) => k)
+	// NEGATIVE CONTROL: the shapes the bus really uses stay green — the notice line that reddened the
+	// first draft included. Without it the scan could be a wall that reddens everything.
+	const busShapes = scan(
+		`import {\n\treadFileSync,\n\twriteFileSync,\n} from "node:fs"\n` +
+		`import { liveAgents as liveAgentsImpl, renderWho } from "./who.mjs"\n` +
+		`import { join } from 'node:path'\n` +
+		"lines.push(`  • from '${String(m.from).slice(0, 40)}' (${m.kind})`)\n" +
+		`if (resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main()`)
+	const busShapesGreen = busShapes.foreign.length === 0 && !busShapes.liveHit
+	const secondModuleIsChecked = seen.length > 1 && seen.some((m) => m.f !== "comm.mjs")
 
 	check("A21 the bus stays a short-lived process, in every module it is split into",
-		foreign.length === 0 && !liveHit && secondModuleIsChecked,
+		foreign.length === 0 && !liveHit && secondModuleIsChecked && missed.length === 0 && busShapesGreen,
 		`${seen.length} bus module(s) checked (${BUS_MODULES.join(", ")}); ` +
 		`imports outside {${[...ALLOWED].join(", ")}} or a non-bus relative: ${foreign.length ? foreign.join(", ") : "none"}; ` +
-		`long-lived construct: ${liveHit || "none"}; second module actually in the scan=${secondModuleIsChecked} ` +
+		`long-lived construct: ${liveHit || "none"}; second module actually in the scan=${secondModuleIsChecked}; ` +
+		`positive control, injected shapes that redden the SAME scan: ${Object.keys(MUST_REDDEN).length - missed.length}/${Object.keys(MUST_REDDEN).length}` +
+		`${missed.length ? ` — MISSED: ${missed.join(", ")}` : ""}; ` +
+		`negative control, the bus's own import shapes and its notice text stay green=${busShapesGreen} ` +
 		`(a relative import is permitted ONLY to a file on the bus list, so the split cannot become a door)`)
 
 	// A budget, in the same idiom as the framework's orientation budget: the fix for
