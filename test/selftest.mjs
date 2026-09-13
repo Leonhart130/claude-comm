@@ -135,17 +135,22 @@ const logRows = () => {
 // The prompt must NOT constrain the reply ("say exactly X, nothing else"), or it
 // CONTRADICTS the instruction in REVIEW.md and the agent may honour either one.
 // That made the old gate flaky in a second, independent way.
+// 🔴 IT RETURNS WHETHER THE SESSION RAN, not only what it printed. Review #10 C5: this returned
+// stdout+stderr and nothing else, so `claude` off PATH (ENOENT) came back as "" — and --prove-red,
+// whose one assertion is "the mail was NOT delivered", PASSED with zero sessions run and printed
+// "a green run is therefore meaningful". Any reason for non-delivery satisfied it.
 const runAgent = (label) => {
 	const r = spawnSync("claude", ["-p", `Reply with the word ${label}.`, "--model", MODEL, "--permission-mode", "acceptEdits"],
 		{ cwd: app, encoding: "utf8", timeout: 300000, input: "" })
-	return (r.stdout || "") + (r.stderr || "")
+	return { out: (r.stdout || "") + (r.stderr || ""), ran: !r.error && r.status === 0,
+		why: r.error ? r.error.code : `exit ${r.status}${r.signal ? ` (${r.signal})` : ""}` }
 }
 
 // ── ARM B: negative control — no mail ───────────────────────────────────────
 stage('ARM B (negative control, no mail)')
 log(`\n── ARM B (no mail) ─────────────────────────────`)
 const rowsB0 = logRows().length
-const outB = runAgent("ARM_B_DONE")
+const B = runAgent("ARM_B_DONE"), outB = B.out
 const drainedB = logRows().length - rowsB0
 const sawB = outB.includes(TOKEN)
 log(`  TRANSPORT  log rows added: ${drainedB}   ${drainedB === 0 ? "✓ nothing delivered, as expected" : "✗ something was delivered from an empty inbox"}`)
@@ -160,7 +165,7 @@ if (snd.status !== 0) fail(`send failed:\n${snd.stdout}${snd.stderr}`)
 log(`  ${snd.stdout.trim().split("\n")[0]}`)
 
 const beforeA = pending("app")
-const outA = runAgent("ARM_A_DONE")
+const A = runAgent("ARM_A_DONE"), outA = A.out
 const afterA = pending("app")
 const rowA = logRows().find((m) => m.to_agent === "app" || m.to === "app")
 const sawA = outA.includes(TOKEN)
@@ -183,6 +188,10 @@ log(`  peer-to-peer send refused: ${refused ? "✓" : "✗"}`)
 stage("verdict")
 log(`\n────────────────────────────────────────────────`)
 if (PROVE_RED) {
+	// A PROOF IN WHICH NO SESSION RAN IS NOT A PROOF. Both arms must have run for "not delivered" to
+	// mean "the hook was removed" rather than "nothing happened at all". Review #10 C5.
+	if (!B.ran || !A.ran) fail(`--prove-red CANNOT PASS: a session never ran (ARM B: ${B.ran ? "ran" : B.why}; ARM A: ${A.ran ? "ran" : A.why}).\n` +
+		`  "The mail was not delivered" is then true for a reason that has nothing to do with the hook.`)
 	if (transportOK) fail(`--prove-red FAILED: the mail was still delivered with the hook removed.\n` +
 		`  That means this gate does NOT measure hook delivery, and a green run proves nothing.`)
 	log(`✓ --prove-red PASSED: with the hook removed the mail was never delivered`)
@@ -191,6 +200,10 @@ if (PROVE_RED) {
 	process.exit(0)
 }
 if (!refused) fail(`hub enforcement did not refuse a peer-to-peer send`)
+// NAME THE LINK THAT FAILED. Without these two, a session that never started reads below as "the hook
+// did not deliver" (ARM A) or passes as "an empty inbox delivered nothing" (ARM B). Review #10 C5.
+if (!B.ran) fail(`ARM B's session never ran (${B.why}) — "nothing delivered from an empty inbox" was never exercised`)
+if (!A.ran) fail(`ARM A's session never ran (${A.why}) — the transport was never exercised, so this is not a delivery failure`)
 if (drainedB !== 0) fail(`ARM B delivered something from an EMPTY inbox — the fixture is not isolating arms.`)
 if (!transportOK) fail(`ARM A transport FAILED — the hook did not deliver at the turn boundary.\n` +
 	`  mail ${beforeA} -> ${afterA}, log row: ${JSON.stringify(rowA ?? null)}\n  Agent output was:\n${outA.slice(0, 800)}`)
