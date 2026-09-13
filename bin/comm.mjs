@@ -420,7 +420,7 @@ function renderNudge(root, cfg, msgs, me, quarantined = 0, event = "stop") {
 		const note = sanitizeNote(m.note)
 		if (note) lines.push(`    sender's note (${note.length} chars, NOT the artifact): ${JSON.stringify(note)}`)
 	}
-	if (hidden > 0) lines.push(`  • …and ${hidden} more — run: node .comm/bin/comm.mjs inbox`)
+	if (hidden > 0) lines.push(`  • …and ${hidden} more NOT acknowledged: node .comm/bin/comm.mjs inbox`)
 	if (quarantined > 0) {
 		lines.push("", `  ⚠ ${quarantined} unreadable message file(s) were moved to .comm/corrupt/ — tell the leader.`)
 	}
@@ -504,7 +504,9 @@ function hookDeliver(event) {
 	// a render exception destroys the message while the hook still exits 0 — a
 	// lost round report the log calls delivered. FINDINGS.md#A10
 	const reason = renderNudge(root, cfg, msgs, me, quarantined, event)
-	drain(root, me, msgs, "hook", idSrc)
+	// ONLY WHAT WAS SHOWN. Draining all of them acknowledged 92 of 100 messages nobody saw, and sent
+	// the reader to an inbox it had just emptied (load test, 2026-09-13). FINDINGS.md#overflow-drained-unseen
+	drain(root, me, msgs.slice(0, MAX_RENDER), "hook", idSrc)
 
 	if (event === "stop") {
 		process.stdout.write(JSON.stringify({ decision: "block", reason }))

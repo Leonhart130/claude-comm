@@ -2529,3 +2529,34 @@ behaviour**, and it now matches the stable half.
 --prompt …` into a split pane, marked so it could close itself. First real-agent exercise of the whole
 chain. ⭐ **It also caught me through the bus** — `--ref FINDINGS.md` was refused with the exact string that
 would have worked (A49), on the author of A49.
+
+## `#overflow-drained-unseen` — the notice showed 8 messages and acknowledged 100
+
+**Measured 2026-09-13**, by a load test written for the owner's question — *« imaginons qu'on tourne avec 4
+voir 5 agents pendant plusieurs heures et que vous échangiez beaucoup, l'inbox a pas de soucis elle saturera
+pas ? »* A leader and five experts on the real bus files and the real hook path, history seeded to 50 000:
+
+| history | hook delivery | `send` | `comm sent` | `log.jsonl` + `delivered/` |
+| --- | --- | --- | --- | --- |
+| 100 | 41 ms | 47 ms | 66 ms | 0.05 MB |
+| 10 000 | 43 ms | 67 ms | 89 ms | 3.3 MB |
+| 50 000 | 41 ms | 138 ms | 174 ms | 16 MB |
+
+100 sends fired at once: 100 landed, none lost. **None of that saturates.** `send` and `sent` read the whole
+log, so they grow linearly; 50 000 messages is about a year at the busiest field rate measured (148 a day).
+
+🔴 **What saturated was the reader.** 100 messages pending at ONE turn boundary: the notice rendered 8 refs
+and *"…and 92 more — run: comm inbox"* — and the same hook drained all 100 into the log. The inbox was then
+empty, so the command the hint named answered `empty`. **92 messages acknowledged, logged as delivered, and
+shown to nobody.** `MAX_RENDER` exists for `#hardening` (40 messages injected at once); draining past it was
+never argued — it came along with the cap. The field never saw it: its busiest notice carried 4.
+
+⇒ `hookDeliver` drains only what the notice shows; the rest stay pending, the notice says they are NOT
+acknowledged, and the next turn end delivers them. Gated by A60.
+⚠️ **Not changed:** a `Stop` continuation (`stop_hook_active`) still delivers nothing, so an agent that goes
+idle after reading its 8 holds the rest until its next real turn — visible to `comm inbox` and to `wake`,
+no longer lost.
+⚠️ **Three arms had been leaning on the defect.** A2 sends 40 messages and fires once; A3 and A4 then fired
+over its backlog. With 32 left pending, A3 went red at 7 623 chars rendering 8 of A2's leftovers — not its
+own note — and A4 found 18 good messages "left". A2 now clears its backlog, bounded. The overflow line itself
+was cut to fit A2's render budget (+11 chars of a 25-char margin): a red there is paid in words, not budget.
