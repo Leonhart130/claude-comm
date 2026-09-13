@@ -2837,4 +2837,53 @@ was reading that letter — `○ leader (pid 13764) is mid-turn — not rung (la
 green; the busy return removed → A64 red alone (`peer mid-turn -> exit 0, typed 2, bell recorded=true`); the turn never
 read → A64 red alone, the same line. ⚠️ A third mutation — record the bell on a busy skip — was written WRONG: it named
 `quietFile` above its declaration and ABORTED the suite, 25 arms never ran, and the suite said so. It proved nothing
-about A64.
+about A64. **Re-run correctly** on the committed bell and suite (work in progress overwritten from `HEAD` in the copy):
+record the bell on a busy skip → A64 red alone, on `bell recorded=true`.
+
+## `#stop-continuation` — mail that arrived during a Stop continuation waited for a ring, up to 10.5 hours
+
+**2026-09-13 (STATUS 1b).** `comm.mjs` exited at every `Stop` carrying `stop_hook_active` — the loop guard since the
+first commit. Measured over every transcript and `log.jsonl` of the four trees: **258** claude-comm Stop blocks, and
+**49** mails queued during the continuation that followed and delivered only after that turn closed (46 by a later
+hook, 3 dismissed by hand) — waiting **median 150 s, p90 1 027 s, max 37 965 s**. getajob 31, work 18. The `39 of
+107` in `#wake-mid-turn` was the same defect seen only through mid-turn doorbells.
+
+**The loop the guard feared, stated exactly.** A block happens only when mail is pending, and the hook drains what it
+shows, so a second block needs NEW mail — unless the drain fails (`renameSync` is swallowed; the mail stays). Then
+every Stop sees the same message and, unguarded, blocks forever, a model call each time.
+
+⇒ **A continuation may block again, bounded per session.** `.comm/stop/<agent>.json` holds the transcript and the
+chain length: a turn end's first block writes 1; a continuation blocks only when that record names the same
+transcript and the length is ≤ `STOP_CHAIN` (3). A record missing, unreadable or another session's exits as before —
+a count that cannot be written degrades to the old guard, never to a loop.
+
+**Why 3 — a simulation, not an observation.** Had a continuation been able to block, it would chain while mail kept
+arriving. Stepping each next continuation at the length of the last: 209 of 258 no chain, 28 one, 10 two, 5 three,
+6 longer (4, 5, 6, 6, 7, 10). **≤ 3 covers 252 (97.7 %)**; the longer ones fall back to today's ring at rest.
+
+**Smoke, in a fixture, before the arm:** first block; a continuation with new mail blocks and drains; an empty one does
+not; two more chain blocks, then the chain stops with 3 mails left, which the next natural turn end delivers; a drain
+made to fail (inbox `0555`) blocks **4 times in 11 Stops**, not 11. Bus 53 244 B of A22's 58 000.
+
+**Live, real `claude -p` (sonnet / low), with the old bus as the control — and the first form measured nothing.** It
+queued mail 1 before the session started: `SessionStart` delivered it 778 ms later, before any reply, mail 2 then
+landed during the first turn and an ordinary Stop took it. **Both buses gave the same result**, so the control could
+not fail — caught by reading the delivery timestamps, not the verdict. The second form queues mail 1 only once the
+transcript shows the turn's `sleep 8`, and mail 2 the instant mail 1 is logged:
+
+| bus | mail 1 | mail 2, queued during the continuation | Stop blocks in the transcript | left after exit |
+| --- | --- | --- | --- | --- |
+| new (`STOP_CHAIN`) | first Stop blocks | **delivered by the continuation's Stop, 4.7 s later** | NOTE1, NOTE2 · count 2 | 0 |
+| old (`HEAD`, exit on `stop_hook_active`) | first Stop blocks | **never delivered** | NOTE1 | **1** |
+
+And Claude Code does continue on a second block: the agent answered NOTE2.
+
+**Not verified:** a field day — the 49 are counted from the past; the recount waits for real traffic · a chain of 3
+under a live session (the arm drives it; the probe reached 2) · two sessions under one agent name sharing
+`.comm/stop/<agent>.json` beyond the transcript check.
+
+**Proved red in copies, 2026-09-13, `attack.mjs` byte-identical (sha `07c23bccb77d25e1`)**: the unmutated copy is green;
+each mutation of `comm.mjs` reddens A65 alone — the bound removed → `continuation blocks in one turn end 6 (want 3)`;
+the old exit reinstated → `a continuation with new mail blocks=false`; any session's count accepted → `another
+session's count -> blocks=true`; the count never written → the fail-closed exit, `a continuation with new mail
+blocks=false` — the direction a broken write is allowed to take.

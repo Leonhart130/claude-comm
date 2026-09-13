@@ -37,6 +37,16 @@ already have.
 
 
 
+
+## 2026-09-13.7 — bus print `4e9e87ce8f87` — 2026-09-13
+
+- 🔴 **Mail that arrives while you answer a notice is now delivered in the same turn end.** Until now, once a turn end
+  had shown you mail, the next turn end of that same turn delivered nothing: mail queued in between waited for a
+  doorbell at rest — measured over four trees, 49 times in 258, median 150 s, up to 10.5 hours. Now that continuation
+  may show you the new mail too, up to 3 times per turn end; past that, the old wait resumes.
+- Nothing to do on your side. The count lives in `.comm/stop/<agent>.json` (per session; gitignored with `.comm/`).
+- ⚠️ If the count cannot be read or written, the hook behaves exactly as before — never a loop.
+
 ## 2026-09-13.6 — bus print `f7c3807cc42e` — 2026-09-13
 
 - 🔴 **Opt-in: an idle expert whose cache has expired is restarted fresh before its doorbell.** Name the agents that

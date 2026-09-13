@@ -13,8 +13,8 @@
  *
  * TRANSPORT: Claude Code's Stop hook. When an agent finishes a turn the hook
  * fires; if mail is waiting it returns {decision:"block", reason:<nudge>}, which
- * injects the nudge and makes the agent continue. `stop_hook_active` guards the
- * loop. A SessionStart hook drains the same inbox, so mail sent to a CRASHED
+ * injects the nudge and makes the agent continue. A continuation may block again,
+ * STOP_CHAIN times at most. A SessionStart hook drains the same inbox, so mail sent to a CRASHED
  * agent is still delivered when it is relaunched.
  *
  * RELIABILITY RULE: a hook that throws must never break the user's session.
@@ -51,6 +51,7 @@ const KINDS = {
 // See FINDINGS.md#A2 (and why importing them was NOT enough on its own).
 export const MAX_NOTE = 240   // characters kept from a --note
 export const MAX_RENDER = 8   // messages rendered into one nudge; the rest are counted
+export const STOP_CHAIN = 3   // blocks a Stop CONTINUATION may add; 252 of 258 measured chains need <= 3
 export const MAX_REF = 400    // characters allowed in a --ref; a path is never longer
 
 // THE security boundary: `note` is the only free text reaching another agent's
@@ -476,8 +477,6 @@ const readStdin = () => { try { return readFileSync(0, "utf8") } catch { return 
 function hookDeliver(event) {
 	let p = {}
 	try { p = JSON.parse(readStdin()) } catch {}
-	// Loop guard: we already blocked once for this stop; let the agent finish.
-	if (event === "stop" && p.stop_hook_active) process.exit(0)
 
 	// IDENTITY MUST NOT COME FROM THE SESSION'S CWD. The Stop payload's `cwd`
 	// follows the BASH TOOL's directory, so `cd web-app && git log` ends the turn
@@ -499,6 +498,17 @@ function hookDeliver(event) {
 
 	const { msgs, quarantined } = pending(root, me)
 	if (!msgs.length && !quarantined) process.exit(0)
+	// A CONTINUATION MAY BLOCK AGAIN, STOP_CHAIN times. Exiting on every stop_hook_active left mail that came during
+	// one for a ring at rest (49 of 258 blocks, max 10.5 h). The loop feared is a drain that fails: this per-session
+	// count bounds it, and a count that cannot be read exits as before. FINDINGS.md#stop-continuation
+	const chainFile = join(root, ".comm", "stop", `${me}.json`)
+	let chain = 1
+	if (event === "stop" && p.stop_hook_active) {
+		let c = null
+		try { c = JSON.parse(readFileSync(chainFile, "utf8")) } catch {}
+		if (!c || !p.transcript_path || c.t !== p.transcript_path || !(c.n <= STOP_CHAIN)) process.exit(0)
+		chain = c.n + 1
+	}
 
 	// ORDER MATTERS: render FIRST, drain only once a nudge exists. Swap these and
 	// a render exception destroys the message while the hook still exits 0 — a
@@ -509,6 +519,10 @@ function hookDeliver(event) {
 	drain(root, me, msgs.slice(0, MAX_RENDER), "hook", idSrc)
 
 	if (event === "stop") {
+		try {
+			mkdirSync(join(root, ".comm", "stop"), { recursive: true })
+			writeFileSync(chainFile, JSON.stringify({ t: p.transcript_path || null, n: chain }))
+		} catch {}
 		process.stdout.write(JSON.stringify({ decision: "block", reason }))
 	} else {
 		process.stdout.write(JSON.stringify({

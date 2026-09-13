@@ -21,8 +21,10 @@ one Read call, 58 000 B; A1 two-way arm self-scan) · model + effort per launch 
 unknown flags refuse (A61, .4) · **`wake` no longer types into a running turn** (A62, .5, `#wake-mid-turn`, in all
 3 trees; owed: a field recount of queued doorbells after a day). 🟡 Unexplained: ~31 silent listeners until A59.
 
-**1b — 🔴 BUILD NEXT: a `Stop` continuation delivers nothing** (`comm.mjs:480`): 39 of 107 mid-turn mails
-outlived their turn for that reason and waited ~2 min for a ring at rest. 🟢 **`exchange-bell` no longer rings a peer
+**1b — 🟢 SHIPPED 2026-09-13 (`.7`, all 3 trees): a `Stop` continuation delivers mail that arrived during it**,
+bounded at `STOP_CHAIN` = 3 per turn end, counted per session, fail-closed (A65, red 4 ways; live `claude -p`: the
+old bus left the mail, the new one delivered it; selftest green both ways). 49 of 258 blocks had waited, max 10.5 h.
+**Owed:** recount after a field day. `FINDINGS.md#stop-continuation`. 🟢 **`exchange-bell` no longer rings a peer
 mid-turn** (A64, 09-13): its ring is now a function the arm executes, not a script only a live peer could reach.
 `FINDINGS.md#bell-mid-turn`.
 
