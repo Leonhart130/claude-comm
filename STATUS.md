@@ -9,51 +9,43 @@ fold the settled parts into the README.
 and effort, and "the inbox saturates".** The first shipped the same morning. The second was never observed —
 but the load test built to answer it found the one thing that does saturate, and it was delivery.)*
 
-**0 — 🔴 C4 IS STILL OPEN, AND NOW HAS ITS EVIDENCE.** A22 caps each module at 48 000 B and nothing caps the
-bus: `comm.mjs` 41 723 + `who.mjs` 9 735 = **51 458 B**, and it grew again today (the overflow fix). Measured
-for the re-argument — not a number yet: reading `who.mjs` whole cost **~4 100 tokens** in-session (~2.65 B
-per token as Read displays it) ⇒ the bus ≈ **20 k tokens**; the Read tool refuses above **25 000 tokens a
-call** (4 transcripts on this box); the review sessions read the bus in **slices 18 times, whole 3**; history
-24 188 → 43 041 → 36 626 (cut) → 46 662 → 51 142 B (split). 🔴 **Argue ONE total from that, gate it, prove it
-red — never fit it to today's size.** 🔴 **A1** (a ratchet on `pass` instead of `ARM_FLOOR`) still unbuilt.
+**0 — 🟢 REVIEW #10 IS CLOSED.** **C4:** A22 gates the WHOLE bus at one Read call of the model that reviews it:
+25 000 tokens × 2.32 B/token (the lowest Opus-5 ratio measured on this repo's JS) = **58 000 B**; the bus is
+51 379 B, ~21 040 tokens, 89 %. Proved red past the total AND for a third module under the old per-module cap —
+the split escape. `FINDINGS.md#bus-read-in-one-call`. ⚠️ The Read tool now PAGES at 25 000 tokens instead of
+refusing, counted in the READER's tokenizer (`boot.mjs`: Opus 5 79 410, Haiku 60 572) — re-measure the ratio
+when the reviewing model changes. **A1:** `ARM_FLOOR` replaced by a two-way self-scan (every declared arm must
+report, every reporting arm must be declared). Proved: an arm skipped → named; the first scan draft → "SELF-SCAN IS
+BROKEN"; a new arm → 62 of 62, green; an abort after A1 → the 59 silent arms named.
 
-**1 — 🟢 REVIEW #10's CODE REDS ARE FIXED, each proved red in copies — one variable per mutation, control
-green:** C1 the `close` claim refusal (A58) · C2 the probe records `null` when blind (A59) · C3 A21 sees
-`watch(` and every import shape, its controls through the same scan · C5 `selftest --prove-red` needs a
-session to have run. Plus: 32 exit listeners printed a leak warning into the leak gate — one listener now.
-🟡 **Unexplained, not claimed:** why ~31 registrations were silent until A59 made 32.
+**1 — 🟢 SHIPPED 2026-09-13 AND SETTLED — the detail is in `CHANGELOG.md` and `FINDINGS.md`, not here.** Review #10
+C1/C2/C3/C5 (A58, A59, A21, selftest), each proved red · the tier is the caller's: `launch.mjs --model --effort`,
+required (A57), measured end to end by the field · a notice drained 100 messages and showed 8 — now only what it
+shows (A60, `#overflow-drained-unseen`); "the inbox saturates" was never observed and the load test found nothing
+else · 32 exit listeners → one. 🟡 **Unexplained:** why ~31 listeners were silent until A59 made 32. ⚠️ A `Stop`
+continuation still delivers nothing: the rest wait for the next real turn.
 
-**2 — 🟢 THE TIER IS THE CALLER'S: `launch.mjs --model --effort`, required (A57).** The machine default was
-opus + xhigh and nobody chose it; on 09-12 getajob's `cv` AND `review` ran Sonnet/xhigh unchosen. 🟢 The field
-measured it end to end: two real launches, transcripts carry the requested model and effort. First rule of
-choice is getajob's, in `.comm/README.md`, labelled an indication.
-
-**3 — 🟢 "THE INBOX SATURATES": NOT OBSERVED** (owner: *« j'ai du mal comprendre »*) **— THE LOAD TEST FOUND
-WHAT DOES.** `FINDINGS.md#overflow-drained-unseen`: history to 50 000 messages, delivery flat ~41 ms, `send`
-and `sent` linear (138 / 174 ms at 50 k ≈ a year of field traffic), 100 parallel sends → 100 landed. 🔴 **But
-more than 8 at one turn boundary: the notice showed 8 and drained ALL** — 92 of 100 acknowledged unseen.
-Fixed: only what is shown is drained (A60 — proved red by drain-all, drain-nothing and the old hint); A2/A3/A4 had been leaning on the defect; selftest green both
-ways. ⚠️ A `Stop` continuation still delivers nothing — the rest wait for the next real turn.
-
-**4 — ⚠️ `bin/context.mjs` READS ONE TURN BEHIND.** Measured today: a 9.7 KB read moved it only a turn later
+**2 — ⚠️ `bin/context.mjs` READS ONE TURN BEHIND.** Measured today: a 9.7 KB read moved it only a turn later
 (+1 683, then +4 617). A before/after with it needs a turn in between. **Not yet named at its site.**
 
-**4b — ⚠️ A DOORBELL NOBODY RECORDS RINGING.** 12:50:25Z today, `wake.mjs`'s text in this leader's input; `comm
+**3 — ⚠️ A DOORBELL NOBODY RECORDS RINGING.** 12:50:25Z today, `wake.mjs`'s text in this leader's input; `comm
 inbox` empty, no wake record in any tree at that time, no `wake`/`kitten` tool call in any getajob or claude-comm
 transcript 12:47–12:51Z. Both leaders are kitty **window 1** (instances 12670 and 14341), and a wake record
 stores the window id WITHOUT its socket — a candidate path, not a proven one. Measure before touching wake.
 
-**5 — 🔴 RUN THE CONTROLS FIRST**, `CLAUDE_COMM_AGENT` set (A48), output **to a file**; read the suite's LAST
+**4 — 🔴 RUN THE CONTROLS FIRST**, `CLAUDE_COMM_AGENT` set (A48), output **to a file**; read the suite's LAST
 LINE, never a wrapper's exit code. ⚠️ **Never two suites at once** — they share kitty and make reds that look
 like findings; a runner in copies waits on a done-file. 🔴 **zsh:** quote globs, never `echo ===`, no bare
 `$args` — three silent non-runs today.
 
-**6 — 🟡 CARRIED:** #9 A3 · C7 · #8 A3 (minor) · `who`'s third and fourth states · `dismiss --citing` ·
+**5 — 🟡 CARRIED:** #9 A3 · C7 · #8 A3 (minor) · `who`'s third and fourth states · `dismiss --citing` ·
 `comm wait --for` · context.mjs's two `/clear` limits (do not "fix" with a guess) · the letter to `work`'s
 leader still unread, two `zz-` claims there held by dead pids · the automatic restart trigger (ledger
 UNKNOWN) · boot's `channel:` row says a letter "arrived 13h ago" that came in under an hour earlier: it
 ages by the filename's date, deliberately (review #8 C3) — the word "arrived" is wrong, not the rule. A fresh review: `launch.mjs review --model opus --effort xhigh --prompt "…"` — the field's rule
 says never Sonnet for review.
+**Later, in the owner's order (2026-09-13):** agents reaching for the bus unprompted (MCP and/or skill — measure
+where they failed first) → the Rust port → what the tool can earn him, worked out with getajob's leader.
 
 ## Where it stands
 
