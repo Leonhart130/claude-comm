@@ -5,39 +5,31 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-09-13. **The owner handed over the whole project with two asks: let a leader pick each expert's model
-and effort, and "the inbox saturates".** The first shipped the same morning. The second was never observed —
-but the load test built to answer it found the one thing that does saturate, and it was delivery.)*
+*(2026-09-13. **The owner handed over the whole project.** His asks: the leader picks each expert's model and
+effort — shipped; "the inbox saturates" — never observed, the load test found delivery did, fixed; and, relayed
+by getajob's leader, a cold expert should restart fresh instead of resuming 600 k uncached — item 0.)*
 
-**0 — 🟢 REVIEW #10 IS CLOSED.** **C4:** A22 gates the WHOLE bus at one Read call of the model that reviews it:
-25 000 tokens × 2.32 B/token (the lowest Opus-5 ratio measured on this repo's JS) = **58 000 B**; the bus is
-51 379 B, ~21 040 tokens, 89 %. Proved red past the total AND for a third module under the old per-module cap —
-the split escape. `FINDINGS.md#bus-read-in-one-call`. ⚠️ The Read tool now PAGES at 25 000 tokens instead of
-refusing, counted in the READER's tokenizer (`boot.mjs`: Opus 5 79 410, Haiku 60 572) — re-measure the ratio
-when the reviewing model changes. **A1:** `ARM_FLOOR` replaced by a two-way self-scan (every declared arm must
-report, every reporting arm must be declared). Proved: an arm skipped → named; the first scan draft → "SELF-SCAN IS
-BROKEN"; a new arm → 62 of 62, green; an abort after A1 → the 59 silent arms named.
+**0 — 🔴 ASKED BY THE OWNER, AWAITING HIS GO: RESTART A COLD, BIG, IDLE AGENT FRESH BEFORE RINGING IT.**
+`FINDINGS.md#cache-lives-an-hour`: every session writes the 1 h cache; cold resumes re-wrote ≈ 13.5 M tokens,
+6.4 M in contexts > 300 k, mostly `work`. Proposed to getajob (their question: wake or the agent? — mine: wake):
+`/clear` when opted in (`config.json`), idle, last call > 60 min, context over a per-agent threshold still to
+measure; proven by the registry naming a NEW transcript, else ring as before. Risk: typed in the owner's line.
 
-**1 — 🟢 SHIPPED 2026-09-13 AND SETTLED — the detail is in `CHANGELOG.md` and `FINDINGS.md`, not here.** Review #10
-C1/C2/C3/C5 (A58, A59, A21, selftest), each proved red · the tier is the caller's: `launch.mjs --model --effort`,
-required (A57), measured end to end by the field · a notice drained 100 messages and showed 8 — now only what it
-shows (A60, `#overflow-drained-unseen`); "the inbox saturates" was never observed and the load test found nothing
-else · 32 exit listeners → one · an unknown flag refuses — `dismiss --help` had cleared a field inbox (A61, release .4). 🟡 **Unexplained:** why ~31 listeners were silent until A59 made 32. ⚠️ A `Stop`
-continuation still delivers nothing: the rest wait for the next real turn.
+**1 — 🟢 SETTLED 2026-09-13, detail in `CHANGELOG.md` / `FINDINGS.md`:** review #10 closed (A22 = the whole bus in
+one Read call, 58 000 B; A1 two-way arm self-scan) · model + effort per launch (A57) · overflow drain (A60) ·
+unknown flags refuse (A61, .4) · **`wake` no longer types into a running turn** (A62, .5, `#wake-mid-turn`, in all
+3 trees; owed: a field recount of queued doorbells after a day). 🟡 Unexplained: ~31 silent listeners until A59.
 
-**1b — 🔴 BUILD NEXT: A WAKE LANDS INSIDE A RUNNING TURN.** Measured in getajob's transcripts 2026-09-13: **18 of
-35 doorbells** arrived with Claude Code's "sent a new message while you were working" — one interrupted `cv` the
-instant its leader woke `web`. `wake` presses Enter and cannot tell busy from idle: `who`'s missing fourth state,
-now with a cost. And **"pending" means NOT ACKNOWLEDGED, not unseen**: `cv` peeked 3.4 s after its bell and stayed
-pending 5 min 35. Measure busy vs idle (CPU, transcript tail) on more than one sample before choosing a signal.
+**1b — 🔴 BUILD NEXT: a `Stop` continuation delivers nothing** (`comm.mjs:480`): 39 of 107 mid-turn mails
+outlived their turn for that reason and waited ~2 min for a ring at rest. `exchange-bell` still rings mid-turn.
 
 **2 — ⚠️ `bin/context.mjs` READS ONE TURN BEHIND.** Measured today: a 9.7 KB read moved it only a turn later
 (+1 683, then +4 617). A before/after with it needs a turn in between. **Not yet named at its site.**
 
-**3 — ⚠️ A DOORBELL NOBODY RECORDS RINGING** (12:50:25Z, wake's own text). 🔴 My first proof could not fire:
-`wake.mjs:117` OVERWRITES one record per agent. A record OLDER than the event still clears claude-comm, work,
-electio; getajob is blind. No transcript active 12:43–12:52Z rang but getajob's 12:43:33 ⇒ rung from outside
-any session, unrecorded. Fix: an append-only ring history, with 1b. Unchecked: getajob's hooks, kitty.
+**3 — ⚠️ A DOORBELL NOBODY RECORDS RINGING** (12:50:25Z, wake's own text). `wake` OVERWRITES one record per
+agent, whoever called it; a record OLDER than the event clears claude-comm, work, electio. getajob cleared itself,
+hooks included: no turn ended there then. A hook-spawned wake leaves NO transcript (getajob's catch) ⇒ the ring
+history must be written BY `wake`, append-only. Unchecked: kitty itself, a hand.
 
 **4 — 🔴 RUN THE CONTROLS FIRST**, `CLAUDE_COMM_AGENT` set (A48), output **to a file**; read the suite's LAST
 LINE, never a wrapper's exit code. ⚠️ **Never two suites at once** — they share kitty and make reds that look

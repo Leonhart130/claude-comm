@@ -2686,3 +2686,33 @@ the property its mutation removed.
   CLI moves.
 - **`exchange-bell.mjs` does not read the turn** and still rings a peer leader mid-turn (6 of 15 cross-project
   doorbells landed mid-turn).
+- **`selftest` was not run for this change:** it never calls `wake`, and neither `comm.mjs` nor the hook stub
+  changed, so it could not have gone red for it.
+- **No field day yet.** Installed in all three trees 2026-09-13 ~15:10Z, and the installed copy read live sessions
+  right (two at rest, one working). That queued doorbells drop to zero in the field waits for a recount of a day
+  of transcripts.
+
+## `#cache-lives-an-hour` — resuming an idle expert after an hour re-writes its whole context
+
+**Asked by the owner 2026-09-13, through getajob's leader:** *"si tu bosses tu rappelles 1 h après un agent qui a
+600k, ça va nous ruiner pour rien"*. Their screen said `~586k uncached`; after a hand `/clear` and a re-read of
+their files, `cv` went from ≈ 667 717 to ≈ 90 234 and `web` from ≈ 585 561 to ≈ 125 052.
+
+**Measured the same day over every transcript on this machine** — one API call per assistant `message.id`, the
+`usage` Claude Code records; *cold* = the call read under half of the previous call's context from cache:
+
+| gap since the previous call | calls | cold |
+| --- | --- | --- |
+| under 10 min | 28 466 | 53 (0.2 %) |
+| 10 – 60 min | 315 | **0** |
+| 60 – 90 min | 12 | **10** |
+| over 90 min | 43 | **43** |
+
+- **29 101 of 29 120 calls write the 1 h ephemeral bucket** (`cache_creation.ephemeral_1h_input_tokens`), experts
+  included; none write the 5 min one. The gap table agrees: warm to an hour, cold after.
+- **Cold resumes after a gap re-wrote ≈ 13.5 M tokens** across all projects, **≈ 6.4 M of it in contexts over
+  300 000** — `work` 4.3 M alone; getajob one (`db`, 438 584), because its owner cleared the others by hand.
+
+⚠️ **Not measured:** the overage case, where the TTL is documented to drop to 5 min — no call here wrote that
+bucket, so this box has never been observed in it. And what a fresh start costs per agent beyond getajob's two
+numbers: that is the threshold the proposal in `STATUS.md` still needs.
