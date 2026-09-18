@@ -396,11 +396,17 @@ try {
 			// hook that was not going to write a start: a one-shot note taken by a path
 			// that then records nothing is a reboot silently filed as cold.
 			let sig = []
+			let rsMod = null, taken = null
 			try {
 				const rs = join(binDir, "restart-signal.mjs")
 				if (existsSync(rs)) {
 					const m = await import(pathToFileURL(rs).href)
-					const c = m.claim({ root: projectRoot, agent })
+					rsMod = m
+					// Only a start that IS a fresh context takes the note (review #11 R2/R7): a
+					// compaction or a resume records its start and leaves the note for the relaunch.
+					const c = typeof m.mayClaim !== "function" || m.mayClaim(p.source)
+						? m.claim({ root: projectRoot, agent }) : { ok: true, signal: null }
+					if (c.ok && c.signal) taken = c.signal
 					if (!c.ok) {
 						// Never silent. A signal that could not be read is a restart about to be
 						// recorded as a cold start, which is the exact defect this mechanism exists
@@ -439,7 +445,9 @@ try {
 			// the note was taken, that restart is gone and this line is the only thing that
 			// will ever say so.
 			if (sig.length && rec.status !== 0) {
-				process.stderr.write(\`claude-comm: a restart signal for \${agent} was claimed but the ledger did not record it (exit \${rec.status}); that restart is now UNCOUNTED.\\n\`)
+				// Put it back (review #11 R3): a ledger that cannot load must not also eat the note.
+				const back = taken && rsMod && typeof rsMod.restore === "function" ? rsMod.restore({ root: projectRoot, agent, record: taken }) : { ok: false, why: "nothing to restore with" }
+				process.stderr.write(\`claude-comm: a restart signal for \${agent} was claimed but the ledger did not record it (exit \${rec.status}); \${back.ok ? "the note was PUT BACK for the next start" : \`that restart is now UNCOUNTED (\${back.why})\`}.\\n\`)
 			}
 		}
 	} catch {}
@@ -758,6 +766,7 @@ function write(path, content, results) {
 	// fails to parse, and that turn's delivery is silently missed. rename(2) is
 	// atomic within a filesystem, so a reader sees either the whole old file or
 	// the whole new one. Same directory, so it never crosses a filesystem.
+	if (process.env.CLAUDE_COMM_INSTALL_TRACE) process.stderr.write(`claude-comm-write: ${path}\n`)
 	const tmp = `${path}.tmp-${randomBytes(4).toString("hex")}`
 	try {
 		writeFileSync(tmp, content)
@@ -939,7 +948,23 @@ const busSrcForLastWrite = busSrc
 // between two agents in one tree - a copy that lived only in claude-comm would have been
 // present at none of it. It imports `session-registry.mjs`, which is already on this list
 // and must stay above it for that reason.
-for (const f of BUS_FILES.filter((f) => f !== "comm.mjs")) {
+// 🔴 EVERY FILE AFTER THE SIBLINGS IT IMPORTS — DERIVED FROM THE IMPORTS, never listed. The
+// rule below was written for ONE edge (comm -> who) as a special case, and the next edge
+// (ledger -> restart-signal, 2026-09-18) walked straight past it: BUS_FILES wrote the new ledger
+// before the restart-signal it imports, and in that window the stub claimed a note with the
+// old module, then spawned a ledger that could not load — the note gone, no start recorded
+// (review #11 R3). Order is now a depth-first walk of each file's `from "./x.mjs"`, so a new
+// import is covered the day it is written. `CLAUDE_COMM_INSTALL_TRACE` prints the order (A70).
+const localImports = (f) => [...readFileSync(join(HERE, "bin", f), "utf8").matchAll(/from\s+"\.\/([A-Za-z0-9._-]+\.mjs)"/g)]
+	.map((m) => m[1]).filter((d) => BUS_FILES.includes(d))
+const writeOrder = []
+const visit = (f, stack) => {
+	if (writeOrder.includes(f) || stack.includes(f)) return
+	for (const d of localImports(f)) visit(d, [...stack, f])
+	writeOrder.push(f)
+}
+for (const f of BUS_FILES.filter((f) => f !== "comm.mjs")) visit(f, [])
+for (const f of writeOrder) {
 	write(join(commDir, "bin", f), readFileSync(join(HERE, "bin", f), "utf8"), results)
 }
 // 🔴 DEPENDENCIES FIRST. `comm.mjs` imports `who.mjs` since the 2026-09-11 split, so writing
