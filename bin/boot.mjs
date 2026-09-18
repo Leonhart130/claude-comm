@@ -156,19 +156,6 @@ const noteWords = (n) => {
 		: "judged on the clock alone - the note names no session"
 	return `⚠ the restart note for ${n.agent} has LAPSED (${old}, ${promise}; ${why}) - its next start scores COLD`
 }
-/**
- * Does THIS root's own settings wire the bus's stub to SessionStart? Then the stub is this
- * root's recorder and `--hook` must not be a second one (review #11 R1). Read from the file
- * the hooks actually come from, never inferred from `.comm/` existing: a root can carry the
- * bus without running its hook.
- */
-function stubRecordsHere() {
-	try {
-		const st = JSON.parse(readFileSync(join(ROOT, ".claude", "settings.json"), "utf8"))
-		return ((st && st.hooks && st.hooks.SessionStart) || []).some((g) => ((g && g.hooks) || [])
-			.some((h) => h && typeof h.command === "string" && /comm-hook\.mjs["']?\s+session-start/.test(h.command)))
-	} catch { return false }
-}
 const sha = (p) => { try { return createHash("sha256").update(readFileSync(p)).digest("hex").slice(0, 12) } catch { return null } }
 const git = (...a) => {
 	try { return execFileSync("git", a, { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim() }
@@ -436,15 +423,16 @@ if (has("--hook")) {
 		wrote = { ok: false, sid: null, why: "the hook payload was empty or unparseable" }
 	} else if (has("--hook") && !(payload.source && sessionAgent)) {
 		wrote = { ok: false, sid: null, why: !payload.source ? "the hook payload carried no `source`" : "no agent could be resolved for this session" }
-	} else if (has("--hook") && payload && payload.source && sessionAgent && stubRecordsHere()) {
-		// 🔴 ONE RECORDER PER ROOT (review #11 R1). Since this repo went on its own bus (09-10)
-		// `.claude/settings.json` runs this hook AND the bus's `comm-hook.mjs session-start`, and
-		// both claimed the note and both wrote a start: 12 records for 6 sessions, the signal on
-		// the earlier twin, whose window then ended 50 ms later at the other - so the ledger
-		// excluded the reboot and kept its cold twin. The declared restart 214f0a0e scored COLD.
-		// The bus's stub is the recorder every field tree runs, so it is the one kept here too.
-		wrote = { deferred: true, ok: true, sid: null }
 	} else if (has("--hook") && payload && payload.source && sessionAgent) {
+		// 🔴 ONE RECORDER PER ROOT, AND AT THIS ROOT IT IS THIS ONE (review #11 R1, then #11b
+		// S1/S2). Since this repo went on its own bus `.claude/settings.json` ran this hook AND the
+		// stub, and both recorded: 12 records for 6 sessions, the declared restart 214f0a0e scored
+		// COLD. The first fix deferred HERE to the stub - on a regex over settings.json, never
+		// checking the stub recorded, and handing this repo's instrument to the INSTALLED copy,
+		// one install behind the code (in a fresh clone, with no `.comm/bin`, nothing recorded and
+		// the row was green). Inverted: this hook runs `bin/` HEAD and re-reads its own write, so
+		// it records; the STUB stands aside when this root wires `bin/boot.mjs --hook`. If that
+		// test ever misses, the cost is a twin, which the ledger collapses - never a lost start.
 		// The session id comes from the transcript path, not from a payload field: `Stop`
 		// is documented to carry `session_id` and SessionStart was only ever OBSERVED to
 		// carry `transcript_path` and `source`. Deriving it from the path uses what was
@@ -570,10 +558,9 @@ if (has("--hook")) {
 			((a.armed && a.armed.notes) || []).some((n) => !n.fresh) && `note-lapsed:${((a.armed && a.armed.notes) || []).filter((n) => !n.fresh).map((n) => n.agent).sort().join(",")}`,
 			(a.armed && a.armed.unreadable) && "note-unreadable", signalTrouble && "signal-trouble",
 		].filter(Boolean)
-		if (wrote && wrote.deferred) bits.push("this start is recorded by the bus's own hook (.claude/comm-hook.mjs), which runs after this one - boot does not record it twice")
 		if (wrote && !wrote.ok) row("ledger", WARN, `THIS START WAS NOT RECORDED (${wrote.why || "no reason given"}) - ${bits.join(" - ")}`, ["not-recorded", ...why])
-		else if (wrote && !wrote.deferred && seen !== "confirmed") row("ledger", WARN, `THE WRITE WAS NOT SEEN BY THE RE-READ (${seen}) - ${bits.join(" - ")}`, ["write-unseen", ...why])
-		else row("ledger", bad ? WARN : OK, bits.join(" - ") + (wrote && !wrote.deferred ? " - this start recorded and re-read" : ""), why)
+		else if (wrote && seen !== "confirmed") row("ledger", WARN, `THE WRITE WAS NOT SEEN BY THE RE-READ (${seen}) - ${bits.join(" - ")}`, ["write-unseen", ...why])
+		else row("ledger", bad ? WARN : OK, bits.join(" - ") + (wrote ? " - this start recorded and re-read" : ""), why)
 	}
 }
 
@@ -695,6 +682,23 @@ function askBus(sessionPidForCwd) {
 	}
 }
 
+// -- 1d. this repo's OWN installed bus, against its own code -----------------
+// LESSONS form A, measured twice on 2026-09-18: this tree ran `2026-09-11.7` while the field
+// ran `.8`, and no row said so, because the `field:` loop excludes ROOT by design (review #11
+// E, #11b S2). The delivery that reaches THIS session goes through `.comm/bin` and the stubs,
+// not `bin/`. Silent when this root has no install, like every row about something absent.
+if (existsSync(join(ROOT, ".comm", "bin"))) {
+	const chk = spawnSync(process.execPath, [join(ROOT, "install.mjs"), ROOT, "--check"], { encoding: "utf8", timeout: 15000 })
+	let behind = []
+	const decl = /^claude-comm-drift: (.*)$/m.exec(chk.stdout || "")
+	if (decl) { try { const v = JSON.parse(decl[1]); if (Array.isArray(v)) behind = v.filter((x) => typeof x === "string") } catch {} }
+	const list = [...behind].sort().join(",")
+	if (chk.status === 0) row("bus", OK, "this repo's installed bus and hook stubs match its own code")
+	else row("bus", WARN, `this repo runs an installed bus BEHIND its own code: ${behind.length ? behind.join(", ") : `install --check refused (exit ${chk.status})`}` +
+		` - the delivery reaching THIS session is not what bin/ says. \`node install.mjs .\``,
+		[`behind:${!behind.length ? "refused" : list.length > 60 ? `${behind.length}#${causeSig(list)}` : list}`])
+}
+
 // -- 2. the tree: what git says, not what a document says --------------------
 {
 	const head = git("log", "-1", "--format=%h %ct %s")
@@ -794,8 +798,8 @@ function askBus(sessionPidForCwd) {
 	// R5: git returning nothing is not git saying "all tracked". The row's whole purpose
 	// is "does git carry these", so when git could not be asked it must say so rather
 	// than assert the reassuring half of the answer it never obtained.
-	if (!decl) row("archive", WARN, "test/attack.mjs carries no `// gate-docs:` marker - gate dependencies undeclared")
-	else if (undeclared.length) row("archive", WARN, `the gate suite names ${undeclared.join(", ")} but does not declare reading it`)
+	if (!decl) row("archive", WARN, "test/attack.mjs carries no `// gate-docs:` marker - gate dependencies undeclared", ["no-marker"])
+	else if (undeclared.length) row("archive", WARN, `the gate suite names ${undeclared.join(", ")} but does not declare reading it`, [`undeclared:${[...undeclared].sort().join(",")}`])
 	else if (lsFiles === null) row("archive", UNKNOWN, "git could not be read - tracking NOT checked")
 	else if (!bad.length) row("archive", OK, `${READ_FIRST.length} core documents present and tracked, ${needed.size} declared as gate inputs`)
 	else {
@@ -803,7 +807,7 @@ function askBus(sessionPidForCwd) {
 		row("archive", gatedBad.length || bad.some((b) => b.why === "missing") ? RED : WARN,
 			bad.map((b) => `${b.f} ${b.why}${b.gated ? " (a GATE reads it)" : ""}` +
 				(b.why === "missing" ? "" : " - lives in this working tree only")).join(" - ") +
-			(gatedBad.length ? " - green here, red on any clone" : ""))
+			(gatedBad.length ? " - green here, red on any clone" : ""), bad.map((b) => `${b.why}:${b.f}`).sort())
 	}
 }
 
@@ -1525,11 +1529,11 @@ function askBus(sessionPidForCwd) {
 			row("gate", RED, `attack HUNG — killed at ${GATE_CEILING_MS / 1000}s after ${secs}s of output. The ${pass} arm(s) that ` +
 				`ran are not a verdict on the ones that never did. A render exception leaves the inbox ` +
 				`undrained BY DESIGN, and a loop waiting for it to empty then never ends. ` +
-				`FINDINGS.md#suite-abort-reads-clean`)
+				`FINDINGS.md#suite-abort-reads-clean`, ["hung"])
 		} else if (g.status === 0 && pass > 0) {
 			// A green recorded over inputs that could not be read would be a cached green
 			// covering less than the row claims, consulted by every --fast boot afterwards.
-			if (fpBlind.length) row("gate", WARN, `attack ${pass}/${pass} in ${secs}s - but the fingerprint is BLIND to ${fpBlind.join(", ")}; this green is NOT being recorded`)
+			if (fpBlind.length) row("gate", WARN, `attack ${pass}/${pass} in ${secs}s - but the fingerprint is BLIND to ${fpBlind.join(", ")}; this green is NOT being recorded`, [`blind:${fpBlind.join(",")}`])
 			else row("gate", OK, `attack ${pass}/${pass} in ${secs}s`)
 			// MERGE. Review #3 R2: this wrote the object wholesale and erased `sources`,
 			// `lastSource` and `lastSourceAt` - the record that exists to answer whether
@@ -1542,9 +1546,12 @@ function askBus(sessionPidForCwd) {
 		} else {
 			// The single inference this tool may draw - and it never suppresses a run.
 			const unchanged = prev && prev.print === print
+			// Codes name WHICH arms failed (review #11b S5): three different red arms acknowledged
+			// on three closes are three problems, not one guard waved past three times.
 			row("gate", RED,
 				`attack: ${fails.length} FAILED, ${pass} passed in ${secs}s` +
-				(unchanged ? " - CODE UNCHANGED since last green: the world moved, not the test (FINDINGS.md#A20)" : ""))
+				(unchanged ? " - CODE UNCHANGED since last green: the world moved, not the test (FINDINGS.md#A20)" : ""),
+				fails.map((f) => `failed:${(/✗\s+(A\d+)/.exec(f) || [null, f.replace(/^\s*✗\s*/, "").slice(0, 32).trim()])[1]}`).sort())
 			for (const f of fails.slice(0, 4)) row("", RED, f.trim().replace(/\s+/g, " ").slice(0, 150))
 		}
 	}
@@ -2403,6 +2410,25 @@ function proveRed() {
 			held.level === OK && /1 held: port:4999/.test(held.text) && gone.level === WARN && /HOLDER IS GONE/.test(gone.text) && none.level === -1,
 			`holder alive -> ${LV[held.level]}; start tick moved -> ${LV[gone.level]} (want ok, then warn); no claims at all -> ${LV[none.level]} (want absent)`)
 	}
+	// THIS REPO'S OWN INSTALLED BUS AGAINST ITS OWN CODE (review #11b S2; LESSONS form A: this tree
+	// ran 09-11.7 while the field ran .8, unseen). Installed into a COPY of the fixture root - the
+	// fixture itself must stay uninstalled for every other arm. One variable: a line appended to
+	// bin/comm.mjs after the install. The control is the same copy, just installed: it must be ok.
+	{
+		const pkgB = join(tmp, "self-bus")
+		cpSync(pkg, pkgB, { recursive: true })
+		const emptyField = join(tmp, "self-bus-field"); mkdirSync(emptyField, { recursive: true })
+		spawnSync(process.execPath, [join(pkgB, "install.mjs"), pkgB], { encoding: "utf8" })
+		const busRow = () => { try { return JSON.parse(spawnSync(process.execPath, [SELFFILE, "--json", "--fast", "--root", pkgB, "--field", emptyField], { encoding: "utf8" }).stdout).rows.find((r) => r.label === "bus") || { level: -1, text: "" } } catch { return { level: -1, text: "" } } }
+		const current = busRow()
+		writeFileSync(join(pkgB, "bin", "comm.mjs"), readFileSync(join(pkgB, "bin", "comm.mjs"), "utf8") + "\n// moved on after the install\n")
+		const behindRow = busRow()
+		rmSync(pkgB, { recursive: true, force: true })
+		assert("bus: this repo's installed bus falls BEHIND its own code",
+			current.level === OK && behindRow.level === WARN && /\.comm\/bin\/comm\.mjs/.test(behindRow.text) && (behindRow.causes || [])[0] === "behind:.comm/bin/comm.mjs",
+			`installed copy -> ${LV[current.level]} (want ok); bin/comm.mjs moved on -> ${LV[behindRow.level]}, names it=${/\.comm\/bin\/comm\.mjs/.test(behindRow.text)}, cause=${(behindRow.causes || [])[0]}`)
+	}
+
 
 
 	const busFile = join(pkg, "bin", "comm.mjs")
@@ -2658,8 +2684,10 @@ function proveRed() {
 		// ── review #11 R2/R7 and R1, on THIS repo's recorder ───────────────────────────────
 		// (1) A compaction takes no note: the same hook, the same note, ONE VARIABLE - the source.
 		//     F2 above is the control: `startup` takes it.
-		// (2) ONE RECORDER PER ROOT: once this root's settings wire the bus's stub, `--hook`
-		//     records nothing and takes nothing - the stub does both. Control: F2, no settings.
+		// (2) ONE RECORDER PER ROOT, and here it is `--hook` (review #11b S1/S2 inverted #11 R1):
+		//     with the bus's stub ALSO wired in this root's settings, `--hook` still records and
+		//     takes the note - the stub is the one that stands aside (A73). The first fix made
+		//     `--hook` defer, and in a fresh clone nothing recorded while the row said it had.
 		if (handoffLogs.length === 1) {
 			const hookAgent = handoffLogs[0].replace(/\.log$/, "")
 			const rsHere = join(pkg, "bin", "restart-signal.mjs")
@@ -2683,10 +2711,10 @@ function proveRed() {
 			rmSync(settingsDir, { recursive: true, force: true }); rmSync(noteHere, { force: true })
 			assert("R2 a compaction takes no restart note (F2's startup, which does, is the control)", keptOnCompact,
 				`note armed, --hook with source "compact" -> note still there=${keptOnCompact}`)
-			assert("R1 one recorder per root: with the stub wired here, --hook records and takes nothing",
-				after === before && keptOnDefer && !!lr && /recorded by the bus's own hook/.test(lr.text),
-				`settings wire comm-hook.mjs session-start -> ${after - before} record(s) written by --hook (want 0), note left for the stub=${keptOnDefer}, ` +
-				`the row says who records=${!!lr && /bus's own hook/.test(lr.text)} (F2, with no settings, records: the control)`)
+			assert("R1 one recorder per root: at this root --hook records even with the stub wired",
+				after === before + 1 && !keptOnDefer && !!lr && /this start recorded and re-read/.test(lr.text),
+				`settings wire comm-hook.mjs session-start too -> ${after - before} record(s) by --hook (want 1), note taken by it=${!keptOnDefer}, ` +
+				`the row re-read its own write=${!!lr && /recorded and re-read/.test(lr.text)}`)
 		}
 
 		// ---- review #4 R3: the FAILING direction of this row, which was never armed ----

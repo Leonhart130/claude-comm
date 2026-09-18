@@ -142,8 +142,14 @@ const ID_OK = /^[A-Za-z0-9][A-Za-z0-9-]{0,63}$/
 // the caller's word onto .comm/inbox/, so `dismiss ../.. --force` moved package.json and
 // tsconfig.json OUT OF A PROJECT ROOT into delivered/undefined.json, the second overwriting
 // the first. Process control already follows this rule; mail reading now does too.
-const rosterAgent = (cfg, who) => {
+const rosterAgent = (cfg, who, root) => {
 	if (typeof who === "string" && Object.prototype.hasOwnProperty.call((cfg && cfg.agents) || {}, who)) return who
+	// ...or an ORPHANED inbox, by its name (review #11b S3): boot gates on mail left for an agent
+	// taken off the roster, and these two commands are its only way out. A NAME in the agent
+	// shape, and an existing directory directly under .comm/inbox/ - never a path.
+	if (typeof who === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(who) && !who.includes("..") && root) {
+		try { if (statSync(inboxDir(root, who)).isDirectory()) return who } catch {}
+	}
 	throw new Error(`'${who}' is not an agent on this project's roster (.comm/config.json) - an inbox is named by the roster, never by a path.\n` +
 		`  Agents: ${Object.keys((cfg && cfg.agents) || {}).join(", ") || "(none)"}`)
 }
@@ -686,7 +692,7 @@ function dispatch(root, cfg, me, cmd, rest) {
 			break
 		}
 		case "inbox": {
-			const who = rosterAgent(cfg, firstPositional(rest) || me)
+			const who = rosterAgent(cfg, firstPositional(rest) || me, root)
 			const { msgs, quarantined } = pending(root, who)
 			if (quarantined) console.log(`⚠ ${quarantined} unreadable file(s) moved to .comm/corrupt/`)
 			if (!msgs.length) { console.log(`inbox '${who}': empty`); break }
@@ -775,7 +781,7 @@ function dispatch(root, cfg, me, cmd, rest) {
 		// the only copy until delivery, so dismissal moves-and-logs like a real
 		// delivery instead of unlinking.
 		case "dismiss": {
-			const who = rosterAgent(cfg, firstPositional(rest) || me)
+			const who = rosterAgent(cfg, firstPositional(rest) || me, root)
 			const id = arg(rest, "id")
 			// `send` enforces identity ("--from is not yours to set") while dismiss,
 			// the DESTRUCTIVE path, took any agent name. An expert could clear the

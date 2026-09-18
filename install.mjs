@@ -369,7 +369,7 @@ try {
 			//     agent can act on. It is normal for minutes at a time while a fix is written.
 			// Announcing the second as if it were the first is a warning that fires during
 			// ordinary work and names a version you already have.
-			} else if (head.label !== mine.label && said !== head.label) {
+			} else if (head.label !== String(mine.label).replace(/\\+unreleased$/, "") && said !== head.label) {
 				process.stderr.write(
 					\`claude-comm: this project's bus is \${mine.label} and \${head.label} is available.\\n\` +
 					\`  what changed: \${clog}\\n\` +
@@ -384,9 +384,21 @@ try {
 	// a defect". It records into THIS project, beside this project's bus, because this
 	// is where the restarts being measured actually happen. Read it back with
 	// \`node bin/ledger.mjs --root <this project>\`.
+	// ONE RECORDER PER ROOT (review #11 R1, #11b S1/S2). In claude-comm's OWN checkout the
+	// root's \`bin/boot.mjs --hook\` records from the code at HEAD and re-reads its write, so this
+	// copy - one install behind - stands aside there. The test reads the file the hooks come
+	// from; if it ever misses, both record and the ledger collapses the twin: never a lost start.
+	let rootRecords = false
+	try {
+		if (existsSync(join(projectRoot, "bin", "boot.mjs"))) {
+			const st = JSON.parse(readFileSync(join(projectRoot, ".claude", "settings.json"), "utf8"))
+			rootRecords = ((st && st.hooks && st.hooks.SessionStart) || []).some((g) => ((g && g.hooks) || [])
+				.some((h) => h && typeof h.command === "string" && /bin\\/boot\\.mjs["']?\\s+(?:--\\S+\\s+)*--hook\\b/.test(h.command)))
+		}
+	} catch {}
 	try {
 		const led = join(binDir, "ledger.mjs")
-		if (existsSync(led) && p.source && tp) {
+		if (!rootRecords && existsSync(led) && p.source && tp) {
 			// THE SIGNAL THAT CROSSES THE RESTART, claimed here and nowhere else. At this
 			// hook a relaunch and a cold start are the same event — \`source\` is "startup"
 			// for both — so without this the reboot arm of the experiment is not
@@ -955,8 +967,12 @@ const busSrcForLastWrite = busSrc
 // old module, then spawned a ledger that could not load — the note gone, no start recorded
 // (review #11 R3). Order is now a depth-first walk of each file's `from "./x.mjs"`, so a new
 // import is covered the day it is written. `CLAUDE_COMM_INSTALL_TRACE` prints the order (A70).
-const localImports = (f) => [...readFileSync(join(HERE, "bin", f), "utf8").matchAll(/from\s+"\.\/([A-Za-z0-9._-]+\.mjs)"/g)]
-	.map((m) => m[1]).filter((d) => BUS_FILES.includes(d))
+// BOTH spellings the bus uses (review #11b S4): `from "./x.mjs"`, and the top-level
+// `await import(new URL("x.mjs", import.meta.url))` of close.mjs and launch.mjs - the first
+// version of this saw only the first, and A70 shared its blindness by sharing its regex.
+const localImports = (f) => [...readFileSync(join(HERE, "bin", f), "utf8")
+	.matchAll(/from\s+["']\.\/([A-Za-z0-9._-]+\.mjs)["']|import\(\s*new URL\(\s*["'](?:\.\/)?([A-Za-z0-9._-]+\.mjs)["']/g)]
+	.map((m) => m[1] || m[2]).filter((d) => BUS_FILES.includes(d))
 const writeOrder = []
 const visit = (f, stack) => {
 	if (writeOrder.includes(f) || stack.includes(f)) return
@@ -1144,19 +1160,24 @@ if (CHECK) {
 	if (changelogUnreadable()) console.error(`  ⚠ ${CHANGELOG} exists but no entry could be parsed - this install records NO version, and that is a defect here, not an absence of history`)
 	const rs = releases()
 	const print = busPrint()
-	const current = rs.find((r) => r.print === print) || rs[0] || null
+	// A PRINT NO RELEASE NAMES IS NOT THAT RELEASE (review #11 E). This fell back to the newest
+	// release's label, so a working copy installed here read "2026-09-13.8" over bytes that were
+	// not .8 - only the print told the truth, and nobody reads a print. It now says so in the label.
+	const matched = rs.find((r) => r.print === print) || null
+	const current = matched || rs[0] || null
+	const label = current ? (matched ? current.label : `${current.label}+unreleased`) : null
 	if (current) write(join(commDir, "INSTALLED.json"),
-		JSON.stringify({ label: current.label, print, at: new Date().toISOString(), from: HERE }, null, 2) + "\n", results)
+		JSON.stringify({ label, print, at: new Date().toISOString(), from: HERE }, null, 2) + "\n", results)
 
 	console.log(`✓ claude-comm installed at ${ROOT}`)
 	console.log(`  agents:  ${Object.keys(cfg.agents).join(", ")}`)
 	console.log(`  wrote:   ${results.wrote.length} file(s)${results.ok.length ? `  (${results.ok.length} already current)` : ""}`)
-	if (current) console.log(`  version: ${current.label}  (print ${print})`)
+	if (current) console.log(`  version: ${label}  (print ${print})`)
 
 	// THE PATCH NOTES: every entry newer than what this project had, and nothing else. A
 	// changelog dumped in full at every install is a changelog nobody reads.
 	if (current && rs.length) {
-		const wasAt = before ? rs.findIndex((r) => r.label === before.label) : -1
+		const wasAt = before ? rs.findIndex((r) => r.label === String(before.label).replace(/\+unreleased$/, "")) : -1
 		const nowAt = rs.findIndex((r) => r.label === current.label)
 		const gained = wasAt === -1 ? (before ? rs.slice(nowAt, nowAt + 1) : []) : rs.slice(nowAt, wasAt)
 		if (gained.length) {

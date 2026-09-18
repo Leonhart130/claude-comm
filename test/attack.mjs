@@ -2107,19 +2107,30 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	const ctl = bus69(["dismiss", "app", "--force"])
 	const delivered = readdirSync(join(r69, ".comm", "delivered"))
 	const escaped = existsSync(join(r69, "escaped.json")) || existsSync(join(tmpdir(), "escaped.json"))
+	// Review #11b S3: mail left for an agent taken OFF the roster must stay clearable by its name -
+	// boot gates on it - while the traversal above stays closed.
+	mkdirSync(join(r69, ".comm", "inbox", "oldexpert"), { recursive: true })
+	writeFileSync(join(r69, ".comm", "inbox", "oldexpert", "o1.json"), JSON.stringify({ id: "2026-09-18T00-00-00-000Z-0ld0ld", from: "leader", to: "oldexpert", kind: "fyi", ref: "x", ts: new Date().toISOString() }))
+	const orphan = bus69(["dismiss", "oldexpert", "--force"])
+	const orphanCleared = !existsSync(join(r69, ".comm", "inbox", "oldexpert", "o1.json"))
 	check("A69 an inbox is named by the roster, never a path, and a drained file stays in delivered/",
-		up.status !== 0 && sideways.status !== 0 && pkgStayed && ctl.status === 0 && delivered.length === 1 && !escaped,
+		up.status !== 0 && sideways.status !== 0 && pkgStayed && ctl.status === 0 && delivered.length === 1 && !escaped &&
+		orphan.status === 0 && orphanCleared,
 		`dismiss ../.. --force -> exit ${up.status}, package.json still in the root=${pkgStayed}; inbox app/../leader -> exit ${sideways.status}; ` +
-		`control, dismiss app --force -> exit ${ctl.status}, delivered/=${JSON.stringify(delivered)}, a "../" id escaped=${escaped}`)
+		`control, dismiss app --force -> exit ${ctl.status}, delivered/=${JSON.stringify(delivered)}, a "../" id escaped=${escaped}; ` +
+		`an orphaned inbox by its name -> exit ${orphan.status}, cleared=${orphanCleared}`)
 }
 
-// A70 — the installer writes every bus file AFTER the siblings it imports, derived from the imports.
+// A70 — the installer writes every bus file AFTER the siblings it imports: measured by LINKING, not by a spelling.
 //
-// Review #11 R3: BUS_FILES wrote the new ledger.mjs before the restart-signal.mjs it now imports, and in
-// that window (or after an interrupted install) the stub claimed a note with the old module, then spawned
-// a ledger that could not load: the note gone, no start recorded. The one rule that existed covered one
-// edge by hand (comm -> who). Measured through the real installer's own trace, never by reading its list.
-// Positive control: the trace is not empty and holds both files of the edge that was missed.
+// Review #11 R3: BUS_FILES wrote the new ledger.mjs before the restart-signal.mjs it now imports, so a stub could
+// claim a note with the old module and spawn a ledger that could not load. Review #11b S4: the first A70 found the
+// dependencies with the installer's OWN regex, so it was blind to what the installer was blind to (the top-level
+// `await import(new URL(...))` of close.mjs and launch.mjs). Now, for each file in the installer's REAL write order
+// (its trace), the file is LINKED - never evaluated: close.mjs closes windows - against a directory holding only
+// the files written before it, which reproduces R3's exact error ("does not provide an export named"). Dynamic
+// imports are not linked, so they are checked with a pattern of this arm's own. Positive control: the same link,
+// with the directory COMPLETE, must pass for every file, or the linker itself is broken and proves nothing.
 {
 	const r70 = mkdtempSync(join(tmpdir(), "comm-attack-order-"))
 	atExit(() => { try { rmSync(r70, { recursive: true, force: true }) } catch {} })
@@ -2128,14 +2139,69 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	writeFileSync(join(r70, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app" } }))
 	const inst = spawnSync(process.execPath, [join(PKG, "install.mjs"), r70], { encoding: "utf8", env: { ...process.env, CLAUDE_COMM_INSTALL_TRACE: "1" } })
 	const order = [...String(inst.stderr).matchAll(/^claude-comm-write: .*\/\.comm\/bin\/([A-Za-z0-9._-]+\.mjs)$/gm)].map((m) => m[1])
+	const linker = join(r70, "link-only.mjs")
+	writeFileSync(linker, [
+		`import vm from "node:vm"; import { readFileSync, existsSync } from "node:fs"; import { join, basename } from "node:path"`,
+		`const [dir, entry] = process.argv.slice(2); const cache = new Map()`,
+		`const builtin = async (spec) => { const ns = await import(spec); const names = Object.keys(ns); return new vm.SyntheticModule(names, function () { for (const n of names) this.setExport(n, ns[n]) }, { identifier: spec }) }`,
+		`const load = (f) => { if (cache.has(f)) return cache.get(f); if (!existsSync(f)) throw new Error("MISSING " + basename(f)); const m = new vm.SourceTextModule(readFileSync(f, "utf8"), { identifier: f }); cache.set(f, m); return m }`,
+		`try { const m = load(join(dir, entry)); await m.link(async (spec) => spec.startsWith("node:") ? builtin(spec) : load(join(dir, spec.replace(/^\\.\\//, "")))); console.log("LINKED") }`,
+		`catch (e) { console.log("FAILED " + ((e && e.message) || e)) }`].join("\n"))
+	const link = (dir, f) => String(spawnSync(process.execPath, ["--experimental-vm-modules", "--no-warnings", linker, dir, f], { encoding: "utf8" }).stdout).trim()
+	const full = join(r70, ".comm", "bin")
+	const control = order.filter((f) => link(full, f) !== "LINKED")
 	const late = []
 	for (const [i, f] of order.entries()) {
-		const deps = [...readFileSync(join(r70, ".comm", "bin", f), "utf8").matchAll(/from\s+"\.\/([A-Za-z0-9._-]+\.mjs)"/g)].map((m) => m[1])
-		for (const d of deps) if (!(order.indexOf(d) >= 0 && order.indexOf(d) < i)) late.push(`${f} before ${d}`)
+		const part = join(r70, `partial-${i}`)
+		mkdirSync(part)
+		for (const g of order.slice(0, i + 1)) cpSync(join(full, g), join(part, g))
+		const r = link(part, f)
+		if (r !== "LINKED") late.push(`${f}: ${r.replace(/^FAILED /, "").slice(0, 60)}`)
+		// An IMPORT of a URL, not any URL: launch.mjs and close.mjs build `new URL("comm.mjs")` to SPAWN it, and a
+		// spawned sibling may be written later - it is found at run time, not at load.
+		for (const m of readFileSync(join(full, f), "utf8").matchAll(/\bimport\(\s*new URL\(\s*["'`](?:\.\/)?([A-Za-z0-9._-]+\.mjs)["'`]\s*,\s*import\.meta\.url/g))
+			if (order.includes(m[1]) && order.indexOf(m[1]) > i) late.push(`${f}: dynamic import of ${m[1]}, written later`)
 	}
 	check("A70 the installer writes each bus file after the siblings it imports",
-		inst.status === 0 && order.includes("ledger.mjs") && order.includes("restart-signal.mjs") && late.length === 0,
-		`install exit ${inst.status}; ${order.length} bus file(s) traced; written before an import: ${late.length ? late.join(", ") : "none"}`)
+		inst.status === 0 && order.length >= 10 && control.length === 0 && late.length === 0,
+		`install exit ${inst.status}; ${order.length} bus file(s) in write order; control, every file linked in the complete ` +
+		`directory -> ${control.length ? `FAILED: ${control.join(", ")}` : "all linked"}; linked with only its predecessors -> ` +
+		`${late.length ? late.join(" · ") : "all linked"}`)
+}
+
+// A73 — at claude-comm's own root the STUB stands aside; everywhere else it records.
+//
+// Review #11b S1/S2: the first R1 fix made `boot --hook` defer to the stub, which in this repo is the installed
+// copy, one install behind, and absent from a fresh clone: nothing recorded while the row said it had. Inverted:
+// the root's `bin/boot.mjs --hook` records, and the stub skips its ledger block when THAT is wired. One variable:
+// the `bin/boot.mjs --hook` group in the fixture's settings. The control, the same fixture without it, records.
+{
+	const r73 = mkdtempSync(join(tmpdir(), "comm-attack-onerecorder-"))
+	atExit(() => { try { rmSync(r73, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(r73, ".comm"), { recursive: true })
+	mkdirSync(join(r73, "bin"), { recursive: true })
+	writeFileSync(join(r73, "bin", "boot.mjs"), "// stand-in: only its presence and its wiring are read\n")
+	writeFileSync(join(r73, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: "." } }))
+	execFileSync("node", [join(PKG, "install.mjs"), r73], { stdio: "pipe" })
+	const settingsP = join(r73, ".claude", "settings.json")
+	const installed = JSON.parse(readFileSync(settingsP, "utf8"))
+	const withBoot = JSON.parse(JSON.stringify(installed))
+	withBoot.hooks.SessionStart.unshift({ hooks: [{ type: "command", command: `node "$CLAUDE_PROJECT_DIR/bin/boot.mjs" --fast --hook 2>/dev/null || true` }] })
+	const fake73 = join(r73, "claude")
+	try { symlinkSync("/bin/sh", fake73) } catch {}
+	const log73 = join(r73, ".comm", "handoff", "leader.log")
+	const lines73 = () => { try { return readFileSync(log73, "utf8").trim().split("\n").length } catch { return 0 } }
+	const fire73 = (sid) => {
+		const tp = join(r73, `${sid}.jsonl`); writeFileSync(tp, "\n")
+		const pl = join(r73, "payload.json"); writeFileSync(pl, JSON.stringify({ cwd: r73, source: "startup", transcript_path: tp }))
+		spawnSync(fake73, ["-c", `cd ${r73} && ${process.execPath} ${join(r73, ".claude", "comm-hook.mjs")} session-start < ${pl} > /dev/null 2>&1; echo done`],
+			{ encoding: "utf8", env: { ...process.env, CLAUDE_COMM_RUNTIME: join(r73, "runtime") } })
+	}
+	writeFileSync(settingsP, JSON.stringify(withBoot)); const b0 = lines73(); fire73("73737373-0000-0000-0000-000000000001"); const aside = lines73() - b0
+	writeFileSync(settingsP, JSON.stringify(installed)); const b1 = lines73(); fire73("73737373-0000-0000-0000-000000000002"); const recorded = lines73() - b1
+	check("A73 at claude-comm's own root the stub stands aside for boot --hook; elsewhere it records",
+		aside === 0 && recorded === 1,
+		`bin/boot.mjs --hook wired beside the stub -> the stub wrote ${aside} start(s) (want 0); control, not wired -> ${recorded} (want 1)`)
 }
 
 // A71/A72 — which starts may TAKE a restart note, and a start that cannot be recorded gives it back.

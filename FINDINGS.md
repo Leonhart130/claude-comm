@@ -3044,3 +3044,35 @@ the transcript, delivery to a session that is NOT running (the inbox waits; a so
 instruments and the claims. **Not verified:** whether `sessionId` follows a `/clear` (it decides whether our registry
 is redundant — `#clear-blind`); two permission modes; a session with no turn yet; message size; remote sessions;
 what happens to a native message sent to a session that exits before draining it.
+
+## `#review11b` — the second pass found both reds inside the first pass's fixes
+
+**2026-09-18, the same reviewer, woken by `SendMessage`** (`#native-path`). *Attack the recent fix*, again.
+
+- **S1 🔴 — R1's fix deferred on a regex, never on the recorder.** `boot --hook` stood aside whenever
+  `settings.json` named the stub, and the row said *"recorded by the bus's own hook"* without re-reading anything. In a
+  fresh clone (`.comm/` is gitignored, so no `.comm/bin/ledger.mjs`) NOTHING recorded and the row was green.
+- **S2 🔴 — and it handed this repo's instrument to the INSTALLED copy, one install behind**: none of R2/R3/R7 was live
+  in the repo that wrote them. **Inverted:** at claude-comm's own root `boot --hook` records (it runs `bin/` HEAD and
+  re-reads its write); the stub stands aside when the root wires `bin/boot.mjs --hook`. Either detection can only
+  miss toward a twin, which the ledger collapses — never toward a lost start. Armed: A73 (the stub, one variable: the
+  boot group) and boot's R1 arm re-pointed (`--hook` records even with the stub wired).
+  And the form-A debt is paid: a **`bus` row** compares this repo's own `.comm/bin` and stubs with its code
+  (`install --check`), armed on a copy (installed → ok; `bin/comm.mjs` moved on → `behind:.comm/bin/comm.mjs`).
+  The installer also stops labelling bytes no release names with the newest release's label: `<label>+unreleased`.
+- **S3 🟠 — the roster rule made orphaned mail un-clearable** while boot gated on it. An existing inbox directory is
+  accepted by its NAME (agent shape, no path). A69 extended.
+- **S4 🟠 — A70 shared the installer's regex, so its blindness**: neither saw close/launch's top-level
+  `await import(new URL(...))`. The installer now reads both spellings; A70 **links** each file (vm.SourceTextModule,
+  never evaluated — close.mjs closes windows) against only its predecessors, which reproduces R3's exact error, plus
+  a dynamic-import check of its own. Proved red with the reviewer's mutation: `close.mjs: dynamic import of wake.mjs,
+  written later`.
+- **S5 🟡 — keying uncoded rows on their level over-counts**: `gate` (`failed:<arm>`) and `archive`
+  (`missing:`/`untracked:<doc>`, `undeclared:`) now declare. Left on the level BY INTENT: single-cause rows —
+  `status`, `session`, `budget` (its two causes differ in level), `close`, `field` with no project, `ledger` silent.
+- **S6 🟡 — `to_state` is honest at send and blind after it:** a recipient relaunched WITHOUT draining (its hooks did
+  not run) and stopped again shows `◦ … its sender was told so`. **Not built** — the only witness would be a
+  transcript in the agent's project directory newer than the message. Named here and in STATUS.
+
+**Proved red in a copy, one mutation per arm:** installer back to static-only + BUS_FILES reordered → A70 alone ·
+the stub's step-aside removed → A73 alone · the orphan branch removed → A69 alone.
