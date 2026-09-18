@@ -1643,10 +1643,19 @@ const POINTER_SOURCES = (() => {
 	writeFileSync(payload, JSON.stringify({ cwd: join(rootS, "app"), source: "startup", transcript_path: tp }))
 	const fakeClaude = join(rootS, "claude")
 	try { symlinkSync("/bin/sh", fakeClaude) } catch {}
-	const start = () => spawnSync(fakeClaude, ["-c",
-		`cd ${join(rootS, "app")} && ${process.execPath} ${join(rootS, "app", ".claude", "comm-hook.mjs")} session-start ` +
-		`< ${payload} > /dev/null 2>&1; echo done`],
-		{ encoding: "utf8", env: { ...process.env, CLAUDE_COMM_RUNTIME: rt } })
+	// EACH START IS ITS OWN SESSION, as every real relaunch is. One transcript for all four made
+	// them one session id started four times within a second - the exact shape of a duplicated
+	// recorder, which the ledger collapses since review #11 R1 (`FINDINGS.md#armer`).
+	let startN = 0
+	const start = () => {
+		const tpN = join(rootS, `11111111-2222-3333-4444-${String(++startN).padStart(12, "0")}.jsonl`)
+		writeFileSync(tpN, "\n")
+		writeFileSync(payload, JSON.stringify({ cwd: join(rootS, "app"), source: "startup", transcript_path: tpN }))
+		return spawnSync(fakeClaude, ["-c",
+			`cd ${join(rootS, "app")} && ${process.execPath} ${join(rootS, "app", ".claude", "comm-hook.mjs")} session-start ` +
+			`< ${payload} > /dev/null 2>&1; echo done`],
+			{ encoding: "utf8", env: { ...process.env, CLAUDE_COMM_RUNTIME: rt } })
+	}
 	const lastRecord = () => {
 		try {
 			const lines = readFileSync(join(rootS, ".comm", "handoff", "app.log"), "utf8").trim().split("\n")
@@ -2071,6 +2080,121 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		`3 pending (2 genuine, 1 forged id) -> ${cmds.length} per-message command(s) (want 2); the first, run as printed -> ` +
 		`exit ${run1.status}, ${left.length} left (want 2, the other genuine one kept=${genuine.filter((f) => left.includes(f)).length === 1}); ` +
 		`forged id printed as a command=${cmds.some((c) => /PWNED68/.test(c))}`)
+}
+
+// A69 — an inbox is named by the ROSTER, never by a path; and a drained file never leaves delivered/.
+//
+// Review #11 R8, measured in a fixture: `dismiss ../.. --force` moved package.json and tsconfig.json OUT
+// OF THE PROJECT ROOT into .comm/delivered/undefined.json, the second overwriting the first; `inbox
+// app/../leader` read the leader's mail and printed a hint echoing the path. And `drain()` took its
+// destination from `${m.id}` read inside the file. The positive control is the roster name itself: the
+// same `dismiss --force`, aimed at `app`, must still work.
+{
+	const r69 = mkdtempSync(join(tmpdir(), "comm-attack-roster-"))
+	atExit(() => { try { rmSync(r69, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(r69, ".comm", "bin"), { recursive: true })
+	for (const a of ["leader", "app"]) mkdirSync(join(r69, ".comm", "inbox", a), { recursive: true })
+	mkdirSync(join(r69, "app"), { recursive: true })
+	writeFileSync(join(r69, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app" } }))
+	for (const f of ["comm.mjs", "who.mjs"]) cpSync(join(PKG, "bin", f), join(r69, ".comm", "bin", f))
+	writeFileSync(join(r69, "package.json"), '{"name":"do-not-move-me"}\n')
+	const bus69 = (args) => spawnSync(process.execPath, [join(r69, ".comm", "bin", "comm.mjs"), ...args], { cwd: r69, encoding: "utf8" })
+	const up = bus69(["dismiss", "../..", "--force"])
+	const sideways = bus69(["inbox", "app/../leader"])
+	const pkgStayed = existsSync(join(r69, "package.json"))
+	// a message whose id tries to climb out of delivered/
+	writeFileSync(join(r69, ".comm", "inbox", "app", "m1.json"), JSON.stringify({ id: "../../../escaped", from: "leader", to: "app", kind: "fyi", ref: "x", ts: new Date().toISOString() }))
+	const ctl = bus69(["dismiss", "app", "--force"])
+	const delivered = readdirSync(join(r69, ".comm", "delivered"))
+	const escaped = existsSync(join(r69, "escaped.json")) || existsSync(join(tmpdir(), "escaped.json"))
+	check("A69 an inbox is named by the roster, never a path, and a drained file stays in delivered/",
+		up.status !== 0 && sideways.status !== 0 && pkgStayed && ctl.status === 0 && delivered.length === 1 && !escaped,
+		`dismiss ../.. --force -> exit ${up.status}, package.json still in the root=${pkgStayed}; inbox app/../leader -> exit ${sideways.status}; ` +
+		`control, dismiss app --force -> exit ${ctl.status}, delivered/=${JSON.stringify(delivered)}, a "../" id escaped=${escaped}`)
+}
+
+// A70 — the installer writes every bus file AFTER the siblings it imports, derived from the imports.
+//
+// Review #11 R3: BUS_FILES wrote the new ledger.mjs before the restart-signal.mjs it now imports, and in
+// that window (or after an interrupted install) the stub claimed a note with the old module, then spawned
+// a ledger that could not load: the note gone, no start recorded. The one rule that existed covered one
+// edge by hand (comm -> who). Measured through the real installer's own trace, never by reading its list.
+// Positive control: the trace is not empty and holds both files of the edge that was missed.
+{
+	const r70 = mkdtempSync(join(tmpdir(), "comm-attack-order-"))
+	atExit(() => { try { rmSync(r70, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(r70, ".comm"), { recursive: true })
+	mkdirSync(join(r70, "app"), { recursive: true })
+	writeFileSync(join(r70, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app" } }))
+	const inst = spawnSync(process.execPath, [join(PKG, "install.mjs"), r70], { encoding: "utf8", env: { ...process.env, CLAUDE_COMM_INSTALL_TRACE: "1" } })
+	const order = [...String(inst.stderr).matchAll(/^claude-comm-write: .*\/\.comm\/bin\/([A-Za-z0-9._-]+\.mjs)$/gm)].map((m) => m[1])
+	const late = []
+	for (const [i, f] of order.entries()) {
+		const deps = [...readFileSync(join(r70, ".comm", "bin", f), "utf8").matchAll(/from\s+"\.\/([A-Za-z0-9._-]+\.mjs)"/g)].map((m) => m[1])
+		for (const d of deps) if (!(order.indexOf(d) >= 0 && order.indexOf(d) < i)) late.push(`${f} before ${d}`)
+	}
+	check("A70 the installer writes each bus file after the siblings it imports",
+		inst.status === 0 && order.includes("ledger.mjs") && order.includes("restart-signal.mjs") && late.length === 0,
+		`install exit ${inst.status}; ${order.length} bus file(s) traced; written before an import: ${late.length ? late.join(", ") : "none"}`)
+}
+
+// A71/A72 — which starts may TAKE a restart note, and a start that cannot be recorded gives it back.
+//
+// Review #11 R2/R7: the stub claimed on every `source`, so an autocompaction during the long close (the
+// case the armer rule was written for) or a `--resume` of the armer's session consumed the note, and the
+// real relaunch afterwards found nothing and scored COLD. R6: nothing asserted the stub forwards the
+// armer. R3: a ledger that cannot load, after the claim, left the note gone and no start recorded.
+// Same fixture shape as A33 (a `claude` ancestor, its own runtime directory).
+{
+	const r71 = mkdtempSync(join(tmpdir(), "comm-attack-sources-"))
+	atExit(() => { try { rmSync(r71, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(r71, "app"), { recursive: true })
+	mkdirSync(join(r71, ".comm"), { recursive: true })
+	writeFileSync(join(r71, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app" } }))
+	execFileSync("node", [join(PKG, "install.mjs"), r71], { stdio: "pipe" })
+	const rs71 = join(r71, ".comm", "bin", "restart-signal.mjs")
+	const note71 = join(r71, ".comm", "restart", "app.json")
+	const tp71 = join(r71, "71717171-7171-7171-7171-717171717171.jsonl")
+	writeFileSync(tp71, "\n")
+	const fake71 = join(r71, "claude")
+	try { symlinkSync("/bin/sh", fake71) } catch {}
+	const start71 = (source) => {
+		const pl = join(r71, `payload-${source}.json`)
+		writeFileSync(pl, JSON.stringify({ cwd: join(r71, "app"), source, transcript_path: tp71 }))
+		return spawnSync(fake71, ["-c", `cd ${join(r71, "app")} && ${process.execPath} ${join(r71, "app", ".claude", "comm-hook.mjs")} session-start < ${pl} > /dev/null 2>${pl}.err; echo done`],
+			{ encoding: "utf8", env: { ...process.env, CLAUDE_COMM_RUNTIME: join(r71, "runtime") } })
+	}
+	const last71 = () => { try { const l = readFileSync(join(r71, ".comm", "handoff", "app.log"), "utf8").trim().split("\n"); return JSON.parse(l[l.length - 1]) } catch { return null } }
+	const arm71 = () => spawnSync("node", [rs71, "arm", "--agent", "app", "--root", r71, "--quiet", "--prev-session", "PREV-71", "--by", "attack"], { encoding: "utf8" })
+
+	arm71()
+	start71("compact"); const afterCompact = { note: existsSync(note71), rec: last71() }
+	start71("resume"); const afterResume = { note: existsSync(note71), rec: last71() }
+	start71("startup"); const afterStartup = { note: existsSync(note71), rec: last71() }
+	const kept = afterCompact.note && afterResume.note && afterCompact.rec && afterCompact.rec.signal === null &&
+		afterResume.rec && afterResume.rec.signal === null
+	const taken = !afterStartup.note && afterStartup.rec && afterStartup.rec.prev_session === "PREV-71" &&
+		afterStartup.rec.signal && typeof afterStartup.rec.signal.armer === "string"
+	check("A71 a compaction or a resume leaves the restart note; a startup takes it and forwards the armer",
+		kept && taken,
+		`compact -> note kept=${afterCompact.note}, signal=${afterCompact.rec && JSON.stringify(afterCompact.rec.signal)}; ` +
+		`resume -> kept=${afterResume.note}; startup (the control) -> note taken=${!afterStartup.note}, prev=${afterStartup.rec && afterStartup.rec.prev_session}, ` +
+		`armer forwarded=${afterStartup.rec && afterStartup.rec.signal && afterStartup.rec.signal.armer}`)
+
+	// A72 — ONE VARIABLE against A71's startup: a ledger that cannot record. The note must come back.
+	const led71 = join(r71, ".comm", "bin", "ledger.mjs")
+	const ledSrc = readFileSync(led71, "utf8")
+	writeFileSync(led71, "process.exit(1)\n")
+	arm71()
+	start71("startup")
+	const backAfterFail = existsSync(note71)
+	let said = ""
+	try { said = readFileSync(join(r71, "payload-startup.json.err"), "utf8") } catch {}
+	writeFileSync(led71, ledSrc)
+	check("A72 a start the ledger cannot record gives the restart note back",
+		backAfterFail && /PUT BACK/.test(said),
+		`ledger replaced by exit(1), note armed, startup -> note still there=${backAfterFail}; stderr says so=${/PUT BACK/.test(said)} ` +
+		`(A71's startup, same fixture with a working ledger, is the control: it takes the note)`)
 }
 
 // A34 — the instrument the experiment is SCORED FROM runs its own arms inside the gate.

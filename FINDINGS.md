@@ -2955,6 +2955,24 @@ under a real restart**, and the stub half reaches the field only with the next r
   `import("install.mjs")` used as a syntax check RAN it, installing this working copy into this tree (`INSTALLED.json`
   now reads `.8` over bytes that are not `.8`). `node --check` was the check; an import of a script is an execution.
 
+### Review #11 on this change — two reds, both about WHO takes the note (R1, R2/R7, R3, R6)
+
+- **R1 🔴 — this repo recorded every start TWICE** (`boot --hook` and the bus's stub, both wired since 09-10): 12
+  records for 6 sessions, the signal on the earlier twin, whose span the later twin cut to 50 ms — so the declared
+  restart `214f0a0e` was excluded and its bare twin scored COLD. Fixed twice over: `boot --hook` defers when this
+  root's `settings.json` wires the stub (one recorder per root, the one the field runs), and the ledger collapses
+  twins AT READ (same agent, session, source, ≤ 5 s; the signal-bearing twin kept) — history repaired, trials
+  16/5 → 15/6. A33's fixture had reused one session id for four starts; it now uses one per start.
+- **R2/R7 🔴 — the note was taken on every `source`**: an autocompaction during the long close (this change's own
+  motivating case) consumed it as `self`, and a `claude --resume` of the armer's session took it and scored `reboot`
+  with its whole old context. Only `startup` and `clear` take a note now (`CLAIMING_SOURCES`, one list for both
+  claimers).
+- **R3 🟠 — `ledger.mjs` now imports `restart-signal.mjs` and was installed BEFORE it**: a stub could claim with the
+  old module and spawn a ledger that could not load. The install order is now derived from the imports, and a claim
+  whose record fails is PUT BACK (`restore()`, by `link`, never over a newer note).
+- **R6 🟠 — nothing asserted the claimers forward the armer**; deleting both lines left `attack` green. A71 and F2 now
+  assert it.
+
 ## `#peer-state` — two amendments on the acknowledgement count: what a `field:` row may gate on, and how the count keys
 
 **2026-09-18.** Both are the protocol in `CLAUDE.md` doing its job — *a guard defensible every time it is bypassed is
@@ -2979,3 +2997,50 @@ claims or notes that cannot be read. The field loop excludes `ROOT`, so this rep
 shown at ok (control: the unreadable-claim arm still warns); a peer's lapsed note → worded, at ok.
 **Not verified:** whether a peer ever relied on my row to learn its own state — nothing suggests so (every ack was
 mine, none reached them), but it was not asked.
+
+### 🔴 Corrected the same day by review #11 (R4, R5) — two of the three statements above were false
+
+- **"Only that leader can release them" was FALSE.** `claim release` refuses a LIVE holder, never a gone one — and
+  one of work's two claims (`zz-mesure-claim-r1`, purpose *"mesure demandee par claude-comm"*) was THIS repo's own
+  debris. **The gone-claim demotion is reverted: gone-holder claims gate again**, alone, armed. The evidence was an
+  ack I wrote, believed, and counted — LESSONS form F.
+- **"Its sender was told so" was printed unconditionally.** `send` says `NOT running — held in inbox` only when the
+  recipient is down AT SEND; sent to a live-but-idle agent that is later closed, the mail strands with the sender
+  told the opposite — the bus's own failure (open item 1). Now `send` stamps `to_state` (what the sender was told),
+  and stranded mail is shown-not-gated ONLY when every waiting message says `not-running`; otherwise `⚠ … nobody was
+  told`, gating, `stranded-untold:<agent>`. Unstamped mail (before today) gates — the conservative reading.
+- **"This repo's own claims still gate" described a guard that did not exist**: no row read `ROOT/.comm/claims`. A
+  `claims` row now does (form A).
+- **The count was understated**: `field:work`'s one cause stood at 15 acks under 8 wordings.
+- **R5.** The hash fallback left every uncoded row evadable: a row that declares no codes is now keyed on its own
+  LEVEL, and `tree` (`uncommitted`·`unpushed`·`no-upstream`·`no-git`) and `registry` declare. And the codes
+  over-counted in the other direction — `drift` for any drift, `unanswered` for any letter — so they now say WHAT:
+  `drift:<files>`, `bus-stale:<files>`, `unanswered:<letter>`, `note-lapsed:<agent>`, `claim:<resource=state>`; a
+  long list becomes a hash of the list, never of the words.
+
+## `#native-path` — Claude Code's own cross-session messaging, measured against this bus (2026-09-18)
+
+Asked by getajob's leader (letter n°3 §3, *"si la voie native couvre une partie du transport"*). Measured on MY
+sessions only — the leader and its launched reviewer, `claude` 2.1.275/2.1.276, one machine — never on theirs.
+
+| question | measured | how |
+| --- | --- | --- |
+| Does `ListAgents` see bus-launched sessions? | **yes** — 8 sessions, names derived (`review-e0`, `web-8d`), each `idle`/`busy`/`shell` | the tool, twice |
+| Does `SendMessage` reach an IDLE session? | **yes, at once** — the reviewer idle 15 min; its native status flipped to `busy` at 13:12:29, the second of the send; its transcript +50 KB within 6 s and a turn ran | transcript size + `~/.claude/sessions/<pid>.json` |
+| Held for approval? | **no** — no `[Cross-session delivery notice]`; both sessions launched with no permission flag | tool result |
+| `notify_when_idle` | **delivered at the SUBSCRIBER's turn end, not at its tool rounds** — subscribed 12:25:50Z, the reviewer went idle 12:57Z, and the notice reached the leader only when the leader itself went idle (~13:15Z), after ~18 min of tool rounds. For a busy receiver it is a mailbox, like ours; for an idle one, `SendMessage` is an interrupt (row above) | the notice's own timestamp vs its arrival |
+| What trace does it leave? | **only inside the recipient's transcript**: a `queue-operation enqueue` line and the text wrapped `<cross-session-message from="uds:/run/user/1000/cc-socks/<pid>.sock" from-name=… from-mode="prompting">`. Nothing like `log.jsonl` or `delivered/` | grep |
+| Our bus's doorbell, same afternoon | the reviewer's `send leader` at 12:56:53.9Z, rung at its turn end 12:57:07.5Z, the leader awake 12:57:13Z | `.comm/wake/rings.jsonl` |
+
+**And Claude Code keeps a registry of its own:** `~/.claude/sessions/<pid>.json` — `sessionId`, `cwd`, `procStart`, a
+live `status` with `statusUpdatedAt`, `name`, `messagingSocketPath`. For the leader it agrees with ours on both keys
+(`sessionId` = our registry's transcript id, `procStart` = our start tick). That is the four-state `who` open item 5
+could not build, maintained by the runtime.
+
+**What it means, stated as far as the measurements go.** Transport and liveness — the latency of open item 1, the
+states of item 5 — now exist natively for sessions on one machine in one permission class. What the bus has that the
+native path does not: the pointer discipline (a native message carries text), the hub rule, an audit trail outside
+the transcript, delivery to a session that is NOT running (the inbox waits; a socket does not), the restart
+instruments and the claims. **Not verified:** whether `sessionId` follows a `/clear` (it decides whether our registry
+is redundant — `#clear-blind`); two permission modes; a session with no turn yet; message size; remote sessions;
+what happens to a native message sent to a session that exits before draining it.

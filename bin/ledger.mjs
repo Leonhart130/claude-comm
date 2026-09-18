@@ -579,10 +579,28 @@ function verdictOf(cold, reboot, rebootReachable = true) {
 
 function analyse(read, windowMin) {
 	const W = windowMin * 60_000
-	const starts = read.records.filter((r) => r.event === "start")
+	const all = read.records.filter((r) => r.event === "start")
 		.map((r) => ({ ...r, t: Date.parse(r.at), kind: classify(r) }))
 		.filter((r) => Number.isFinite(r.t))
 		.sort((x, y) => x.t - y.t)
+	// 🔴 A TWIN IS NOT A SECOND TRIAL (review #11 R1). Two recorders on one root wrote every
+	// start twice, 40-60 ms apart, only one carrying the claimed note - and the twin ENDED the
+	// first one's span, so the declared restart was excluded as "cut short" and its sig=null
+	// twin scored COLD (session 214f0a0e, restart.mjs, 304 s of 1 800). Collapsed here, at
+	// read, so every record ever written is re-read under the rule (property 1): same agent,
+	// same session id, same source, within TWIN_MS - the one carrying a signal or a
+	// predecessor is kept, else the first. Counted and reported, never silent.
+	const TWIN_MS = 5_000
+	const carries = (r) => !!(r.signal || r.prev_session)
+	const starts = []
+	let twins = 0
+	for (const s of all) {
+		const i = starts.findIndex((o) => o.agent === s.agent && o.session && o.session === s.session &&
+			(o.source || null) === (s.source || null) && s.t - o.t <= TWIN_MS)
+		if (i < 0) { starts.push(s); continue }
+		twins++
+		if (carries(s) && !carries(starts[i])) starts[i] = s
+	}
 	// A session's span ends where the same agent's next session begins. Without this a
 	// reboot five minutes in would leave the previous session credited with a fifteen
 	// minute window it never had, and exposure is half of any rate.
@@ -716,7 +734,7 @@ function analyse(read, windowMin) {
 		dir: read.dir, files: read.files, window: windowMin, minArm: MIN_ARM,
 		records: read.records.length, unreadable: read.unreadable, mislabelled: read.mislabelled,
 		unreadableFiles: read.unreadableFiles, dirUnreadable: read.dirUnreadable,
-		starts: { cold: cold.length, reboot: reboot.length, other: other.length },
+		starts: { cold: cold.length, reboot: reboot.length, other: other.length, twins },
 		trials: { cold: coldT.length, reboot: rebootT.length,
 			excluded: starts.length - coldT.length - rebootT.length - other.length, defectsInExcluded: inExcluded },
 		sources: starts.reduce((m, s) => (m[s.source || "(none)"] = (m[s.source || "(none)"] || 0) + 1, m), {}),
@@ -757,6 +775,7 @@ function render(a) {
 		`  starts        cold ${a.starts.cold} · reboot ${a.starts.reboot} · other ${a.starts.other}` +
 			`   [${Object.entries(a.sources).map(([k, v]) => `${k}:${v}`).join(" ")}]`,
 		`  trials        cold ${a.trials.cold} · reboot ${a.trials.reboot}` +
+			(a.starts.twins ? `   (${a.starts.twins} duplicated start record(s) collapsed - two recorders on one root, FINDINGS.md#armer)` : ``) +
 			(a.trials.excluded ? `   (${a.trials.excluded} start(s) excluded: the window was cut short or has not elapsed` +
 				(a.trials.defectsInExcluded ? `, carrying ${a.trials.defectsInExcluded} defect(s) now in the pool` : ``) + `)` : ``),
 		`  defects       ${a.defects.attributed} attributed · ${a.defects.unattributable} unattributable` +
@@ -1293,6 +1312,28 @@ function proveRed() {
 			world(`sig-armer-${tag}`, { src: "test", age_s: 4000, ttl_s: 900, armer: a, quiet_s: q }).starts.reboot !== 0).map(([tag]) => tag)
 		check("only an armer measured GONE and quiet in time extends the clock",
 			promoted.length === 0, promoted.length ? `promoted by: ${promoted.join(", ")}` : `${cases.length} near-misses, none promoted`)
+
+		// 20f. A TWIN IS NOT A SECOND TRIAL (review #11 R1). Two recorders wrote each start
+		//      twice, 50 ms apart, one carrying the note: the twin cut the first one's span, so
+		//      the restart was excluded and its bare twin scored COLD. Both orders, because
+		//      which recorder wins was never modelled. Control: the SAME two records under two
+		//      session ids are two starts and are not merged.
+		{
+			const T = Date.UTC(2026, 0, 3)
+			const at = (ms) => new Date(T + ms).toISOString()
+			const hot = (ms, sid) => ({ v: 1, at: at(ms), event: "start", agent: "leader", session: sid, source: "startup",
+				prev_session: "p", signal: { src: "test", age_s: 10, ttl_s: 900 } })
+			const bare = (ms, sid) => ({ v: 1, at: at(ms), event: "start", agent: "leader", session: sid, source: "startup",
+				prev_session: null, signal: null })
+			const sigFirst = mkSig("twin-sig-first", [st(0, {}), st(1, {}), hot(0, "s2"), bare(50, "s2")])
+			const sigLast = mkSig("twin-sig-last", [st(0, {}), st(1, {}), bare(0, "s2"), hot(50, "s2")])
+			const two = mkSig("twin-control", [st(0, {}), st(1, {}), hot(0, "s2"), bare(50, "s3")])
+			check("a twin start record is not a second trial, whichever twin carries the note",
+				sigFirst.trials.reboot === 1 && sigFirst.starts.twins === 1 && sigLast.trials.reboot === 1 && sigLast.starts.twins === 1 &&
+				two.starts.twins === 0 && two.starts.reboot + two.starts.cold === 4,
+				`note on the 1st twin -> reboot trials ${sigFirst.trials.reboot}, twins ${sigFirst.starts.twins}; on the 2nd -> ${sigLast.trials.reboot}, ${sigLast.starts.twins}; ` +
+				`control, two session ids -> twins ${two.starts.twins}, starts ${two.starts.reboot + two.starts.cold} (want 4)`)
+		}
 
 		// 20e. THE PATH THE CLAIMERS USE — `record start --signal-armer/--signal-quiet`, which
 		//      the stub and `boot --hook` send. A value this version does not know is STORED,

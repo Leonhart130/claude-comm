@@ -52,7 +52,7 @@
  * claimed to be restarting, and the age says whether the restart plausibly followed.
  */
 
-import { existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs"
+import { existsSync, linkSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { bootId, lookup, processState, sessionPid, startTimeOf } from "./session-registry.mjs"
@@ -266,6 +266,41 @@ export function claim({ root, agent, now = Date.now(), pid = process.pid }) {
 	// successor is running, "was the armer still alive when its successor started" can no
 	// longer be asked of /proc. The ledger stores it and classify() judges it.
 	return { ok: true, signal: rec, age_s: ageOf(rec, now), armer: armerOf(rec, { now, from: pid }) }
+}
+
+/**
+ * WHICH STARTS MAY TAKE A NOTE. Only a start that IS a fresh context: `startup` (a new
+ * process) and `clear` (the self-reboot, inside one process). Review #11 R2/R7: the claimers
+ * took the note on EVERY source, so an autocompaction during the long close the armer rule
+ * was written for consumed it (`self`, measured: note gone) and a `claude --resume` of the
+ * armer's session took it and scored `reboot` with its whole old context - in both cases the
+ * real relaunch afterwards found nothing and scored COLD. One list, exported, so the stub and
+ * `boot --hook` cannot disagree about it.
+ */
+export const CLAIMING_SOURCES = ["startup", "clear"]
+export const mayClaim = (source) => CLAIMING_SOURCES.includes(String(source || "").toLowerCase())
+
+/**
+ * PUT A CLAIMED NOTE BACK, when the start that took it could not be recorded. A claim is
+ * one-shot and a record is not retried, so without this a ledger that failed to load (a
+ * half-finished install, review #11 R3) turned a declared restart into NOTHING - worse than
+ * cold. Never over a note that is already there: `link` fails if the name exists, so a newer
+ * arm always wins. Returns {ok, why}.
+ */
+export function restore({ root, agent, record }) {
+	const p = signalPath(root, agent)
+	if (!p) return { ok: false, why: "unsafe agent name" }
+	const tmp = `${p}.${process.pid}.${Date.now()}.restore`
+	try {
+		mkdirSync(dirname(p), { recursive: true })
+		writeFileSync(tmp, JSON.stringify(record) + "\n")
+		linkSync(tmp, p)
+		return { ok: true }
+	} catch (e) {
+		return { ok: false, why: e && e.code === "EEXIST" ? "a newer note is already there" : (e && e.message) || String(e) }
+	} finally {
+		try { unlinkSync(tmp) } catch {}
+	}
 }
 
 // ── CLI ────────────────────────────────────────────────────────────────────────────────

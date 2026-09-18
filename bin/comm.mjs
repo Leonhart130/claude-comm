@@ -135,6 +135,18 @@ function whoami(root, cfg, cwd = process.cwd(), declared = declaredAgent()) {
 }
 
 const inboxDir = (root, agent) => join(root, ".comm", "inbox", agent)
+// The shape `send` writes an id in. An id is READ FROM A FILE, so wherever it becomes a
+// filename or a command to paste, anything else is refused (review #11 R8).
+const ID_OK = /^[A-Za-z0-9][A-Za-z0-9-]{0,63}$/
+// AN INBOX IS NAMED BY THE ROSTER, NEVER BY A PATH (review #11 R8). `inbox`/`dismiss` joined
+// the caller's word onto .comm/inbox/, so `dismiss ../.. --force` moved package.json and
+// tsconfig.json OUT OF A PROJECT ROOT into delivered/undefined.json, the second overwriting
+// the first. Process control already follows this rule; mail reading now does too.
+const rosterAgent = (cfg, who) => {
+	if (typeof who === "string" && Object.prototype.hasOwnProperty.call((cfg && cfg.agents) || {}, who)) return who
+	throw new Error(`'${who}' is not an agent on this project's roster (.comm/config.json) - an inbox is named by the roster, never by a path.\n` +
+		`  Agents: ${Object.keys((cfg && cfg.agents) || {}).join(", ") || "(none)"}`)
+}
 
 // LOCAL time, plus the date when not today. Every bare clock time in this tool
 // is local; only `comm log`'s full ISO is UTC, and it is marked `Z`. Revert this
@@ -290,8 +302,8 @@ function staleRef(root, from, to, refPath) {
 }
 
 // ── sending ─────────────────────────────────────────────────────────────────
-function send(root, cfg, { from, to, kind, ref, note, force = false }) {
-	if (!cfg.agents[to]) {
+function send(root, cfg, { from, to, kind, ref, note, force = false, toState = null }) {
+	if (!Object.prototype.hasOwnProperty.call(cfg.agents || {}, to)) {   // `constructor` is not an agent
 		throw new Error(`unknown recipient '${to}'. Known: ${Object.keys(cfg.agents).join(", ")}`)
 	}
 	if (!KINDS[kind]) {
@@ -326,7 +338,9 @@ function send(root, cfg, { from, to, kind, ref, note, force = false }) {
 
 	const stale = force ? null : staleRef(root, from, to, refPath)
 	const id = `${new Date().toISOString().replace(/[:.]/g, "-")}-${randomBytes(3).toString("hex")}`
-	const msg = { id, from, to, kind, ref, refPath, note: sanitizeNote(note), ts: new Date().toISOString() }
+	// `to_state`: what the SENDER WAS TOLD about the recipient (review #11 R4). Mail that later
+	// strands is the sender's to act on only if the sender was told it would; boot reads this.
+	const msg = { id, from, to, kind, ref, refPath, note: sanitizeNote(note), ts: new Date().toISOString(), to_state: toState }
 
 	const dir = inboxDir(root, to)
 	mkdirSync(dir, { recursive: true })
@@ -453,7 +467,14 @@ function drain(root, agent, msgs, via = "hook", idSrc = "cli") {
 	const done = join(root, ".comm", "delivered")
 	mkdirSync(done, { recursive: true })
 	for (const m of msgs) {
-		try { renameSync(m._file, join(done, `${m.id}.json`)) } catch {}
+		// The destination never comes from bytes inside the file unless they are in the
+		// bus's own shape: `${m.id}` with a `../` in it was a rename target outside
+		// delivered/, and a file with no id at all became `undefined.json`, overwriting the
+		// previous one (review #11 R8). Never over an existing file: move, never delete.
+		const base = typeof m.id === "string" && ID_OK.test(m.id) ? m.id : basename(m._file, ".json").replace(/[^A-Za-z0-9._-]/g, "_")
+		let dest = join(done, `${base}.json`)
+		for (let k = 1; existsSync(dest) && k < 1000; k++) dest = join(done, `${base}.${k}.json`)
+		try { renameSync(m._file, dest) } catch {}
 	}
 	try {
 		appendFileSync(
@@ -640,8 +661,9 @@ function dispatch(root, cfg, me, cmd, rest) {
 			const from = me === cfg.leader ? (claimed || cfg.leader) : me
 			if (!from) throw new Error(`cannot tell which agent you are: cwd is not inside a known agent directory`)
 
-			const m = send(root, cfg, { from, to, kind: arg(rest, "kind", from === cfg.leader ? "nudge" : "done"), ref: arg(rest, "ref"), note: arg(rest, "note"), force: rest.includes("--force") })
 			const live = liveAgents(root, cfg)[to]
+			const m = send(root, cfg, { from, to, kind: arg(rest, "kind", from === cfg.leader ? "nudge" : "done"), ref: arg(rest, "ref"), note: arg(rest, "note"), force: rest.includes("--force"),
+				toState: live?.length ? "running" : "not-running" })
 			console.log(`✓ ${m.from} → ${m.to}  [${m.kind}]  they will read: ${refForRecipient(root, cfg, m)}`)
 			// The SILENT case, and the reason the refusal alone was not enough: type
 			// `LEAD.md` with a LEAD.md at the root and another in the spoke, and the send
@@ -664,7 +686,7 @@ function dispatch(root, cfg, me, cmd, rest) {
 			break
 		}
 		case "inbox": {
-			const who = firstPositional(rest) || me
+			const who = rosterAgent(cfg, firstPositional(rest) || me)
 			const { msgs, quarantined } = pending(root, who)
 			if (quarantined) console.log(`⚠ ${quarantined} unreadable file(s) moved to .comm/corrupt/`)
 			if (!msgs.length) { console.log(`inbox '${who}': empty`); break }
@@ -682,7 +704,6 @@ function dispatch(root, cfg, me, cmd, rest) {
 			// printed as a command only in the shape the bus writes it: it comes from a file,
 			// and a line meant to be pasted into a shell must not carry a forged `; rm -rf`.
 			const force = who === me ? "" : " --force"
-			const ID_OK = /^[A-Za-z0-9][A-Za-z0-9-]{0,63}$/
 			for (const m of msgs) {
 				console.log(`  ${m.ts}  from ${m.from}  [${m.kind}]  ref: ${safeRef(refForRecipient(root, cfg, m))}${m.note ? `  — ${sanitizeNote(m.note)}` : ""}`)
 				console.log(typeof m.id === "string" && ID_OK.test(m.id)
@@ -754,7 +775,7 @@ function dispatch(root, cfg, me, cmd, rest) {
 		// the only copy until delivery, so dismissal moves-and-logs like a real
 		// delivery instead of unlinking.
 		case "dismiss": {
-			const who = firstPositional(rest) || me
+			const who = rosterAgent(cfg, firstPositional(rest) || me)
 			const id = arg(rest, "id")
 			// `send` enforces identity ("--from is not yours to set") while dismiss,
 			// the DESTRUCTIVE path, took any agent name. An expert could clear the

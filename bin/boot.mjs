@@ -89,7 +89,9 @@ for (let i = 0; i < ARGV.length; i++) {
 // above, reached through the operator instead of the row. So a row that KNOWS its causes
 // declares them as codes where it computes them (`row(..., causes)`), and the close counts
 // those; the per-row knowledge lives in the row, not in this mechanism. A row that declares
-// nothing still falls back to this hash. `FINDINGS.md#armer`.
+// nothing is keyed on its own level (review #11 R5a), never on the words. This hash survives
+// only to shorten a long code - `drift:` over twelve files - and it hashes the DATA, never the
+// operator's reason. `FINDINGS.md#armer`, `#peer-state`.
 const causeSig = (why) => {
 	const flat = String(why ?? "").toLowerCase().replace(/\s+/g, " ").trim()
 	let h = 5381
@@ -153,6 +155,19 @@ const noteWords = (n) => {
 		? (n.quiet_s === null || n.quiet_s === undefined ? "its armer exited and its last activity could not be measured" : `its armer exited ${age(n.quiet_s * 1000)} ago with no relaunch`)
 		: "judged on the clock alone - the note names no session"
 	return `⚠ the restart note for ${n.agent} has LAPSED (${old}, ${promise}; ${why}) - its next start scores COLD`
+}
+/**
+ * Does THIS root's own settings wire the bus's stub to SessionStart? Then the stub is this
+ * root's recorder and `--hook` must not be a second one (review #11 R1). Read from the file
+ * the hooks actually come from, never inferred from `.comm/` existing: a root can carry the
+ * bus without running its hook.
+ */
+function stubRecordsHere() {
+	try {
+		const st = JSON.parse(readFileSync(join(ROOT, ".claude", "settings.json"), "utf8"))
+		return ((st && st.hooks && st.hooks.SessionStart) || []).some((g) => ((g && g.hooks) || [])
+			.some((h) => h && typeof h.command === "string" && /comm-hook\.mjs["']?\s+session-start/.test(h.command)))
+	} catch { return false }
 }
 const sha = (p) => { try { return createHash("sha256").update(readFileSync(p)).digest("hex").slice(0, 12) } catch { return null } }
 const git = (...a) => {
@@ -421,6 +436,14 @@ if (has("--hook")) {
 		wrote = { ok: false, sid: null, why: "the hook payload was empty or unparseable" }
 	} else if (has("--hook") && !(payload.source && sessionAgent)) {
 		wrote = { ok: false, sid: null, why: !payload.source ? "the hook payload carried no `source`" : "no agent could be resolved for this session" }
+	} else if (has("--hook") && payload && payload.source && sessionAgent && stubRecordsHere()) {
+		// 🔴 ONE RECORDER PER ROOT (review #11 R1). Since this repo went on its own bus (09-10)
+		// `.claude/settings.json` runs this hook AND the bus's `comm-hook.mjs session-start`, and
+		// both claimed the note and both wrote a start: 12 records for 6 sessions, the signal on
+		// the earlier twin, whose window then ended 50 ms later at the other - so the ledger
+		// excluded the reboot and kept its cold twin. The declared restart 214f0a0e scored COLD.
+		// The bus's stub is the recorder every field tree runs, so it is the one kept here too.
+		wrote = { deferred: true, ok: true, sid: null }
 	} else if (has("--hook") && payload && payload.source && sessionAgent) {
 		// The session id comes from the transcript path, not from a payload field: `Stop`
 		// is documented to carry `session_id` and SessionStart was only ever OBSERVED to
@@ -436,11 +459,16 @@ if (has("--hook")) {
 		// own ▶ NEXT told the next session to arm one and restart, which could not have
 		// worked. Reporting half shipped where the acting half did not exist.
 		let sig = []
+		let rsMod = null, taken = null
 		try {
 			const rs = join(ROOT, "bin", "restart-signal.mjs")
 			if (existsSync(rs)) {
 				const m = await import(pathToFileURL(rs).href)
-				const c = m.claim({ root: ROOT, agent: sessionAgent })
+				rsMod = m
+				// Only a fresh context takes the note (review #11 R2/R7) - one list, the module's.
+				const c = typeof m.mayClaim !== "function" || m.mayClaim(payload.source)
+					? m.claim({ root: ROOT, agent: sessionAgent }) : { ok: true, signal: null }
+				if (c.ok && c.signal) taken = c.signal
 				// 🔴 THE ONLY TWO LINES THIS FILE WROTE TO STDERR WERE THE TWO IT MUTED. Both live
 				// under `--hook`, and `--hook` is invoked by this repo's own SessionStart as
 				// `... --hook 2>/dev/null || true` (review #7 F9). So: a note consumed - renamed,
@@ -472,6 +500,11 @@ if (has("--hook")) {
 		const r = node(["record", "start", "--agent", sessionAgent, "--source", payload.source,
 			...(sid ? ["--session", sid] : []), "--quiet", "--pending-auto", ...sig])
 		wrote = { ok: !!r && r.status === 0, sid, why: r ? (r.stderr || "").trim().split("\n")[0] : "spawn failed" }
+		// A start that could not be recorded must not also have eaten the note (review #11 R3).
+		if (!wrote.ok && taken && rsMod && typeof rsMod.restore === "function") {
+			const back = rsMod.restore({ root: ROOT, agent: sessionAgent, record: taken })
+			signalTrouble = `⚠ A RESTART SIGNAL WAS CLAIMED AND NOT RECORDED - ${back.ok ? "the note was PUT BACK for the next start" : `it is LOST (${back.why})`}`
+		}
 	}
 	const q = node(["--json"])
 	let a = null
@@ -534,12 +567,13 @@ if (has("--hook")) {
 		const why = [
 			(a.unreadable || (a.unreadableFiles && a.unreadableFiles.length) || a.dirUnreadable) && "log-unreadable",
 			a.mislabelled && "mislabelled", a.exposureSkew && "exposure-skew",
-			((a.armed && a.armed.notes) || []).some((n) => !n.fresh) && "note-lapsed",
+			((a.armed && a.armed.notes) || []).some((n) => !n.fresh) && `note-lapsed:${((a.armed && a.armed.notes) || []).filter((n) => !n.fresh).map((n) => n.agent).sort().join(",")}`,
 			(a.armed && a.armed.unreadable) && "note-unreadable", signalTrouble && "signal-trouble",
 		].filter(Boolean)
+		if (wrote && wrote.deferred) bits.push("this start is recorded by the bus's own hook (.claude/comm-hook.mjs), which runs after this one - boot does not record it twice")
 		if (wrote && !wrote.ok) row("ledger", WARN, `THIS START WAS NOT RECORDED (${wrote.why || "no reason given"}) - ${bits.join(" - ")}`, ["not-recorded", ...why])
-		else if (wrote && seen !== "confirmed") row("ledger", WARN, `THE WRITE WAS NOT SEEN BY THE RE-READ (${seen}) - ${bits.join(" - ")}`, ["write-unseen", ...why])
-		else row("ledger", bad ? WARN : OK, bits.join(" - ") + (wrote ? " - this start recorded and re-read" : ""), why)
+		else if (wrote && !wrote.deferred && seen !== "confirmed") row("ledger", WARN, `THE WRITE WAS NOT SEEN BY THE RE-READ (${seen}) - ${bits.join(" - ")}`, ["write-unseen", ...why])
+		else row("ledger", bad ? WARN : OK, bits.join(" - ") + (wrote && !wrote.deferred ? " - this start recorded and re-read" : ""), why)
 	}
 }
 
@@ -602,12 +636,12 @@ function askBus(sessionPidForCwd) {
 	const where = registryDir()
 	if (has("--hook")) {
 		if (!wrote.ok) {
-			row("registry", WARN, `THIS SESSION WAS NOT RECORDED (${wrote.why}) - bin/context.mjs will REFUSE for it`)
+			row("registry", WARN, `THIS SESSION WAS NOT RECORDED (${wrote.why}) - bin/context.mjs will REFUSE for it`, ["not-recorded"])
 		} else if (!back.ok || back.transcript !== wrote.transcript) {
 			// The re-read is the whole point: a write nobody read back is a claim.
-			row("registry", WARN, `THE WRITE WAS NOT SEEN BY THE RE-READ (${back.ok ? `it names ${basename(back.transcript)}` : back.why})`)
+			row("registry", WARN, `THE WRITE WAS NOT SEEN BY THE RE-READ (${back.ok ? `it names ${basename(back.transcript)}` : back.why})`, ["write-unseen"])
 		} else if (!existsSync(back.transcript) && !justPromised(back)) {
-			row("registry", WARN, `recorded ${basename(back.transcript)} for pid ${thisPid}, and that file does not exist`)
+			row("registry", WARN, `recorded ${basename(back.transcript)} for pid ${thisPid}, and that file does not exist`, ["transcript-missing"])
 		} else if (!existsSync(back.transcript)) {
 			row("registry", OK, `pid ${thisPid} -> ${basename(back.transcript)} (${back.source || "no source"}) - written and re-read - ${where}`)
 		} else {
@@ -624,20 +658,47 @@ function askBus(sessionPidForCwd) {
 		// green: a green row over a dead sensor, which is the one shape this project keeps
 		// paying for. If the row is going to speak for the reader, it reads what the reader
 		// reads.
-		row("registry", WARN, `pid ${thisPid} -> ${basename(back.transcript)}, and that file is GONE - bin/context.mjs will REFUSE`)
+		row("registry", WARN, `pid ${thisPid} -> ${basename(back.transcript)}, and that file is GONE - bin/context.mjs will REFUSE`, ["transcript-gone"])
 	} else if (back.ok) {
 		row("registry", OK, `pid ${thisPid} -> ${basename(back.transcript)} (${back.source || "no source"}) - bin/context.mjs can resolve this session`)
 	} else {
 		// Truthful and self-healing: the next SessionStart in this process records it.
 		// Until then `bin/context.mjs` refuses for this session, which is the point.
-		row("registry", WARN, `${back.why} - bin/context.mjs will REFUSE for this session (--transcript still answers)`)
+		row("registry", WARN, `${back.why} - bin/context.mjs will REFUSE for this session (--transcript still answers)`, ["unresolved"])
+	}
+}
+
+// -- 1c. this tree's own resource claims ---------------------------------------
+// Review #11 R4: `#peer-state` said "this repo's own claims still gate" and NO row read them -
+// the `field:` loop, the only reader of claims, excludes ROOT by design. A guard in the prose
+// that does not exist in the code (LESSONS form A, the author exempt). Silent when there is
+// nothing to read, like the field's own claim check: one directory listing per boot.
+{
+	let files = []
+	try { files = readdirSync(join(ROOT, ".comm", "claims")).filter((f) => f.endsWith(".json")) }
+	catch (e) { if (e && e.code !== "ENOENT") files = null }
+	if (files === null) row("claims", WARN, `${join(ROOT, ".comm", "claims")} could not be read - a claim may be there`, ["unreadable"])
+	else if (files.length) {
+		let cl = null
+		try {
+			const r = spawnSync(process.execPath, [join(ROOT, "bin", "claim.mjs"), "list", "--json", "--root", ROOT], { encoding: "utf8", timeout: 5000 })
+			cl = JSON.parse(r.stdout).claims || []
+		} catch {}
+		if (!cl) row("claims", WARN, `${files.length} claim file(s) here and bin/claim.mjs could not be asked about them`, ["unasked"])
+		else {
+			const bad = cl.filter((c) => c.state !== "held")
+			row("claims", bad.length ? WARN : OK, [
+				...bad.map((c) => `⚠ CLAIM ${c.resource}: ${c.note || c.state}`),
+				...(cl.length - bad.length ? [`${cl.length - bad.length} held: ${cl.filter((c) => c.state === "held").map((c) => c.resource).join(", ")}`] : []),
+			].join(" - "), bad.map((c) => `${c.resource}=${c.state}`))
+		}
 	}
 }
 
 // -- 2. the tree: what git says, not what a document says --------------------
 {
 	const head = git("log", "-1", "--format=%h %ct %s")
-	if (!head) row("tree", WARN, "not a git repository")
+	if (!head) row("tree", WARN, "not a git repository", ["no-git"])
 	else {
 		const [h, ct, ...rest] = head.split(" ")
 		const dirty = (git("status", "--porcelain") || "").split("\n").filter(Boolean).length
@@ -646,7 +707,8 @@ function askBus(sessionPidForCwd) {
 		const bits = [`${h} ${age(Date.now() - Number(ct) * 1000)} ago`, dirty ? `${dirty} uncommitted` : "clean"]
 		if (ahead > 0) bits.push(`${ahead} unpushed`)
 		else if (ahead < 0) bits.push("no upstream")
-		row("tree", dirty || ahead !== 0 ? WARN : OK, `${bits.join(" - ")} - "${rest.join(" ").slice(0, 44)}"`)
+		row("tree", dirty || ahead !== 0 ? WARN : OK, `${bits.join(" - ")} - "${rest.join(" ").slice(0, 44)}"`,
+			[dirty && "uncommitted", ahead > 0 && "unpushed", ahead < 0 && "no-upstream"].filter(Boolean))
 	}
 }
 
@@ -936,6 +998,7 @@ function askBus(sessionPidForCwd) {
 		// the row answered the second one from a different source than the first (review #7 F3).
 		const perDir = new Map()
 		const ibx = join(p, ".comm", "inbox")
+		const unannounced = new Map()
 		try {
 			for (const a of readdirSync(ibx)) {
 				let files = []
@@ -944,6 +1007,12 @@ function askBus(sessionPidForCwd) {
 					if (!f.endsWith(".json")) continue
 					pending++
 					perDir.set(a, (perDir.get(a) || 0) + 1)
+					// Was its sender told the recipient was NOT running? Only then is a stranded
+					// message the sender's own knowledge (review #11 R4); unstamped mail (sent
+					// before 2026-09-18) and mail sent to a live recipient count as unannounced.
+					let told = false
+					try { told = JSON.parse(readFileSync(join(ibx, a, f), "utf8")).to_state === "not-running" } catch {}
+					if (!told) unannounced.set(a, (unannounced.get(a) || 0) + 1)
 					const mt = statSync(join(ibx, a, f)).mtimeMs
 					if (!oldest || mt < oldest) oldest = mt
 				}
@@ -1007,7 +1076,7 @@ function askBus(sessionPidForCwd) {
 		// this project has now shipped three times. One spawn per field project per boot,
 		// which is what the condition is worth: it is silent, it is live, and the sender gets
 		// a success either way.
-		let shared = [], stranded = [], unaddressable = [], busAnswered = false
+		let shared = [], stranded = [], strandedNames = [], unaddressable = [], busAnswered = false
 		try {
 			const w = spawnSync("node", [join(p, ".comm", "bin", "comm.mjs"), "who", "--json"],
 				{ cwd: p, encoding: "utf8", timeout: 5000 })
@@ -1036,8 +1105,9 @@ function askBus(sessionPidForCwd) {
 			// the half worth a warning, and it is the half the old row buried by warning about
 			// both. Split with the answer the bus already gave for the shared-inbox check above;
 			// no second spawn, and no second definition of "running".
-			stranded = Object.entries(ag).filter(([, v]) => (v && v.pending) > 0 && !((v && v.pids) || []).length)
-				.map(([name, v]) => `${name} (${v.pending})`)
+			const strandedE = Object.entries(ag).filter(([, v]) => (v && v.pending) > 0 && !((v && v.pids) || []).length)
+			stranded = strandedE.map(([name, v]) => `${name} (${v.pending})`)
+			strandedNames = strandedE.map(([name]) => name)
 		} catch { /* the bus not answering is already the DRIFT/STALE half of this row */ }
 		let claims = [], claimDirBad = false
 		let claimFiles = []
@@ -1065,7 +1135,12 @@ function askBus(sessionPidForCwd) {
 		// notes that could not be read. This loop never includes ROOT, so this repo's own state
 		// is untouched by the amendment.
 		const notesBad = notes.some((n) => n.unread)
-		const claimsBad = claimDirBad || claims.some((c) => c.state !== "held" && c.state !== "gone")
+		// 🔴 CORRECTED the same day by review #11 R4: gone-holder claims were demoted too, on the
+		// ack "only that leader can release them" - FALSE: `claim release` refuses a LIVE holder,
+		// never a gone one, and one of work's two claims was debris from THIS repo's measurement.
+		// They gate again. Only stranded mail whose sender WAS told stays shown-not-gated.
+		const claimsBad = claimDirBad || claims.some((c) => c.state !== "held")
+		const unannouncedStranded = strandedNames.filter((n) => (unannounced.get(n) || 0) > 0).map((n) => `${unannounced.get(n)} for ${n}`)
 		const bits = [
 			// An unparsed non-zero exit must not borrow the confident wording of a parsed one:
 			// it means the installer refused for a reason this row has not read.
@@ -1077,7 +1152,8 @@ function askBus(sessionPidForCwd) {
 				: `bus current (${installed.length} files)`,
 			!pending ? "0 pending"
 				: unaddressable.length ? `⚠ ${unaddressable.join(", ")} has mail and IS ON NO ROSTER - nothing will ever deliver it: the bus does not know the name (oldest ${age(Date.now() - oldest)})`
-				: stranded.length ? `◦ ${stranded.join(", ")} has mail and is not running - its sender was told so; it lands at the relaunch (oldest ${age(Date.now() - oldest)})`
+				: stranded.length && unannouncedStranded.length ? `⚠ ${stranded.join(", ")} has mail and is NOT RUNNING, and ${unannouncedStranded.join(", ")} was sent while it ran or before sends were stamped - nobody was told it would wait for a relaunch (oldest ${age(Date.now() - oldest)})`
+				: stranded.length ? `◦ ${stranded.join(", ")} has mail and is not running - its sender was told so at send; it lands at the relaunch (oldest ${age(Date.now() - oldest)})`
 				: busAnswered ? `${pending} pending, in flight to a running agent (oldest ${age(Date.now() - oldest)})`
 				: `${pending} pending (oldest ${age(Date.now() - oldest)}) - the bus could not be asked who is running`,
 			last ? `last delivery ${age(Date.now() - Date.parse(last))} ago` : "no delivery logged",
@@ -1094,7 +1170,7 @@ function askBus(sessionPidForCwd) {
 			// on stderr as it was written — was announced at every session start as a crash
 			// (F14). `note` comes from claim.mjs's one renderer; there is no second wording here.
 			...claims.filter((c) => c.state !== "held" && c.note)
-				.map((c) => `${c.state === "gone" ? "◦" : "⚠"} CLAIM ${c.resource}: ${c.note}`),
+				.map((c) => `⚠ CLAIM ${c.resource}: ${c.note}`),
 			...(claims.some((c) => c.state === "held")
 				? [`${claims.filter((c) => c.state === "held").length} resource(s) claimed: ${claims.filter((c) => c.state === "held").map((c) => c.resource).join(", ")}`] : []),
 			...notes.map((n) => n.unread === "dir" ? `⚠ ${noteFiles.length} restart note(s) are here and ${join(p, ".comm", "restart")} could not be read`
@@ -1104,10 +1180,19 @@ function askBus(sessionPidForCwd) {
 		// `pending` no longer reddens on its own (2026-09-05), nor mail for a stopped agent
 		// (2026-09-18): what reddens is mail NOTHING can deliver, or a bus that could not be
 		// asked and so cannot tell the cases apart.
-		const mailStuck = pending > 0 && (unaddressable.length > 0 || !busAnswered)
-		const causes = [drift && "drift", busStale === true && "bus-stale", busStale === null && "bus-uncompared",
-			pending > 0 && unaddressable.length > 0 && "unaddressable", pending > 0 && !busAnswered && "bus-unasked",
-			shared.length > 0 && "shared-inbox", claimsBad && "claim-bad", notesBad && "note-unreadable"].filter(Boolean)
+		const mailStuck = pending > 0 && (unaddressable.length > 0 || !busAnswered || unannouncedStranded.length > 0)
+		// WHAT each cause is about, not only its kind (review #11 R5b): `drift` over envoi's
+		// missing hooks and `drift` over a stale web hook are two problems, and one code for both
+		// would demand an amendment for a row that was right three times. A long list is
+		// shortened to a hash of the list - of the DATA, never of the ack's words.
+		const about = (xs) => { const l = [...xs].sort().join(","); return l.length > 60 ? `${xs.length}#${causeSig(l)}` : l }
+		const causes = [drift && `drift:${drifted.length ? about(drifted) : "refused"}`,
+			busStale === true && `bus-stale:${installed.length ? about(staleFiles) : "empty"}`, busStale === null && "bus-uncompared",
+			pending > 0 && unaddressable.length > 0 && `unaddressable:${about(unaddressable)}`, pending > 0 && !busAnswered && "bus-unasked",
+			unannouncedStranded.length > 0 && `stranded-untold:${about(strandedNames.filter((n) => (unannounced.get(n) || 0) > 0))}`,
+			shared.length > 0 && `shared-inbox:${about(shared)}`,
+			claimsBad && `claim:${claimDirBad ? "unreadable" : about(claims.filter((c) => c.state !== "held").map((c) => `${c.resource}=${c.state}`))}`,
+			notesBad && "note-unreadable"].filter(Boolean)
 		row(`field:${name}`, drift || busStale !== false ? RED : mailStuck || claimsBad || shared.length > 0 || notesBad ? WARN : OK,
 			bits.join(" - "), causes)
 	}
@@ -1294,11 +1379,11 @@ function askBus(sessionPidForCwd) {
 		} else if (open.length) {
 			row(`channel:${peer}`, WARN,
 				`UNANSWERED - ${open[0].name} arrived ${age(Date.now() - open[0].at)} ago` +
-				(open.length > 1 ? ` (+${open.length - 1} more unnamed by any reply)` : ""), ["unanswered"])
+				(open.length > 1 ? ` (+${open.length - 1} more unnamed by any reply)` : ""), [`unanswered:${open[0].name}`])
 		} else if (legacyWaiting) {
 			row(`channel:${peer}`, WARN, `UNANSWERED - ${legacyOpen[0].name} arrived ` +
 				`${age(Date.now() - legacyOpen[0].at)} ago${dated}` +
-				(legacyOpen.length > 1 ? ` (+${legacyOpen.length - 1} more on the old rule)` : ""), ["unanswered"])
+				(legacyOpen.length > 1 ? ` (+${legacyOpen.length - 1} more on the old rule)` : ""), [`unanswered:${legacyOpen[0].name}`])
 		} else {
 			// NAMED BY DATE, not by mtime. The green branch printed `inb.name` - newest by
 			// mtime - so a restore made the row name the wrong letter while the verdict was
@@ -1588,8 +1673,10 @@ if (CLOSE) {
 				const why = ACKS.get(r.label)
 				if (why === undefined) continue
 				causes[r.label] = causes[r.label] || {}
-				// Every cause the row declared was waved past by this ack, whatever it says.
-				for (const sig of r.causes && r.causes.length ? r.causes : [causeSig(why)]) {
+				// Every cause the row declared was waved past by this ack, whatever it says. A row
+				// that declares none is keyed on ITSELF - its level - never on the operator's
+				// words (review #11 R5a: the hash fallback left every uncoded row evadable).
+				for (const sig of r.causes && r.causes.length ? r.causes : [["ok", "unknown", "warn", "red"][r.level] || "open"]) {
 					const prev = causes[r.label][sig] || { n: 0, why }
 					causes[r.label][sig] = { n: prev.n + 1, why }
 				}
@@ -1970,20 +2057,22 @@ function proveRed() {
 			() => { for (const k of kids) { try { k.kill("SIGKILL") } catch {} } kids = [] })
 	}
 
-	// 🔴 RE-POINTED 2026-09-18 by the amendment it arms (`FINDINGS.md#peer-state`): mail for a
-	// PEER's stopped agent is printed and no longer gates - `send` told its sender, and 6
-	// acknowledgements said only their leader relaunches. This arm used to demand WARN. It
-	// now demands the row SAY it, at ok: an amendment that silenced the text would be the
-	// dropped-state defect, not this one. The row still gates mail NOTHING can deliver -
-	// "mail addressed to nobody on the roster" below is that half, and this one's control.
+	// 🔴 AMENDED 2026-09-18 and CORRECTED by review #11 R4 (`FINDINGS.md#peer-state`). Mail for a
+	// PEER's stopped agent is shown, not gated, ONLY when its sender was told at send that the
+	// recipient was not running (`to_state`). Mail sent to a live recipient that then went
+	// away - an idle agent never reaches its turn end - strands with the sender told the
+	// OPPOSITE, and that is the bus's failure: it still gates. ONE VARIABLE: the stamp.
 	const msg = join(proj, ".comm", "inbox", "app", "0001-x.json")
 	{
-		writeFileSync(msg, JSON.stringify({ id: "0001-x", to: "app" }))
-		const r = rowOf(run(true), "field:proj")
+		writeFileSync(msg, JSON.stringify({ id: "0001-x", to: "app", to_state: "not-running" }))
+		const told = rowOf(run(true), "field:proj")
+		writeFileSync(msg, JSON.stringify({ id: "0001-x", to: "app", to_state: "running" }))
+		const untold = rowOf(run(true), "field:proj")
 		rmSync(msg, { force: true })
-		assert("field: mail for a PEER's stopped agent is shown, not gated",
-			r.level === OK && /app \(1\) has mail and is not running/.test(r.text),
-			`one message, recipient not running -> ${LV[r.level]} (want ok); says so=${/has mail and is not running/.test(r.text)}`)
+		assert("field: stranded mail gates unless its sender was told the recipient was down",
+			told.level === OK && /app \(1\) has mail and is not running - its sender was told/.test(told.text) &&
+			untold.level === WARN && /nobody was told/.test(untold.text),
+			`stamped not-running -> ${LV[told.level]} (want ok, shown); stamped running (the sender was told "delivered when its turn ends") -> ${LV[untold.level]} (want warn)`)
 	}
 
 	// THE OTHER DIRECTION, and it is the amendment's whole point. This row used to redden on
@@ -2004,20 +2093,17 @@ function proveRed() {
 		writeFileSync(msg, JSON.stringify({ id: "0001-x", to: "app" }))
 		kid = spawn(fakeD, ["-c", "sleep 30; :"], { cwd: join(proj, "app"), stdio: "ignore" })
 		settle()
-		const withLive = rowOf(run(true), "field:proj")
+		const withLive = level(run(true), "field:proj")
 		try { kid.kill("SIGKILL") } catch {}
-		// The recipient is gone again: the SAME pending message must now be reported as waiting
-		// for a relaunch, which proves the reading above came from the session and not from the
-		// row going quiet. Since 2026-09-18 both are ok (the amendment above), so the variable
-		// is what the row SAYS; its level is asserted ok in both.
+		// The recipient is gone again: the SAME pending message (unstamped, so nobody was told it
+		// would wait) must now redden, which proves the green above came from the session and
+		// not from the row going quiet.
 		const t0 = Date.now(); while (Date.now() - t0 < 2000) { if (!existsSync(`/proc/${kid.pid}`)) break }
-		const withoutLive = rowOf(run(true), "field:proj")
+		const withoutLive = level(run(true), "field:proj")
 		rmSync(msg, { force: true })
 		assert("field: mail in flight to a RUNNING agent does not redden the row",
-			withLive.level === OK && /in flight to a running agent/.test(withLive.text) &&
-			withoutLive.level === OK && /has mail and is not running/.test(withoutLive.text),
-			`same message, recipient live -> ${LV[withLive.level]} "in flight"=${/in flight/.test(withLive.text)}; ` +
-			`recipient gone -> ${LV[withoutLive.level]} "not running"=${/is not running/.test(withoutLive.text)}`)
+			withLive === OK && withoutLive === WARN,
+			`same message, recipient live -> ${LV[withLive]} (must stay ok); recipient gone -> ${LV[withoutLive]} (must warn)`)
 	}
 
 	const scratch = join(pkg, "uncommitted.txt")
@@ -2300,6 +2386,24 @@ function proveRed() {
 			`armer alive -> ${LV[peer.running.level]} "still running"=${/still running/.test(peer.running.text)}; ` +
 			`start tick moved -> ${LV[peer.gone.level]} "LAPSED"=${/LAPSED/.test(peer.gone.text)}`)
 	}
+	// THIS TREE'S OWN CLAIMS (review #11 R4: the prose said they gated and no row read them).
+	// One variable: whether the holder (pid, start, boot) is alive. This process holds the live one.
+	{
+		const cdir = join(pkg, ".comm", "claims")
+		mkdirSync(cdir, { recursive: true })
+		const claimRec = (start) => JSON.stringify({ v: 1, at: new Date().toISOString(), resource: "port:4999", by: "leader",
+			pid: process.pid, start, boot: bootId(), holder: "session", purpose: "prove-red" }) + "\n"
+		writeFileSync(join(cdir, "port:4999.json"), claimRec(startTimeOf(process.pid)))
+		const held = rowOf(run(true), "claims")
+		writeFileSync(join(cdir, "port:4999.json"), claimRec(startTimeOf(process.pid) + 1))
+		const gone = rowOf(run(true), "claims")
+		rmSync(cdir, { recursive: true, force: true })
+		const none = rowOf(run(true), "claims")
+		assert("claims: this tree's own gone-holder claim gates; a held one does not",
+			held.level === OK && /1 held: port:4999/.test(held.text) && gone.level === WARN && /HOLDER IS GONE/.test(gone.text) && none.level === -1,
+			`holder alive -> ${LV[held.level]}; start tick moved -> ${LV[gone.level]} (want ok, then warn); no claims at all -> ${LV[none.level]} (want absent)`)
+	}
+
 
 	const busFile = join(pkg, "bin", "comm.mjs")
 	const stamp = statSync(busFile)
@@ -2545,10 +2649,44 @@ function proveRed() {
 		const consumedHere = !existsSync(noteHere)
 		assert("F2 a note armed in THIS repo crosses into THIS repo's ledger",
 			armedHere && consumedHere && crossedHere && crossedHere.prev_session === "PREV-BOOT-HOOK" &&
-			crossedHere.signal && crossedHere.signal.src === "prove-red",
+			crossedHere.signal && crossedHere.signal.src === "prove-red" && typeof crossedHere.signal.armer === "string",
 			`note armed=${armedHere}; boot --hook -> prev_session=${crossedHere && crossedHere.prev_session}, ` +
 			`signal=${crossedHere && JSON.stringify(crossedHere.signal)}; note consumed=${consumedHere} ` +
 			`(the two asserts above fire the same hook with nothing armed: that is this arm's control)`)
+		}
+
+		// ── review #11 R2/R7 and R1, on THIS repo's recorder ───────────────────────────────
+		// (1) A compaction takes no note: the same hook, the same note, ONE VARIABLE - the source.
+		//     F2 above is the control: `startup` takes it.
+		// (2) ONE RECORDER PER ROOT: once this root's settings wire the bus's stub, `--hook`
+		//     records nothing and takes nothing - the stub does both. Control: F2, no settings.
+		if (handoffLogs.length === 1) {
+			const hookAgent = handoffLogs[0].replace(/\.log$/, "")
+			const rsHere = join(pkg, "bin", "restart-signal.mjs")
+			const noteHere = join(pkg, ".comm", "restart", `${hookAgent}.json`)
+			const logPath = join(pkg, ".comm", "handoff", handoffLogs[0])
+			const lines = () => { try { return readFileSync(logPath, "utf8").trim().split("\n").length } catch { return 0 } }
+			const fire = (source, sid) => spawnSync(process.execPath, [SELFFILE, "--json", "--fast", "--hook", "--root", pkg, "--field", tmp],
+				{ encoding: "utf8", input: JSON.stringify({ source, transcript_path: `/x/${sid}.jsonl` }) })
+			spawnSync(process.execPath, [rsHere, "arm", "--agent", hookAgent, "--root", pkg, "--quiet", "--prev-session", "PREV-R2", "--by", "prove-red"], { encoding: "utf8" })
+			fire("compact", "88888888-8888-8888-8888-888888888888")
+			const keptOnCompact = existsSync(noteHere)
+			const settingsDir = join(pkg, ".claude"), settings = join(settingsDir, "settings.json")
+			mkdirSync(settingsDir, { recursive: true })
+			writeFileSync(settings, JSON.stringify({ hooks: { SessionStart: [{ hooks: [{ type: "command",
+				command: `node "$CLAUDE_PROJECT_DIR/.claude/comm-hook.mjs" session-start` }] }] } }))
+			const before = lines()
+			const deferred = fire("startup", "99999999-9999-9999-9999-999999999999")
+			const after = lines(), keptOnDefer = existsSync(noteHere)
+			let lr = null
+			try { lr = JSON.parse(deferred.stdout).rows.find((r) => r.label === "ledger") } catch {}
+			rmSync(settingsDir, { recursive: true, force: true }); rmSync(noteHere, { force: true })
+			assert("R2 a compaction takes no restart note (F2's startup, which does, is the control)", keptOnCompact,
+				`note armed, --hook with source "compact" -> note still there=${keptOnCompact}`)
+			assert("R1 one recorder per root: with the stub wired here, --hook records and takes nothing",
+				after === before && keptOnDefer && !!lr && /recorded by the bus's own hook/.test(lr.text),
+				`settings wire comm-hook.mjs session-start -> ${after - before} record(s) written by --hook (want 0), note left for the stub=${keptOnDefer}, ` +
+				`the row says who records=${!!lr && /bus's own hook/.test(lr.text)} (F2, with no settings, records: the control)`)
 		}
 
 		// ---- review #4 R3: the FAILING direction of this row, which was never armed ----
@@ -2927,8 +3065,10 @@ function proveRed() {
 			// `--amended` cleared both - so the instrument stopped demanding an amendment for
 			// a cause nobody had addressed. FINDINGS.md#ack-amendment.
 			//
-			// ONE VARIABLE: the ack's own REASON. Same row, same close machinery, two
-			// different sentences. The third assertion is the one the previous code fails.
+			// ONE VARIABLE: the row's CAUSE. Since review #11 R5 the ack's words key nothing, so
+			// the two causes are two real states of `tree`: work uncommitted (A), then the same
+			// work committed and never pushed (B). The third assertion is the one a count keyed
+			// by row fails.
 			{
 				const st0 = stateOf(); st0.ackCounts = {}; st0.ackCauses = {}
 				writeFileSync(join(pkg, ".boot-state.json"), JSON.stringify(st0, null, 2) + "\n")
@@ -2946,8 +3086,9 @@ function proveRed() {
 				for (let i = 0; i < 3; i++) { touchStatus(); closeRun2(reasonA) }
 				const causesA = (stateOf().ackCauses || {}).tree || {}
 				const sigA = Object.keys(causesA)[0]
-				// A SECOND, DIFFERENT reason on the SAME row.
-                                touchStatus()
+				// A SECOND, DIFFERENT CAUSE on the SAME row: the work committed, never pushed.
+				g("add", "-A"); g("commit", "-qm", "cause B: committed, not pushed")
+				touchStatus()
 				closeRun2(ackWith("cause B: something else entirely"))
 				const both = (stateOf().ackCauses || {}).tree || {}
 				const sigB = Object.keys(both).find((k) => k !== sigA)
@@ -2971,10 +3112,11 @@ function proveRed() {
 				const aGone = !after[sigA], bStands = !!after[sigB]
 				assert("close: an amendment discharges ONE cause, not the whole row",
 					separate && aGone && bStands && refused && untouched && (amended.status === 0),
-					`two reasons on one row -> A=${sigA && both[sigA] && both[sigA].n}x B=${sigB && both[sigB] && both[sigB].n}x kept apart=${separate}; ` +
+					`two causes on one row (${sigA}, ${sigB}) -> A=${sigA && both[sigA] && both[sigA].n}x B=${sigB && both[sigB] && both[sigB].n}x kept apart=${separate}; ` +
 					`a bare --amended while BOTH stand -> REFUSED=${refused}, state untouched=${untouched}; ` +
 					`--amended tree@${sigA} -> A cleared=${aGone}, **B still standing=${bStands}** (this is the one ` +
 					`a row-keyed count fails)`)
+				g("reset", "-q", "--hard", baseSha); rmSync(join(pkg, "dirty-causes.txt"), { force: true })
 			}
 		}
 
@@ -2983,9 +3125,10 @@ function proveRed() {
 		// 2026-09-18, measured in this repo's own state: one getajob cause acknowledged 6 times
 		// under 5 wordings, and no signature reached 3 - the operator's text moves with ring
 		// counts and release numbers exactly as `#ack-amendment` said the row's text would.
-		// ONE VARIABLE between the two rows: whether the row declares its causes. The SAME
-		// three wordings on `tree` (which declares none) must stay three separate counts of 1;
-		// that half proves the wordings really differ, so the field row's 3 comes from its code.
+		// Since review #11 R5 EVERY row is keyed on itself - its codes, or its level - so the
+		// same three wordings must reach 3 on BOTH rows here, and each code must name what it is
+		// about (`drift:<the file>`), not only its kind. The mutation this arm exists for -
+		// keying on the ack's words again - spreads each row into three counts of 1.
 		{
 			const clean = () => { const st0 = stateOf(); st0.ackCounts = {}; st0.ackCauses = {}; writeFileSync(join(pkg, ".boot-state.json"), JSON.stringify(st0, null, 2) + "\n") }
 			clean()
@@ -3004,13 +3147,14 @@ function proveRed() {
 			const fc = (stateOf().ackCauses || {})["field:proj"] || {}
 			const tc = (stateOf().ackCauses || {}).tree || {}
 			unplant(); rmSync(join(pkg, "dirty.txt"), { force: true }); clean()
-			const onCode = !!fc.drift && fc.drift.n === 3 && /field:proj @drift acknowledged 3x/.test(last)
-			const spread = Object.keys(tc).length === 3 && Object.values(tc).every((v) => v.n === 1)
+			const fk = Object.keys(fc)
+			const onCode = fk.length === 1 && /^drift:.*comm-hook\.mjs$/.test(fk[0]) && fc[fk[0]].n === 3 && /field:proj @drift:\S+ acknowledged 3x/.test(last)
+			const onTree = Object.keys(tc).length === 1 && tc.uncommitted && tc.uncommitted.n === 3
 			assert("close: a cause the row DECLARES is counted however the ack is worded",
-				onCode && spread,
-				`3 closes, 3 wordings: field:proj (declares "drift") -> ${JSON.stringify(Object.fromEntries(Object.entries(fc).map(([k, v]) => [k, v.n])))}, ` +
-				`AMEND demanded=${/field:proj @drift/.test(last)}; tree (declares nothing, the control) -> ` +
-				`${Object.keys(tc).length} separate count(s) of ${JSON.stringify(Object.values(tc).map((v) => v.n))} (want 3 of 1)`)
+				onCode && onTree,
+				`3 closes, 3 wordings: field:proj -> ${JSON.stringify(Object.fromEntries(Object.entries(fc).map(([k, v]) => [k, v.n])))} ` +
+				`(want one drift:<the hook> at 3), AMEND demanded=${/field:proj @drift/.test(last)}; tree -> ` +
+				`${JSON.stringify(Object.fromEntries(Object.entries(tc).map(([k, v]) => [k, v.n])))} (want uncommitted at 3)`)
 		}
 
 		// ── a close whose record does not land is not a close ────────────────────────────
@@ -3058,14 +3202,10 @@ function proveRed() {
 			const without = run(true).rows.find((r) => r.label === "field:proj") || { level: -1, text: "" }
 			writeFileSync(cfgPath, cfg)
 			rmSync(msg2, { force: true })
-			// Since 2026-09-18 (`FINDINGS.md#peer-state`) the control half is ok - mail for a
-			// peer's stopped agent is shown, not gated - so the one variable now moves the LEVEL
-			// too, and this arm is the positive control for that amendment: mail NOTHING can
-			// deliver still warns.
 			assert("field: mail addressed to nobody on the roster",
-				/has mail and is not running/.test(withRoster.text) && withRoster.level === OK &&
+				/NOT RUNNING/.test(withRoster.text) && withRoster.level === WARN &&
 				/ON NO ROSTER/.test(without.text) && without.level === WARN,
-				`the same message, agent IN the roster -> ${LV[withRoster.level]} "${(withRoster.text.match(/◦ [^-]*/) || [""])[0].trim().slice(0, 44)}" (control, want ok); ` +
+				`the same message, agent IN the roster -> ${LV[withRoster.level]} "${(withRoster.text.match(/⚠ [^-]*/) || [""])[0].trim().slice(0, 44)}" (control); ` +
 				`agent removed from config.json -> ${LV[without.level]} ${/ON NO ROSTER/.test(without.text) ? "says it is unaddressable" : `SAID: ${without.text.slice(0, 60)}`}`)
 		}
 
@@ -3095,9 +3235,10 @@ function proveRed() {
 				`the corrupt file was left where it was by a READ=${stillThere} (a listing that moves files makes the next boot blind)`)
 		}
 
-		// A GONE-HOLDER CLAIM IN A PEER'S TREE IS SHOWN, NOT GATED (`FINDINGS.md#peer-state`: work,
-		// 6 acknowledgements, "only that leader can release them"). The arm above is this one's
-		// control: the same directory holding a claim nobody can READ still warns.
+		// A GONE-HOLDER CLAIM GATES, alone (review #11 R4 reversed its demotion the same day: the
+		// ack "only that leader can release them" was false - `release` refuses only a LIVE
+		// holder - and one of work's two was this repo's own debris). The arm above plants three
+		// states at once; this one isolates `gone`, so a demotion of it alone cannot hide.
 		{
 			const cdir = join(proj, ".comm", "claims")
 			mkdirSync(cdir, { recursive: true })
@@ -3105,9 +3246,9 @@ function proveRed() {
 				resource: "port:7000", by: "db", pid: 4194303, start: 1, boot: "not-this-boot", holder: "session", purpose: "pg" }) + "\n")
 			const r = run(true).rows.find((x) => x.label === "field:proj") || { level: -1, text: "" }
 			rmSync(cdir, { recursive: true, force: true })
-			assert("field: a PEER's gone-holder claim is shown, not gated",
-				r.level === OK && /◦ CLAIM port:7000: HOLDER IS GONE/.test(r.text),
-				`one claim, holder gone -> ${LV[r.level]} (want ok); named=${/port:7000/.test(r.text)}`)
+			assert("field: a gone-holder claim gates, on its own",
+				r.level === WARN && /⚠ CLAIM port:7000: HOLDER IS GONE/.test(r.text),
+				`one claim, holder gone -> ${LV[r.level]} (want warn); named=${/port:7000/.test(r.text)}`)
 		}
 
 		// ── F13: --hook writes two instruments and --root governs one ────────────────────
