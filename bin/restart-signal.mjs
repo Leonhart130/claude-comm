@@ -52,9 +52,10 @@
  * claimed to be restarting, and the age says whether the restart plausibly followed.
  */
 
-import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
+import { bootId, lookup, processState, sessionPid, startTimeOf } from "./session-registry.mjs"
 
 const SCHEMA = 1
 // A default, and named as one. A restart driven by a program takes seconds; one driven by
@@ -85,11 +86,62 @@ export function signalPath(root, agent) {
 }
 
 /**
+ * WHO IS RESTARTING — the session, not the command that said so.
+ *
+ * `by_pid` was `process.pid`: the pid of THIS CLI, which exits the moment the note is
+ * written. Measured on the note armed for the 2026-09-13 reboot: by_pid 1033917, the
+ * arming session 663779. Every note named an armer that was gone at birth, so nothing
+ * could ask the one question the clock answers badly — has the session that declared this
+ * restart actually ended? Three acknowledgements on 09-13 were that question: a note
+ * "LAPSED" while the leader that armed it was alive and still working. `FINDINGS.md#armer`.
+ *
+ * The session is the nearest `claude` ancestor, keyed like everything else on (pid, start,
+ * boot), plus the transcript it was writing, whose mtime is its last sign of life once it
+ * has gone. A note armed from a plain terminal has no session ancestor: it records the
+ * caller's pid and NO start/boot, and is judged on the clock alone, exactly as before.
+ */
+function armerFields(byPid) {
+	const sp = byPid ? Number(byPid) : sessionPid()
+	if (!sp) return { by_pid: process.pid }
+	const start = startTimeOf(sp), boot = bootId()
+	if (start === null || !boot) return { by_pid: sp }
+	const t = lookup(sp)
+	return { by_pid: sp, by_start: start, by_boot: boot, by_transcript: t.ok ? t.transcript : null }
+}
+
+/**
+ * Has the session that armed this note ended, and when did it last do anything?
+ *
+ *   alive    it is still running: the restart it declared has not happened yet
+ *   self     the caller IS that session — a /clear or a compaction inside one process
+ *   gone     it has ended; `quiet_s` is how long ago its transcript was last written
+ *   unknown  the note cannot say: armed from a terminal, or before 2026-09-18
+ *
+ * ONE implementation, exported, because two readers need it and must agree: `claim()`,
+ * which measures it for the ledger to classify, and the ledger's report of notes still
+ * waiting, which boot renders. A row that says "waiting" over a classifier that will say
+ * "lapsed" is worse than no row (`bin/ledger.mjs`, armedNotes).
+ *
+ * `quiet_s` is null whenever it could not be measured — never 0, which is the reading that
+ * would look freshest (the `Number(null)` defect, `FINDINGS.md#reboot-signal`). It errs
+ * toward COLD: an armer that sat idle before its window was closed looks quieter than it
+ * was, and a real restart is lost rather than a cold start promoted.
+ */
+export function armerOf(rec, { now = Date.now(), from = process.pid } = {}) {
+	const state = processState({ pid: rec && rec.by_pid, start: rec && rec.by_start, boot: rec && rec.by_boot })
+	if (state === "alive") return { state: sessionPid(from) === Number(rec.by_pid) ? "self" : "alive", quiet_s: null }
+	if (state !== "gone") return { state: "unknown", quiet_s: null }
+	let quiet = null
+	try { if (typeof rec.by_transcript === "string") quiet = (now - statSync(rec.by_transcript).mtimeMs) / 1000 } catch {}
+	return { state: "gone", quiet_s: Number.isFinite(quiet) ? quiet : null }
+}
+
+/**
  * Leave the note. Returns {ok, path} or {ok:false, why} — it never throws, because its
  * callers are a hook and a session about to die, and neither may be broken by an
  * instrument. A failed arm is a reboot that files as cold: bad data, not a bad session.
  */
-export function arm({ root, agent, prevSession = null, ttlS = DEFAULT_TTL_S, by = null, byPid = process.pid, at = null }) {
+export function arm({ root, agent, prevSession = null, ttlS = DEFAULT_TTL_S, by = null, byPid = null, at = null }) {
 	try {
 		if (!safeAgent(agent)) return { ok: false, why: `agent must match ${AGENT_OK} — it becomes a filename` }
 		const ttl = Number(ttlS)
@@ -108,7 +160,7 @@ export function arm({ root, agent, prevSession = null, ttlS = DEFAULT_TTL_S, by 
 			prev_session: prevSession || null,
 			ttl_s: ttl,
 			by: by || null,
-			by_pid: byPid,
+			...armerFields(byPid),
 		}
 		// Atomic publish: a reader must never meet a half-written signal. Same idiom as
 		// .boot-state.json, for the same reason.
@@ -146,7 +198,7 @@ export function peek({ root, agent, now = Date.now() }) {
 	try {
 		if (!existsSync(p)) return { ok: true, signal: null }
 		const rec = parseSignal(readFileSync(p, "utf8"))
-		return { ok: true, signal: rec, age_s: ageOf(rec, now) }
+		return { ok: true, signal: rec, age_s: ageOf(rec, now), armer: armerOf(rec, { now }) }
 	} catch (e) {
 		return { ok: false, why: (e && e.message) || String(e) }
 	}
@@ -210,7 +262,10 @@ export function claim({ root, agent, now = Date.now(), pid = process.pid }) {
 		return { ok: false, why: `the signal in ${agent}.json names agent ${JSON.stringify(rec.agent)}`, mismatch: true, setAside: aside }
 	}
 	try { unlinkSync(mine) } catch { /* consumed either way: the rename already took it */ }
-	return { ok: true, signal: rec, age_s: ageOf(rec, now) }
+	// Measured HERE, at the claim, because it is the one moment the answer exists: once the
+	// successor is running, "was the armer still alive when its successor started" can no
+	// longer be asked of /proc. The ledger stores it and classify() judges it.
+	return { ok: true, signal: rec, age_s: ageOf(rec, now), armer: armerOf(rec, { now, from: pid }) }
 }
 
 // ── CLI ────────────────────────────────────────────────────────────────────────────────
@@ -264,7 +319,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 	}
 	const r = verb === "peek" ? peek({ root, agent }) : claim({ root, agent })
 	if (!r.ok) { process.stderr.write(`restart-signal: ${r.why}${r.setAside ? ` (set aside at ${r.setAside})` : ""}\n`); process.exit(65) }
-	process.stdout.write(JSON.stringify(r.signal === null ? { signal: null } : { signal: r.signal, age_s: r.age_s }) + "\n")
+	process.stdout.write(JSON.stringify(r.signal === null ? { signal: null } : { signal: r.signal, age_s: r.age_s, armer: r.armer }) + "\n")
 	// A missing signal is not an error, but it is not a success either: exit 3 lets a shell
 	// tell "no restart was signalled" from "a restart was signalled" without parsing JSON.
 	process.exit(r.signal === null ? 3 : 0)

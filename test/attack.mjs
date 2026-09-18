@@ -1874,8 +1874,14 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		/if \(e && e\.code === "ENOENT"\) return \{ ok: true, signal: null \}\n\t\treturn \{ ok: false, why: \(e && e\.message\) \|\| String\(e\) \}/,
 		'if (e && e.code === "ENOENT") return { ok: true, signal: null }\n\t\ttry { const t = readFileSync(p, "utf8"); unlinkSync(p); writeFileSync(mine, t) }\n\t\tcatch { return { ok: false, why: (e && e.message) || String(e) } }')
 	const patched = defectiveSrc !== shippedSrc
+	// The copy lives in a scratch directory, so its one relative import (the armer's identity
+	// rule, 2026-09-18) is pointed at the shipped file. Applied AFTER `patched` is measured:
+	// `patched` must say whether the CATCH was substituted and nothing else, or a moved catch
+	// would read as patched because the import line changed.
+	const registryUrl = pathToFileURL(join(PKG, "bin", "session-registry.mjs")).href
+	const resolvedSrc = defectiveSrc.replace(`from "./session-registry.mjs"`, `from ${JSON.stringify(registryUrl)}`)
 	const defectivePath = join(rootS, "defective-restart-signal.mjs")
-	writeFileSync(defectivePath, defectiveSrc)
+	writeFileSync(defectivePath, resolvedSrc)
 
 	const runA = probeRun(shippedUrl, "plain")
 	const runB = probeRun(shippedUrl, "exdev")
@@ -1990,6 +1996,42 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		`unwritable dir -> exit ${denied.status} (65=refused, 3=THE LIE "none waiting", 0=claimed), ` +
 		`note still there=${noteSurvived} ` +
 		`${fixtureArmed ? "(fixture armed)" : "(FIXTURE NEVER ARMED - running as root?)"}`)
+}
+
+// A67 — a restart note names the SESSION that armed it, not the command that wrote it.
+//
+// `by_pid` was `process.pid` inside `arm()`: the pid of the CLI, dead the instant the note
+// was on disk. Measured on the note armed for the 2026-09-13 reboot (CLI 1033917, session
+// 663779). So no reader could ask whether the session that declared a restart had ended,
+// and a note under a leader still working read "LAPSED" three times (`FINDINGS.md#armer`).
+//
+// The stand-in session is a process whose argv[0] is `claude` — the exact thing
+// `sessionPid()` walks for — and it arms as its CHILD, the shape of `restart.mjs prepare`
+// run from a Bash tool call. One variable separates the two readings: the CLI's pid, which
+// is what the old code wrote. Then the claim must see that session GONE, because it exited.
+{
+	const rootN = mkdtempSync(join(tmpdir(), "comm-attack-armer-"))
+	const rs = join(PKG, "bin", "restart-signal.mjs")
+	const script = `const {spawnSync}=require("child_process");` +
+		`const r=spawnSync(process.execPath,[${JSON.stringify(rs)},"arm","--agent","leader","--root",${JSON.stringify(rootN)},"--quiet","--by","attack"],{encoding:"utf8"});` +
+		`process.stdout.write(JSON.stringify({me:process.pid,cli:r.pid,status:r.status}))`
+	const fake = spawnSync(process.execPath, ["-e", script], { argv0: "claude", encoding: "utf8" })
+	let ids = {}
+	try { ids = JSON.parse(fake.stdout) } catch {}
+	let note = {}
+	try { note = JSON.parse(readFileSync(join(rootN, ".comm", "restart", "leader.json"), "utf8")) } catch {}
+	const namesSession = ids.status === 0 && note.by_pid === ids.me && note.by_pid !== ids.cli &&
+		Number.isInteger(note.by_start) && typeof note.by_boot === "string"
+	const c = spawnSync("node", [rs, "claim", "--agent", "leader", "--root", rootN], { encoding: "utf8" })
+	let claimed = {}
+	try { claimed = JSON.parse(c.stdout) } catch {}
+	const judgedGone = c.status === 0 && !!claimed.armer && claimed.armer.state === "gone"
+	rmSync(rootN, { recursive: true, force: true })
+	check("A67 a restart note names the session that armed it, and its claim sees that session gone",
+		namesSession && judgedGone,
+		`stand-in session pid ${ids.me}, arming CLI pid ${ids.cli} -> note by_pid ${note.by_pid} ` +
+		`(${note.by_pid === ids.cli ? "THE CLI - dead at birth" : note.by_pid === ids.me ? "the session" : "neither"}), ` +
+		`start=${note.by_start} boot=${note.by_boot ? "set" : "MISSING"}; claim after it exited -> armer ${claimed.armer && claimed.armer.state}`)
 }
 
 // A34 — the instrument the experiment is SCORED FROM runs its own arms inside the gate.

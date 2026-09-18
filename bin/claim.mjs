@@ -62,7 +62,7 @@ import { join, dirname, resolve, sep } from "node:path"
 import { tmpdir } from "node:os"
 import { fileURLToPath } from "node:url"
 import { spawnSync } from "node:child_process"
-import { startTimeOf, bootId, sessionPid } from "./session-registry.mjs"
+import { startTimeOf, bootId, sessionPid, processState } from "./session-registry.mjs"
 
 const SCHEMA = 1
 const ARGV = process.argv.slice(2)
@@ -110,13 +110,10 @@ export function claimPath(root, resource) {
  * on an old file; guessing "gone" would hand somebody else a live port.
  */
 export function holderState(rec) {
-	const pid = Number(rec && rec.pid)
-	if (!Number.isFinite(pid) || pid <= 0) return "unknown"
-	if (rec.start === undefined || rec.boot === undefined) return "unknown"
-	if (rec.boot !== bootId()) return "gone"
-	const st = startTimeOf(pid)
-	if (st === null) return "gone"
-	return st === rec.start ? "held" : "gone"
+	// The rule lives in session-registry.mjs since 2026-09-18 — a restart note judges its
+	// armer by it too, and this file cannot be imported (it parses --root at load).
+	const s = processState({ pid: rec && rec.pid, start: rec && rec.start, boot: rec && rec.boot })
+	return s === "alive" ? "held" : s
 }
 
 /** Set bytes aside under a name nothing claims, and report where they went. */
