@@ -81,6 +81,15 @@ for (let i = 0; i < ARGV.length; i++) {
 // text was rejected - it moves with ages, pids and filenames, so it would either never
 // accumulate (the detector goes silent, the worst direction for a guard whose job is to
 // notice repetition) or need per-row knowledge inside a generic mechanism.
+//
+// 🔴 AMENDED 2026-09-18, on a measurement: THE OPERATOR'S TEXT MOVES TOO. `field:getajob` holds
+// one cause - their expert has mail and is not running, only their leader relaunches it -
+// acknowledged 6 times under 5 wordings (ring counts, release numbers, one dropped article),
+// so no signature ever reached 3 and the instrument stayed silent: the direction rejected
+// above, reached through the operator instead of the row. So a row that KNOWS its causes
+// declares them as codes where it computes them (`row(..., causes)`), and the close counts
+// those; the per-row knowledge lives in the row, not in this mechanism. A row that declares
+// nothing still falls back to this hash. `FINDINGS.md#armer`.
 const causeSig = (why) => {
 	const flat = String(why ?? "").toLowerCase().replace(/\s+/g, " ").trim()
 	let h = 5381
@@ -110,7 +119,13 @@ const OK = 0, UNKNOWN = 1, WARN = 2, RED = 3
 const MARK = ["✓", "?", "⚠", "✗"]
 let worst = OK
 const rows = []
-const row = (label, level, text) => { rows.push({ label, level, text }); if (level > worst) worst = level }
+// `causes`: the codes a row DECLARES for what made it non-green, where it computed them.
+// The close counts acknowledgements per code (`FINDINGS.md#armer`, 2nd finding); a row that
+// declares none is counted on the hash of the operator's reason, as before.
+const row = (label, level, text, causes = null) => {
+	rows.push({ label, level, text, ...(level !== OK && causes && causes.length ? { causes } : {}) })
+	if (level > worst) worst = level
+}
 
 const age = (ms) => {
 	const s = Math.max(0, Math.round(ms / 1000))
@@ -516,9 +531,15 @@ if (has("--hook")) {
 		const lapsed = ((a.armed && a.armed.notes) || []).some((n) => !n.fresh) || (a.armed && a.armed.unreadable)
 		const bad = a.unreadable || (a.unreadableFiles && a.unreadableFiles.length) || a.dirUnreadable
 			|| a.mislabelled || a.exposureSkew || lapsed || signalTrouble
-		if (wrote && !wrote.ok) row("ledger", WARN, `THIS START WAS NOT RECORDED (${wrote.why || "no reason given"}) - ${bits.join(" - ")}`)
-		else if (wrote && seen !== "confirmed") row("ledger", WARN, `THE WRITE WAS NOT SEEN BY THE RE-READ (${seen}) - ${bits.join(" - ")}`)
-		else row("ledger", bad ? WARN : OK, bits.join(" - ") + (wrote ? " - this start recorded and re-read" : ""))
+		const why = [
+			(a.unreadable || (a.unreadableFiles && a.unreadableFiles.length) || a.dirUnreadable) && "log-unreadable",
+			a.mislabelled && "mislabelled", a.exposureSkew && "exposure-skew",
+			((a.armed && a.armed.notes) || []).some((n) => !n.fresh) && "note-lapsed",
+			(a.armed && a.armed.unreadable) && "note-unreadable", signalTrouble && "signal-trouble",
+		].filter(Boolean)
+		if (wrote && !wrote.ok) row("ledger", WARN, `THIS START WAS NOT RECORDED (${wrote.why || "no reason given"}) - ${bits.join(" - ")}`, ["not-recorded", ...why])
+		else if (wrote && seen !== "confirmed") row("ledger", WARN, `THE WRITE WAS NOT SEEN BY THE RE-READ (${seen}) - ${bits.join(" - ")}`, ["write-unseen", ...why])
+		else row("ledger", bad ? WARN : OK, bits.join(" - ") + (wrote ? " - this start recorded and re-read" : ""), why)
 	}
 }
 
@@ -1031,10 +1052,20 @@ function askBus(sessionPidForCwd) {
 		}
 		if (noteDirBad) notes = [{ agent: "?", age_s: null, ttl_s: null, fresh: false, unread: "dir" }]
 		else if (ledgerUnreachable) notes = [{ agent: "?", age_s: null, ttl_s: null, fresh: false, unread: "ledger" }]
-		const lapsedNote = notes.some((n) => !n.fresh)
-		// Anything that is not plainly held is a claim somebody has to look at: a dead holder,
-		// bytes nobody can read, or a record this version cannot judge.
-		const deadClaim = claimDirBad || claims.some((c) => c.state !== "held") || shared.length > 0
+		// 🔴 AMENDED 2026-09-18, on the acknowledgement count and not on an opinion
+		// (`FINDINGS.md#peer-state`). This row gated on three states of the PEER's own
+		// operations and every acknowledgement said the same thing: only their leader can act.
+		// getajob: mail for a stopped expert, 6 acks (under 5 wordings, which is why the counter
+		// never fired) - and `send` had already told their leader "NOT running - held in inbox".
+		// work: a gone-holder claim and a lapsed note, 6 acks, "only that leader can release them".
+		// A row that demands an acknowledgement for what the reader cannot act on is LESSONS
+		// form K. So they are PRINTED, never dropped, and no longer gate. What stays gated is
+		// what THE BUS is responsible for: drift, a stale bus, mail nothing can deliver (no
+		// roster entry, or a bus that would not answer), two sessions on one inbox, claims or
+		// notes that could not be read. This loop never includes ROOT, so this repo's own state
+		// is untouched by the amendment.
+		const notesBad = notes.some((n) => n.unread)
+		const claimsBad = claimDirBad || claims.some((c) => c.state !== "held" && c.state !== "gone")
 		const bits = [
 			// An unparsed non-zero exit must not borrow the confident wording of a parsed one:
 			// it means the installer refused for a reason this row has not read.
@@ -1046,7 +1077,7 @@ function askBus(sessionPidForCwd) {
 				: `bus current (${installed.length} files)`,
 			!pending ? "0 pending"
 				: unaddressable.length ? `⚠ ${unaddressable.join(", ")} has mail and IS ON NO ROSTER - nothing will ever deliver it: the bus does not know the name (oldest ${age(Date.now() - oldest)})`
-				: stranded.length ? `⚠ ${stranded.join(", ")} has mail and is NOT RUNNING - it waits for a relaunch (oldest ${age(Date.now() - oldest)})`
+				: stranded.length ? `◦ ${stranded.join(", ")} has mail and is not running - its sender was told so; it lands at the relaunch (oldest ${age(Date.now() - oldest)})`
 				: busAnswered ? `${pending} pending, in flight to a running agent (oldest ${age(Date.now() - oldest)})`
 				: `${pending} pending (oldest ${age(Date.now() - oldest)}) - the bus could not be asked who is running`,
 			last ? `last delivery ${age(Date.now() - Date.parse(last))} ago` : "no delivery logged",
@@ -1063,17 +1094,22 @@ function askBus(sessionPidForCwd) {
 			// on stderr as it was written — was announced at every session start as a crash
 			// (F14). `note` comes from claim.mjs's one renderer; there is no second wording here.
 			...claims.filter((c) => c.state !== "held" && c.note)
-				.map((c) => `⚠ CLAIM ${c.resource}: ${c.note}`),
+				.map((c) => `${c.state === "gone" ? "◦" : "⚠"} CLAIM ${c.resource}: ${c.note}`),
 			...(claims.some((c) => c.state === "held")
 				? [`${claims.filter((c) => c.state === "held").length} resource(s) claimed: ${claims.filter((c) => c.state === "held").map((c) => c.resource).join(", ")}`] : []),
 			...notes.map((n) => n.unread === "dir" ? `⚠ ${noteFiles.length} restart note(s) are here and ${join(p, ".comm", "restart")} could not be read`
 				: n.unread === "ledger" ? `⚠ ${noteFiles.length} restart note(s) are here and bin/ledger.mjs could not be asked about them`
-				: noteWords(n)),
+				: noteWords(n).replace(/^⚠/, "◦")),
 		]
-		// `pending` no longer reddens on its own: see the amendment above. What reddens is mail
-		// that is STRANDED, or a bus that could not be asked and so cannot tell the two apart.
-		const mailStuck = pending > 0 && (stranded.length > 0 || unaddressable.length > 0 || !busAnswered)
-		row(`field:${name}`, drift || busStale !== false ? RED : mailStuck || lapsedNote || deadClaim ? WARN : OK, bits.join(" - "))
+		// `pending` no longer reddens on its own (2026-09-05), nor mail for a stopped agent
+		// (2026-09-18): what reddens is mail NOTHING can deliver, or a bus that could not be
+		// asked and so cannot tell the cases apart.
+		const mailStuck = pending > 0 && (unaddressable.length > 0 || !busAnswered)
+		const causes = [drift && "drift", busStale === true && "bus-stale", busStale === null && "bus-uncompared",
+			pending > 0 && unaddressable.length > 0 && "unaddressable", pending > 0 && !busAnswered && "bus-unasked",
+			shared.length > 0 && "shared-inbox", claimsBad && "claim-bad", notesBad && "note-unreadable"].filter(Boolean)
+		row(`field:${name}`, drift || busStale !== false ? RED : mailStuck || claimsBad || shared.length > 0 || notesBad ? WARN : OK,
+			bits.join(" - "), causes)
 	}
 }
 
@@ -1128,7 +1164,7 @@ function askBus(sessionPidForCwd) {
 		// than silently, and never fall through to the `continue` that removes the row.
 		if (inb.err && outb.err) {
 			row(`channel:${peer}`, WARN, `CANNOT SAY whether mail here is answered - the channel ` +
-				`directory could not be read (${inb.err}) - this is NOT the same as having no mail`)
+				`directory could not be read (${inb.err}) - this is NOT the same as having no mail`, ["unreadable"])
 			continue
 		}
 		if (!inb.at && !outb.at) continue
@@ -1254,15 +1290,15 @@ function askBus(sessionPidForCwd) {
 		// an unreadable out/ is reported as NOT KNOWING, never as an answer.
 		if (blind || unread) {
 			row(`channel:${peer}`, WARN, "CANNOT SAY whether mail here is answered - " +
-				(blind || (unread < 0 ? "out/ could not be listed" : unread + " repl(y/ies) could not be read")))
+				(blind || (unread < 0 ? "out/ could not be listed" : unread + " repl(y/ies) could not be read")), ["unreadable"])
 		} else if (open.length) {
 			row(`channel:${peer}`, WARN,
 				`UNANSWERED - ${open[0].name} arrived ${age(Date.now() - open[0].at)} ago` +
-				(open.length > 1 ? ` (+${open.length - 1} more unnamed by any reply)` : ""))
+				(open.length > 1 ? ` (+${open.length - 1} more unnamed by any reply)` : ""), ["unanswered"])
 		} else if (legacyWaiting) {
 			row(`channel:${peer}`, WARN, `UNANSWERED - ${legacyOpen[0].name} arrived ` +
 				`${age(Date.now() - legacyOpen[0].at)} ago${dated}` +
-				(legacyOpen.length > 1 ? ` (+${legacyOpen.length - 1} more on the old rule)` : ""))
+				(legacyOpen.length > 1 ? ` (+${legacyOpen.length - 1} more on the old rule)` : ""), ["unanswered"])
 		} else {
 			// NAMED BY DATE, not by mtime. The green branch printed `inb.name` - newest by
 			// mtime - so a restore made the row name the wrong letter while the verdict was
@@ -1551,10 +1587,12 @@ if (CLOSE) {
 			for (const r of open) {
 				const why = ACKS.get(r.label)
 				if (why === undefined) continue
-				const sig = causeSig(why)
 				causes[r.label] = causes[r.label] || {}
-				const prev = causes[r.label][sig] || { n: 0, why }
-				causes[r.label][sig] = { n: prev.n + 1, why }
+				// Every cause the row declared was waved past by this ack, whatever it says.
+				for (const sig of r.causes && r.causes.length ? r.causes : [causeSig(why)]) {
+					const prev = causes[r.label][sig] || { n: 0, why }
+					causes[r.label][sig] = { n: prev.n + 1, why }
+				}
 			}
 			// THE DISCHARGE (review #7 F10), now aimed. An amendment clears the CAUSE it names
 			// and leaves the row's other causes standing - which is the whole point, and the
@@ -1932,10 +1970,21 @@ function proveRed() {
 			() => { for (const k of kids) { try { k.kill("SIGKILL") } catch {} } kids = [] })
 	}
 
+	// 🔴 RE-POINTED 2026-09-18 by the amendment it arms (`FINDINGS.md#peer-state`): mail for a
+	// PEER's stopped agent is printed and no longer gates - `send` told its sender, and 6
+	// acknowledgements said only their leader relaunches. This arm used to demand WARN. It
+	// now demands the row SAY it, at ok: an amendment that silenced the text would be the
+	// dropped-state defect, not this one. The row still gates mail NOTHING can deliver -
+	// "mail addressed to nobody on the roster" below is that half, and this one's control.
 	const msg = join(proj, ".comm", "inbox", "app", "0001-x.json")
-	arm("field: mail STRANDED on an agent that is not running", "field:proj", WARN,
-		() => writeFileSync(msg, JSON.stringify({ id: "0001-x", to: "app" })),
-		() => rmSync(msg, { force: true }))
+	{
+		writeFileSync(msg, JSON.stringify({ id: "0001-x", to: "app" }))
+		const r = rowOf(run(true), "field:proj")
+		rmSync(msg, { force: true })
+		assert("field: mail for a PEER's stopped agent is shown, not gated",
+			r.level === OK && /app \(1\) has mail and is not running/.test(r.text),
+			`one message, recipient not running -> ${LV[r.level]} (want ok); says so=${/has mail and is not running/.test(r.text)}`)
+	}
 
 	// THE OTHER DIRECTION, and it is the amendment's whole point. This row used to redden on
 	// ANY pending mail, and `field:work` was acknowledged THREE times in one day with the
@@ -1955,16 +2004,20 @@ function proveRed() {
 		writeFileSync(msg, JSON.stringify({ id: "0001-x", to: "app" }))
 		kid = spawn(fakeD, ["-c", "sleep 30; :"], { cwd: join(proj, "app"), stdio: "ignore" })
 		settle()
-		const withLive = level(run(true), "field:proj")
+		const withLive = rowOf(run(true), "field:proj")
 		try { kid.kill("SIGKILL") } catch {}
-		// The recipient is gone again: the SAME pending message must now redden, which is what
-		// proves the green above came from the session and not from the row going quiet.
+		// The recipient is gone again: the SAME pending message must now be reported as waiting
+		// for a relaunch, which proves the reading above came from the session and not from the
+		// row going quiet. Since 2026-09-18 both are ok (the amendment above), so the variable
+		// is what the row SAYS; its level is asserted ok in both.
 		const t0 = Date.now(); while (Date.now() - t0 < 2000) { if (!existsSync(`/proc/${kid.pid}`)) break }
-		const withoutLive = level(run(true), "field:proj")
+		const withoutLive = rowOf(run(true), "field:proj")
 		rmSync(msg, { force: true })
 		assert("field: mail in flight to a RUNNING agent does not redden the row",
-			withLive === OK && withoutLive === WARN,
-			`same message, recipient live -> ${LV[withLive]} (must stay ok); recipient gone -> ${LV[withoutLive]} (must warn)`)
+			withLive.level === OK && /in flight to a running agent/.test(withLive.text) &&
+			withoutLive.level === OK && /has mail and is not running/.test(withoutLive.text),
+			`same message, recipient live -> ${LV[withLive.level]} "in flight"=${/in flight/.test(withLive.text)}; ` +
+			`recipient gone -> ${LV[withoutLive.level]} "not running"=${/is not running/.test(withoutLive.text)}`)
 	}
 
 	const scratch = join(pkg, "uncommitted.txt")
@@ -2239,9 +2292,13 @@ function proveRed() {
 		assert("ledger: a note whose armer still RUNS has not lapsed; armer gone, it has",
 			own.running.level === OK && /still running/.test(own.running.text) && own.gone.level === WARN && /LAPSED/.test(own.gone.text),
 			`armer alive -> ${LV[own.running.level]}; start tick moved -> ${LV[own.gone.level]} (must be ok, then warn)`)
+		// In a PEER's row a lapsed note is shown and does not gate (`FINDINGS.md#peer-state`), so
+		// the variable there is the wording, and both levels are asserted ok.
 		assert("field: a peer's note whose armer still RUNS has not lapsed; armer gone, it has",
-			peer.running.level === OK && /still running/.test(peer.running.text) && peer.gone.level === WARN && /LAPSED/.test(peer.gone.text),
-			`armer alive -> ${LV[peer.running.level]}; start tick moved -> ${LV[peer.gone.level]} (must be ok, then warn)`)
+			peer.running.level === OK && /still running/.test(peer.running.text) && !/LAPSED/.test(peer.running.text) &&
+			peer.gone.level === OK && /LAPSED/.test(peer.gone.text),
+			`armer alive -> ${LV[peer.running.level]} "still running"=${/still running/.test(peer.running.text)}; ` +
+			`start tick moved -> ${LV[peer.gone.level]} "LAPSED"=${/LAPSED/.test(peer.gone.text)}`)
 	}
 
 	const busFile = join(pkg, "bin", "comm.mjs")
@@ -2921,6 +2978,41 @@ function proveRed() {
 			}
 		}
 
+		// ── the count keys on what the ROW declares, not on how the ack is worded ──────────
+		//
+		// 2026-09-18, measured in this repo's own state: one getajob cause acknowledged 6 times
+		// under 5 wordings, and no signature reached 3 - the operator's text moves with ring
+		// counts and release numbers exactly as `#ack-amendment` said the row's text would.
+		// ONE VARIABLE between the two rows: whether the row declares its causes. The SAME
+		// three wordings on `tree` (which declares none) must stay three separate counts of 1;
+		// that half proves the wordings really differ, so the field row's 3 comes from its code.
+		{
+			const clean = () => { const st0 = stateOf(); st0.ackCounts = {}; st0.ackCauses = {}; writeFileSync(join(pkg, ".boot-state.json"), JSON.stringify(st0, null, 2) + "\n") }
+			clean()
+			writeFileSync(join(pkg, "dirty.txt"), "x\n")
+			const [plant, unplant] = swap(hook, (x) => `${x}\n// drift\n`)
+			plant()
+			const open3 = run(false).rows.filter((r) => r.label && r.label !== "close" && r.level !== OK)
+			const words = ["their leader relaunches it, rung four times", "their leader relaunches it, rung six times",
+				"their leader relaunches it - release .7 is installed there"]
+			let last = ""
+			for (const w of words) {
+				touchStatus()
+				last = closeRun2(open3.flatMap((r) => ["--ack",
+					`${r.label}=${r.label === "field:proj" || r.label === "tree" ? w : "fixture: deliberately " + r.label}`])).stdout || ""
+			}
+			const fc = (stateOf().ackCauses || {})["field:proj"] || {}
+			const tc = (stateOf().ackCauses || {}).tree || {}
+			unplant(); rmSync(join(pkg, "dirty.txt"), { force: true }); clean()
+			const onCode = !!fc.drift && fc.drift.n === 3 && /field:proj @drift acknowledged 3x/.test(last)
+			const spread = Object.keys(tc).length === 3 && Object.values(tc).every((v) => v.n === 1)
+			assert("close: a cause the row DECLARES is counted however the ack is worded",
+				onCode && spread,
+				`3 closes, 3 wordings: field:proj (declares "drift") -> ${JSON.stringify(Object.fromEntries(Object.entries(fc).map(([k, v]) => [k, v.n])))}, ` +
+				`AMEND demanded=${/field:proj @drift/.test(last)}; tree (declares nothing, the control) -> ` +
+				`${Object.keys(tc).length} separate count(s) of ${JSON.stringify(Object.values(tc).map((v) => v.n))} (want 3 of 1)`)
+		}
+
 		// ── a close whose record does not land is not a close ────────────────────────────
 		//
 		// Not one of review #7's fourteen: found by re-reading the fix for F2. `updateState`
@@ -2966,10 +3058,14 @@ function proveRed() {
 			const without = run(true).rows.find((r) => r.label === "field:proj") || { level: -1, text: "" }
 			writeFileSync(cfgPath, cfg)
 			rmSync(msg2, { force: true })
+			// Since 2026-09-18 (`FINDINGS.md#peer-state`) the control half is ok - mail for a
+			// peer's stopped agent is shown, not gated - so the one variable now moves the LEVEL
+			// too, and this arm is the positive control for that amendment: mail NOTHING can
+			// deliver still warns.
 			assert("field: mail addressed to nobody on the roster",
-				/NOT RUNNING/.test(withRoster.text) && withRoster.level === WARN &&
+				/has mail and is not running/.test(withRoster.text) && withRoster.level === OK &&
 				/ON NO ROSTER/.test(without.text) && without.level === WARN,
-				`the same message, agent IN the roster -> ${LV[withRoster.level]} "${(withRoster.text.match(/⚠ [^-]*/) || [""])[0].trim().slice(0, 44)}" (control); ` +
+				`the same message, agent IN the roster -> ${LV[withRoster.level]} "${(withRoster.text.match(/◦ [^-]*/) || [""])[0].trim().slice(0, 44)}" (control, want ok); ` +
 				`agent removed from config.json -> ${LV[without.level]} ${/ON NO ROSTER/.test(without.text) ? "says it is unaddressable" : `SAID: ${without.text.slice(0, 60)}`}`)
 		}
 
@@ -2997,6 +3093,21 @@ function proveRed() {
 				`corrupt+unknown+self-held planted -> ${LV[seen.level]}; names the corrupt one=${/port:4173/.test(seen.text)}, ` +
 				`the unjudgeable one=${/port:5555/.test(seen.text)}, and says the self-held one is NOT a crash=${/nothing crashed/.test(seen.text)}; ` +
 				`the corrupt file was left where it was by a READ=${stillThere} (a listing that moves files makes the next boot blind)`)
+		}
+
+		// A GONE-HOLDER CLAIM IN A PEER'S TREE IS SHOWN, NOT GATED (`FINDINGS.md#peer-state`: work,
+		// 6 acknowledgements, "only that leader can release them"). The arm above is this one's
+		// control: the same directory holding a claim nobody can READ still warns.
+		{
+			const cdir = join(proj, ".comm", "claims")
+			mkdirSync(cdir, { recursive: true })
+			writeFileSync(join(cdir, "port:7000.json"), JSON.stringify({ v: 1, at: new Date().toISOString(),
+				resource: "port:7000", by: "db", pid: 4194303, start: 1, boot: "not-this-boot", holder: "session", purpose: "pg" }) + "\n")
+			const r = run(true).rows.find((x) => x.label === "field:proj") || { level: -1, text: "" }
+			rmSync(cdir, { recursive: true, force: true })
+			assert("field: a PEER's gone-holder claim is shown, not gated",
+				r.level === OK && /◦ CLAIM port:7000: HOLDER IS GONE/.test(r.text),
+				`one claim, holder gone -> ${LV[r.level]} (want ok); named=${/port:7000/.test(r.text)}`)
 		}
 
 		// ── F13: --hook writes two instruments and --root governs one ────────────────────

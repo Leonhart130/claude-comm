@@ -2034,6 +2034,45 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		`start=${note.by_start} boot=${note.by_boot ? "set" : "MISSING"}; claim after it exited -> armer ${claimed.armer && claimed.armer.state}`)
 }
 
+// A68 — `inbox` prints each message's id as the command that acknowledges exactly that one.
+//
+// getajob's leader, 2026-09-14: the listing printed no id, and its closing hint named the
+// bare `dismiss` — which acknowledges the WHOLE queue, mail that arrived mid-turn included,
+// and cost them twice on 09-13. So the printed command is RUN, as printed, and must take
+// exactly one message. And because that line is meant to be pasted into a shell, an id
+// carrying a command (a forged file in the inbox) must never be printed as one. Positive
+// control: the two genuine ids ARE printed, so a listing that printed nothing cannot pass.
+{
+	const r68 = mkdtempSync(join(tmpdir(), "comm-attack-inbox-"))
+	atExit(() => { try { rmSync(r68, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(r68, ".comm", "bin"), { recursive: true })
+	for (const a of ["leader", "app"]) mkdirSync(join(r68, ".comm", "inbox", a), { recursive: true })
+	mkdirSync(join(r68, "app"), { recursive: true })
+	writeFileSync(join(r68, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app" } }))
+	for (const f of ["comm.mjs", "who.mjs"]) cpSync(join(PKG, "bin", f), join(r68, ".comm", "bin", f))
+	const bus68 = (cwd, args) => spawnSync(process.execPath, [join(r68, ".comm", "bin", "comm.mjs"), ...args], { cwd, encoding: "utf8" })
+	const box68 = () => readdirSync(join(r68, ".comm", "inbox", "leader")).filter((f) => f.endsWith(".json")).sort()
+	for (let k = 0; k < 2; k++) {
+		writeFileSync(join(r68, "app", "R.md"), `report ${k} ${Math.random()}\n`)
+		bus68(join(r68, "app"), ["send", "leader", "--ref", "R.md"])
+	}
+	const genuine = box68()
+	let forged = {}
+	try { forged = { ...JSON.parse(readFileSync(join(r68, ".comm", "inbox", "leader", genuine[0]), "utf8")), id: "x; touch PWNED68" } } catch {}
+	writeFileSync(join(r68, ".comm", "inbox", "leader", "zz-forged.json"), JSON.stringify(forged))
+	const shown = bus68(r68, ["inbox"])
+	const cmds = [...String(shown.stdout).matchAll(/done with it: {2}node \.comm\/bin\/comm\.mjs (dismiss .*)$/gm)].map((m) => m[1])
+	const run1 = cmds[0] ? bus68(r68, cmds[0].split(" ")) : { status: null }
+	const left = box68()
+	const tookOne = run1.status === 0 && left.length === 2 && genuine.filter((f) => left.includes(f)).length === 1
+	const noForgery = !cmds.some((c) => /PWNED68/.test(c)) && /not in the bus's shape/.test(String(shown.stdout))
+	check("A68 inbox prints each id as the command that acknowledges exactly that message",
+		cmds.length === 2 && tookOne && noForgery,
+		`3 pending (2 genuine, 1 forged id) -> ${cmds.length} per-message command(s) (want 2); the first, run as printed -> ` +
+		`exit ${run1.status}, ${left.length} left (want 2, the other genuine one kept=${genuine.filter((f) => left.includes(f)).length === 1}); ` +
+		`forged id printed as a command=${cmds.some((c) => /PWNED68/.test(c))}`)
+}
+
 // A34 — the instrument the experiment is SCORED FROM runs its own arms inside the gate.
 //
 // `bin/ledger.mjs` decides which arm every session start lands in, and until this case it

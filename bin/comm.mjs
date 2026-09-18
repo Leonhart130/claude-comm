@@ -670,14 +670,28 @@ function dispatch(root, cfg, me, cmd, rest) {
 			if (!msgs.length) { console.log(`inbox '${who}': empty`); break }
 			console.log(`inbox '${who}': ${msgs.length} pending`)
 			// Show the path THIS reader can open, not the one the sender typed.
-			for (const m of msgs) console.log(`  ${m.ts}  from ${m.from}  [${m.kind}]  ref: ${safeRef(refForRecipient(root, cfg, m))}${m.note ? `  — ${sanitizeNote(m.note)}` : ""}`)
-			// `inbox` PEEKS, it does not acknowledge. Drop this hint and an agent acts
-			// on its mail, gets re-blocked at its turn end by the same messages, and
-			// reads that as a bug in the bus. The hint must name a command the identity
-			// guard actually ALLOWS — it once documented one the guard refuses.
-			// FINDINGS.md#inbox-hint
-			const clear = who === me ? `dismiss ${who}` : `dismiss ${who} --force`
-			console.log(`\n  ↑ still pending — reading them here does NOT acknowledge them.\n    After acting, run:  node .comm/bin/comm.mjs ${clear}`)
+			// `inbox` PEEKS, it does not acknowledge. Drop the hint and an agent acts on its
+			// mail, gets re-blocked at its turn end by the same messages, and reads that as a
+			// bug in the bus. The hint must name a command the identity guard ALLOWS — it once
+			// documented one the guard refuses. FINDINGS.md#inbox-hint
+			//
+			// PER MESSAGE, BY ID (getajob's leader, 2026-09-14). The hint named the bare
+			// `dismiss`, which acknowledges the WHOLE queue - including mail that landed while
+			// the reader worked - and it cost them twice on 09-13; the ids it needed were
+			// printed nowhere, so one was fished out of log.jsonl and was a day old. An id is
+			// printed as a command only in the shape the bus writes it: it comes from a file,
+			// and a line meant to be pasted into a shell must not carry a forged `; rm -rf`.
+			const force = who === me ? "" : " --force"
+			const ID_OK = /^[A-Za-z0-9][A-Za-z0-9-]{0,63}$/
+			for (const m of msgs) {
+				console.log(`  ${m.ts}  from ${m.from}  [${m.kind}]  ref: ${safeRef(refForRecipient(root, cfg, m))}${m.note ? `  — ${sanitizeNote(m.note)}` : ""}`)
+				console.log(typeof m.id === "string" && ID_OK.test(m.id)
+					? `      done with it:  node .comm/bin/comm.mjs dismiss ${who} --id ${m.id}${force}`
+					: `      (its id is not in the bus's shape - not printed as a command)`)
+			}
+			console.log(`\n  ↑ still pending — reading them here does NOT acknowledge them.\n` +
+				`    Acknowledge each one by its id once you have acted on it. \`dismiss ${who}\` with no --id\n` +
+				`    acknowledges EVERY pending message, including any that arrived while you worked.`)
 			break
 		}
 		// The sender is otherwise blind: `log` records what was SENT, nothing recorded

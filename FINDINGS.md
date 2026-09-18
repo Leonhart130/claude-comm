@@ -2954,3 +2954,28 @@ under a real restart**, and the stub half reaches the field only with the next r
   row says so: the `field:` loop excludes `ROOT` by design. LESSONS form A. And the way I found it is its own defect:
   `import("install.mjs")` used as a syntax check RAN it, installing this working copy into this tree (`INSTALLED.json`
   now reads `.8` over bytes that are not `.8`). `node --check` was the check; an import of a script is an execution.
+
+## `#peer-state` — two amendments on the acknowledgement count: what a `field:` row may gate on, and how the count keys
+
+**2026-09-18.** Both are the protocol in `CLAUDE.md` doing its job — *a guard defensible every time it is bypassed is
+already failing* — and both land as gated changes with arms.
+
+**1. The count keys on the causes a row DECLARES.** `#armer` measured the evasion: one getajob cause acknowledged 6× under
+5 wordings. A row that knows its causes now declares them as codes where it computes them — `field:` (`drift`,
+`bus-stale`, `bus-uncompared`, `unaddressable`, `bus-unasked`, `shared-inbox`, `claim-bad`, `note-unreadable`),
+`channel:` (`unanswered`, `unreadable`), `ledger` (`note-lapsed`, `not-recorded`, …) — and the close counts one per code,
+whatever the ack says; `--amended <row>@<code>` discharges one. A row that declares nothing keeps the hash of the
+operator's reason (`tree` does, deliberately: the per-cause arms prove the fallback on it). Armed with the same three
+wordings on both kinds of row: the declaring row reaches 3 and demands the amendment, `tree` stays three counts of 1.
+⚠️ Migration: history kept under the old hashes stays history; a code starts at 0.
+
+**2. A `field:` row prints the peer's own operations and does not gate on them.** Evidence: getajob, mail for a stopped
+expert — 6 acks, and `send` had already told their leader *"NOT running — held in inbox"* · work, gone-holder claims and
+a lapsed note — 6 acks, *"only that leader can release them"*. The reader of a `field:` row is this repo's leader, who
+cannot act on any of it: LESSONS form K. Printed with `◦`, never dropped. **Still gated** — what the bus answers for:
+drift, a stale bus, mail nothing can deliver (no roster entry, a bus that would not answer), two sessions on one inbox,
+claims or notes that cannot be read. The field loop excludes `ROOT`, so this repo's own claims and notes still gate
+(the `ledger` row). Arms re-pointed: stranded mail → shown at ok (control: the roster arm still warns); gone claim →
+shown at ok (control: the unreadable-claim arm still warns); a peer's lapsed note → worded, at ok.
+**Not verified:** whether a peer ever relied on my row to learn its own state — nothing suggests so (every ack was
+mine, none reached them), but it was not asked.
