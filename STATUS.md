@@ -24,6 +24,7 @@ no codes ⇒ the why-hash. Arm: one cause, 3 wordings ⇒ AMEND.
 stranded mail (`send` already tells their leader "NOT running — held in inbox"; 6 acks), gone-holder claims and lapsed
 notes (work: 6 acks, "only that leader can"). Stays gated: drift, stale, unaddressable, bus not answering, shared
 inbox, corrupt/unreadable. The loop excludes ROOT, so this repo stays gated. Re-point the "mail STRANDED" arm.
+Discharges `--amended field:work@924908` (4×, demanded at the 09-18 close).
 
 **D — reply to getajob n°3** (unanswered since 09-14, `exchange/getajob-leader/in/2026-09-14-…`, `Answers:` line 1):
 §2 accepted — `inbox` prints each id, its hint becomes `dismiss <agent> --id <id>` (comm.mjs 43.5 of 58 KB). §3 native
