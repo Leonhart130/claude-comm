@@ -416,6 +416,10 @@ try {
 						sig.push("--signal-src", String(c.signal.by || "unknown"))
 						if (Number.isFinite(c.age_s)) sig.push("--signal-age", String(c.age_s))
 						if (Number.isFinite(c.signal.ttl_s)) sig.push("--signal-ttl", String(c.signal.ttl_s))
+						// The armer, measured at this claim (\`FINDINGS.md#armer\`): the ledger stores it and
+						// \`classify()\` decides. Absent from an older restart-signal.mjs, and then omitted.
+						if (c.armer && typeof c.armer.state === "string") sig.push("--signal-armer", c.armer.state)
+						if (c.armer && Number.isFinite(c.armer.quiet_s)) sig.push("--signal-quiet", String(c.armer.quiet_s))
 					}
 				}
 			} catch (e) {

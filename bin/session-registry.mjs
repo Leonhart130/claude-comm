@@ -70,6 +70,33 @@ const BOOT_ID = (() => {
 export function bootId() { return BOOT_ID }
 
 /**
+ * Is the process named by (pid, start, boot) still the process that wrote them?
+ *
+ * Three ways to be gone, and none of them may read as alive:
+ *   · the pid is not running at all;
+ *   · the pid is running but started at a different time — RECYCLED, a different program;
+ *   · the machine rebooted, so "ticks since boot" is not comparable at all.
+ *
+ * A record that does not carry `start`/`boot` cannot be judged on them, and is `unknown`
+ * rather than either answer.
+ *
+ * MOVED HERE from `bin/claim.mjs`'s `holderState`, 2026-09-18, byte-for-byte in its logic,
+ * because a restart note needs the same judgment about the session that armed it and
+ * claim.mjs cannot be imported: it parses `--root` at load and may exit the importer. Two
+ * copies of "is this process still that process" is the shape this project has paid for
+ * three times; the registry is where the (pid, start, boot) key already lives.
+ */
+export function processState({ pid, start, boot } = {}) {
+	const p = Number(pid)
+	if (!Number.isFinite(p) || p <= 0) return "unknown"
+	if (start === undefined || boot === undefined) return "unknown"
+	if (boot !== BOOT_ID) return "gone"
+	const st = startTimeOf(p)
+	if (st === null) return "gone"
+	return st === start ? "alive" : "gone"
+}
+
+/**
  * `CLAUDE_COMM_RUNTIME` is a TEST SEAM and nothing else: the negative controls must build
  * their own registry rather than write into the machine's, exactly as `CLAUDE_COMM_PROJECTS`
  * does for transcripts. The `/tmp` fallback keeps the tool usable where `XDG_RUNTIME_DIR`

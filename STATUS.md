@@ -1,47 +1,47 @@
-# STATUS — claude-comm, 2026-09-13 (sessions 4–18)
+# STATUS — claude-comm, 2026-09-18 (sessions 4–19)
 
 Design and gates are in `README.md`; **this file is only what is OPEN.** Keep it short — when it grows,
 fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-09-13. **The owner handed over the whole project**; all three of his asks shipped. The field is getajob —
-work is dormant for a while.)*
+*(2026-09-18. Owner restated the full grant: plan, launch experts and adversarial reviews as needed. Session cut short
+on his credit — the plan below is the rest of it. Field = getajob; work dormant.)*
 
-**A — 🔴 FIRST: AMEND THE LAPSED-NOTE ROW.** The close printed *AMEND THE PROTOCOL* for `field:getajob@f59780`:
-acked 3× on 09-13 for one cause — "restart note LAPSED" while that leader (pid 13764) was alive and working (idle
-18:49Z, rung at rest 19:33Z, busy after). **Not `--amended` by flag: nothing it measures has changed yet.** The note
-holds `by_pid` only (`restart-signal.mjs:92`, TTL 900 s) — 🔴 and it is the ARMING CLI's pid, dead at once (armed 20:39Z: 1033917, session 663779): use `sessionPid()`, or every note reads armer-gone at birth ⇒ record `by_start` + `by_boot` at arm (bus file → release),
-then judge *armer gone* with `claim.mjs:112` `holderState`, TTL a backstop; old notes fall back to the TTL and say so.
-Read side: `boot.mjs:1013/1051/1056` (field) and `:492-497` (own tree). Arm both, `boot --prove-red`.
+**A — 🟢 BUILT, NOT RELEASED: a restart note judged by its ARMER** (`FINDINGS.md#armer`). Green: attack 68/68 (A67),
+ledger arms 20c–e/24b–c, each proved red by a mutation. 🔴 **FIRST: read the last line of
+`/tmp/claude-1000/-home-leonh-Dev-claude-comm/b52fcfeb-dec0-44ca-bf46-8232b91760c9/scratchpad/boot-pr.txt`** — `boot
+--prove-red` was still running at close (2 new pairs); if absent, re-run it. Then an **adversarial review** (Opus,
+`launch.mjs`): `armerOf`/`quiet_s`, the "only adds reboots" claim, the stub's 2 flags, `processState` moved out of
+claim.mjs. Then release, then `--amended field:getajob@f59780="a running armer's note is waiting, not lapsed"`.
 
-**0 — 🟢 `.6`–`.8` SHIPPED, all 3 trees: fresh restart (A63, A66), ring history, continuation delivery (A65), bell
-turn guard (A64)** — `FINDINGS.md#fresh-restart`, `#stop-continuation`, `#bell-mid-turn`, `#dry-run-hid-the-decision`.
-**Owed, in getajob after a field day:** read its `rings.jsonl` (the real 60-min path and a hook-spawned clear were
-never observed) · recount queued doorbells (A62) and continuation deliveries (A65). `work`: deferred. A per-agent
-threshold only if a field start measures > 300 k.
+**B — 🔴 THE EROSION COUNTER IS EVADED BY PARAPHRASE** (`#armer`, 2nd finding): one getajob cause acked 6× under 5
+wordings. Rows declare machine cause codes where they compute them (field: drift·stale·unaddressable·stranded·shared·
+claim-gone·claim-bad·note-lapsed·note-bad; channel: unanswered; tree: dirty·unpushed); close counts per (row, code);
+no codes ⇒ the why-hash. Arm: one cause, 3 wordings ⇒ AMEND.
 
-**1 — 🟢 SETTLED 2026-09-13** (`CHANGELOG.md`, `FINDINGS.md`): review #10 · model + effort per launch (A57) ·
-overflow drain (A60) · unknown flags refuse (A61) · no ring mid-turn (A62) · `context.mjs`'s one-call lag named at
-`lastUsage`. 🟡 Unexplained: ~31 silent listeners until A59.
+**C — 🟡 AMEND `field:<peer>` on that evidence** (same boot pass as B): the PEER's own state is printed, not gated —
+stranded mail (`send` already tells their leader "NOT running — held in inbox"; 6 acks), gone-holder claims and lapsed
+notes (work: 6 acks, "only that leader can"). Stays gated: drift, stale, unaddressable, bus not answering, shared
+inbox, corrupt/unreadable. The loop excludes ROOT, so this repo stays gated. Re-point the "mail STRANDED" arm.
 
-**3 — ⚠️ A DOORBELL NOBODY RECORDS RINGING** (12:50:25Z). 🟢 **The history exists since `.6`**: every ring,
-append-only, with the parent's command line — so the NEXT unexplained ring is attributable. That one stays
-unexplained: kitty itself and a hand were never checked.
+**D — reply to getajob n°3** (unanswered since 09-14, `exchange/getajob-leader/in/2026-09-14-…`, `Answers:` line 1):
+§2 accepted — `inbox` prints each id, its hint becomes `dismiss <agent> --id <id>` (comm.mjs 43.5 of 58 KB). §3 native
+`ListAgents`/`SendMessage`: this session's `ListAgents` saw 6 getajob sessions (not `extension`: not running). Measure
+on MY OWN launched expert first (reaches an IDLE session? leaves a trace? survives a restart?), never on theirs.
 
-**4 — 🔴 RUN THE CONTROLS FIRST**, `CLAUDE_COMM_AGENT` set (A48), output **to a file**; read the suite's LAST
-LINE, never a wrapper's exit code. ⚠️ **Never two suites at once** — they share kitty and make reds that look
-like findings; a runner in copies waits on a done-file. 🔴 **zsh:** quote globs, never `echo ===`, no bare
-`$args` — three silent non-runs today.
+**E — getajob `envoi`**: on their roster, `apps/envoi/.claude/` never installed (boot ✗ DRIFT), `envoi-d1` ran 11 h
+off the bus. Install with the release; say so in D.
 
-**5 — 🟡 CARRIED:** #9 A3 · C7 · #8 A3 (minor) · `who`'s third and fourth states · `dismiss --citing` ·
-`comm wait --for` · context.mjs's two `/clear` limits (do not "fix" with a guess) · the letter to `work`'s
-leader still unread, two `zz-` claims there held by dead pids · the automatic restart trigger (ledger
-UNKNOWN) · boot's `channel:` row dates a letter by its filename (review #8 C3, deliberate): "arrived 13h ago" of one an
-hour old, and on a same-day tie it names readdir's first, not the newest — wording, not verdict. 🔴 09-13: it said "arrived 19h ago" of a letter minutes old ON THE ROW THAT
-REFUSED A CLOSE — the one row a reader must act on. Re-open C3 in a fresh session (`boot --prove-red`, ~13 min). A fresh review runs on Opus: the field's rule says never Sonnet for review.
-**Later, in the owner's order (2026-09-13):** agents reaching for the bus unprompted (MCP and/or skill — measure
-where they failed first) → the Rust port → what the tool can earn him, worked out with getajob's leader.
+**F — release** after A's review, with B–E: CHANGELOG, selftest (stub changed), install into getajob, electio, work
+AND here — ⚠ this tree's `INSTALLED.json` reads `.8` over the 09-18 working copy (an accident, `#armer`). Add a boot
+row for ROOT's own `.comm/bin` vs `bin/` (form A: two releases behind, unseen).
+
+**Carried:** getajob owes a field-day read of `rings.jsonl` and a recount (A62, A65) · the 12:50Z unattributed ring ·
+run controls to a FILE, never two suites at once, zsh quoting · #9 A3 · C7 · `who`'s 3rd/4th states · `dismiss
+--citing` · `comm wait --for` · context.mjs's `/clear` limits · work: unread letter, two `zz-` claims on dead pids ·
+the restart trigger (ledger UNKNOWN) · C3 (channel row dates by filename; re-open fresh, Opus). **Later, owner's
+order:** adoption (MCP/skill, measured first) → Rust port → value, with getajob's leader.
 
 ## Where it stands
 

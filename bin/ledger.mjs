@@ -59,11 +59,13 @@
  *    `record defect` therefore REFUSES a defect with no authored time unless the caller
  *    says `--authored-unknown` out loud, and that admission lands in property 3's pool.
  */
-import { readFileSync, writeFileSync, appendFileSync, existsSync, readdirSync, statSync, mkdirSync, mkdtempSync, rmSync } from "node:fs"
+import { readFileSync, writeFileSync, appendFileSync, existsSync, readdirSync, statSync, mkdirSync, mkdtempSync, rmSync, utimesSync } from "node:fs"
 import { join, dirname, resolve, basename } from "node:path"
 import { tmpdir } from "node:os"
 import { fileURLToPath } from "node:url"
 import { spawnSync } from "node:child_process"
+import { armerOf } from "./restart-signal.mjs"
+import { bootId, startTimeOf } from "./session-registry.mjs"
 
 const ARGV = process.argv.slice(2)
 const has = (f) => ARGV.includes(f)
@@ -227,8 +229,18 @@ function writeRecord() {
 			const sigSrc = opt("--signal-src", null)
 			const sigAge = numOrNull("--signal-age")
 			const sigTtl = numOrNull("--signal-ttl")
-			rec.signal = sigSrc === null && sigAge === null && sigTtl === null
-				? null : { src: sigSrc, age_s: sigAge, ttl_s: sigTtl }
+			// THE ARMER, as measured at the claim — the only moment it can be: once the
+			// successor runs, /proc can no longer say whether the session that declared the
+			// restart was still alive when it started. Stored verbatim, never applied, like the
+			// age and like `source`: `signalIsFresh` honours the one exact string "gone" and
+			// nothing else, so a value this version does not know cannot promote a start —
+			// and refusing it here would cost the whole start record, which is worse.
+			// `FINDINGS.md#armer`.
+			const sigArmer = opt("--signal-armer", null)
+			const sigQuiet = numOrNull("--signal-quiet")
+			rec.signal = sigSrc === null && sigAge === null && sigTtl === null && sigArmer === null
+				? null : { src: sigSrc, age_s: sigAge, ttl_s: sigTtl,
+					...(sigArmer === null ? {} : { armer: sigArmer, quiet_s: sigQuiet }) }
 			// WHAT WAS WAITING IN FRONT OF THE SESSION WHEN IT OPENED — the covariate the
 			// ~/Dev/work leader's measurement demanded, and the one his measurement KILLED is
 			// not this one. He priced a crashed restart at 115 609 tokens against a declared
@@ -403,16 +415,35 @@ function armedNotes(handoffDir, agentFilter = null) {
 	for (const f of names) {
 		let d = null
 		try { d = JSON.parse(readFileSync(join(dir, f), "utf8")) } catch { out.unreadable++; continue }
-		if (!d || typeof d !== "object") { out.unreadable++; continue }
+		if (!d || typeof d !== "object" || Array.isArray(d)) { out.unreadable++; continue }
+		const now = Date.now()
 		const t = Date.parse(d.at)
-		const age = Number.isFinite(t) ? (Date.now() - t) / 1000 : null
+		const age = Number.isFinite(t) ? (now - t) / 1000 : null
 		const ttl = typeof d.ttl_s === "number" && Number.isFinite(d.ttl_s) ? d.ttl_s : null
+		const armer = armerOf(d, { now })
 		// The MEANING comes from one place: the same rule that will judge the record when
 		// this note is finally claimed. A second freshness test here could disagree with
 		// the classification, and a boot row that says "fresh" over a ledger that will
 		// score it cold is worse than no row at all.
+		//
+		// ONE STATE HAS NO CLAIM-TIME TWIN, and it is the one the 09-13 acknowledgements were
+		// about: the armer is still RUNNING. Nothing has been claimed, so nothing can have
+		// lapsed — the restart it declared simply has not happened. Its promise will run
+		// from that session's last sign of life, which `signalIsFresh` measures when the
+		// successor claims it. Reported as `waiting`, never as fresh-by-the-clock, so the row
+		// can say which of the two it is.
+		// A note with no usable promise can never score a reboot, so it is not waiting for
+		// anything — it stays on the rule, which calls it lapsed.
+		const waiting = (armer.state === "alive" || armer.state === "self") && ttl !== null && ttl > 0
+		// WHICH REASON keeps it live, so a row can say it instead of implying the clock:
+		// `running` its armer has not exited · `clock` inside the promise since it was armed ·
+		// `quiet` its armer exited and went quiet inside the promise · null: lapsed.
+		const basis = waiting ? "running"
+			: signalIsFresh({ age_s: age, ttl_s: ttl }) ? "clock"
+			: signalIsFresh({ age_s: age, ttl_s: ttl, armer: armer.state, quiet_s: armer.quiet_s }) ? "quiet" : null
 		out.notes.push({ agent: basename(f, ".json"), age_s: age, ttl_s: ttl, by: d.by || null,
-			prev_session: d.prev_session || null, fresh: signalIsFresh({ age_s: age, ttl_s: ttl }) })
+			prev_session: d.prev_session || null, armer: armer.state, quiet_s: armer.quiet_s, by_pid: d.by_pid ?? null,
+			waiting, basis, fresh: basis !== null })
 	}
 	return out
 }
@@ -449,11 +480,28 @@ function signalIsFresh(sig) {
 	// arithmetic. A string "5" is refused for the same reason: it did not come from the
 	// writer, so it is not a measurement this file made.
 	const num = (x) => (typeof x === "number" && Number.isFinite(x) ? x : null)
-	const age = num(sig.age_s)
-	if (age === null || age < 0) return false
 	const ttl = num(sig.ttl_s)
 	if (ttl === null || ttl <= 0) return false
-	return age <= Math.min(ttl, SIGNAL_TTL_MAX_S)
+	const bound = Math.min(ttl, SIGNAL_TTL_MAX_S)
+	const age = num(sig.age_s)
+	if (age !== null && age >= 0 && age <= bound) return true
+	// THE ARMER, 2026-09-18 (`FINDINGS.md#armer`). The clock above counts from the moment the
+	// note was ARMED, and the natural moment to arm is the start of a close, which does not
+	// fit in the promise: a real restart that followed a long close scored COLD, and three
+	// acknowledgements on 09-13 were a note "lapsed" under a leader still working. The
+	// promise is about how long a human may take to relaunch, so it is measured from the
+	// armer's LAST SIGN OF LIFE when the note can name one: its session gone at the claim,
+	// its transcript last written within the promise.
+	//
+	// It only ADDS reboots, never removes one the clock granted, and only on a measurement:
+	// `alive` (a second session while the armer runs), `self` (a /clear or compaction —
+	// `source` classifies those below), `unknown` and an unmeasured `quiet_s` all stay on
+	// the clock, and a negative quiet is a clock problem, not the freshest reading.
+	if (sig.armer === "gone") {
+		const quiet = num(sig.quiet_s)
+		if (quiet !== null && quiet >= 0 && quiet <= bound) return true
+	}
+	return false
 }
 
 /**
@@ -729,7 +777,10 @@ function render(a) {
 		for (const n of a.armed.notes) {
 			const age = n.age_s === null ? "age unmeasurable" : `${Math.round(n.age_s / 60)}m old`
 			const promise = n.ttl_s === null ? "no promise declared" : `${Math.round(n.ttl_s / 60)}m promise`
-			lines.push(`    ${n.agent.padEnd(10)} ${age} of its ${promise}${n.by ? ` (by ${n.by})` : ``}` +
+			const armer = n.basis === "running" ? `   its armer (pid ${n.by_pid}) is still running — nothing has lapsed`
+				: n.basis === "quiet" ? `   its armer exited, quiet ${Math.round(n.quiet_s / 60)}m — waiting for the relaunch`
+				: ``
+			lines.push(`    ${n.agent.padEnd(10)} ${age} of its ${promise}${n.by ? ` (by ${n.by})` : ``}${armer}` +
 				(n.fresh ? `` : `   ⚠ LAPSED — the next start will be scored COLD; re-arm it as the LAST act before the restart`))
 		}
 	}
@@ -1220,6 +1271,48 @@ function proveRed() {
 			withArm.caveats.length === 1 && /CRASHES/.test(withArm.caveats[0]) && withoutArm.caveats.length === 0,
 			`reboot=${withArm.starts.reboot} -> ${withArm.caveats.length} caveat(s); ` +
 			`reboot=${withoutArm.starts.reboot} -> ${withoutArm.caveats.length}`)
+
+		// 20c. THE ARMER (`FINDINGS.md#armer`). The restart the clock used to lose: a note
+		//      armed at the start of a long close, its session exiting at the end of it. The
+		//      clock is SPENT in both worlds (4000 s of a 900 s promise); the one variable is
+		//      how long the armer had been quiet when its successor claimed the note.
+		const late = (q) => world(`sig-armer-q${q}`, { src: "test", age_s: 4000, ttl_s: 900, armer: "gone", quiet_s: q })
+		const inside = late(120), outside = late(1000)
+		check("an armer gone quiet inside the promise still scores its restart",
+			inside.starts.reboot === 1 && outside.starts.reboot === 0,
+			`clock spent; armer gone, quiet 120s -> reboot=${inside.starts.reboot}; quiet 1000s -> reboot=${outside.starts.reboot}`)
+
+		// 20d. ...and ONLY a measured "gone" extends it. An armer ALIVE at the claim is a second
+		//      session beside it, not its successor; `self` is a /clear, which `source`
+		//      classifies; an unmeasured, negative or string quiet is not a measurement; a state
+		//      this version does not know is not "gone" however it is spelled. Every case
+		//      carries the quiet that promoted 20c, which is this arm's positive control.
+		const cases = [["alive", "alive", 120], ["self", "self", 120], ["unknown", "unknown", 120],
+			["GONE", "GONE", 120], ["nullq", "gone", null], ["negq", "gone", -5], ["strq", "gone", "120"]]
+		const promoted = cases.filter(([tag, a, q]) =>
+			world(`sig-armer-${tag}`, { src: "test", age_s: 4000, ttl_s: 900, armer: a, quiet_s: q }).starts.reboot !== 0).map(([tag]) => tag)
+		check("only an armer measured GONE and quiet in time extends the clock",
+			promoted.length === 0, promoted.length ? `promoted by: ${promoted.join(", ")}` : `${cases.length} near-misses, none promoted`)
+
+		// 20e. THE PATH THE CLAIMERS USE — `record start --signal-armer/--signal-quiet`, which
+		//      the stub and `boot --hook` send. A value this version does not know is STORED,
+		//      not refused: a refusal costs the whole start record, and 20d proves an unknown
+		//      value cannot promote. One variable: the armer string.
+		{
+			const cli = (name, armer) => {
+				const r = join(dir, name)
+				mkdirSync(join(r, ".comm", "handoff"), { recursive: true })
+				for (let k = 0; k < 2; k++) writeFileSync(join(r, ".comm", "handoff", "leader.log"), JSON.stringify(st(k, {})) + "\n", { flag: "a" })
+				const w = rec(r, ["start", "--agent", "leader", "--source", "startup", "--session", "s9", "--signal-src", "test",
+					"--signal-age", "4000", "--signal-ttl", "900", "--signal-armer", armer, "--signal-quiet", "60"])
+				return { exit: w.status, q: run(r) }
+			}
+			const gone = cli("sig-cli-gone", "gone"), odd = cli("sig-cli-odd", "departed")
+			check("the claimers' flags cross, and an unknown armer is stored, not refused",
+				gone.exit === 0 && gone.q.starts.reboot === 1 && odd.exit === 0 && odd.q.starts.reboot === 0 && odd.q.records === 3,
+				`--signal-armer gone -> exit ${gone.exit}, reboot=${gone.q.starts.reboot}; ` +
+				`"departed" -> exit ${odd.exit}, reboot=${odd.q.starts.reboot}, records=${odd.q.records}`)
+		}
 	}
 
 	// ── ARMED NOTES: the only state here that is about the future ──────────────────
@@ -1279,6 +1372,34 @@ function proveRed() {
 		check("a project with no restart directory reports no notes",
 			none.armed.notes.length === 0 && none.armed.unreadable === 0,
 			`no .comm/restart at all -> notes=${none.armed.notes.length}, unreadable=${none.armed.unreadable}`)
+
+		// 24b. THE 2026-09-13 ACKNOWLEDGEMENTS: "LAPSED" three times under a leader that was
+		//      alive and still working. A note long past its clock whose ARMER IS RUNNING has
+		//      not lapsed - the restart it declared has not happened. One variable: whether
+		//      (pid, start, boot) still names a live process. This process is the live armer;
+		//      the same record with its start tick moved is a recycled pid, i.e. gone, and
+		//      with no transcript to measure it falls back to the clock - which is spent.
+		{
+			const live = { ...note(4000, 900), by_pid: process.pid, by_start: startTimeOf(process.pid), by_boot: bootId() }
+			const running = run(mkNote("note-running", live)).armed.notes[0] || {}
+			const recycled = run(mkNote("note-recycled", { ...live, by_start: live.by_start + 1 })).armed.notes[0] || {}
+			check("a note whose armer still runs has not lapsed; the same note, armer gone, has",
+				running.fresh === true && running.basis === "running" && recycled.fresh === false && recycled.armer === "gone",
+				`armer alive -> fresh=${running.fresh} basis=${running.basis}; start moved -> fresh=${recycled.fresh} armer=${recycled.armer}`)
+
+			// 24c. An armer that has EXITED is judged from its last sign of life: its transcript's
+			//      mtime. One variable: that mtime, either side of the promise. A dead pid with a
+			//      start and boot is gone; the clock is spent in both.
+			const tx = join(dir, "armer-transcript.jsonl")
+			writeFileSync(tx, "{}\n")
+			const dead = { ...note(4000, 900), by_pid: 4194303, by_start: 1, by_boot: bootId(), by_transcript: tx }
+			const at = (sAgo) => { const t = new Date(Date.now() - sAgo * 1000); utimesSync(tx, t, t) }
+			at(120); const quiet = run(mkNote("note-quiet", dead)).armed.notes[0] || {}
+			at(2000); const silent = run(mkNote("note-silent", dead)).armed.notes[0] || {}
+			check("an exited armer quiet inside its promise waits; quiet past it has lapsed",
+				quiet.fresh === true && quiet.basis === "quiet" && silent.fresh === false && silent.armer === "gone",
+				`transcript 120s old -> fresh=${quiet.fresh} basis=${quiet.basis}; 2000s old -> fresh=${silent.fresh} armer=${silent.armer}`)
+		}
 
 		// 25. WHOSE notes. Review #6 F10: every arm above asked an unfiltered ledger, so
 		//     `armedNotes` could ignore `--agent` entirely - and it did - while all of them

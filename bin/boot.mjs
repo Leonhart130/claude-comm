@@ -38,7 +38,7 @@ import { join, dirname, resolve, basename } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { execFileSync, spawnSync, spawn } from "node:child_process"
 import { createHash } from "node:crypto"
-import { record as registryRecord, lookup as registryLookup, registryDir, sessionPid } from "./session-registry.mjs"
+import { record as registryRecord, lookup as registryLookup, registryDir, sessionPid, startTimeOf, bootId } from "./session-registry.mjs"
 
 const ARGV = process.argv.slice(2)
 const has = (f) => ARGV.includes(f)
@@ -118,6 +118,26 @@ const age = (ms) => {
 	if (s < 5400) return `${Math.round(s / 60)}m`
 	if (s < 172800) return `${Math.round(s / 3600)}h`
 	return `${Math.round(s / 86400)}d`
+}
+/**
+ * A restart note, in the words of the reason the ledger gave for it (`basis`). ONE
+ * rendering for the `ledger` row and every `field:` row: the two used to word the same
+ * note differently, and both implied the clock was the only thing that could keep it live.
+ *
+ * `running` is the state three acknowledgements on 2026-09-13 were about — "LAPSED" printed
+ * under a leader that was alive and still working. Nothing has lapsed while the armer runs:
+ * the restart it declared has not happened yet. `FINDINGS.md#armer`.
+ */
+const noteWords = (n) => {
+	const promise = n.ttl_s === null || n.ttl_s === undefined ? "no promise" : `${age(n.ttl_s * 1000)} promise`
+	const old = n.age_s === null || n.age_s === undefined ? "age unmeasurable" : `armed ${age(n.age_s * 1000)} ago`
+	if (n.basis === "running") return `◷ restart note for ${n.agent} (${old}) - its armer${n.by_pid ? ` (pid ${n.by_pid})` : ""} is still running, so nothing has lapsed: the ${promise} counts from its exit`
+	if (n.basis === "quiet") return `◷ restart note for ${n.agent} waits for the relaunch - its armer exited, quiet ${age(n.quiet_s * 1000)} of a ${promise}`
+	if (n.fresh) return `◷ restart note for ${n.agent} (${old}, ${promise})`
+	const why = n.armer === "gone"
+		? (n.quiet_s === null || n.quiet_s === undefined ? "its armer exited and its last activity could not be measured" : `its armer exited ${age(n.quiet_s * 1000)} ago with no relaunch`)
+		: "judged on the clock alone - the note names no session"
+	return `⚠ the restart note for ${n.agent} has LAPSED (${old}, ${promise}; ${why}) - its next start scores COLD`
 }
 const sha = (p) => { try { return createHash("sha256").update(readFileSync(p)).digest("hex").slice(0, 12) } catch { return null } }
 const git = (...a) => {
@@ -422,6 +442,10 @@ if (has("--hook")) {
 					sig.push("--signal-src", String(c.signal.by || "unknown"))
 					if (Number.isFinite(c.age_s)) sig.push("--signal-age", String(c.age_s))
 					if (Number.isFinite(c.signal.ttl_s)) sig.push("--signal-ttl", String(c.signal.ttl_s))
+					// The armer, measured at this claim (`FINDINGS.md#armer`): the ledger stores it
+					// and `classify()` decides. Absent from an older restart-signal.mjs, and omitted.
+					if (c.armer && typeof c.armer.state === "string") sig.push("--signal-armer", c.armer.state)
+					if (c.armer && Number.isFinite(c.armer.quiet_s)) sig.push("--signal-quiet", String(c.armer.quiet_s))
 				}
 			}
 		} catch (e) {
@@ -485,12 +509,9 @@ if (has("--hook")) {
 		// use showed nothing anywhere would say so: the ~/Dev/work leader armed one at the
 		// start of its close with a 15-minute promise, and a close does not fit in fifteen
 		// minutes. It was visible only because I happened to be watching his screen.
-		for (const n of (a.armed && a.armed.notes) || []) {
-			const age = n.age_s === null ? "age unmeasurable" : `${Math.round(n.age_s / 60)}m old`
-			bits.push(n.fresh
-				? `◷ a restart note is armed for ${n.agent} (${age}, ${n.ttl_s === null ? "no promise" : `${Math.round(n.ttl_s / 60)}m promise`})`
-				: `⚠ the restart note for ${n.agent} has LAPSED (${age}) - the next start scores COLD; re-arm it as the LAST act before the restart`)
-		}
+		// In THIS tree the fix is mine, so a lapsed note keeps its instruction.
+		for (const n of (a.armed && a.armed.notes) || [])
+			bits.push(n.fresh ? noteWords(n) : `${noteWords(n)}; re-arm it as the LAST act before the restart`)
 		if (a.armed && a.armed.unreadable) bits.push(`⚠ ${a.armed.unreadable} restart note(s) the ledger could not read`)
 		const lapsed = ((a.armed && a.armed.notes) || []).some((n) => !n.fresh) || (a.armed && a.armed.unreadable)
 		const bad = a.unreadable || (a.unreadableFiles && a.unreadableFiles.length) || a.dirUnreadable
@@ -1047,8 +1068,7 @@ function askBus(sessionPidForCwd) {
 				? [`${claims.filter((c) => c.state === "held").length} resource(s) claimed: ${claims.filter((c) => c.state === "held").map((c) => c.resource).join(", ")}`] : []),
 			...notes.map((n) => n.unread === "dir" ? `⚠ ${noteFiles.length} restart note(s) are here and ${join(p, ".comm", "restart")} could not be read`
 				: n.unread === "ledger" ? `⚠ ${noteFiles.length} restart note(s) are here and bin/ledger.mjs could not be asked about them`
-				: n.fresh ? `◷ restart note armed for ${n.agent} (${Math.round((n.age_s || 0) / 60)}m of ${Math.round((n.ttl_s || 0) / 60)}m)`
-				: `⚠ the restart note for ${n.agent} has LAPSED - its next start will score COLD`),
+				: noteWords(n)),
 		]
 		// `pending` no longer reddens on its own: see the amendment above. What reddens is mail
 		// that is STRANDED, or a bus that could not be asked and so cannot tell the two apart.
@@ -2193,6 +2213,35 @@ function proveRed() {
 		rmSync(notePath, { force: true })
 		assert("ledger: a note inside its promise does NOT redden the row", lv === OK,
 			`a note 0s old of a 900s promise -> ${LV[lv]} (must stay ok)`)
+	}
+
+	// THE 2026-09-13 ACKNOWLEDGEMENTS, armed in both rows that render a note (`FINDINGS.md#armer`).
+	// A note an hour past its 15-minute clock whose ARMER IS STILL RUNNING has not lapsed: the
+	// restart it declared has not happened. The live armer is this process, named by (pid,
+	// start, boot). One variable per pair: the start tick, moved by one - a recycled pid, i.e.
+	// an armer that is GONE with no transcript to measure, which falls back to the spent clock
+	// and must redden. That half is the positive control: without it a row that had stopped
+	// reading notes at all would pass the first half.
+	{
+		const liveNote = (start) => JSON.stringify({ v: 1, at: new Date(Date.now() - 3600_000).toISOString(),
+			agent: "leader", prev_session: "p", ttl_s: 900, by: "prove-red",
+			by_pid: process.pid, by_start: start, by_boot: bootId() }) + "\n"
+		const st0 = startTimeOf(process.pid)
+		const fieldNote = join(proj, ".comm", "restart", "leader.json")
+		const pair = (label, path) => {
+			mkdirSync(dirname(path), { recursive: true })
+			writeFileSync(path, liveNote(st0)); const running = rowOf(run(true), label)
+			writeFileSync(path, liveNote(st0 + 1)); const gone = rowOf(run(true), label)
+			rmSync(path, { force: true })
+			return { running, gone }
+		}
+		const own = pair("ledger", notePath), peer = pair("field:proj", fieldNote)
+		assert("ledger: a note whose armer still RUNS has not lapsed; armer gone, it has",
+			own.running.level === OK && /still running/.test(own.running.text) && own.gone.level === WARN && /LAPSED/.test(own.gone.text),
+			`armer alive -> ${LV[own.running.level]}; start tick moved -> ${LV[own.gone.level]} (must be ok, then warn)`)
+		assert("field: a peer's note whose armer still RUNS has not lapsed; armer gone, it has",
+			peer.running.level === OK && /still running/.test(peer.running.text) && peer.gone.level === WARN && /LAPSED/.test(peer.gone.text),
+			`armer alive -> ${LV[peer.running.level]}; start tick moved -> ${LV[peer.gone.level]} (must be ok, then warn)`)
 	}
 
 	const busFile = join(pkg, "bin", "comm.mjs")

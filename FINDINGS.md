@@ -2906,3 +2906,51 @@ each mutation of `wake.mjs` reddens A66 alone — the report limited to agents w
 nothing printed by the CLI; a name missing from the roster skipped → `report rows 4`; the report printed on every run
 → the positive control reddens. Live on getajob, read-only: five rows, `cv` busy, `web` idle with no call since its
 clear, three not running.
+
+## `#armer` — a restart note judged by the session that armed it, not only by the clock
+
+**2026-09-18, STATUS ▶ NEXT A.** The close demanded an amendment for `field:getajob@f59780`: acknowledged 5× (plus once
+as `@06a61b`) for one cause — *"restart note lapsed on the TTL while that leader kept working"*. The row was right by its
+rule and useless: a note cannot have lapsed while the session that declared the restart is still running, because
+the restart has not happened.
+
+**Why nothing could ask that question.** `arm()` wrote `by_pid: process.pid` — the pid of the CLI, dead the moment the
+note was on disk. Measured on the note armed for the 09-13 reboot: `by_pid` 1033917, the arming session 663779. Every
+note named an armer that was gone at birth.
+
+**What changed.**
+- `arm()` records the SESSION — `sessionPid()`, plus `by_start`, `by_boot` and `by_transcript` from the registry. A
+  note armed from a plain terminal has no session ancestor: it keeps the caller's pid and no start/boot, and is judged
+  on the clock alone, as before.
+- One liveness rule: `holderState`'s body moved to `session-registry.mjs` as `processState` (`claim.mjs` delegates —
+  it cannot be imported, it parses `--root` at load and may exit the importer).
+- `restart-signal.mjs armerOf()` — `alive` · `self` · `gone` (with `quiet_s`, the age of its transcript's last write)
+  · `unknown`. `claim()` measures it at the one moment it exists and both claimers pass it to `record start`.
+- `signalIsFresh` = the old clock **or** (`armer === "gone"` and `0 ≤ quiet_s ≤ min(ttl, 3600)`). **Monotone: it only
+  adds reboots** — `alive`, `self`, `unknown`, an unmeasured, negative or string quiet all stay on the clock. An armer
+  string this version does not know is stored, not refused: a refusal costs the whole start record.
+- Report side (`armedNotes`, both boot rows): a running armer is `waiting`, never lapsed, and the row says which
+  `basis` keeps a note live — `running`, `clock` or `quiet`.
+
+**Arms.** Ledger 20c (clock spent, quiet 120 s → reboot, 1000 s → cold), 20d (seven near-misses, none promoted), 20e (the
+CLI path the claimers use), 24b (armer alive → waiting; start tick moved → lapsed), 24c (transcript mtime either side of
+the promise). `attack` A67 (a stand-in session with `argv0: claude` arms as its child: the note names it, not the CLI,
+and the claim sees it gone). `boot --prove-red`: the pair in the `ledger` row and in a peer's `field:` row. **Proved red
+in a copy**, one mutation each: the `gone` branch removed → 20c, 20e, 24c red · any armer extending → 20d, 20e ·
+`waiting` ignored → 24b · an unknown armer refused → 20e.
+
+**Limits, named.** `quiet_s` is the last *write*, so an armer left idle before its window was closed looks quieter than
+it was — this errs toward COLD, a restart lost rather than a cold start promoted. A relaunch that OVERLAPS its armer (the
+new window opened before the old one closed) sees `alive` and stays on the clock. A registry miss at arm leaves no
+transcript and no quiet. Notes armed before today carry no start/boot (work's lapsed note is one). **Not yet observed
+under a real restart**, and the stub half reaches the field only with the next release.
+
+**Two things this work found that are not this fix.**
+- 🔴 **The erosion counter is evaded by paraphrase.** `field:getajob` shows ONE cause — *their expert has mail and is not
+  running; only their leader relaunches it* — acknowledged 6× under 5 wordings (ring counts, release numbers, one
+  dropped article), so no `@sig` ever reached 3. `#ack-amendment` rejected keying on the ROW's text because it varies
+  with ages, pids and filenames; the operator's text varied for the same reason.
+- ⚠️ **This repo's own `.comm/bin` was two releases behind the field** (`2026-09-11.7` while getajob ran `.8`), and no
+  row says so: the `field:` loop excludes `ROOT` by design. LESSONS form A. And the way I found it is its own defect:
+  `import("install.mjs")` used as a syntax check RAN it, installing this working copy into this tree (`INSTALLED.json`
+  now reads `.8` over bytes that are not `.8`). `node --check` was the check; an import of a script is an execution.
