@@ -2281,6 +2281,10 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	const sShared = skillOf(r75s)
 	const sharedChk = spawnSync(process.execPath, [join(PKG, "install.mjs"), r75s, "--check"], { encoding: "utf8" })
 	const sharedOK = sharedChk.status === 0 && /This folder is shared by `leader`, `helper`/.test(sShared) && !/You are \*\*/.test(sShared)
+	// NO CONTROL BYTE IN A GENERATED FILE (2026-09-19): an escape written with one backslash inside the stub's template
+	// literal put a RAW NUL in the generated hook - it ran, and git would have shown every field stub as binary.
+	const ctrl = (f) => { try { return /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(readFileSync(f, "utf8")) } catch { return true } }
+	const noCtrl = !ctrl(join(webDir, ".claude", "comm-hook.mjs")) && !ctrl(join(webDir, ".claude", "skills", "claude-comm", "SKILL.md"))
 	const fresh = spawnSync(process.execPath, [join(PKG, "install.mjs"), r74, "--check"], { encoding: "utf8" })
 	// Guarded: with no skill written (the defect this arm exists for) the edit must not ABORT the suite and hide
 	// every arm after it - it must leave this one red. Found by mutation: an unguarded write threw ENOENT.
@@ -2288,11 +2292,11 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	const edited = spawnSync(process.execPath, [join(PKG, "install.mjs"), r74, "--check"], { encoding: "utf8" })
 	const drift = fresh.status === 0 && edited.status !== 0 && /claude-comm\/SKILL\.md/.test(`${edited.stdout}${edited.stderr}`)
 	check("A75 the installer writes the claude-comm skill for every agent, true from that agent's folder",
-		front(sLead) && front(sWeb) && roles && skillPaths && drift && star && sharedOK,
+		front(sLead) && front(sWeb) && roles && skillPaths && drift && star && sharedOK && noCtrl,
 		`frontmatter leader/expert=${front(sLead)}/${front(sWeb)}; roles differ where they must=${roles}; every node path resolves=${skillPaths}; ` +
 		`--check fresh -> exit ${fresh.status}, after a hand edit -> exit ${edited.status}, names the skill=${drift}; ` +
 		`only the leader's names exchange/, the expert's sends it to its leader, pointer first=${star}; ` +
-		`a folder shared by two agents -> one role-free skill, --check exit ${sharedChk.status}=${sharedOK}`)
+		`a folder shared by two agents -> one role-free skill, --check exit ${sharedChk.status}=${sharedOK}; no control byte in the generated stub or skill=${noCtrl}`)
 
 	writeFileSync(join(webDir, "notes.md"), "- finish the parser\n")
 	writeFileSync(join(webDir, "src.txt"), "read me\n")
@@ -3608,7 +3612,8 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	// and equally for a box where every window happens to be in one tab.
 	let optOutElsewhere = false
 	if (caller) {
-		const run = spawnSync(process.execPath, [L50, "db", ...T50, "--os-window"], { cwd: r50, encoding: "utf8", env: env50 })
+		// --minimized: the owner asked (2026-09-19) that this control stop popping a window over his work at every run.
+		const run = spawnSync(process.execPath, [L50, "db", ...T50, "--os-window", "--minimized"], { cwd: r50, encoding: "utf8", env: env50 })
 		const id = Number((run.stdout.match(/window: (\d+)/) || [])[1])
 		if (Number.isInteger(id) && id > 0) {
 			opened.push([caller.sock, id])

@@ -3178,3 +3178,30 @@ deliver, two sessions on one inbox and anything unreadable still do — *"l'outi
 
 **What would make this wrong:** a dormant field waking without the file being edited. Its row keeps printing the
 decision and its date, so a new start in that tree (the ledger records it) is the prompt to ask him.
+
+## `#review12` — review #12 on the onboarding batch: no red, five yellows, all disposed (2026-09-19)
+
+`review/REVIEW-12.md`, target `cd0ad2c..1e9e00a`. The reviewer measured every finding with one variable moved.
+
+| # | finding | disposition | arm | mutation → red |
+| --- | --- | --- | --- | --- |
+| D1 🟡 | `--root` asked identity at the root: an expert overwrote the leader's handoff and armed its reboot | identity asked where the caller stands whenever it is inside the project; outside, only `--agent` | A76 | identity at `ROOT` again → A76 alone |
+| D2 🟢 | no project and no `--root` wrote a stray `.comm/` and printed "armed" | refused in `prepare`/`write` (not at load: the files' own `--prove-red` pass `--root`) | A76 | refusal removed → A76 alone |
+| E1 🟡 | the ledger guard read `sessionPid() = 0` (nothing found) as FOREIGN | 0 is "cannot tell": the ledger records. The reviewer's positive test through `~/.claude/sessions` is NOT built | A77, split out of A74 | `ownsSession(0)` again → A77 alone; guard removed → A77 alone |
+| F1 🟡 | dormancy stopped gating on claims the TOOL cannot read (corrupt, EACCES); and no tripwire for a field waking up | only a GONE claim stops gating; a live session or a start after `since` WARNs `dormant-awake` | boot `--prove-red` dormant arm | old clause → dormant arm; `awake` forced false → dormant arm |
+| C1 🟡 | the skill sent EXPERTS to the maintainer's `exchange/` (around the star), and put "where to read" LAST in notes (LESSONS form AE) | an expert's skill sends bus defects to its leader; only the leader's names `exchange/`; pointer first in the skill AND the introduction | A74, A75 | expert names exchange → A75 alone; old note order → A74 alone |
+| C2 🟡 | two agents in one folder: the last one's skill won, `--check` red from birth | one skill per folder, role-free when shared | A75 | per-agent write again → A75 alone |
+| A1 🟢 | notices cross `spawnSync`'s argv: a NUL threw (mail waiting), 140 kB gave E2BIG (mail waiting, silent) | NUL-stripped and capped in the stub; a spawn that fails with notices delivers without them; `delivered.error` reported | A78 | stub unbounded → A78 alone |
+| A2 🟢 | a marker is written when the bus RAN, not when it SHOWED the notice (new stub + old bus) | **named, not fixed**: unreachable through the installer's write order | — | — |
+| form | the phantom refusal lived in A74 ("tells the agent who it is"); the introduction in A29 ("records a start") | A77 has its own title; A29's names "mail and introduction in one JSON" | — | — |
+
+**One more, mine, found while building the mutations:** A1's fix wrote `\u0000` with ONE backslash inside the stub's
+template literal, so the generated hook carried a RAW NUL byte. It ran (A78 green), and git would have shown every
+field stub as binary. Never installed anywhere. A75 now refuses any control byte in a generated file; mutation
+(single backslash back) → A75 alone.
+
+**Also named, not fixed:** the installer overwrites a `.claude/skills/claude-comm/SKILL.md` it did not generate.
+
+Attack: 79 checks green on the tree; nine mutations, each red on its own arm only. `boot --prove-red`: see the
+disposition commit — its close-amendment arm went red on the tree with every printed clause true (it tested an exit
+it did not print); re-run with the exit printed.

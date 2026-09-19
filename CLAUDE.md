@@ -22,6 +22,9 @@ node bin/context.mjs       # how full this session is, resolved from /proc - exa
 node bin/ledger.mjs        # did a restart cost us a defect? UNKNOWN until 10 starts per arm
 ```
 
+**"hey leader expert" here means THIS boot.** The user-level `leader-expert` skill (a sibling repo, 2026-09-19) is
+the method for field projects: its kickstart and `notes/PROTOCOL.md` do not apply to this repo — never run it here.
+
 Read the boot report; if a row is `⚠` or `✗`, resolve or name it before anything else. **Never paraphrase
 `STATUS.md` in place of running boot** — this project shipped a bus 4 commits stale in the field while its
 status file read green.
