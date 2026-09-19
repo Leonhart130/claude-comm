@@ -28,6 +28,14 @@ every command - a grep counts the documentation): **introduction received 1×; `
 `~/.claude/sessions/<pid>.json` against the ledger, per agent. E1's positive test (same file, `session_id` → live
 session in the project) is the same instrument — build them together or not at all.
 
+**E — two AMENDMENTS demanded at the 2026-09-20 close** (3 acks each, same cause):
+`field:getajob@stranded-untold:extension` and
+`channel:getajob-leader@unanswered:2026-09-19-recu-2026-09-19-1-envoi-relance-extension-attend-volontairement.md`.
+Both are the PEER's own state: mail their leader stopped on purpose, and a thread their own letter closed ("rien
+n'attend de réponse"). The 09-18 amendment already moved peer operations to shown-not-gated; `stranded-untold` was
+kept gating because the BUS mis-told the sender. Design it with an arm (what does the row measure now?) or delete
+the cause — evidence, never an opinion, and it lands as a gated change. `FINDINGS.md#peer-state`.
+
 **Carried:** A2 (a notice's marker is written when the bus RAN, not when it SHOWED it) · the installer overwrites a
 `SKILL.md` it did not generate · the close-amendment arm went red ONCE with every clause true, cause unknown — it now
 prints its exit · every other stderr line of the stub still reaches no model · S6 (`to_state` blind after send) ·
