@@ -10,8 +10,9 @@ new leader in `~/Dev/moneyMaker` today and wants it to use the bus as well as ge
 MCP: skill yes, MCP not now — `FINDINGS.md#unseen-introduction`.)*
 
 **A — 🔴 REVIEW #12 IS IN (`review/REVIEW-12.md`): no red, 5 🟡, 3 🟢. DISPOSITION HALF DONE — resume here.**
-*(Paused 2026-09-19 ~20:10 local at the owner's request; bus mail id `2026-09-19T17-48-11-449Z-d6dbd9` left pending ON
-PURPOSE until the disposition is finished. The reviewer's pane is still open — it was told not to close.)*
+*(Paused 2026-09-19 ~20:10 local at the owner's request. The review's bus mail was drained by my own Stop hook at that
+turn's end — a peeked message cannot be kept pending as a reminder; this section is the reminder. The reviewer's pane
+is still open — it was told not to close.)*
 - **FIXED + ARMED, attack 79/79 green, NOT yet proved red by mutation:** D1 (`--root` asked identity at the root →
   asked from the caller's folder; A76), D2 (no project and no `--root` ⇒ refuse; A76), E1 (pid 0 = cannot tell →
   ledger records; A77, split out of A74), A1 (notices NUL-stripped/capped in the stub, delivery retried without them;
