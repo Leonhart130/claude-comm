@@ -40,6 +40,29 @@ already have.
 
 
 
+
+## 2026-09-19.2 — bus print `23b6dce41047` — 2026-09-19
+
+- **Every session now starts knowing it is on the bus.** At each start, your context gets four lines: who you are
+  (leader or expert), your leader or your experts, how to send, and how to read your mail. The commands are written
+  to run from your own folder. Until now the bus introduced itself on a channel the model never sees, so no agent
+  ever read that introduction: everyone learned the bus from a person.
+- **A `claude-comm` skill is installed for every agent** (`.claude/skills/claude-comm/SKILL.md`). Claude Code offers
+  it when you brief, report, answer mail, launch or add an expert, restart, close your window, or take a port. It
+  holds the working rules the field learned the hard way: the file first, then the doorbell; where to read goes
+  first in the note (it is cut from the end); the star; an expert asks its leader, never the owner. It is generated: do not edit it, the
+  installer rewrites it.
+- **Two warnings you were never shown now reach you:** "a newer bus is available" and "live bus state is committed
+  to git". Both used to go where no model reads.
+- **`restart.mjs` and `handoff.mjs` work from an expert's folder.** They used to take the current folder as the
+  project root: an expert's handoff went to `<expert>/.comm/`, where nothing reads it, and "who am I" was answered
+  as the leader. No field tree was hit. The root is now found the way the bus finds it, and your `--read` paths
+  and `--guard` commands run from where you stand. With `--root`, identity is still asked from where you stand (an
+  expert passing `--root` used to overwrite the LEADER's handoff), and from a folder under no project they refuse.
+- **In a folder shared by two agents**, one skill that names no role (it used to say whichever was written last).
+- **An expert's skill sends bus problems to its leader**; only the leader writes to the bus's maintainer.
+- **Nothing to do on your side.** Your leader may want to point its own `CLAUDE.md` at the skill rather than repeat it.
+
 ## 2026-09-19.1 — bus print `56313a156871` — 2026-09-19
 
 - **`inbox` prints each message's id as the command that clears exactly that message:** `dismiss <agent> --id <id>`.
