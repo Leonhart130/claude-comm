@@ -49,7 +49,7 @@
 import * as fsx from "node:fs"
 import { readFileSync, writeFileSync, existsSync, mkdirSync, statSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join, resolve, isAbsolute, basename, dirname, relative } from "node:path"
+import { join, resolve, isAbsolute, basename, dirname, relative, sep } from "node:path"
 import { createHash } from "node:crypto"
 import { execFileSync, spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
@@ -69,6 +69,11 @@ const die = (m, code = 2) => { process.stderr.write(`handoff: ${m}\n`); process.
 const HOME_DIR = process.cwd()
 const findRoot = (d) => { for (let x = resolve(d); ; x = dirname(x)) { if (existsSync(join(x, ".comm", "config.json"))) return x; if (dirname(x) === x) return null } }
 const ROOT = resolve(opt("--root", findRoot(HOME_DIR) || HOME_DIR))
+// Review #12 D1: with --root, identity was asked AT THE ROOT - an expert passing --root overwrote the leader's handoff
+// and armed the leader's reboot. It is asked where the caller stands whenever that is inside the project; from outside
+// it, only --agent can say. D2: no project above the caller and no --root wrote a stray .comm/ there - refused.
+const INSIDE = HOME_DIR === ROOT || HOME_DIR.startsWith(ROOT + sep)
+const PROJECT = !!opt("--root", null) || !!findRoot(HOME_DIR)
 const sha = (p) => { try { return createHash("sha256").update(readFileSync(p)).digest("hex") } catch { return null } }
 
 /** The agent this handoff belongs to. Asked of the bus, never guessed - the same rule the
@@ -81,7 +86,8 @@ function whoAmI() {
 	const local = join(resolve(fileURLToPath(new URL(".", import.meta.url))), "comm.mjs")
 	for (const b of [bus, local]) {
 		if (!existsSync(b)) continue
-		const r = spawnSync(process.execPath, [b, "whoami"], { cwd: opt("--root", null) ? ROOT : HOME_DIR, encoding: "utf8" })
+		if (!INSIDE) return null
+		const r = spawnSync(process.execPath, [b, "whoami"], { cwd: HOME_DIR, encoding: "utf8" })
 		if (r.status === 0 && r.stdout.trim()) return r.stdout.trim()
 	}
 	return null
@@ -146,6 +152,7 @@ function machineState() {
 }
 
 function cmdWrite() {
+	if (!PROJECT) die(`no project here: no .comm/config.json at or above ${HOME_DIR} - run this from an agent's folder, or pass --root`)
 	const agent = whoAmI() || die("cannot tell which agent you are - pass --agent, or run inside an agent's directory")
 	const oblPath = opt("--obligations", null)
 	if (!oblPath) die("--obligations <file> is required.\n" +
