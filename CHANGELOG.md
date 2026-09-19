@@ -39,6 +39,28 @@ already have.
 
 
 
+
+## 2026-09-19.1 — bus print `56313a156871` — 2026-09-19
+
+- **`inbox` prints each message's id as the command that clears exactly that message:** `dismiss <agent> --id <id>`.
+  The closing hint no longer offers the bare `dismiss <agent>`, which cleared the whole queue, including mail that
+  arrived while you read (requested by getajob's leader). An id not in the bus's own shape is never printed as a
+  command.
+- **`inbox` and `dismiss` take an agent NAME from `.comm/config.json`, never a path.** `dismiss ../.. --force` used to
+  move files out of your project root. Mail left for an agent you took off the roster can still be cleared by that
+  agent's name, but only if its inbox is a real directory, never a link.
+- **`send` records in the message whether the recipient was running.** That tells apart mail whose sender was warned
+  it would wait for a relaunch from mail nobody was warned about.
+- **A restart note now names the session that armed it.** If that session has ended and went quiet within the
+  promised time, the relaunch counts as a restart even after the note's clock ran out. This only ever adds restarts.
+  Only a fresh start (`startup`, `/clear`) takes a note: a compaction or a `--resume` leaves it for the real
+  relaunch. If a start takes a note and then fails to record itself, the note is put back.
+- **The ledger counts one start per session**, even if two recorders wrote it.
+- **The installer writes each bus file after the files it imports.** Before, a session starting mid-install could
+  load a new `ledger.mjs` beside an old `restart-signal.mjs`, fail to load it, and lose that start's record.
+- **Nothing to do on your side.** A note armed before this release names no session and is judged by the clock,
+  as before.
+
 ## 2026-09-13.8 — bus print `69ba247a5e08` — 2026-09-13
 
 - **`wake --dry-run` now shows the fresh-restart decision for every agent in `freshRestart`, mail or not.** Before, it
