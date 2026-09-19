@@ -94,6 +94,11 @@ const printOnly = process.argv.includes("--print")
 // owner named the failure that decides it: an intense session launches several agents, and
 // many OS windows is the thing that goes wrong.
 const osWindow = process.argv.includes("--os-window")
+// --minimized: the OS window opens minimized (kitty --os-window-state), so it never covers what the owner is looking at.
+// Asked by the owner 2026-09-19 - the attack suite's --os-window control popped a window over his work at every run.
+// Only with --os-window: a pane in the caller's tab has no window state of its own, and --keep-focus already holds.
+const minimized = process.argv.includes("--minimized")
+if (minimized && !osWindow) { process.stderr.write("launch: --minimized applies to --os-window only - a pane in your tab has no window state of its own\n"); process.exit(2) }
 // 🔴 THE FIRST TURN. Reported by the `getajob` field leader 2026-09-11, after it cost his
 // owner two mornings: this launcher started `claude` with NO ARGUMENTS, so the session came
 // up and sat at its prompt. **The failure does not look like one** — the window is there,
@@ -124,7 +129,7 @@ if (pi > -1 && (prompt === undefined || prompt.startsWith("-")))
 	    `  ${prompt === undefined ? "A bare --prompt" : `A prompt starting with "-" is read by claude as a FLAG (\`-p\` is print mode), so it`}\n` +
 	    `  would launch a session that takes no turn — the exact failure this flag exists to remove.\n` +
 	    `  If you meant a bullet, drop the leading "- " or start with the word.`)
-if (!agent || agent.startsWith("--")) die(`usage: launch.mjs <agent> --model <model> --effort <level> [--prompt "<first turn>"] [--print] [--os-window]\n` +
+if (!agent || agent.startsWith("--")) die(`usage: launch.mjs <agent> --model <model> --effort <level> [--prompt "<first turn>"] [--print] [--os-window [--minimized]]\n` +
 	`  --model and --effort are REQUIRED: the tier is chosen for each task, never inherited.\n` +
 	`  default: a pane in the CURRENT tab. --os-window opens a separate OS window instead.\n` +
 	`  --prompt is what makes the new session TAKE A TURN. Without it, it sits at its prompt\n` +
@@ -219,7 +224,7 @@ if (!claudeBin) {
 const childPath = [dirname(nodeBin), dirname(claudeBin), ...(process.env.PATH || "").split(delimiter).filter(Boolean)]
 	.filter((d, i, a) => a.indexOf(d) === i).join(delimiter)
 const cwd = join(root, cfg.agents[agent] ?? ".")
-const argv = ["@", "launch", `--type=${osWindow ? "os-window" : "window"}`, "--keep-focus", `--cwd=${cwd}`,
+const argv = ["@", "launch", `--type=${osWindow ? "os-window" : "window"}`, ...(minimized ? ["--os-window-state=minimized"] : []), "--keep-focus", `--cwd=${cwd}`,
 	`--env=PATH=${childPath}`, `--env=CLAUDE_COMM_AGENT=${agent}`, claudeBin,
 	"--model", model, "--effort", effort,
 	...(prompt ? [prompt] : [])]

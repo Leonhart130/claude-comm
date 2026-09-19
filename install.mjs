@@ -351,7 +351,7 @@ try {
 // of what the harness sees.
 // Bounded HERE, on this side of spawn (review #12 A1): a NUL in one made spawnSync throw and a 140 kB one gave E2BIG,
 // status null - the mail left waiting and nothing said so. And if the spawn fails anyway, deliver without them.
-for (let i = 0; i < notices.length; i++) notices[i] = String(notices[i]).replace(/\u0000/g, "").slice(0, 1500)
+for (let i = 0; i < notices.length; i++) notices[i] = String(notices[i]).replace(/\\u0000/g, "").slice(0, 1500)
 let delivered = forward(raw, notices)
 if (delivered.error && notices.length) {
 	process.stderr.write(\`claude-comm: the bus could not be started WITH its notices (\${delivered.error.code || delivered.error.message}); delivering without them.\\n\`)

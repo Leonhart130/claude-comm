@@ -33,7 +33,7 @@
  * reason the bus does: nothing here lives long enough to leak.
  */
 import { readFileSync, writeFileSync, renameSync, existsSync, readdirSync, statSync, utimesSync, mkdtempSync, mkdirSync, cpSync, rmSync, symlinkSync, readlinkSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { tmpdir, homedir } from "node:os"
 import { join, dirname, resolve, basename } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { execFileSync, spawnSync, spawn } from "node:child_process"
@@ -3185,7 +3185,9 @@ function proveRed() {
 					`two causes on one row (${sigA}, ${sigB}) -> A=${sigA && both[sigA] && both[sigA].n}x B=${sigB && both[sigB] && both[sigB].n}x kept apart=${separate}; ` +
 					`a bare --amended while BOTH stand -> REFUSED=${refused}, state untouched=${untouched}; ` +
 					`--amended tree@${sigA} -> A cleared=${aGone}, **B still standing=${bStands}** (this is the one ` +
-					`a row-keyed count fails)`)
+					`a row-keyed count fails); that close -> exit ${amended.status}` +
+					// Printed because the condition tests it: on 2026-09-19 every clause above read true and the arm was red.
+					(amended.status ? ` REFUSED: ${(amended.stdout || "").split("\n").filter((l) => /NOT CLOSED|^\s{6}\S/.test(l)).join(" | ").slice(0, 400)}` : ""))
 				g("reset", "-q", "--hard", baseSha); rmSync(join(pkg, "dirty-causes.txt"), { force: true })
 			}
 		}
@@ -3422,7 +3424,7 @@ function proveRed() {
 
 	{
 		const realAfter = snapReal()
-		const changed = [], vanished = [], leaked = [], foreign = [], departed = []
+		const changed = [], vanished = [], leaked = [], foreign = [], departed = [], relived = []
 		for (const [f, v] of realBefore) {
 			// A vanished entry is damage ONLY if its session is still alive. This control cannot
 			// kill a live process, so an entry that went away while its pid died is ATTRITION —
@@ -3437,7 +3439,17 @@ function proveRed() {
 				if (Number.isFinite(pid) && existsSync(`/proc/${pid}`)) vanished.push(f)
 				else departed.push(f)
 			}
-			else if (realAfter.get(f).hash !== v.hash) changed.push(f)
+			// A LIVE SESSION REWRITES ITS OWN ENTRY (2026-09-19): getajob's leader was compacted mid-run and its hook
+			// re-recorded it, `source: compact`, pointing at its own real transcript - and this arm called it damage. The
+			// only transcripts this control handles are its fixtures'. So the world moving (#A20) is narrow: the pid still
+			// LIVES and its entry now names a REAL Claude transcript (~/.claude/projects/). Anything else stays damage -
+			// this arm exists because a probe once rewrote a live entry to a SCRATCHPAD path, outside any fixture.
+			else if (realAfter.get(f).hash !== v.hash) {
+				const t = realAfter.get(f).transcript, pid = Number(String(f).replace(/\.json$/, ""))
+				const own = typeof t === "string" && !t.startsWith(tmp) && t.startsWith(join(homedir(), ".claude", "projects") + "/") &&
+					Number.isFinite(pid) && existsSync(`/proc/${pid}`)
+				;(own ? relived : changed).push(f)
+			}
 		}
 		for (const [f, v] of realAfter) {
 			if (realBefore.has(f)) continue
@@ -3449,6 +3461,7 @@ function proveRed() {
 			(moved === 0 ? "no entry changed, vanished, or appeared carrying a fixture transcript"
 				: `THIS CONTROL MOVED IT - changed ${JSON.stringify(changed)}, vanished ${JSON.stringify(vanished)}, fixture transcripts ${JSON.stringify(leaked)}`) +
 			(foreign.length ? ` · ${foreign.length} session(s) started on this machine during the run (${foreign.join(", ")}) - the world moving, not this control` : "") +
+			(relived.length ? ` · ${relived.length} live session(s) re-recorded themselves during the run (${relived.join(", ")}) to their own transcripts - the world moving, not this control` : "") +
 			(departed.length ? ` · ${departed.length} session(s) ENDED during the run (${departed.join(", ")}) - their pids are gone, so this control did not remove them` : ""))
 	}
 
