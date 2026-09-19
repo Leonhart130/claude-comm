@@ -22,7 +22,7 @@ evidence, armed with an expert that records nothing.
 asked work's leader to run (09-07/08); both holders dead; `claim release` takes them. They sit in work's tree, so
 **asked the owner** — act on the answer. `field:work` gates on them until then.
 
-**D — getajob:** letter n°3 answered 09-19 (bell: see the letter's `.last-bell.json`). Their 7 updated stubs are
+**D — getajob:** letter n°3 answered 09-19 (rung 14:29:48Z; its name is in their leader's transcript, 3×). Their 7 updated stubs are
 uncommitted in THEIR tree (theirs to commit). `envoi` (pid 57934, running) gets its hooks at its next start. 1
 message for `extension` waits ~38 h; told their leader. Next letter from them: read it first.
 
