@@ -152,7 +152,7 @@ try {
 		notices.push([
 			"[claude-comm] You are '" + whoIs + "', " + role,
 			"A message is a doorbell that points at a FILE: " + cmd + " send " + (whoIs === lead ? "<agent>" : lead) +
-				' --ref <file> --note "<what is decided, then where to read>". It reaches the other session at its turn boundary.',
+				' --ref <file> --note "<where to read, then what is decided>". It reaches the other session at its turn boundary.',
 			"How to work with it - replying, launching an expert, restarting, the rules: the claude-comm skill, or " +
 				relative(agentRoot, join(projectRoot, ".comm", "README.md")) + ".",
 			"Your mail: " + cmd + " inbox",
@@ -294,7 +294,14 @@ try {
 // DELIVERY FIRST, and its status is this hook's status. Everything below is an
 // instrument: it may not delay delivery, may not fail it, and may not change one byte
 // of what the harness sees.
-const delivered = forward(raw, notices)
+// Bounded HERE, on this side of spawn (review #12 A1): a NUL in one made spawnSync throw and a 140 kB one gave E2BIG,
+// status null - the mail left waiting and nothing said so. And if the spawn fails anyway, deliver without them.
+for (let i = 0; i < notices.length; i++) notices[i] = String(notices[i]).replace(/\u0000/g, "").slice(0, 1500)
+let delivered = forward(raw, notices)
+if (delivered.error && notices.length) {
+	process.stderr.write(`claude-comm: the bus could not be started WITH its notices (${delivered.error.code || delivered.error.message}); delivering without them.\n`)
+	delivered = forward(raw, [])
+}
 if (delivered.status === 0) for (const [f, c] of marks) { try { writeFileSync(f, c) } catch {} }
 
 try {
@@ -331,8 +338,10 @@ try {
 		if (existsSync(reg)) {
 			const m = await import(pathToFileURL(reg).href)
 			const sp = m.sessionPid()
-			ownStart = ownsSession(sp)
-			if (!ownStart) throw new Error(`the session I resolved (pid ${sp}) is not running inside ${projectRoot}; recording nothing`)
+			// 0 is "no claude ancestor found" (off Linux, another argv0): CANNOT TELL, so the ledger still records
+			// (review #12 E1). Only a found session running outside this project is known to be foreign.
+			ownStart = sp > 0 ? ownsSession(sp) : null
+			if (!ownsSession(sp)) throw new Error(`the session I resolved (pid ${sp}) is not running inside ${projectRoot}; recording nothing`)
 			const r = m.record({ pid: sp, transcript: tp, agent, source: p.source })
 			if (!r.ok) process.stderr.write(`claude-comm: this session is NOT in the session registry (${r.why}). `
 				+ `A context reading by pid will refuse for it${r.invalidated ? "" : ", and a previous entry may still stand"}.\n`)
@@ -443,7 +452,7 @@ try {
 // never do. Measured 2026-09-11 on a half-installed tree: exit 1 and a Node stack trace.
 // ⚠️ Loud AND non-breaking: the child's stderr is inherited, so its trace is already on
 // screen; this line names what the status meant. Silence would be the worse defect.
-if (delivered.status) {
-	process.stderr.write(`claude-comm: the bus could not RUN (exit ${delivered.status}) — the hook path exits 0 on every decision, so this is a broken or half-installed bus, not a verdict. Your mail is untouched and this turn is not blocked. Re-run the installer.\n`)
+if (delivered.status || delivered.error) {
+	process.stderr.write(`claude-comm: the bus could not RUN (${delivered.error ? delivered.error.code || delivered.error.message : `exit ${delivered.status}`}) — the hook path exits 0 on every decision, so this is a broken or half-installed bus, not a verdict. Your mail is untouched and this turn is not blocked. Re-run the installer.\n`)
 }
 process.exit(0)
