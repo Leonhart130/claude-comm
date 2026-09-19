@@ -20,8 +20,9 @@ field agents: fold the finding's first three bullets. Install into getajob, elec
 (`~/.claude/projects/-home-leonh-Dev-moneyMaker/`): did it reach for the bus UNPROMPTED — `send`, `launch.mjs`,
 `--add-agent` — and did it read the skill? Prefix `./` on those dirs (they start with `-`).
 
-**C — T1 live, still unseen** (from the first half): a real `review` start here must add exactly one line to
-`.comm/handoff/review.log`. The review #12 launch is that start — read `wc -l` before and after.
+**C — 🟢 T1 SEEN LIVE 2026-09-19 17:08Z:** the review #12 launch added exactly one line to `review.log` (3 → 4,
+session `861a423a`), and its transcript carries the introduction as `hook_additional_context`. The leader's own
+next start must add exactly one to `leader.log` (14 now) — the root half, still unseen.
 
 **D — the gap T1 exposed: nothing reports a recorder that never runs** (`#review11c`). Measure first with
 `~/.claude/sessions/<pid>.json` against the ledger, per agent.
