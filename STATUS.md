@@ -5,49 +5,35 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-09-19, second half. The owner: work stays dormant (`FIELDS.json`), getajob is the field, and he launches a
-new leader in `~/Dev/moneyMaker` today and wants it to use the bus as well as getajob does. Asked my view on skill vs
-MCP: skill yes, MCP not now — `FINDINGS.md#unseen-introduction`.)*
+*(Closed 2026-09-19 late. Field = getajob; work dormant by the owner's word (`FIELDS.json`); `~/Dev/moneyMaker` is new,
+its leader not launched yet. Owner's question answered: skill yes, MCP not now — `FINDINGS.md#unseen-introduction`.)*
 
-**A — 🔴 REVIEW #12 IS IN (`review/REVIEW-12.md`): no red, 5 🟡, 3 🟢. DISPOSITION HALF DONE — resume here.**
-*(Paused 2026-09-19 ~20:10 local at the owner's request. The review's bus mail was drained by my own Stop hook at that
-turn's end — a peeked message cannot be kept pending as a reminder; this section is the reminder. The reviewer's pane
-is still open — it was told not to close.)*
-- **FIXED + ARMED, attack 79/79 green, NOT yet proved red by mutation:** D1 (`--root` asked identity at the root →
-  asked from the caller's folder; A76), D2 (no project and no `--root` ⇒ refuse; A76), E1 (pid 0 = cannot tell →
-  ledger records; A77, split out of A74), A1 (notices NUL-stripped/capped in the stub, delivery retried without them;
-  A78), C1 (expert skill: bus defects → its leader, only the leader's names `exchange/`; pointer FIRST in notes;
-  A74/A75), C2 (one role-free skill per shared folder; A75), A29 title.
-- **FIXED in `boot.mjs`, arm extended, NOT yet run:** F1 — under dormancy only a GONE claim stops gating (corrupt /
-  unreadable still gate), and a dormant field with a live session or a start after `since` WARNs `dormant-awake`.
-- **NEXT, in order:** (1) one attack run per mutation, each reverting ONE fix: D1, D2, E1, the ledger guard, A1, C1
-  (expert names exchange), C1 note order, C2 (write per agent) — each must redden its own arm alone; (2)
-  `boot --prove-red` on HEAD, then once per F1 mutation (old `claimsBad` clause; `awake` forced false) — 12 min
-  each, systemd-run capped; (3) `FINDINGS.md#review12` with the table; NAMED not fixed: A2 (a marker is written when
-  the bus RAN, not when it SHOWED the notice — new stub + old bus loses it), the installer overwrites a
-  non-generated `SKILL.md`; (4) ask the reviewer for a short #12b on the fixes (`SendMessage` or `send review`);
-  (5) release `2026-09-19.2` — body drafted at `<scratchpad>/changelog-body-2.md` (add: "the pointer goes first in
-  a note"), install here, getajob, electio, work, **moneyMaker (still on 18f3ed2 — before its first session)**;
-  letter to getajob drafted at `<scratchpad>/letter-skill.md`; (6) full boot, close.
-  `<scratchpad>` = `/tmp/claude-1000/-home-leonh-Dev-claude-comm/83c9d8bd-e0f2-44b0-8636-85181c542fce/scratchpad`.
+**A — FIRST: read `review/REVIEW-12b.md`** (the reviewer's attack on review #12's disposition, briefed at close in
+`BRIEF-adversarial-12b.md`; it closes its own window). Its ring waits in the inbox. A red ⇒ fix, arm, mutation, `.3`,
+reinstall the five trees. `#review12` in FINDINGS is the disposition it attacks.
 
-**B — moneyMaker is the first real test of the skill.** Installed 2026-09-19 at the reviewed-pending build
-(`+unreleased`), leader only; its leader adds its own experts. Measure from its transcripts
-(`~/.claude/projects/-home-leonh-Dev-moneyMaker/`): did it reach for the bus UNPROMPTED — `send`, `launch.mjs`,
-`--add-agent` — and did it read the skill? Prefix `./` on those dirs (they start with `-`).
+**B — moneyMaker: the adoption measurement is STARTED, on its own transcript.** Its leader ran 2026-09-19 18:42Z→
+~20:50Z (one session, `7c449631`, on the pre-review build; it has `2026-09-19.2` from its next start) and kickstarted
+itself with the sibling `leader-expert` skill. Measured by parsing TOOL CALLS, never grep (the skills' own text names
+every command - a grep counts the documentation): **introduction received 1×; `Skill` calls: `leader-expert`,
+`claude-in-chrome` - NOT `claude-comm`; bus commands: `comm.mjs inbox` twice, unprompted; no `send`/`launch`/
+`--add-agent` (its roster is still leader-only, so nothing to send to).** Continue from `./-home-leonh-Dev-moneyMaker*/`
+(prefix `./`: the dirs start with `-`) once it has experts: does it reach for `send`/`launch.mjs`, does it load the
+`claude-comm` skill, does its note put the pointer first? That, not an opinion, answers the owner on skill vs MCP.
 
-**C — 🟢 T1 SEEN LIVE 2026-09-19 17:08Z:** the review #12 launch added exactly one line to `review.log` (3 → 4,
-session `861a423a`), and its transcript carries the introduction as `hook_additional_context`. The leader's own
-next start must add exactly one to `leader.log` (14 now) — the root half, still unseen.
+**C — T1's root half, still unseen:** this leader's next start must add exactly ONE line to `.comm/handoff/leader.log`
+(read `wc -l` first). The expert half was seen live 09-19 (review's start: 3 → 4).
 
 **D — the gap T1 exposed: nothing reports a recorder that never runs** (`#review11c`). Measure first with
-`~/.claude/sessions/<pid>.json` against the ledger, per agent.
+`~/.claude/sessions/<pid>.json` against the ledger, per agent. E1's positive test (same file, `session_id` → live
+session in the project) is the same instrument — build them together or not at all.
 
-**Carried:** S6 (`to_state` blind after send) · every OTHER stderr line of the stub still reaches no model
-(registry/ledger/restart diagnostics) · getajob's field-day read of `rings.jsonl` (A62, A65) · the 12:50Z
-unattributed ring · #9 A3 · C7 · `who`'s 3rd/4th states · `dismiss --citing` · `comm wait --for` · context.mjs's
-`/clear` limits · the restart trigger (ledger UNKNOWN) · C3 (channel row dates by filename — seen again 09-19).
-**Later, owner's order:** adoption (skill shipped; measure it) → Rust port → value, with getajob's leader.
+**Carried:** A2 (a notice's marker is written when the bus RAN, not when it SHOWED it) · the installer overwrites a
+`SKILL.md` it did not generate · the close-amendment arm went red ONCE with every clause true, cause unknown — it now
+prints its exit · every other stderr line of the stub still reaches no model · S6 (`to_state` blind after send) ·
+getajob's field-day read of `rings.jsonl` (A62, A65) · #9 A3 · C7 · `who`'s 3rd/4th states · the restart trigger
+(ledger UNKNOWN) · C3 (the channel row dates letters by filename). **Later, owner's order:** adoption (measure B) →
+Rust port → value, with getajob's leader.
 
 ## Where it stands
 
@@ -76,17 +62,12 @@ unattributed ring · #9 A3 · C7 · `who`'s 3rd/4th states · `dismiss --citing`
    table predates it. ⚠️ A wake inside `QUIET_MS` rings nobody and nothing catches up — it prints
    `○ rung 104s ago`, which reads like success.
 
-4. **🟢 Holding a machine resource — `bin/claim.mjs`, IN PRODUCTION**, 17 arms, A38, three field trees.
-   **It advises; it opens nothing, kills nothing, blocks nothing.**
-   🟢 **CLOSED 2026-09-10 BY THE `getajob` FIELD** — open since 09-05, made by someone not looking for it:
-   two real SESSIONS, two names, one real vite server ⇒ **refused, exit 3, nothing changed**, both names in
-   ONE line. Its FIRST transcript did not close it — it proved the claimant by an attached `whoami`.
-   🔴 The name in the record is the CALLER'S DIRECTORY (`claim.mjs:405-425`): a `cd` changes it, only the
-   pid identifies who acted. 🟢 A third property neither of us had listed: `release` REFUSES while the
-   holder process still LIVES. All of it, and what it does not close, at `FINDINGS.md#claim-file`.
-   ⚠️ Claims live in one project's `.comm/`, so a resource shared ACROSS projects is visible to nobody.
-   ⭐ Their verdict, accepted as the scope: *a claim makes sharing visible; the first answer is not to
-   share.*
+4. **🟢 Holding a machine resource — `bin/claim.mjs`, IN PRODUCTION**, 17 arms, A38, three field trees. It advises:
+   it opens nothing, kills nothing, blocks nothing. Closed 2026-09-10 by the getajob field with two real sessions on
+   one vite server. `release` refuses while the holder LIVES; the record cannot tell a crash from a forgotten
+   release. Claims live in one project, so a resource shared ACROSS projects is visible to nobody.
+   `FINDINGS.md#claim-file`. ⭐ Their verdict, accepted as the scope: *a claim makes sharing visible; the first
+   answer is not to share.*
 
 5. **🟡 `who` reports TWO states and there are FOUR.** A leader lost **2 h 30** reading `running` for four
    sessions sitting at their prompt. ✅ `context.mjs --sessions` prints `quiet <age>` — a MEASUREMENT, never
@@ -96,16 +77,14 @@ unattributed ring · #9 A3 · C7 · `who`'s 3rd/4th states · `dismiss --citing`
    sample each, so no threshold from it. 🔴 All of it belongs in `comm who` and cannot go there — A21 forbids
    the import ⇒ an A21 amendment **and a split — both done 09-11; the states themselves are not built.**
 
-6. **🟢 A reply must NAME what it answers** — `Answers:` in front matter on **line 1**, anchored to the
-   first byte so a quotation cannot forge one (#8 C1). Stateless, no read receipt; a failed scan says
-   `CANNOT SAY`. Contract: `exchange/README.md`. `FINDINGS.md#answered-mtime`.
+6. **🟢 A reply must NAME what it answers** — `Answers:` in front matter on **line 1**, anchored to the first byte
+   so a quotation cannot forge one. Stateless; a failed scan says `CANNOT SAY`. Contract: `exchange/README.md`.
+   `FINDINGS.md#answered-mtime`. ⚠️ The row dates letters by FILENAME (C3, carried).
 
-7. **🟢 A program launches an agent, and the agent puts its own window away.** `launch.mjs` (A46) builds the
-   child's `PATH` and resolves the runtime absolutely; **09-11 it SPLITS the caller's tab, refuses a launch
-   it cannot name, and `--prompt` gives the new session a first turn** — without one it sits inert while
-   `who` says `running`. 🟢 **`close.mjs` (A51)**: an agent closes ITSELF, never a sibling.
-   🟢 **Review #10 C1/C2 fixed 09-13:** the claim refusal runs (A58); the probe records `null` when blind (A59).
-   `FINDINGS.md#self-close`, `#split-raised-the-cap`.
+7. **🟢 A program launches an agent, and the agent puts its own window away.** `launch.mjs` (A46) builds the child's
+   `PATH`, resolves the runtime absolutely, SPLITS the caller's tab (`--os-window`, and `--minimized` with it),
+   refuses a launch it cannot name, and `--prompt` gives the new session a first turn. `close.mjs` (A51): an agent
+   closes ITSELF, never a sibling. `FINDINGS.md#self-close`, `#split-raised-the-cap`.
 
 8. **🟡 The autonomy mandate — self-launching experts, a self-rebooting leader.** Given 2026-09-04; settled
    parts in [`DESIGN-autonomy.md`](DESIGN-autonomy.md), **do not re-derive them here.** The finding that
