@@ -314,7 +314,7 @@ try {
 			//     agent can act on. It is normal for minutes at a time while a fix is written.
 			// Announcing the second as if it were the first is a warning that fires during
 			// ordinary work and names a version you already have.
-			} else if (head.label !== mine.label && said !== head.label) {
+			} else if (head.label !== String(mine.label).replace(/\+unreleased$/, "") && said !== head.label) {
 				process.stderr.write(
 					`claude-comm: this project's bus is ${mine.label} and ${head.label} is available.\n` +
 					`  what changed: ${clog}\n` +
@@ -329,9 +329,25 @@ try {
 	// a defect". It records into THIS project, beside this project's bus, because this
 	// is where the restarts being measured actually happen. Read it back with
 	// `node bin/ledger.mjs --root <this project>`.
+	// ONE RECORDER PER ROOT (review #11 R1, #11b S1/S2). In claude-comm's OWN checkout the
+	// root's `bin/boot.mjs --hook` records from the code at HEAD and re-reads its write, so this
+	// copy - one install behind - stands aside there. The test reads the file the hooks come
+	// from; if it ever misses, both record and the ledger collapses the twin: never a lost start.
+	// 🔴 THE HOOKS OF THIS AGENT'S DIRECTORY, never the root's (review #11c T1). A session in
+	// `review/` loads `review/.claude/settings.json`, which runs only this stub: reading the
+	// ROOT's file made every expert stand aside for a `boot --hook` that never runs for it, and
+	// its starts stopped reaching the ledger with nothing to say so (measured: 0 records, 1 unwired).
+	let rootRecords = false
+	try {
+		if (existsSync(join(projectRoot, "bin", "boot.mjs"))) {
+			const st = JSON.parse(readFileSync(join(agentRoot, ".claude", "settings.json"), "utf8"))
+			rootRecords = ((st && st.hooks && st.hooks.SessionStart) || []).some((g) => ((g && g.hooks) || [])
+				.some((h) => h && typeof h.command === "string" && /bin\/boot\.mjs["']?\s+(?:--\S+\s+)*--hook\b/.test(h.command)))
+		}
+	} catch {}
 	try {
 		const led = join(binDir, "ledger.mjs")
-		if (existsSync(led) && p.source && tp) {
+		if (!rootRecords && existsSync(led) && p.source && tp) {
 			// THE SIGNAL THAT CROSSES THE RESTART, claimed here and nowhere else. At this
 			// hook a relaunch and a cold start are the same event — `source` is "startup"
 			// for both — so without this the reboot arm of the experiment is not
@@ -341,11 +357,17 @@ try {
 			// hook that was not going to write a start: a one-shot note taken by a path
 			// that then records nothing is a reboot silently filed as cold.
 			let sig = []
+			let rsMod = null, taken = null
 			try {
 				const rs = join(binDir, "restart-signal.mjs")
 				if (existsSync(rs)) {
 					const m = await import(pathToFileURL(rs).href)
-					const c = m.claim({ root: projectRoot, agent })
+					rsMod = m
+					// Only a start that IS a fresh context takes the note (review #11 R2/R7): a
+					// compaction or a resume records its start and leaves the note for the relaunch.
+					const c = typeof m.mayClaim !== "function" || m.mayClaim(p.source)
+						? m.claim({ root: projectRoot, agent }) : { ok: true, signal: null }
+					if (c.ok && c.signal) taken = c.signal
 					if (!c.ok) {
 						// Never silent. A signal that could not be read is a restart about to be
 						// recorded as a cold start, which is the exact defect this mechanism exists
@@ -384,7 +406,9 @@ try {
 			// the note was taken, that restart is gone and this line is the only thing that
 			// will ever say so.
 			if (sig.length && rec.status !== 0) {
-				process.stderr.write(`claude-comm: a restart signal for ${agent} was claimed but the ledger did not record it (exit ${rec.status}); that restart is now UNCOUNTED.\n`)
+				// Put it back (review #11 R3): a ledger that cannot load must not also eat the note.
+				const back = taken && rsMod && typeof rsMod.restore === "function" ? rsMod.restore({ root: projectRoot, agent, record: taken }) : { ok: false, why: "nothing to restore with" }
+				process.stderr.write(`claude-comm: a restart signal for ${agent} was claimed but the ledger did not record it (exit ${rec.status}); ${back.ok ? "the note was PUT BACK for the next start" : `that restart is now UNCOUNTED (${back.why})`}.\n`)
 			}
 		}
 	} catch {}
