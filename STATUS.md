@@ -7,7 +7,10 @@ fold the settled parts into the README.
 
 *(2026-09-19. Last session's A–F are DONE: A reviewed by #11/#11b/#11c, B+C landed (c9ef312, corrected c4b4506),
 T1/T2 fixed (182c4a7), release **2026-09-19.1** (print `56313a156871`) installed here, getajob, electio, work;
-getajob n°3 answered. Field = getajob; work dormant.)*
+getajob n°3 answered. Field = getajob; work dormant. The two amendments the 09-18 close demanded are DISCHARGED at
+this close, now that they are live: `field:getajob@f59780` (armer-judged notes) and `field:work@924908` (a peer's
+lapsed note prints; its gone-holder claims still gate, by R4). The `channel` row dated a letter from minutes earlier
+"15h ago": C3, form D, in the field.)*
 
 **A — 🔴 T1 IS FIXED IN CODE, NOT YET SEEN LIVE.** The first `review` start in THIS repo must add exactly one line
 to `.comm/handoff/review.log`, and the leader's next start exactly one to `leader.log` (no twin). Read both before
