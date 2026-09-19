@@ -49,7 +49,7 @@
 import * as fsx from "node:fs"
 import { readFileSync, writeFileSync, existsSync, mkdirSync, statSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join, resolve, isAbsolute, basename } from "node:path"
+import { join, resolve, isAbsolute, basename, dirname, relative } from "node:path"
 import { createHash } from "node:crypto"
 import { execFileSync, spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
@@ -61,7 +61,14 @@ const opt = (f, d = null) => { const i = ARGV.indexOf(f); return i >= 0 && ARGV[
 const all = (f) => ARGV.reduce((a, v, i) => (v === f && ARGV[i + 1] ? [...a, ARGV[i + 1]] : a), [])
 const die = (m, code = 2) => { process.stderr.write(`handoff: ${m}\n`); process.exit(code) }
 
-const ROOT = resolve(opt("--root", process.cwd()))
+// THE PROJECT ROOT IS FOUND, NEVER ASSUMED TO BE WHERE YOU STAND (2026-09-19). Both were `cwd`, so an
+// expert running this from its own folder - the only place its commands are written to run from - wrote
+// its handoff into `<expert>/.comm/`, which no ledger and no verify at the root ever reads, and asked
+// "who am I" FROM THE ROOT, where the answer is the leader. The root is walked up to, the way the bus
+// finds it; identity, --read paths and guards belong to where the caller stands. FINDINGS.md#unseen-introduction
+const HOME_DIR = process.cwd()
+const findRoot = (d) => { for (let x = resolve(d); ; x = dirname(x)) { if (existsSync(join(x, ".comm", "config.json"))) return x; if (dirname(x) === x) return null } }
+const ROOT = resolve(opt("--root", findRoot(HOME_DIR) || HOME_DIR))
 const sha = (p) => { try { return createHash("sha256").update(readFileSync(p)).digest("hex") } catch { return null } }
 
 /** The agent this handoff belongs to. Asked of the bus, never guessed - the same rule the
@@ -74,7 +81,7 @@ function whoAmI() {
 	const local = join(resolve(fileURLToPath(new URL(".", import.meta.url))), "comm.mjs")
 	for (const b of [bus, local]) {
 		if (!existsSync(b)) continue
-		const r = spawnSync(process.execPath, [b, "whoami"], { cwd: ROOT, encoding: "utf8" })
+		const r = spawnSync(process.execPath, [b, "whoami"], { cwd: opt("--root", null) ? ROOT : HOME_DIR, encoding: "utf8" })
 		if (r.status === 0 && r.stdout.trim()) return r.stdout.trim()
 	}
 	return null
@@ -90,7 +97,7 @@ function observedReads(transcript) {
 	try { lines = readFileSync(transcript, "utf8").split("\n") } catch { return out }
 	const add = (p, how) => {
 		if (!p) return
-		const abs = isAbsolute(p) ? p : join(ROOT, p)
+		const abs = isAbsolute(p) ? p : resolve(HOME_DIR, p)
 		if (!abs.startsWith(ROOT)) return               // another project is not this handoff's business
 		let st = null
 		try { st = statSync(abs) } catch { return }
@@ -153,7 +160,7 @@ function cmdWrite() {
 	const manifest = new Map()
 	if (reg.ok) for (const [p, how] of observedReads(reg.transcript)) manifest.set(p, how)
 	for (const d of all("--read")) {
-		const abs = isAbsolute(d) ? d : join(ROOT, d)
+		const abs = isAbsolute(d) ? d : resolve(HOME_DIR, d)
 		if (!existsSync(abs)) die(`--read: no such file: ${d}`)
 		manifest.set(abs, "declared")
 	}
@@ -193,14 +200,14 @@ function cmdWrite() {
 	// GUARDS ARE RUN, NEVER REPORTED. "passed" is a claim; stdout is evidence.
 	const guards = []
 	for (const g of all("--guard")) {
-		const r = spawnSync("sh", ["-c", g], { cwd: ROOT, encoding: "utf8" })
+		const r = spawnSync("sh", ["-c", g], { cwd: HOME_DIR, encoding: "utf8" })
 		const out = `${r.stdout || ""}${r.stderr || ""}`.trim().split("\n").slice(-6).join("\n")
 		guards.push({ cmd: g, exit: r.status, out })
 	}
 	const body = `# HANDOFF — ${agent}, ${new Date().toISOString()}
 
 🔴 **This is a manifest, not a summary. Nothing here replaces reading a file — it tells you which files you
-do NOT have to read again, and proves it.** Run \`node bin/handoff.mjs verify\` first: every UNCHANGED row is
+do NOT have to read again, and proves it.** Run \`node ${relative(HOME_DIR, fileURLToPath(import.meta.url))} verify\` first, from where this was written: every UNCHANGED row is
 a verified fact about the disk, and every CHANGED row is a file to read in full before acting.
 
 ## 1. Machine state no file knows

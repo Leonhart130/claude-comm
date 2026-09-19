@@ -937,6 +937,23 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 			.filter((p) => resolve(p) !== ROOT)
 	} catch {}
 	if (!projects.length) row("field", WARN, `no installed project under ${FIELD}`)
+	// 🟡 DORMANT BY THE OWNER'S WORD, NEVER BY MINE (2026-09-19). His words: "je n'ai pas lancé work depuis pas
+	// mal de temps et je compte pas le faire, le jour où ce sera nécessaire on verra ensemble, tant qu'il a l'outil
+	// à jour c'est ce qui compte". So a field he names in FIELDS.json keeps gating on what makes its TOOL out of date
+	// or broken - drift, a stale bus, mail nothing can deliver, two sessions on one inbox, anything unreadable - and
+	// its own operations (gone-holder claims, mail waiting for a relaunch) are printed, marked dormant, not gated:
+	// nobody may act on them until he wakes it. Every entry carries who decided and why, printed in the row. A file
+	// that exists and cannot be read makes NOTHING dormant, and every field row says so (form E: a failed read must
+	// not look like an empty one). FINDINGS.md#dormant-field
+	let dormant = {}, dormantBad = null
+	const fieldsP = join(ROOT, "FIELDS.json")
+	if (existsSync(fieldsP)) {
+		try {
+			const d = JSON.parse(readFileSync(fieldsP, "utf8")).dormant || {}
+			for (const [k, v] of Object.entries(d)) if (!(v && typeof v.why === "string" && v.why && typeof v.by === "string" && v.by)) throw new Error(`entry '${k}' lacks by/why`)
+			dormant = d
+		} catch (e) { dormantBad = (e && e.message) || String(e) }
+	}
 	// Every file the field hooks actually EXECUTE, not just the bus. `comm.mjs` was the
 	// only one compared until the two instruments started travelling beside it
 	// (2026-09-04); a copy that can go stale and is compared by nothing is a drift class
@@ -1144,8 +1161,9 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 		// ack "only that leader can release them" - FALSE: `claim release` refuses a LIVE holder,
 		// never a gone one, and one of work's two claims was debris from THIS repo's measurement.
 		// They gate again. Only stranded mail whose sender WAS told stays shown-not-gated.
-		const claimsBad = claimDirBad || claims.some((c) => c.state !== "held")
-		const unannouncedStranded = strandedNames.filter((n) => (unannounced.get(n) || 0) > 0).map((n) => `${unannounced.get(n)} for ${n}`)
+		const asleep = Object.prototype.hasOwnProperty.call(dormant, name) ? dormant[name] : null
+		const claimsBad = claimDirBad || (!asleep && claims.some((c) => c.state !== "held"))
+		const unannouncedStranded = asleep ? [] : strandedNames.filter((n) => (unannounced.get(n) || 0) > 0).map((n) => `${unannounced.get(n)} for ${n}`)
 		const bits = [
 			// An unparsed non-zero exit must not borrow the confident wording of a parsed one:
 			// it means the installer refused for a reason this row has not read.
@@ -1175,7 +1193,9 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 			// on stderr as it was written — was announced at every session start as a crash
 			// (F14). `note` comes from claim.mjs's one renderer; there is no second wording here.
 			...claims.filter((c) => c.state !== "held" && c.note)
-				.map((c) => `⚠ CLAIM ${c.resource}: ${c.note}`),
+				.map((c) => `${asleep && c.state === "gone" ? "◦" : "⚠"} CLAIM ${c.resource}: ${c.note}`),
+			...(asleep ? [`◦ DORMANT (${asleep.by}${asleep.since ? `, ${asleep.since}` : ""}): ${String(asleep.why).slice(0, 160)} - only its tool's state gates`] : []),
+			...(dormantBad ? [`⚠ FIELDS.json could not be read (${dormantBad.slice(0, 80)}) - no field is treated as dormant`] : []),
 			...(claims.some((c) => c.state === "held")
 				? [`${claims.filter((c) => c.state === "held").length} resource(s) claimed: ${claims.filter((c) => c.state === "held").map((c) => c.resource).join(", ")}`] : []),
 			...notes.map((n) => n.unread === "dir" ? `⚠ ${noteFiles.length} restart note(s) are here and ${join(p, ".comm", "restart")} could not be read`
@@ -1197,8 +1217,8 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 			unannouncedStranded.length > 0 && `stranded-untold:${about(strandedNames.filter((n) => (unannounced.get(n) || 0) > 0))}`,
 			shared.length > 0 && `shared-inbox:${about(shared)}`,
 			claimsBad && `claim:${claimDirBad ? "unreadable" : about(claims.filter((c) => c.state !== "held").map((c) => `${c.resource}=${c.state}`))}`,
-			notesBad && "note-unreadable"].filter(Boolean)
-		row(`field:${name}`, drift || busStale !== false ? RED : mailStuck || claimsBad || shared.length > 0 || notesBad ? WARN : OK,
+			notesBad && "note-unreadable", dormantBad && "fields-unreadable"].filter(Boolean)
+		row(`field:${name}`, drift || busStale !== false ? RED : mailStuck || claimsBad || shared.length > 0 || notesBad || dormantBad ? WARN : OK,
 			bits.join(" - "), causes)
 	}
 }
@@ -3278,6 +3298,33 @@ function proveRed() {
 			assert("field: a gone-holder claim gates, on its own",
 				r.level === WARN && /⚠ CLAIM port:7000: HOLDER IS GONE/.test(r.text),
 				`one claim, holder gone -> ${LV[r.level]} (want warn); named=${/port:7000/.test(r.text)}`)
+		}
+
+		// A FIELD THE OWNER DECLARED DORMANT (FINDINGS.md#dormant-field): the same gone-holder claim is printed and
+		// does not gate, and its tool's state still does. ONE VARIABLE against the arm above: FIELDS.json. Then
+		// drift in the dormant field must still be RED, and an unreadable FIELDS.json must make nothing dormant.
+		{
+			const cdir = join(proj, ".comm", "claims")
+			mkdirSync(cdir, { recursive: true })
+			writeFileSync(join(cdir, "port:7000.json"), JSON.stringify({ v: 1, at: new Date().toISOString(),
+				resource: "port:7000", by: "db", pid: 4194303, start: 1, boot: "not-this-boot", holder: "session", purpose: "pg" }) + "\n")
+			const fp = join(pkg, "FIELDS.json")
+			const rowNow = () => run(true).rows.find((x) => x.label === "field:proj") || { level: -1, text: "" }
+			writeFileSync(fp, JSON.stringify({ dormant: { proj: { by: "owner", since: "2026-09-19", why: "not launched; keep its bus current" } } }))
+			const asleep = rowNow()
+			const stub = join(proj, "app", ".claude", "comm-hook.mjs")
+			const stubWas = readFileSync(stub, "utf8")
+			writeFileSync(stub, stubWas + "\n// drifted\n")
+			const asleepDrift = rowNow()
+			writeFileSync(stub, stubWas)
+			writeFileSync(fp, "{ not json")
+			const unreadable = rowNow()
+			rmSync(fp, { force: true }); rmSync(cdir, { recursive: true, force: true })
+			assert("field: a dormant field shows its own operations and gates only on its tool",
+				asleep.level === OK && /◦ CLAIM port:7000/.test(asleep.text) && /DORMANT \(owner, 2026-09-19\)/.test(asleep.text) &&
+				asleepDrift.level === RED && unreadable.level === WARN && /FIELDS\.json could not be read/.test(unreadable.text),
+				`dormant + gone claim -> ${LV[asleep.level]} (want ok, printed and marked); dormant + a drifted stub -> ${LV[asleepDrift.level]} (want RED); ` +
+				`FIELDS.json unreadable -> ${LV[unreadable.level]} (want warn, says so)`)
 		}
 
 		// ── F13: --hook writes two instruments and --root governs one ────────────────────
