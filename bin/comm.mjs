@@ -30,7 +30,7 @@
  */
 import {
 	readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync,
-	readdirSync, renameSync, statSync, readlinkSync,
+	readdirSync, renameSync, statSync, lstatSync, readlinkSync,
 } from "node:fs"
 import { join, dirname, resolve, relative, sep, basename } from "node:path"
 // A21 permits a relative import of a BUS file and checks it transitively; see
@@ -146,9 +146,10 @@ const rosterAgent = (cfg, who, root) => {
 	if (typeof who === "string" && Object.prototype.hasOwnProperty.call((cfg && cfg.agents) || {}, who)) return who
 	// ...or an ORPHANED inbox, by its name (review #11b S3): boot gates on mail left for an agent
 	// taken off the roster, and these two commands are its only way out. A NAME in the agent
-	// shape, and an existing directory directly under .comm/inbox/ - never a path.
+	// shape, and an existing directory directly under .comm/inbox/ - never a path, and never a
+	// LINK to one (#11c T2: `stat` followed `inbox/linked -> ../../elsewhere` and drained it).
 	if (typeof who === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(who) && !who.includes("..") && root) {
-		try { if (statSync(inboxDir(root, who)).isDirectory()) return who } catch {}
+		try { if (lstatSync(inboxDir(root, who)).isDirectory()) return who } catch {}
 	}
 	throw new Error(`'${who}' is not an agent on this project's roster (.comm/config.json) - an inbox is named by the roster, never by a path.\n` +
 		`  Agents: ${Object.keys((cfg && cfg.agents) || {}).join(", ") || "(none)"}`)

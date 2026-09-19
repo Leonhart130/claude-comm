@@ -388,10 +388,14 @@ try {
 	// root's \`bin/boot.mjs --hook\` records from the code at HEAD and re-reads its write, so this
 	// copy - one install behind - stands aside there. The test reads the file the hooks come
 	// from; if it ever misses, both record and the ledger collapses the twin: never a lost start.
+	// 🔴 THE HOOKS OF THIS AGENT'S DIRECTORY, never the root's (review #11c T1). A session in
+	// \`review/\` loads \`review/.claude/settings.json\`, which runs only this stub: reading the
+	// ROOT's file made every expert stand aside for a \`boot --hook\` that never runs for it, and
+	// its starts stopped reaching the ledger with nothing to say so (measured: 0 records, 1 unwired).
 	let rootRecords = false
 	try {
 		if (existsSync(join(projectRoot, "bin", "boot.mjs"))) {
-			const st = JSON.parse(readFileSync(join(projectRoot, ".claude", "settings.json"), "utf8"))
+			const st = JSON.parse(readFileSync(join(agentRoot, ".claude", "settings.json"), "utf8"))
 			rootRecords = ((st && st.hooks && st.hooks.SessionStart) || []).some((g) => ((g && g.hooks) || [])
 				.some((h) => h && typeof h.command === "string" && /bin\\/boot\\.mjs["']?\\s+(?:--\\S+\\s+)*--hook\\b/.test(h.command)))
 		}

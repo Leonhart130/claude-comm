@@ -3076,3 +3076,33 @@ what happens to a native message sent to a session that exits before draining it
 
 **Proved red in a copy, one mutation per arm:** installer back to static-only + BUS_FILES reordered → A70 alone ·
 the stub's step-aside removed → A73 alone · the orphan branch removed → A69 alone.
+
+## `#review11c` — the third pass found its red inside the second pass's fix, a third time running
+
+**2026-09-18, the same reviewer, `REVIEW-11c.md`; disposed 2026-09-19.** Target `6521603` (#11b's disposal).
+
+- **T1 🔴 — S2's inverted rule silenced every EXPERT of this repo.** The stub stood aside when the ROOT's
+  `settings.json` wired `bin/boot.mjs --hook`. But a session launched in `review/` loads `review/.claude/settings.json`,
+  which runs only the stub: `boot --hook` never runs for it. Measured by the reviewer on `git archive 6521603`: root
+  wired → **0** records in `review.log`, unwired → 1. *"Either detection can only miss toward a twin"* (S2 above) was
+  false for every agent but the root's. It was **not live**: the installed stubs predate it, and the `bus` row's
+  advice (`node install.mjs .`) would have put it live. **Fix:** the stub reads the hooks of its OWN directory
+  (`agentRoot`), which are the hooks that run for its session. **A73 extended:** the same install's `review/` stub,
+  root wired, must record 1; the root's stub, wired, still 0 — that half proves the switch is armed.
+- **T2 🟡 — the orphan-inbox name followed a symlink** (`statSync`): `inbox/linked -> ../../elsewhere` was drained.
+  `lstatSync`. **A69 extended**, with the real orphan beside it as the positive control.
+
+**Proved red in a copy, one mutation per arm** (2026-09-19): the stub back to the root's settings → A73 alone, *expert
+→ 0 (want 1)*, both root cases unchanged · `lstat` back to `stat` → A69 alone, *LINK → exit 0, its target's mail
+kept=false*. Attack 74/74 on the fix.
+
+**The form, third time:** each disposal of this review shipped a red the next pass found (#11 → S1/S2, #11b → T1). The
+arm that goes with a scope decision must fire from EVERY place the rule claims to cover — A73 fired only the root's
+stub, so it proved the rule for the one agent it was written for.
+
+### Not verified
+
+- **Nothing reports a recorder that never runs.** T1 was found by reading, and would have shown only as `review`
+  starts ceasing to appear. No row compares an agent's sessions with its ledger records. Named, not built.
+- Claude Code's settings resolution was not measured by me: the fix rests on the reviewer's ledger evidence (every
+  `review` session has exactly one record, never a twin), i.e. the root's `settings.json` never ran for them.

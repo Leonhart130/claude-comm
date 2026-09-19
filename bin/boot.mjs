@@ -431,7 +431,8 @@ if (has("--hook")) {
 		// checking the stub recorded, and handing this repo's instrument to the INSTALLED copy,
 		// one install behind the code (in a fresh clone, with no `.comm/bin`, nothing recorded and
 		// the row was green). Inverted: this hook runs `bin/` HEAD and re-reads its own write, so
-		// it records; the STUB stands aside when this root wires `bin/boot.mjs --hook`. If that
+		// it records; the STUB stands aside when ITS OWN directory's hooks wire `bin/boot.mjs --hook`
+		// - here, only the root's; an expert's session never runs this hook (#11c T1). If that
 		// test ever misses, the cost is a twin, which the ledger collapses - never a lost start.
 		// The session id comes from the transcript path, not from a payload field: `Stop`
 		// is documented to carry `session_id` and SessionStart was only ever OBSERVED to

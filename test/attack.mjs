@@ -15,7 +15,7 @@
  * directives? Measuring the wrong thing produced a confident, plausible, wrong
  * result, which is this project's signature failure mode.
  */
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync, statSync, symlinkSync, cpSync, utimesSync, chmodSync } from "node:fs"
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync, statSync, lstatSync, symlinkSync, cpSync, utimesSync, chmodSync } from "node:fs"
 import { join, delimiter } from "node:path"
 import { execFileSync, spawnSync, spawn } from "node:child_process"
 import { createHash } from "node:crypto"
@@ -2113,12 +2113,21 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	writeFileSync(join(r69, ".comm", "inbox", "oldexpert", "o1.json"), JSON.stringify({ id: "2026-09-18T00-00-00-000Z-0ld0ld", from: "leader", to: "oldexpert", kind: "fyi", ref: "x", ts: new Date().toISOString() }))
 	const orphan = bus69(["dismiss", "oldexpert", "--force"])
 	const orphanCleared = !existsSync(join(r69, ".comm", "inbox", "oldexpert", "o1.json"))
+	// Review #11c T2: an orphan NAME that is a link to a directory elsewhere was followed and drained. The
+	// orphan above, a real directory under the same name rule, is this case's positive control.
+	mkdirSync(join(r69, "elsewhere"), { recursive: true })
+	writeFileSync(join(r69, "elsewhere", "keep.json"), JSON.stringify({ id: "2026-09-18T00-00-00-000Z-11ked0", from: "leader", to: "linked", kind: "fyi", ref: "x", ts: new Date().toISOString() }))
+	try { symlinkSync("../../elsewhere", join(r69, ".comm", "inbox", "linked")) } catch {}
+	const linkPlanted = (() => { try { return lstatSync(join(r69, ".comm", "inbox", "linked")).isSymbolicLink() } catch { return false } })()
+	const linked = bus69(["dismiss", "linked", "--force"])
+	const linkKept = existsSync(join(r69, "elsewhere", "keep.json"))
 	check("A69 an inbox is named by the roster, never a path, and a drained file stays in delivered/",
 		up.status !== 0 && sideways.status !== 0 && pkgStayed && ctl.status === 0 && delivered.length === 1 && !escaped &&
-		orphan.status === 0 && orphanCleared,
+		orphan.status === 0 && orphanCleared && linkPlanted && linked.status !== 0 && linkKept,
 		`dismiss ../.. --force -> exit ${up.status}, package.json still in the root=${pkgStayed}; inbox app/../leader -> exit ${sideways.status}; ` +
 		`control, dismiss app --force -> exit ${ctl.status}, delivered/=${JSON.stringify(delivered)}, a "../" id escaped=${escaped}; ` +
-		`an orphaned inbox by its name -> exit ${orphan.status}, cleared=${orphanCleared}`)
+		`an orphaned inbox by its name -> exit ${orphan.status}, cleared=${orphanCleared}; ` +
+		`an orphan name that is a LINK (planted=${linkPlanted}) -> exit ${linked.status}, its target's mail kept=${linkKept}`)
 }
 
 // A70 — the installer writes every bus file AFTER the siblings it imports: measured by LINKING, not by a spelling.
@@ -2175,13 +2184,17 @@ process.stdout.write(JSON.stringify({ ops, res }))
 // copy, one install behind, and absent from a fresh clone: nothing recorded while the row said it had. Inverted:
 // the root's `bin/boot.mjs --hook` records, and the stub skips its ledger block when THAT is wired. One variable:
 // the `bin/boot.mjs --hook` group in the fixture's settings. The control, the same fixture without it, records.
+// Review #11c T1: the stub read the ROOT's settings, so an EXPERT's stub - whose session loads only its own
+// directory's hooks, never boot's - stood aside too and nothing recorded it. The third case fires the expert's
+// stub with the root wired: it must record. The root case (0 with boot wired) is what proves the switch is armed.
 {
 	const r73 = mkdtempSync(join(tmpdir(), "comm-attack-onerecorder-"))
 	atExit(() => { try { rmSync(r73, { recursive: true, force: true }) } catch {} })
 	mkdirSync(join(r73, ".comm"), { recursive: true })
 	mkdirSync(join(r73, "bin"), { recursive: true })
 	writeFileSync(join(r73, "bin", "boot.mjs"), "// stand-in: only its presence and its wiring are read\n")
-	writeFileSync(join(r73, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: "." } }))
+	mkdirSync(join(r73, "review"), { recursive: true })
+	writeFileSync(join(r73, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", review: "review" } }))
 	execFileSync("node", [join(PKG, "install.mjs"), r73], { stdio: "pipe" })
 	const settingsP = join(r73, ".claude", "settings.json")
 	const installed = JSON.parse(readFileSync(settingsP, "utf8"))
@@ -2189,19 +2202,21 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	withBoot.hooks.SessionStart.unshift({ hooks: [{ type: "command", command: `node "$CLAUDE_PROJECT_DIR/bin/boot.mjs" --fast --hook 2>/dev/null || true` }] })
 	const fake73 = join(r73, "claude")
 	try { symlinkSync("/bin/sh", fake73) } catch {}
-	const log73 = join(r73, ".comm", "handoff", "leader.log")
-	const lines73 = () => { try { return readFileSync(log73, "utf8").trim().split("\n").length } catch { return 0 } }
-	const fire73 = (sid) => {
+	const lines73 = (agent = "leader") => { try { return readFileSync(join(r73, ".comm", "handoff", `${agent}.log`), "utf8").trim().split("\n").length } catch { return 0 } }
+	const fire73 = (sid, dir = r73) => {
 		const tp = join(r73, `${sid}.jsonl`); writeFileSync(tp, "\n")
-		const pl = join(r73, "payload.json"); writeFileSync(pl, JSON.stringify({ cwd: r73, source: "startup", transcript_path: tp }))
-		spawnSync(fake73, ["-c", `cd ${r73} && ${process.execPath} ${join(r73, ".claude", "comm-hook.mjs")} session-start < ${pl} > /dev/null 2>&1; echo done`],
+		const pl = join(r73, "payload.json"); writeFileSync(pl, JSON.stringify({ cwd: dir, source: "startup", transcript_path: tp }))
+		spawnSync(fake73, ["-c", `cd ${dir} && ${process.execPath} ${join(dir, ".claude", "comm-hook.mjs")} session-start < ${pl} > /dev/null 2>&1; echo done`],
 			{ encoding: "utf8", env: { ...process.env, CLAUDE_COMM_RUNTIME: join(r73, "runtime") } })
 	}
+	const expertStub = existsSync(join(r73, "review", ".claude", "comm-hook.mjs"))
 	writeFileSync(settingsP, JSON.stringify(withBoot)); const b0 = lines73(); fire73("73737373-0000-0000-0000-000000000001"); const aside = lines73() - b0
+	const e0 = lines73("review"); fire73("73737373-0000-0000-0000-000000000003", join(r73, "review")); const expert = lines73("review") - e0
 	writeFileSync(settingsP, JSON.stringify(installed)); const b1 = lines73(); fire73("73737373-0000-0000-0000-000000000002"); const recorded = lines73() - b1
 	check("A73 at claude-comm's own root the stub stands aside for boot --hook; elsewhere it records",
-		aside === 0 && recorded === 1,
-		`bin/boot.mjs --hook wired beside the stub -> the stub wrote ${aside} start(s) (want 0); control, not wired -> ${recorded} (want 1)`)
+		aside === 0 && recorded === 1 && expertStub && expert === 1,
+		`bin/boot.mjs --hook wired beside the stub -> the stub wrote ${aside} start(s) (want 0); control, not wired -> ${recorded} (want 1); ` +
+		`an EXPERT's stub (installed=${expertStub}) with the root wired -> ${expert} (want 1: its session never runs boot --hook)`)
 }
 
 // A71/A72 — which starts may TAKE a restart note, and a start that cannot be recorded gives it back.
