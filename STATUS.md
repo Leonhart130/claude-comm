@@ -5,36 +5,32 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-09-19. Last session's A–F are DONE: A reviewed by #11/#11b/#11c, B+C landed (c9ef312, corrected c4b4506),
-T1/T2 fixed (182c4a7), release **2026-09-19.1** (print `56313a156871`) installed here, getajob, electio, work;
-getajob n°3 answered. Field = getajob; work dormant. The two amendments the 09-18 close demanded are DISCHARGED at
-this close, now that they are live: `field:getajob@f59780` (armer-judged notes) and `field:work@924908` (a peer's
-lapsed note prints; its gone-holder claims still gate, by R4). The `channel` row dated a letter from minutes earlier
-"15h ago": C3, form D, in the field.)*
+*(2026-09-19, second half. The owner: work stays dormant (`FIELDS.json`), getajob is the field, and he launches a
+new leader in `~/Dev/moneyMaker` today and wants it to use the bus as well as getajob does. Asked my view on skill vs
+MCP: skill yes, MCP not now — `FINDINGS.md#unseen-introduction`.)*
 
-**A — 🔴 T1 IS FIXED IN CODE, NOT YET SEEN LIVE.** The first `review` start in THIS repo must add exactly one line
-to `.comm/handoff/review.log`, and the leader's next start exactly one to `leader.log` (no twin). Read both before
-and after a start: `wc -l .comm/handoff/*.log`. A73 proves it only in a fixture.
+**A — 🔴 REVIEW #12, then release `2026-09-19.2`.** Target `cd0ad2c..HEAD`: the introduction in the model's context
+(stub `--notice` → bus), the generated skill, restart/handoff finding their root, the dormant field, the ledger's
+refusal of a hand-fired start. Brief: `BRIEF-adversarial-12.md` (gitignored, on disk). Release notes drafted for
+field agents: fold the finding's first three bullets. Install into getajob, electio, work, here; tell getajob (new
+`SKILL.md` files in their 7 agents, theirs to commit; `apps/web` ignores `.claude/`).
 
-**B — the gap T1 exposed: nothing reports a recorder that never runs** (`FINDINGS.md#review11c`, Not verified). An
-agent whose starts stop reaching the ledger is silent. Measure first: `~/.claude/sessions/<pid>.json` (`#native-path`)
-gives each session's `cwd` and start; compare with the ledger's records per agent. Build a row only on that
-evidence, armed with an expert that records nothing.
+**B — moneyMaker is the first real test of the skill.** Installed 2026-09-19 at the reviewed-pending build
+(`+unreleased`), leader only; its leader adds its own experts. Measure from its transcripts
+(`~/.claude/projects/-home-leonh-Dev-moneyMaker/`): did it reach for the bus UNPROMPTED — `send`, `launch.mjs`,
+`--add-agent` — and did it read the skill? Prefix `./` on those dirs (they start with `-`).
 
-**C — `work`'s two `zz-` claims** (`zz-mesure-claim-r1`, `zz-e458-b`): debris from the claim measurement claude-comm
-asked work's leader to run (09-07/08); both holders dead; `claim release` takes them. They sit in work's tree, so
-**asked the owner** — act on the answer. `field:work` gates on them until then.
+**C — T1 live, still unseen** (from the first half): a real `review` start here must add exactly one line to
+`.comm/handoff/review.log`. The review #12 launch is that start — read `wc -l` before and after.
 
-**D — getajob: settled on their side** (their reply 09-19, nothing awaits me): stubs committed (`fb57e64`), `envoi`
-closes and relaunches via `launch.mjs` with hooks, `extension`'s message waits ON PURPOSE. ⚠ Not measured: `envoi`
-answered 3 bells with NO hooks, so the bell's pointer reached it while nothing drained its inbox; its `1 pending` is
-probably mail it already acted on. Look after its relaunch. Their native-path measurement: when they have a slot.
+**D — the gap T1 exposed: nothing reports a recorder that never runs** (`#review11c`). Measure first with
+`~/.claude/sessions/<pid>.json` against the ledger, per agent.
 
-**Carried:** S6 (`to_state` blind after send, `#review11b`) · getajob owes a field-day read of `rings.jsonl` and a
-recount (A62, A65) · the 12:50Z unattributed ring · run controls to a FILE, never two suites at once, zsh quoting ·
-#9 A3 · C7 · `who`'s 3rd/4th states · `dismiss --citing` · `comm wait --for` · context.mjs's `/clear` limits · work:
-unread letter · the restart trigger (ledger UNKNOWN) · C3 (channel row dates by filename; re-open fresh, Opus).
-**Later, owner's order:** adoption (MCP/skill, measured first) → Rust port → value, with getajob's leader.
+**Carried:** S6 (`to_state` blind after send) · every OTHER stderr line of the stub still reaches no model
+(registry/ledger/restart diagnostics) · getajob's field-day read of `rings.jsonl` (A62, A65) · the 12:50Z
+unattributed ring · #9 A3 · C7 · `who`'s 3rd/4th states · `dismiss --citing` · `comm wait --for` · context.mjs's
+`/clear` limits · the restart trigger (ledger UNKNOWN) · C3 (channel row dates by filename — seen again 09-19).
+**Later, owner's order:** adoption (skill shipped; measure it) → Rust port → value, with getajob's leader.
 
 ## Where it stands
 

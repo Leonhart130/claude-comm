@@ -3135,6 +3135,16 @@ handoff went to `<expert>/.comm/` (read by no verify and no ledger) and "who am 
 answer is the leader. Latent — no field tree has a stray `.comm/` — because the README's commands only ran from the
 root. Now the root is walked up to, like the bus; identity, `--read` and guards stay where the caller stands.
 
+**Two more, found by my own controls the same afternoon.**
+- **The leader's skill listed its experts**, so one hand edit of `config.json` made the generated file drift and
+  turned boot's unaddressable-mail arm RED for a reason foreign to it (`boot --prove-red`, HEAD `18f3ed2`). A
+  generated file must not copy volatile state: the roster is given live by the introduction at every start.
+- **The ledger recorded a hand-fired stub.** A probe of moneyMaker's brand-new stub, fired from my own session,
+  wrote a phantom cold start into its ledger: the registry refuses a session not running inside the project, the
+  ledger had no such test. It now refuses when that is KNOWN (and still records when the registry cannot be asked).
+  A74 asserts it; A73 is the positive control. The phantom record was mine, one line, deleted. **Form: a probe
+  that writes into the world it measures** — `STATUS.md`'s measurement traps, an eleventh instance.
+
 **Why a skill and not an MCP server, on this evidence.** getajob's failures were remembering the bus and its
 conventions, not typing its commands — its letters cite the CLI's refusals as what WORKED. A skill costs one
 description line per session and is read when the work calls for it; an MCP server is a process per session, tool

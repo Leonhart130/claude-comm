@@ -18,7 +18,7 @@
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync, statSync, lstatSync, symlinkSync, cpSync, utimesSync, chmodSync } from "node:fs"
 import { join, delimiter, resolve } from "node:path"
 import { execFileSync, spawnSync, spawn } from "node:child_process"
-import { createHash } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import { pathToFileURL } from "node:url"
 import { tmpdir } from "node:os"
 import { MAX_NOTE, MAX_RENDER, MAX_REF, STOP_CHAIN } from "../bin/comm.mjs"
@@ -2243,21 +2243,29 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	const webDir = join(r74, "apps", "web")
 	const env74 = { ...process.env, CLAUDE_COMM_RUNTIME: join(r74, "runtime") }
 	const start74 = (dir) => {
+		// A transcript_path, or the ledger would never record whatever the guard said: the phantom-start assertion
+		// below was GREEN with the guard removed (mutation m9, 2026-09-19) - a probe that could not fire.
+		const tp74 = join(r74, `${randomUUID()}.jsonl`); writeFileSync(tp74, "\n")
 		const r = spawnSync(process.execPath, [join(dir, ".claude", "comm-hook.mjs"), "session-start"],
-			{ cwd: dir, encoding: "utf8", input: JSON.stringify({ cwd: dir, source: "startup" }), env: env74 })
+			{ cwd: dir, encoding: "utf8", input: JSON.stringify({ cwd: dir, source: "startup", transcript_path: tp74 }), env: env74 })
 		try { return JSON.parse(r.stdout).hookSpecificOutput.additionalContext || "" } catch { return "" }
 	}
 	const paths = (txt) => [...txt.matchAll(/node (\S+\.mjs)/g)].map((m) => m[1])
 	const allExist = (txt, dir) => { const ps = paths(txt); return ps.length > 0 && ps.every((q) => existsSync(resolve(dir, q))) }
 	const lead74 = start74(r74), web74 = start74(webDir)
+	// These two starts are fired by THIS process, not by a session inside r74: the ledger must not count them
+	// (a probe of moneyMaker's stub wrote a phantom start on 2026-09-19). The control is A73, whose fixture has
+	// a claude ancestor inside the project and must record exactly one.
+	const phantom = (() => { try { return readdirSync(join(r74, ".comm", "handoff")).filter((f) => f.endsWith(".log")) } catch { return [] } })()
 	const intro = /You are 'leader', the LEADER/.test(lead74) && /experts: web/.test(lead74) &&
 		/You are 'web', an EXPERT/.test(web74) && /Your leader is 'leader'/.test(web74) && /send leader --ref/.test(web74)
 	const introPaths = allExist(lead74, r74) && allExist(web74, webDir) && /\.\.\/\.\.\/\.comm\/README\.md/.test(web74)
 	const oldSpellingAbsent = !existsSync(join(webDir, ".comm", "bin", "comm.mjs"))
 	check("A74 every start tells the agent who it is, in the model's context, with commands that run from its folder",
-		intro && introPaths && oldSpellingAbsent,
+		intro && introPaths && oldSpellingAbsent && phantom.length === 0,
 		`leader told its role and roster, expert told its leader=${intro}; every command named exists from that agent's folder=${introPaths} ` +
-		`(${paths(web74).join(", ") || "none found"}); control, the root spelling .comm/bin/comm.mjs does not exist from apps/web=${oldSpellingAbsent}`)
+		`(${paths(web74).join(", ") || "none found"}); control, the root spelling .comm/bin/comm.mjs does not exist from apps/web=${oldSpellingAbsent}; ` +
+		`starts fired from outside the project left no ledger record=${phantom.length === 0}${phantom.length ? ` (${phantom.join(", ")})` : ""}`)
 
 	const skillOf = (dir) => { try { return readFileSync(join(dir, ".claude", "skills", "claude-comm", "SKILL.md"), "utf8") } catch { return "" } }
 	const sLead = skillOf(r74), sWeb = skillOf(webDir)
