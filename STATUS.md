@@ -9,11 +9,26 @@ fold the settled parts into the README.
 new leader in `~/Dev/moneyMaker` today and wants it to use the bus as well as getajob does. Asked my view on skill vs
 MCP: skill yes, MCP not now — `FINDINGS.md#unseen-introduction`.)*
 
-**A — 🔴 REVIEW #12, then release `2026-09-19.2`.** Target `cd0ad2c..HEAD`: the introduction in the model's context
-(stub `--notice` → bus), the generated skill, restart/handoff finding their root, the dormant field, the ledger's
-refusal of a hand-fired start. Brief: `BRIEF-adversarial-12.md` (gitignored, on disk). Release notes drafted for
-field agents: fold the finding's first three bullets. Install into getajob, electio, work, here; tell getajob (new
-`SKILL.md` files in their 7 agents, theirs to commit; `apps/web` ignores `.claude/`).
+**A — 🔴 REVIEW #12 IS IN (`review/REVIEW-12.md`): no red, 5 🟡, 3 🟢. DISPOSITION HALF DONE — resume here.**
+*(Paused 2026-09-19 ~20:10 local at the owner's request; bus mail id `2026-09-19T17-48-11-449Z-d6dbd9` left pending ON
+PURPOSE until the disposition is finished. The reviewer's pane is still open — it was told not to close.)*
+- **FIXED + ARMED, attack 79/79 green, NOT yet proved red by mutation:** D1 (`--root` asked identity at the root →
+  asked from the caller's folder; A76), D2 (no project and no `--root` ⇒ refuse; A76), E1 (pid 0 = cannot tell →
+  ledger records; A77, split out of A74), A1 (notices NUL-stripped/capped in the stub, delivery retried without them;
+  A78), C1 (expert skill: bus defects → its leader, only the leader's names `exchange/`; pointer FIRST in notes;
+  A74/A75), C2 (one role-free skill per shared folder; A75), A29 title.
+- **FIXED in `boot.mjs`, arm extended, NOT yet run:** F1 — under dormancy only a GONE claim stops gating (corrupt /
+  unreadable still gate), and a dormant field with a live session or a start after `since` WARNs `dormant-awake`.
+- **NEXT, in order:** (1) one attack run per mutation, each reverting ONE fix: D1, D2, E1, the ledger guard, A1, C1
+  (expert names exchange), C1 note order, C2 (write per agent) — each must redden its own arm alone; (2)
+  `boot --prove-red` on HEAD, then once per F1 mutation (old `claimsBad` clause; `awake` forced false) — 12 min
+  each, systemd-run capped; (3) `FINDINGS.md#review12` with the table; NAMED not fixed: A2 (a marker is written when
+  the bus RAN, not when it SHOWED the notice — new stub + old bus loses it), the installer overwrites a
+  non-generated `SKILL.md`; (4) ask the reviewer for a short #12b on the fixes (`SendMessage` or `send review`);
+  (5) release `2026-09-19.2` — body drafted at `<scratchpad>/changelog-body-2.md` (add: "the pointer goes first in
+  a note"), install here, getajob, electio, work, **moneyMaker (still on 18f3ed2 — before its first session)**;
+  letter to getajob drafted at `<scratchpad>/letter-skill.md`; (6) full boot, close.
+  `<scratchpad>` = `/tmp/claude-1000/-home-leonh-Dev-claude-comm/83c9d8bd-e0f2-44b0-8636-85181c542fce/scratchpad`.
 
 **B — moneyMaker is the first real test of the skill.** Installed 2026-09-19 at the reviewed-pending build
 (`+unreleased`), leader only; its leader adds its own experts. Measure from its transcripts

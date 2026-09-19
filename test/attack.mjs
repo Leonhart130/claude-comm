@@ -1519,7 +1519,7 @@ const POINTER_SOURCES = (() => {
 		regOK = readdirSync(d).some((f) => JSON.parse(readFileSync(join(d, f), "utf8")).transcript === tp)
 	} catch {}
 
-	check("A29 the field hook records a start in both instruments, and still delivers",
+	check("A29 the field hook records a start in both instruments, and still delivers - its mail and introduction in one JSON",
 		stopDrained && !stopTouchedLedger && stopRegistered && stopIdempotent &&
 		foreignRecordedNothing && startDrained && schemaOK && ledgerOK && regOK && streamsSeparate,
 		`stop: drained=${stopDrained} ledger-untouched=${!stopTouchedLedger} registry-refreshed=${stopRegistered} ` +
@@ -2243,29 +2243,24 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	const webDir = join(r74, "apps", "web")
 	const env74 = { ...process.env, CLAUDE_COMM_RUNTIME: join(r74, "runtime") }
 	const start74 = (dir) => {
-		// A transcript_path, or the ledger would never record whatever the guard said: the phantom-start assertion
-		// below was GREEN with the guard removed (mutation m9, 2026-09-19) - a probe that could not fire.
-		const tp74 = join(r74, `${randomUUID()}.jsonl`); writeFileSync(tp74, "\n")
 		const r = spawnSync(process.execPath, [join(dir, ".claude", "comm-hook.mjs"), "session-start"],
-			{ cwd: dir, encoding: "utf8", input: JSON.stringify({ cwd: dir, source: "startup", transcript_path: tp74 }), env: env74 })
+			{ cwd: dir, encoding: "utf8", input: JSON.stringify({ cwd: dir, source: "startup" }), env: env74 })
 		try { return JSON.parse(r.stdout).hookSpecificOutput.additionalContext || "" } catch { return "" }
 	}
 	const paths = (txt) => [...txt.matchAll(/node (\S+\.mjs)/g)].map((m) => m[1])
 	const allExist = (txt, dir) => { const ps = paths(txt); return ps.length > 0 && ps.every((q) => existsSync(resolve(dir, q))) }
 	const lead74 = start74(r74), web74 = start74(webDir)
-	// These two starts are fired by THIS process, not by a session inside r74: the ledger must not count them
-	// (a probe of moneyMaker's stub wrote a phantom start on 2026-09-19). The control is A73, whose fixture has
-	// a claude ancestor inside the project and must record exactly one.
-	const phantom = (() => { try { return readdirSync(join(r74, ".comm", "handoff")).filter((f) => f.endsWith(".log")) } catch { return [] } })()
 	const intro = /You are 'leader', the LEADER/.test(lead74) && /experts: web/.test(lead74) &&
 		/You are 'web', an EXPERT/.test(web74) && /Your leader is 'leader'/.test(web74) && /send leader --ref/.test(web74)
 	const introPaths = allExist(lead74, r74) && allExist(web74, webDir) && /\.\.\/\.\.\/\.comm\/README\.md/.test(web74)
 	const oldSpellingAbsent = !existsSync(join(webDir, ".comm", "bin", "comm.mjs"))
+	// Review #12 C1: a note is cut from the END, so "where to read" goes FIRST (getajob section 7, LESSONS form AE).
+	const pointerFirst = /--note "<where to read, then/.test(web74) && /--note "<where to read, then/.test(lead74)
 	check("A74 every start tells the agent who it is, in the model's context, with commands that run from its folder",
-		intro && introPaths && oldSpellingAbsent && phantom.length === 0,
+		intro && introPaths && oldSpellingAbsent && pointerFirst,
 		`leader told its role and roster, expert told its leader=${intro}; every command named exists from that agent's folder=${introPaths} ` +
 		`(${paths(web74).join(", ") || "none found"}); control, the root spelling .comm/bin/comm.mjs does not exist from apps/web=${oldSpellingAbsent}; ` +
-		`starts fired from outside the project left no ledger record=${phantom.length === 0}${phantom.length ? ` (${phantom.join(", ")})` : ""}`)
+		`the note's pointer first=${pointerFirst}`)
 
 	const skillOf = (dir) => { try { return readFileSync(join(dir, ".claude", "skills", "claude-comm", "SKILL.md"), "utf8") } catch { return "" } }
 	const sLead = skillOf(r74), sWeb = skillOf(webDir)
@@ -2274,6 +2269,18 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	const roles = /## Your experts/.test(sLead) && !/## Your experts/.test(sWeb) && /your leader is \*\*`leader`\*\*/.test(sWeb) &&
 		/send leader --ref <report> --kind done/.test(sWeb)
 	const skillPaths = allExist(sLead, r74) && allExist(sWeb, webDir) && !!absInstall && existsSync(absInstall[1])
+	// Review #12 C1: exchange/ is leader-to-leader; an expert writes to its leader only. And the pointer first.
+	const star = /exchange\/field\/in/.test(sLead) && !/exchange/.test(sWeb) && /Tell your leader, by the bus/.test(sWeb) &&
+		/WHERE TO READ goes first/.test(sWeb) && /--note "<where to read, then the verdict>"/.test(sWeb)
+	// Review #12 C2: two agents in one folder got the LAST one's skill and --check red from birth. One skill, no role.
+	const r75s = mkdtempSync(join(tmpdir(), "comm-attack-sharedskill-"))
+	atExit(() => { try { rmSync(r75s, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(r75s, ".comm"), { recursive: true })
+	writeFileSync(join(r75s, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", helper: "." } }))
+	execFileSync("node", [join(PKG, "install.mjs"), r75s], { stdio: "pipe" })
+	const sShared = skillOf(r75s)
+	const sharedChk = spawnSync(process.execPath, [join(PKG, "install.mjs"), r75s, "--check"], { encoding: "utf8" })
+	const sharedOK = sharedChk.status === 0 && /This folder is shared by `leader`, `helper`/.test(sShared) && !/You are \*\*/.test(sShared)
 	const fresh = spawnSync(process.execPath, [join(PKG, "install.mjs"), r74, "--check"], { encoding: "utf8" })
 	// Guarded: with no skill written (the defect this arm exists for) the edit must not ABORT the suite and hide
 	// every arm after it - it must leave this one red. Found by mutation: an unguarded write threw ENOENT.
@@ -2281,9 +2288,11 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	const edited = spawnSync(process.execPath, [join(PKG, "install.mjs"), r74, "--check"], { encoding: "utf8" })
 	const drift = fresh.status === 0 && edited.status !== 0 && /claude-comm\/SKILL\.md/.test(`${edited.stdout}${edited.stderr}`)
 	check("A75 the installer writes the claude-comm skill for every agent, true from that agent's folder",
-		front(sLead) && front(sWeb) && roles && skillPaths && drift,
+		front(sLead) && front(sWeb) && roles && skillPaths && drift && star && sharedOK,
 		`frontmatter leader/expert=${front(sLead)}/${front(sWeb)}; roles differ where they must=${roles}; every node path resolves=${skillPaths}; ` +
-		`--check fresh -> exit ${fresh.status}, after a hand edit -> exit ${edited.status}, names the skill=${drift}`)
+		`--check fresh -> exit ${fresh.status}, after a hand edit -> exit ${edited.status}, names the skill=${drift}; ` +
+		`only the leader's names exchange/, the expert's sends it to its leader, pointer first=${star}; ` +
+		`a folder shared by two agents -> one role-free skill, --check exit ${sharedChk.status}=${sharedOK}`)
 
 	writeFileSync(join(webDir, "notes.md"), "- finish the parser\n")
 	writeFileSync(join(webDir, "src.txt"), "read me\n")
@@ -2298,11 +2307,104 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	const lprep = spawnSync(process.execPath, [join(".comm", "bin", "restart.mjs"), "prepare", "--obligations", "lnotes.md", "--read", "lnotes.md"],
 		{ cwd: r74, encoding: "utf8", env: env74 })
 	const control = lprep.status === 0 && existsSync(join(r74, ".comm", "handoff", "leader.md"))
+	// Review #12 D1: with --root, identity was asked AT THE ROOT - the expert overwrote the leader's handoff and armed
+	// the leader's reboot. The leader's handoff above is the thing that must not move.
+	const shaOf = (f) => { try { return createHash("sha256").update(readFileSync(f)).digest("hex") } catch { return null } }
+	const leadSha = shaOf(join(r74, ".comm", "handoff", "leader.md"))
+	writeFileSync(join(webDir, "notes2.md"), "- second pass\n")
+	const rooted = spawnSync(process.execPath, [join("..", "..", ".comm", "bin", "restart.mjs"), "prepare", "--root", join("..", ".."),
+		"--obligations", "notes2.md", "--read", "src.txt"], { cwd: webDir, encoding: "utf8", env: env74 })
+	const leaderKept = !!leadSha && shaOf(join(r74, ".comm", "handoff", "leader.md")) === leadSha &&
+		/second pass/.test((() => { try { return readFileSync(join(r74, ".comm", "handoff", "web.md"), "utf8") } catch { return "" } })())
+	// D2: no project above the caller and no --root wrote a stray .comm/ there, and printed "armed".
+	const nowhere = mkdtempSync(join(tmpdir(), "comm-attack-noproject-"))
+	atExit(() => { try { rmSync(nowhere, { recursive: true, force: true }) } catch {} })
+	writeFileSync(join(nowhere, "o.md"), "- o\n")
+	const lost = spawnSync(process.execPath, [join(r74, ".comm", "bin", "restart.mjs"), "prepare", "--agent", "web", "--obligations", "o.md", "--read", "o.md"],
+		{ cwd: nowhere, encoding: "utf8", env: env74 })
+	const refusedOutside = lost.status !== 0 && !existsSync(join(nowhere, ".comm"))
 	check("A76 restart and handoff from an expert's folder land at the project root, under the expert's name",
-		landed && inPlace && verify.status === 0 && control,
+		landed && inPlace && verify.status === 0 && control && rooted.status === 0 && leaderKept && refusedOutside,
 		`prepare from apps/web -> exit ${prep.status}, handoff and note at the root as 'web', no apps/web/.comm=${landed}; ` +
 		`--read and the guard resolved in apps/web, verify spelled from there=${inPlace}; verify from apps/web -> exit ${verify.status}; ` +
-		`control, the leader from the root -> exit ${lprep.status}, leader.md=${control}`)
+		`control, the leader from the root -> exit ${lprep.status}, leader.md=${control}; ` +
+		`the expert again WITH --root -> exit ${rooted.status}, the leader's handoff untouched and its own rewritten=${leaderKept}; ` +
+		`from a folder under no project -> exit ${lost.status}, no stray .comm/=${refusedOutside}`)
+}
+
+// A77 — THE LEDGER COUNTS A START ONLY FROM A SESSION IN THE PROJECT, and "cannot tell" is not "foreign".
+//
+// A probe of moneyMaker's new stub, fired from the claude-comm leader's session, wrote a phantom cold start into its
+// ledger (2026-09-19): the registry refused a session running elsewhere, the ledger had no such test. Then review #12
+// E1: the guard read sessionPid() = 0 ("no claude ancestor", off Linux or another argv0) as FOREIGN and dropped real
+// starts. Split out of A74 (review #12, form: a red must name its own property). Three fires of one stub, each moving
+// ONE variable: a claude ancestor outside the project (refuse), the same ancestor inside (record: the positive
+// control), and a registry whose walk finds nothing (record). The first mutation run of this property was GREEN with
+// the guard removed, because its payload carried no transcript_path: every fire here carries one.
+{
+	const r77 = mkdtempSync(join(tmpdir(), "comm-attack-ledger-own-"))
+	const out77 = mkdtempSync(join(tmpdir(), "comm-attack-ledger-out-"))
+	atExit(() => { for (const d of [r77, out77]) { try { rmSync(d, { recursive: true, force: true }) } catch {} } })
+	mkdirSync(join(r77, ".comm"), { recursive: true })
+	writeFileSync(join(r77, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: "." } }))
+	execFileSync("node", [join(PKG, "install.mjs"), r77], { stdio: "pipe" })
+	const fake77 = join(out77, "claude")
+	try { symlinkSync("/bin/sh", fake77) } catch {}
+	const stub77 = join(r77, ".claude", "comm-hook.mjs")
+	const log77 = join(r77, ".comm", "handoff", "leader.log")
+	const n77 = () => { try { return readFileSync(log77, "utf8").trim().split("\n").filter(Boolean).length } catch { return 0 } }
+	const fire77 = (inside) => {
+		const tp = join(r77, `${randomUUID()}.jsonl`); writeFileSync(tp, "\n")
+		const pl = join(out77, "payload.json"); writeFileSync(pl, JSON.stringify({ cwd: r77, source: "startup", transcript_path: tp }))
+		const before = n77()
+		spawnSync(fake77, ["-c", `${inside ? `cd ${r77} && ` : ""}${process.execPath} ${stub77} session-start < ${pl} > /dev/null 2>&1; echo done`],
+			{ cwd: out77, encoding: "utf8", env: { ...process.env, CLAUDE_COMM_RUNTIME: join(out77, "runtime") } })
+		return n77() - before
+	}
+	const foreign = fire77(false)
+	const own = fire77(true)
+	const regP = join(r77, ".comm", "bin", "session-registry.mjs"), regWas = readFileSync(regP, "utf8")
+	const hook = "export function sessionPid(from = process.pid) {"
+	const pinned = regWas.includes(hook)
+	writeFileSync(regP, regWas.replace(hook, `${hook}\n\treturn 0 // A77: the walk found no claude ancestor`))
+	const unknown = fire77(true)
+	writeFileSync(regP, regWas)
+	check("A77 the ledger counts a start only from a session in the project, and records when it cannot tell",
+		foreign === 0 && own === 1 && pinned && unknown === 1,
+		`a claude ancestor OUTSIDE the project -> ${foreign} record(s) (want 0); the same ancestor INSIDE -> ${own} (want 1, positive control); ` +
+		`sessionPid() pinned to 0 (found nothing; pinned=${pinned}) -> ${unknown} (want 1: cannot tell is not foreign)`)
+}
+
+// A78 — A NOTICE NEVER COSTS A DELIVERY (review #12 A1). Notices cross spawnSync's argv: a NUL in one made the spawn
+// throw (the hook exited 1, the mail stayed waiting), a 140 kB one gave E2BIG with status null (exit 0, stdout empty,
+// mail waiting, nothing said). The trigger is data read from disk - INSTALLED.json's label, printed by the version
+// notice. One variable, the label; the control is a plain one. Each fire has one message waiting.
+{
+	const r78 = mkdtempSync(join(tmpdir(), "comm-attack-notice-"))
+	atExit(() => { try { rmSync(r78, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(r78, ".comm"), { recursive: true })
+	mkdirSync(join(r78, "app", "docs"), { recursive: true })
+	writeFileSync(join(r78, "app", "docs", "N.md"), "# n\n")
+	writeFileSync(join(r78, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app" } }))
+	execFileSync("node", [join(PKG, "install.mjs"), r78], { stdio: "pipe" })
+	const instP = join(r78, ".comm", "INSTALLED.json"), inst = JSON.parse(readFileSync(instP, "utf8"))
+	const fire78 = (label) => {
+		writeFileSync(instP, JSON.stringify({ ...inst, label, from: join(r78, "no-such-checkout") }))
+		try { rmSync(join(r78, ".comm", ".update-seen"), { force: true }) } catch {}
+		execFileSync("node", [join(r78, ".comm", "bin", "comm.mjs"), "send", "app", "--ref", "docs/N.md"], { cwd: r78, stdio: "pipe" })
+		const r = spawnSync(process.execPath, [join(r78, "app", ".claude", "comm-hook.mjs"), "session-start"], {
+			cwd: join(r78, "app"), encoding: "utf8", input: JSON.stringify({ cwd: join(r78, "app"), source: "startup" }),
+			env: { ...process.env, CLAUDE_COMM_RUNTIME: join(r78, "runtime") } })
+		let ctx = ""
+		try { ctx = JSON.parse(r.stdout).hookSpecificOutput.additionalContext || "" } catch {}
+		const left = readdirSync(join(r78, ".comm", "inbox", "app")).filter((f) => f.endsWith(".json")).length
+		return { exit: r.status, delivered: left === 0 && /docs\/N\.md/.test(ctx) }
+	}
+	const plain = fire78("2026-09-19.1"), nul = fire78("x\u0000y"), huge = fire78("L".repeat(140000))
+	check("A78 a notice never costs a delivery: a hostile label in INSTALLED.json still delivers the mail",
+		plain.delivered && nul.delivered && nul.exit === 0 && huge.delivered && huge.exit === 0,
+		`plain label -> exit ${plain.exit}, delivered=${plain.delivered} (control); a NUL in it -> exit ${nul.exit}, delivered=${nul.delivered}; ` +
+		`140 kB of it -> exit ${huge.exit}, delivered=${huge.delivered}`)
 }
 
 // A71/A72 — which starts may TAKE a restart note, and a start that cannot be recorded gives it back.

@@ -1098,12 +1098,13 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 		// this project has now shipped three times. One spawn per field project per boot,
 		// which is what the condition is worth: it is silent, it is live, and the sender gets
 		// a success either way.
-		let shared = [], stranded = [], strandedNames = [], unaddressable = [], busAnswered = false
+		let shared = [], stranded = [], strandedNames = [], unaddressable = [], busAnswered = false, liveNames = []
 		try {
 			const w = spawnSync("node", [join(p, ".comm", "bin", "comm.mjs"), "who", "--json"],
 				{ cwd: p, encoding: "utf8", timeout: 5000 })
 			const ag = JSON.parse(w.stdout).agents || {}
 			busAnswered = true
+			liveNames = Object.entries(ag).filter(([, v]) => ((v && v.pids) || []).length > 0).map(([n]) => n)
 			// 🔴 THE THIRD STATE, and the amendment below created it (review #7 F3). `pending` is
 			// a walk of every directory under .comm/inbox/; `stranded` is computed from the
 			// ROSTER. When those two disagree — an agent renamed or retired while it had mail —
@@ -1162,7 +1163,26 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 		// never a gone one, and one of work's two claims was debris from THIS repo's measurement.
 		// They gate again. Only stranded mail whose sender WAS told stays shown-not-gated.
 		const asleep = Object.prototype.hasOwnProperty.call(dormant, name) ? dormant[name] : null
-		const claimsBad = claimDirBad || (!asleep && claims.some((c) => c.state !== "held"))
+		// Only a GONE holder is the peer's own operation (review #12 F1): corrupt and unreadable are the TOOL failing
+		// to read its own records - a SCHEMA bump would turn work's two claims corrupt - and gate even when dormant.
+		const claimsBad = claimDirBad || claims.some((c) => c.state !== "held" && (!asleep || c.state !== "gone"))
+		// AND THE TRIPWIRE the finding promised and nothing built (F1): a dormant field with a live session, or a start
+		// recorded after the decision, is awake - its hidden states are real again, and the owner must be asked.
+		let wokeAt = null
+		if (asleep) {
+			const since = Date.parse(asleep.since || "")
+			try {
+				for (const f of readdirSync(join(p, ".comm", "handoff")).filter((x) => x.endsWith(".log"))) {
+					for (const l of readFileSync(join(p, ".comm", "handoff", f), "utf8").split("\n")) {
+						if (!l.includes('"event":"start"')) continue
+						let r = null; try { r = JSON.parse(l) } catch { continue }
+						const at = Date.parse(r.at || "")
+						if (Number.isFinite(since) && at > since && (!wokeAt || at > wokeAt.at)) wokeAt = { at, agent: r.agent }
+					}
+				}
+			} catch {}
+		}
+		const awake = !!asleep && (liveNames.length > 0 || !!wokeAt)
 		const unannouncedStranded = asleep ? [] : strandedNames.filter((n) => (unannounced.get(n) || 0) > 0).map((n) => `${unannounced.get(n)} for ${n}`)
 		const bits = [
 			// An unparsed non-zero exit must not borrow the confident wording of a parsed one:
@@ -1195,6 +1215,7 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 			...claims.filter((c) => c.state !== "held" && c.note)
 				.map((c) => `${asleep && c.state === "gone" ? "◦" : "⚠"} CLAIM ${c.resource}: ${c.note}`),
 			...(asleep ? [`◦ DORMANT (${asleep.by}${asleep.since ? `, ${asleep.since}` : ""}): ${String(asleep.why).slice(0, 160)} - only its tool's state gates`] : []),
+			...(awake ? [`⚠ BUT IT IS AWAKE: ${liveNames.length ? `${liveNames.join(", ")} running` : ""}${liveNames.length && wokeAt ? ", " : ""}${wokeAt ? `'${wokeAt.agent}' started ${new Date(wokeAt.at).toISOString().slice(0, 16)}Z, after the decision` : ""} - ask the owner, and edit FIELDS.json`] : []),
 			...(dormantBad ? [`⚠ FIELDS.json could not be read (${dormantBad.slice(0, 80)}) - no field is treated as dormant`] : []),
 			...(claims.some((c) => c.state === "held")
 				? [`${claims.filter((c) => c.state === "held").length} resource(s) claimed: ${claims.filter((c) => c.state === "held").map((c) => c.resource).join(", ")}`] : []),
@@ -1217,8 +1238,8 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 			unannouncedStranded.length > 0 && `stranded-untold:${about(strandedNames.filter((n) => (unannounced.get(n) || 0) > 0))}`,
 			shared.length > 0 && `shared-inbox:${about(shared)}`,
 			claimsBad && `claim:${claimDirBad ? "unreadable" : about(claims.filter((c) => c.state !== "held").map((c) => `${c.resource}=${c.state}`))}`,
-			notesBad && "note-unreadable", dormantBad && "fields-unreadable"].filter(Boolean)
-		row(`field:${name}`, drift || busStale !== false ? RED : mailStuck || claimsBad || shared.length > 0 || notesBad || dormantBad ? WARN : OK,
+			notesBad && "note-unreadable", dormantBad && "fields-unreadable", awake && "dormant-awake"].filter(Boolean)
+		row(`field:${name}`, drift || busStale !== false ? RED : mailStuck || claimsBad || shared.length > 0 || notesBad || dormantBad || awake ? WARN : OK,
 			bits.join(" - "), causes)
 	}
 }
@@ -3317,14 +3338,26 @@ function proveRed() {
 			writeFileSync(stub, stubWas + "\n// drifted\n")
 			const asleepDrift = rowNow()
 			writeFileSync(stub, stubWas)
+			// Review #12 F1: a claim the TOOL cannot read gates even when dormant, and a start after the decision wakes it.
+			const cpath = join(cdir, "port:7000.json"), claimWas = readFileSync(cpath, "utf8")
+			writeFileSync(cpath, "{ bytes this version cannot read")
+			const asleepCorrupt = rowNow()
+			writeFileSync(cpath, claimWas)
+			const hlog = join(proj, ".comm", "handoff", "fx-woke.log")
+			mkdirSync(dirname(hlog), { recursive: true })
+			writeFileSync(hlog, JSON.stringify({ v: 1, at: "2026-09-20T08:00:00.000Z", event: "start", agent: "leader", session: "woke" }) + "\n")
+			const woke = rowNow()
+			rmSync(hlog, { force: true })
 			writeFileSync(fp, "{ not json")
 			const unreadable = rowNow()
 			rmSync(fp, { force: true }); rmSync(cdir, { recursive: true, force: true })
 			assert("field: a dormant field shows its own operations and gates only on its tool",
 				asleep.level === OK && /◦ CLAIM port:7000/.test(asleep.text) && /DORMANT \(owner, 2026-09-19\)/.test(asleep.text) &&
-				asleepDrift.level === RED && unreadable.level === WARN && /FIELDS\.json could not be read/.test(unreadable.text),
+				asleepDrift.level === RED && unreadable.level === WARN && /FIELDS\.json could not be read/.test(unreadable.text) &&
+				asleepCorrupt.level === WARN && woke.level === WARN && /IT IS AWAKE: 'leader' started/.test(woke.text),
 				`dormant + gone claim -> ${LV[asleep.level]} (want ok, printed and marked); dormant + a drifted stub -> ${LV[asleepDrift.level]} (want RED); ` +
-				`FIELDS.json unreadable -> ${LV[unreadable.level]} (want warn, says so)`)
+				`FIELDS.json unreadable -> ${LV[unreadable.level]} (want warn, says so); dormant + a CORRUPT claim -> ${LV[asleepCorrupt.level]} (want warn: the tool's state); ` +
+				`dormant + a start after the decision -> ${LV[woke.level]} (want warn, AWAKE)`)
 		}
 
 		// ── F13: --hook writes two instruments and --root governs one ────────────────────

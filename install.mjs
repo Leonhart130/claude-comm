@@ -207,7 +207,7 @@ try {
 		notices.push([
 			"[claude-comm] You are '" + whoIs + "', " + role,
 			"A message is a doorbell that points at a FILE: " + cmd + " send " + (whoIs === lead ? "<agent>" : lead) +
-				' --ref <file> --note "<what is decided, then where to read>". It reaches the other session at its turn boundary.',
+				' --ref <file> --note "<where to read, then what is decided>". It reaches the other session at its turn boundary.',
 			"How to work with it - replying, launching an expert, restarting, the rules: the claude-comm skill, or " +
 				relative(agentRoot, join(projectRoot, ".comm", "README.md")) + ".",
 			"Your mail: " + cmd + " inbox",
@@ -349,7 +349,14 @@ try {
 // DELIVERY FIRST, and its status is this hook's status. Everything below is an
 // instrument: it may not delay delivery, may not fail it, and may not change one byte
 // of what the harness sees.
-const delivered = forward(raw, notices)
+// Bounded HERE, on this side of spawn (review #12 A1): a NUL in one made spawnSync throw and a 140 kB one gave E2BIG,
+// status null - the mail left waiting and nothing said so. And if the spawn fails anyway, deliver without them.
+for (let i = 0; i < notices.length; i++) notices[i] = String(notices[i]).replace(/\u0000/g, "").slice(0, 1500)
+let delivered = forward(raw, notices)
+if (delivered.error && notices.length) {
+	process.stderr.write(\`claude-comm: the bus could not be started WITH its notices (\${delivered.error.code || delivered.error.message}); delivering without them.\\n\`)
+	delivered = forward(raw, [])
+}
 if (delivered.status === 0) for (const [f, c] of marks) { try { writeFileSync(f, c) } catch {} }
 
 try {
@@ -386,8 +393,10 @@ try {
 		if (existsSync(reg)) {
 			const m = await import(pathToFileURL(reg).href)
 			const sp = m.sessionPid()
-			ownStart = ownsSession(sp)
-			if (!ownStart) throw new Error(\`the session I resolved (pid \${sp}) is not running inside \${projectRoot}; recording nothing\`)
+			// 0 is "no claude ancestor found" (off Linux, another argv0): CANNOT TELL, so the ledger still records
+			// (review #12 E1). Only a found session running outside this project is known to be foreign.
+			ownStart = sp > 0 ? ownsSession(sp) : null
+			if (!ownsSession(sp)) throw new Error(\`the session I resolved (pid \${sp}) is not running inside \${projectRoot}; recording nothing\`)
 			const r = m.record({ pid: sp, transcript: tp, agent, source: p.source })
 			if (!r.ok) process.stderr.write(\`claude-comm: this session is NOT in the session registry (\${r.why}). \`
 				+ \`A context reading by pid will refuse for it\${r.invalidated ? "" : ", and a previous entry may still stand"}.\\n\`)
@@ -498,8 +507,8 @@ try {
 // never do. Measured 2026-09-11 on a half-installed tree: exit 1 and a Node stack trace.
 // ⚠️ Loud AND non-breaking: the child's stderr is inherited, so its trace is already on
 // screen; this line names what the status meant. Silence would be the worse defect.
-if (delivered.status) {
-	process.stderr.write(\`claude-comm: the bus could not RUN (exit \${delivered.status}) — the hook path exits 0 on every decision, so this is a broken or half-installed bus, not a verdict. Your mail is untouched and this turn is not blocked. Re-run the installer.\\n\`)
+if (delivered.status || delivered.error) {
+	process.stderr.write(\`claude-comm: the bus could not RUN (\${delivered.error ? delivered.error.code || delivered.error.message : \`exit \${delivered.status}\`}) — the hook path exits 0 on every decision, so this is a broken or half-installed bus, not a verdict. Your mail is untouched and this turn is not blocked. Re-run the installer.\\n\`)
 }
 process.exit(0)
 `
@@ -1032,9 +1041,15 @@ if (!CHECK) { try { mkdirSync(join(HERE, "exchange", "field", "in"), { recursive
 // every session's context, its body is read when the work calls for it. So the installer
 // writes it per agent, with every command already written to run from THAT agent's folder.
 // Generated like the stub: re-running the installer rewrites it, and --check reports drift.
-const SKILL = (id, agentRoot) => {
+// ONE SKILL PER FOLDER (review #12 C2). Written once per agent, two agents sharing a folder (the CLAUDE_COMM_AGENT
+// case the README documents) left the LAST one's skill there - the leader's folder telling the leader it is an
+// expert - and --check red from birth, the two writes disagreeing. A shared folder gets one skill naming no role.
+const SKILL = (ids, agentRoot) => {
 	const leader = cfg.leader
-	const isLeader = id === leader
+	const shared = ids.length > 1
+	const id = shared ? "<you>" : ids[0]
+	const isLeader = !shared && id === leader
+	const hasLeader = ids.includes(leader), hasExpert = ids.some((a) => a !== leader)
 	const rel = (...f) => relative(agentRoot, join(ROOT, ...f)) || "."
 	const C = `node ${rel(".comm", "bin", "comm.mjs")}`
 	const B = rel(".comm", "bin")
@@ -1049,18 +1064,20 @@ const SKILL = (id, agentRoot) => {
 		"shared machine resource; and whenever the owner asks you to tell, ask or brief another agent - that goes through the " +
 		"bus, never pasted into chat.",
 		"---", "",
-		"<!-- GENERATED by claude-comm's install.mjs for the agent '" + id + "'. Do not edit: re-running the installer rewrites it. -->", "",
+		"<!-- GENERATED by claude-comm's install.mjs for " + ids.map((a) => "'" + a + "'").join(", ") + ". Do not edit: re-running the installer rewrites it. -->", "",
 		"# Working on this project's bus", "",
-		isLeader
+		shared
+			? `This folder is shared by ${ids.map((a) => "`" + a + "`").join(", ")}: which one you are is set by \`CLAUDE_COMM_AGENT\` (\`${C} whoami\`), and the line the bus gives you at every start says it. Every command below runs from this folder.`
+			: isLeader
 			? `You are **\`${id}\`, the leader**. Your experts: \`${C} who\`, and the line the bus gives you at every start. Every command below runs from your own folder.`
 			: `You are **\`${id}\`, an expert**; your leader is **\`${leader}\`**. Every command below runs from your own folder.`,
 		"",
 		"## The one rule: the file is the artifact, the message is a doorbell", "",
 		"1. Write the brief, report or question to a **file** in your repo first.",
-		`2. Then ring: \`${C} send ${isLeader ? "<agent>" : leader} --ref <file> --kind <kind> --note "<note>"\``,
+		`2. Then ring: \`${C} send ${isLeader || shared ? "<agent>" : leader} --ref <file> --kind <kind> --note "<note>"\``,
 		"   - `--kind`: `nudge` a correction or brief landed · `done` round finished, ready for review · `blocked` needs a ruling · `fyi`.",
-		"   - The note is **cut at 240 characters, from the end**. Put first what is decided and where to read. Never the reasoning:",
-		"     a reason cut in half reads like the whole reason.",
+		"   - The note is **cut at 240 characters, from the end**, so WHERE TO READ goes first (the section), then what is decided.",
+		"     Never the reasoning: a reason cut in half reads like the whole reason.",
 		"3. Never paste content into a message or into another session. There is no `--body`, on purpose: the receiver cannot tell",
 		"   a colleague's pasted text from an injection.", "",
 		"Mail reaches a session at its **turn boundary**, or at its next start. A doorbell can wake an idle session; it never",
@@ -1082,8 +1099,8 @@ const SKILL = (id, agentRoot) => {
 		`| \`${C} dismiss ${id} --id <id>\` | acknowledge one message |`,
 		`| \`node ${B}/claim.mjs take port:5173 --purpose "vite dev server" [--pid <pid>]\` · \`list\` · \`release <resource>\` | before using a port or any shared machine resource: two agents in one tree otherwise take the same one, and each reads the clash as a broken test |`,
 		"")
-	if (isLeader) L.push(
-		"## Your experts", "",
+	if (isLeader || (shared && hasLeader)) L.push(
+		shared ? "## If you are the leader: your experts" : "## Your experts", "",
 		`- **Add one:** \`node ${join(HERE, "install.mjs")} ${ROOT} --add-agent <name>[=<dir>]\` — folder, roster entry, hooks and inbox.`,
 		"  Never start a second session in an agent's folder: it IS that agent and will drain its mail. Give it its own folder.",
 		"- **Launch one:** write its brief to a file, then",
@@ -1092,24 +1109,30 @@ const SKILL = (id, agentRoot) => {
 		"  Opus for review, law, arbitration, and anything only checked by re-reading. `--effort high` by default, `xhigh` for",
 		"  adversarial review.",
 		"- The expert reports with `--kind done` and a file. Read the file, decide, answer with a file.", "")
-	else L.push(
-		"## Reporting to your leader", "",
-		`Write the report to a file, then \`${C} send ${leader} --ref <report> --kind done --note "<verdict first, then where>"\`.`,
+	if (!isLeader && (!shared || hasExpert)) L.push(
+		shared ? "## If you are an expert: reporting to your leader" : "## Reporting to your leader", "",
+		`Write the report to a file, then \`${C} send ${leader} --ref <report> --kind done --note "<where to read, then the verdict>"\`.`,
 		"Stuck on a decision that is not yours: `--kind blocked`, same form, and wait for the ruling.",
 		`Your task done, the report sent, and you were launched for it: close your window (\`node ${B}/close.mjs\`, below).`, "")
 	L.push(
 		"## Restarting yourself without losing what you read", "",
 		`\`node ${B}/restart.mjs prepare --obligations <notes.md> --read <a file you read>... --guard "<a check command>"\``,
 		"pins what you read and arms the restart. It does not relaunch you: the launcher refuses a live agent. " +
-		(isLeader ? "Exit; the owner relaunches you." : `Tell your leader first (\`${C} send ${leader} --ref <notes.md> --kind fyi\`), then exit: it relaunches you.`),
+		(isLeader ? "Exit; the owner relaunches you." : `${shared ? "An expert tells" : "Tell"} your leader first (\`${C} send ${leader} --ref <notes.md> --kind fyi\`), then exit: it relaunches you.`),
 		`The next session runs \`node ${B}/handoff.mjs verify\` FIRST: UNCHANGED files stand as read, CHANGED ones are read again.`, "",
 		"## Closing your own window", "",
 		`After the report is written and the bell rung: \`node ${B}/close.mjs\`. It refuses a window nobody launched, and one with`,
 		"mail waiting or a claim held (`--force` overrides and records it).", "",
-		"## Something wrong with the bus", "",
-		`Write a Markdown file to \`${join(HERE, "exchange", "field", "in")}/<project>-<you>-<date>-<topic>.md\`: what you did, what you`,
-		"expected, the command, and what you did NOT check. The maintainer's boot reports it; the answer comes back in `out/`.",
-		`Full reference: \`${rel(".comm", "README.md")}\`.`, "")
+		"## Something wrong with the bus", "")
+	// Review #12 C1: exchange/ is leader-to-leader - every message has that project's leader at one end - and an
+	// expert writes to its leader only. Only the leader's skill names the maintainer's inbox.
+	if (isLeader || (shared && hasLeader)) L.push(
+		`${shared ? "The leader writes" : "Write"} a Markdown file to \`${join(HERE, "exchange", "field", "in")}/<project>-<you>-<date>-<topic>.md\`: what you did,`,
+		"what you expected, the command, and what you did NOT check. The maintainer's boot reports it; the answer comes back in `out/`.")
+	if (!isLeader && (!shared || hasExpert)) L.push(
+		`${shared ? "An expert tells" : "Tell"} your leader, by the bus, with a file: what you did, what you expected, the command, and what`,
+		"you did NOT check. The leader reports it to the bus's maintainer; you never write to another project.")
+	L.push("", `Full reference: \`${rel(".comm", "README.md")}\`.`, "")
 	return L.join("\n")
 }
 
@@ -1125,7 +1148,8 @@ for (const [id, relPath] of Object.entries(cfg.agents)) {
 	if (!existsSync(agentRoot)) { results.missing.push(`${id} → ${agentRoot}`); continue }
 
 	write(join(agentRoot, ".claude", "comm-hook.mjs"), STUB, results)
-	write(join(agentRoot, ".claude", "skills", "claude-comm", "SKILL.md"), SKILL(id, agentRoot), results)
+	const folderIds = Object.keys(cfg.agents).filter((a) => resolve(ROOT, cfg.agents[a]) === agentRoot)
+	if (folderIds[0] === id) write(join(agentRoot, ".claude", "skills", "claude-comm", "SKILL.md"), SKILL(folderIds, agentRoot), results)
 
 	// One unreadable agent must not abort the other six, and must not be
 	// reported as installed either.

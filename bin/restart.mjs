@@ -35,7 +35,7 @@
  */
 import { readFileSync, existsSync, mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join, resolve, dirname } from "node:path"
+import { join, resolve, dirname, sep } from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
 
@@ -50,19 +50,26 @@ const die = (m, code = 2) => { process.stderr.write(`restart: ${m}\n`); process.
 const HOME_DIR = process.cwd()
 const findRoot = (d) => { for (let x = resolve(d); ; x = dirname(x)) { if (existsSync(join(x, ".comm", "config.json"))) return x; if (dirname(x) === x) return null } }
 const ROOT = resolve(opt("--root", findRoot(HOME_DIR) || HOME_DIR))
+// Review #12 D1: with --root, identity was asked AT THE ROOT - an expert passing --root overwrote the leader's handoff
+// and armed the leader's reboot. It is asked where the caller stands whenever that is inside the project; from outside
+// it, only --agent can say. D2: no project above the caller and no --root wrote a stray .comm/ there - refused.
+const INSIDE = HOME_DIR === ROOT || HOME_DIR.startsWith(ROOT + sep)
+const PROJECT = !!opt("--root", null) || !!findRoot(HOME_DIR)
 
 function agentName() {
 	const declared = opt("--agent", null)
 	if (declared) return declared
 	for (const b of [join(ROOT, ".comm", "bin", "comm.mjs"), join(HERE, "comm.mjs")]) {
 		if (!existsSync(b)) continue
-		const r = spawnSync(process.execPath, [b, "whoami"], { cwd: opt("--root", null) ? ROOT : HOME_DIR, encoding: "utf8" })
+		if (!INSIDE) return null
+		const r = spawnSync(process.execPath, [b, "whoami"], { cwd: HOME_DIR, encoding: "utf8" })
 		if (r.status === 0 && r.stdout.trim()) return r.stdout.trim()
 	}
 	return null
 }
 
 function prepare() {
+	if (!PROJECT) die(`no project here: no .comm/config.json at or above ${HOME_DIR} - run this from an agent's folder, or pass --root`)
 	const agent = agentName() || die("cannot tell which agent you are - pass --agent, or run inside an agent's directory")
 	const obl = opt("--obligations", null)
 	if (!obl) die("--obligations <file> is required - it is what handoff.mjs refuses without, and for the same reason")
