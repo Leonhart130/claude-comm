@@ -45,14 +45,18 @@ const has = (f) => ARGV.includes(f)
 const opt = (f, d = null) => { const i = ARGV.indexOf(f); return i >= 0 && ARGV[i + 1] ? ARGV[i + 1] : d }
 const all = (f) => ARGV.reduce((a, v, i) => (v === f && ARGV[i + 1] ? [...a, ARGV[i + 1]] : a), [])
 const die = (m, code = 2) => { process.stderr.write(`restart: ${m}\n`); process.exit(code) }
-const ROOT = resolve(opt("--root", process.cwd()))
+// Found, never assumed: see handoff.mjs's ROOT. The caller's folder is its identity, and where its
+// --read paths and guards mean something, so handoff is run FROM there.
+const HOME_DIR = process.cwd()
+const findRoot = (d) => { for (let x = resolve(d); ; x = dirname(x)) { if (existsSync(join(x, ".comm", "config.json"))) return x; if (dirname(x) === x) return null } }
+const ROOT = resolve(opt("--root", findRoot(HOME_DIR) || HOME_DIR))
 
 function agentName() {
 	const declared = opt("--agent", null)
 	if (declared) return declared
 	for (const b of [join(ROOT, ".comm", "bin", "comm.mjs"), join(HERE, "comm.mjs")]) {
 		if (!existsSync(b)) continue
-		const r = spawnSync(process.execPath, [b, "whoami"], { cwd: ROOT, encoding: "utf8" })
+		const r = spawnSync(process.execPath, [b, "whoami"], { cwd: opt("--root", null) ? ROOT : HOME_DIR, encoding: "utf8" })
 		if (r.status === 0 && r.stdout.trim()) return r.stdout.trim()
 	}
 	return null
@@ -68,7 +72,7 @@ function prepare() {
 	const hArgs = ["write", "--obligations", obl, "--root", ROOT, "--agent", agent]
 	for (const r of all("--read")) hArgs.push("--read", r)
 	for (const g of all("--guard")) hArgs.push("--guard", g)
-	const h = spawnSync(process.execPath, [join(HERE, "handoff.mjs"), ...hArgs], { encoding: "utf8", cwd: ROOT })
+	const h = spawnSync(process.execPath, [join(HERE, "handoff.mjs"), ...hArgs], { encoding: "utf8", cwd: HOME_DIR })
 	process.stdout.write(h.stdout || "")
 	if (h.status !== 0) die(`the handoff FAILED (exit ${h.status}) - nothing was armed.\n${(h.stderr || "").trim()}`, 3)
 

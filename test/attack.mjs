@@ -16,7 +16,7 @@
  * result, which is this project's signature failure mode.
  */
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync, statSync, lstatSync, symlinkSync, cpSync, utimesSync, chmodSync } from "node:fs"
-import { join, delimiter } from "node:path"
+import { join, delimiter, resolve } from "node:path"
 import { execFileSync, spawnSync, spawn } from "node:child_process"
 import { createHash } from "node:crypto"
 import { pathToFileURL } from "node:url"
@@ -1503,12 +1503,14 @@ const POINTER_SOURCES = (() => {
 	const startDrained = beforeStart === 1 && mail() === 0
 	let schemaOK = false
 	try { schemaOK = JSON.parse(h.stdout)?.hookSpecificOutput?.hookEventName === "SessionStart" } catch {}
-	// The property the merged redirect could not state: this start DID write a diagnostic to
-	// stderr (the one-time notice, on a project seeing the bus for the first time), and the
-	// stdout the harness parses is unpolluted by it. Without the first half this is a check
-	// that passes on a silent hook and proves nothing - the void-probe shape.
-	const saidSomething = /claude-comm:/.test(h.stderr || "")
-	const streamsSeparate = saidSomething && !/claude-comm:/.test(h.stdout || "")
+	// Re-pointed 2026-09-19 (FINDINGS.md#unseen-introduction): this leaned on the one-time notice going to
+	// stderr, where no model ever read it. The property is now the one that matters: what the agent must be
+	// told - its introduction AND its mail - is inside the ONE JSON the harness parses. The first half keeps
+	// this from passing on a silent hook (the void-probe shape); the parse is the "unpolluted" half.
+	let ctx29 = ""
+	try { ctx29 = JSON.parse(h.stdout).hookSpecificOutput.additionalContext || "" } catch {}
+	const saidSomething = /You are 'app'/.test(ctx29) && /docs\/REVIEW\.md/.test(ctx29)
+	const streamsSeparate = saidSomething && schemaOK
 	const led = ledgerLog()
 	const ledgerOK = /"event":"start"/.test(led) && /"agent":"app"/.test(led) && /eeeeeeeeeeee/.test(led)
 	let regOK = false
@@ -1523,7 +1525,7 @@ const POINTER_SOURCES = (() => {
 		`stop: drained=${stopDrained} ledger-untouched=${!stopTouchedLedger} registry-refreshed=${stopRegistered} ` +
 		`no-rewrite-when-unchanged=${stopIdempotent} fired-from-outside-records-nothing=${foreignRecordedNothing}; ` +
 		`session-start: drained=${startDrained} schema=${schemaOK} ledger=${ledgerOK} registry=${regOK}; ` +
-		`the hook wrote a diagnostic to stderr=${saidSomething} and stdout stayed clean=${streamsSeparate}`)
+		`the introduction and the mail are in the model's context=${saidSomething}, stdout one parseable JSON=${streamsSeparate}`)
 }
 
 // A30 — `whoami --agent-root` resolves against THAT agent's project, never the caller's.
@@ -2219,6 +2221,82 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		`an EXPERT's stub (installed=${expertStub}) with the root wired -> ${expert} (want 1: its session never runs boot --hook)`)
 }
 
+// A74/A75/A76 — WHAT A NEW AGENT IS TOLD, AND WHETHER IT IS TRUE FROM WHERE IT STANDS (2026-09-19).
+//
+// FINDINGS.md#unseen-introduction. The bus's only introduction went to a SessionStart's stderr, which Claude Code
+// never puts in a model's context: 2 of ~180 field transcripts carry it, both with an empty content. So:
+//   A74 - the introduction is in the ONE JSON the model reads, at every start, empty inbox included, for the
+//         leader and for an expert two levels down; every command it names EXISTS from that agent's folder
+//         (the control: the root-relative spelling the bus used to print does NOT exist there).
+//   A75 - the installer writes the claude-comm skill for EVERY agent, every `node <path>` in it resolves from
+//         that agent's folder, roles differ where they must, and --check sees an edited skill as drift.
+//   A76 - restart/handoff run from an EXPERT's folder land at the project root under the expert's name: they
+//         took cwd as the root, so an expert's handoff went to <expert>/.comm/ and its identity was asked at
+//         the root, where the answer is the leader. Control: the leader's own prepare, from the root.
+{
+	const r74 = mkdtempSync(join(tmpdir(), "comm-attack-intro-"))
+	atExit(() => { try { rmSync(r74, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(r74, ".comm"), { recursive: true })
+	mkdirSync(join(r74, "apps", "web"), { recursive: true })
+	writeFileSync(join(r74, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", web: "apps/web" } }))
+	execFileSync("node", [join(PKG, "install.mjs"), r74], { stdio: "pipe" })
+	const webDir = join(r74, "apps", "web")
+	const env74 = { ...process.env, CLAUDE_COMM_RUNTIME: join(r74, "runtime") }
+	const start74 = (dir) => {
+		const r = spawnSync(process.execPath, [join(dir, ".claude", "comm-hook.mjs"), "session-start"],
+			{ cwd: dir, encoding: "utf8", input: JSON.stringify({ cwd: dir, source: "startup" }), env: env74 })
+		try { return JSON.parse(r.stdout).hookSpecificOutput.additionalContext || "" } catch { return "" }
+	}
+	const paths = (txt) => [...txt.matchAll(/node (\S+\.mjs)/g)].map((m) => m[1])
+	const allExist = (txt, dir) => { const ps = paths(txt); return ps.length > 0 && ps.every((q) => existsSync(resolve(dir, q))) }
+	const lead74 = start74(r74), web74 = start74(webDir)
+	const intro = /You are 'leader', the LEADER/.test(lead74) && /experts: web/.test(lead74) &&
+		/You are 'web', an EXPERT/.test(web74) && /Your leader is 'leader'/.test(web74) && /send leader --ref/.test(web74)
+	const introPaths = allExist(lead74, r74) && allExist(web74, webDir) && /\.\.\/\.\.\/\.comm\/README\.md/.test(web74)
+	const oldSpellingAbsent = !existsSync(join(webDir, ".comm", "bin", "comm.mjs"))
+	check("A74 every start tells the agent who it is, in the model's context, with commands that run from its folder",
+		intro && introPaths && oldSpellingAbsent,
+		`leader told its role and roster, expert told its leader=${intro}; every command named exists from that agent's folder=${introPaths} ` +
+		`(${paths(web74).join(", ") || "none found"}); control, the root spelling .comm/bin/comm.mjs does not exist from apps/web=${oldSpellingAbsent}`)
+
+	const skillOf = (dir) => { try { return readFileSync(join(dir, ".claude", "skills", "claude-comm", "SKILL.md"), "utf8") } catch { return "" } }
+	const sLead = skillOf(r74), sWeb = skillOf(webDir)
+	const front = (t) => /^---\nname: claude-comm\ndescription: .{80,}\n---\n/.test(t)
+	const absInstall = /node (\/\S+\/install\.mjs)/.exec(sLead)
+	const roles = /## Your experts/.test(sLead) && !/## Your experts/.test(sWeb) && /your leader is \*\*`leader`\*\*/.test(sWeb) &&
+		/send leader --ref <report> --kind done/.test(sWeb)
+	const skillPaths = allExist(sLead, r74) && allExist(sWeb, webDir) && !!absInstall && existsSync(absInstall[1])
+	const fresh = spawnSync(process.execPath, [join(PKG, "install.mjs"), r74, "--check"], { encoding: "utf8" })
+	// Guarded: with no skill written (the defect this arm exists for) the edit must not ABORT the suite and hide
+	// every arm after it - it must leave this one red. Found by mutation: an unguarded write threw ENOENT.
+	try { writeFileSync(join(webDir, ".claude", "skills", "claude-comm", "SKILL.md"), sWeb + "\nhand-edited\n") } catch {}
+	const edited = spawnSync(process.execPath, [join(PKG, "install.mjs"), r74, "--check"], { encoding: "utf8" })
+	const drift = fresh.status === 0 && edited.status !== 0 && /claude-comm\/SKILL\.md/.test(`${edited.stdout}${edited.stderr}`)
+	check("A75 the installer writes the claude-comm skill for every agent, true from that agent's folder",
+		front(sLead) && front(sWeb) && roles && skillPaths && drift,
+		`frontmatter leader/expert=${front(sLead)}/${front(sWeb)}; roles differ where they must=${roles}; every node path resolves=${skillPaths}; ` +
+		`--check fresh -> exit ${fresh.status}, after a hand edit -> exit ${edited.status}, names the skill=${drift}`)
+
+	writeFileSync(join(webDir, "notes.md"), "- finish the parser\n")
+	writeFileSync(join(webDir, "src.txt"), "read me\n")
+	const prep = spawnSync(process.execPath, [join("..", "..", ".comm", "bin", "restart.mjs"), "prepare", "--obligations", "notes.md",
+		"--read", "src.txt", "--guard", "pwd"], { cwd: webDir, encoding: "utf8", env: env74 })
+	let hWeb = ""
+	try { hWeb = readFileSync(join(r74, ".comm", "handoff", "web.md"), "utf8") } catch {}
+	const landed = prep.status === 0 && !!hWeb && existsSync(join(r74, ".comm", "restart", "web.json")) && !existsSync(join(webDir, ".comm"))
+	const inPlace = /apps\/web\/src\.txt/.test(hWeb) && hWeb.includes(webDir + "\n") && /node \.\.\/\.\.\/\.comm\/bin\/handoff\.mjs verify/.test(hWeb)
+	const verify = spawnSync(process.execPath, [join("..", "..", ".comm", "bin", "handoff.mjs"), "verify"], { cwd: webDir, encoding: "utf8", env: env74 })
+	writeFileSync(join(r74, "lnotes.md"), "- leader obligation\n")
+	const lprep = spawnSync(process.execPath, [join(".comm", "bin", "restart.mjs"), "prepare", "--obligations", "lnotes.md", "--read", "lnotes.md"],
+		{ cwd: r74, encoding: "utf8", env: env74 })
+	const control = lprep.status === 0 && existsSync(join(r74, ".comm", "handoff", "leader.md"))
+	check("A76 restart and handoff from an expert's folder land at the project root, under the expert's name",
+		landed && inPlace && verify.status === 0 && control,
+		`prepare from apps/web -> exit ${prep.status}, handoff and note at the root as 'web', no apps/web/.comm=${landed}; ` +
+		`--read and the guard resolved in apps/web, verify spelled from there=${inPlace}; verify from apps/web -> exit ${verify.status}; ` +
+		`control, the leader from the root -> exit ${lprep.status}, leader.md=${control}`)
+}
+
 // A71/A72 — which starts may TAKE a restart note, and a start that cannot be recorded gives it back.
 //
 // Review #11 R2/R7: the stub claimed on every `source`, so an autocompaction during the long close (the
@@ -2721,13 +2799,14 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		input: JSON.stringify({ cwd: join(rootG, "app"), source: "startup" }),
 		env: { ...process.env, CLAUDE_COMM_RUNTIME: join(rootG, "runtime") },
 	})
-	const warned = (r) => /LIVE BUS STATE are committed/.test(r.stderr || "")
-	// A notice is not read because it is there - it is read when somebody says it is not.
-	// The field leader measured that on himself (exchange/field/in/, 2026-09-04), so the hook
-	// names it ONCE. The control needs no extra fixture: the three starts below are the same
-	// stub in the same project, so the first must say it and the later two must not - and a
-	// line repeated every session is the failure, not the fix.
-	const namesNotice = (r) => /this project is on a message bus/.test(r.stderr || "")
+	// READ WHERE THE MODEL READS (2026-09-19, FINDINGS.md#unseen-introduction). This arm asserted on
+	// stderr, which Claude Code never puts in a model's context: it proved the warning was WRITTEN, and
+	// the field showed nobody ever read it. Now it asserts on the SessionStart JSON's additionalContext.
+	const ctxOf = (r) => { try { return JSON.parse(r.stdout).hookSpecificOutput.additionalContext || "" } catch { return "" } }
+	const warned = (r) => /LIVE BUS STATE are committed/.test(ctxOf(r))
+	// The introduction was "said once", on stderr: read by no model. It is now in the context at EVERY
+	// start, because every start is a new reader - the three starts below must all carry it.
+	const namesNotice = (r) => /You are 'app', an EXPERT/.test(ctxOf(r)) && /\.\.\/\.comm\/README\.md/.test(ctxOf(r))
 
 	// CONTROL 1: no git at all. A project that is not a repository must be told nothing —
 	// a guard that speaks where there is no possible defect is how a warning gets ignored.
@@ -2752,7 +2831,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	const waiting = () => readdirSync(join(rootG, ".comm", "inbox", "app")).filter((f) => f.endsWith(".json")).length
 	const before = waiting()
 	const tracked = fire()
-	const tellsHow = /git rm -r --cached/.test(tracked.stderr || "")
+	const tellsHow = /git rm -r --cached/.test(ctxOf(tracked)) && !/LIVE BUS STATE/.test(tracked.stderr || "")
 	let schemaOK = false
 	try { schemaOK = JSON.parse(tracked.stdout)?.hookSpecificOutput?.hookEventName === "SessionStart" } catch {}
 	const stillDelivers = before === 1 && waiting() === 0 && schemaOK
@@ -2807,7 +2886,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	// bus state, only the probe's ability to answer moved. `warned(tracked)` immediately
 	// above is the positive control, and it is re-run at the end to prove the fixture came
 	// back — if it does not, something other than the permission moved this row.
-	const unanswered = (r) => /could not be asked whether \.comm\/ is committed/.test(r.stderr || "")
+	const unanswered = (r) => /could not be asked whether \.comm\/ is committed/.test(ctxOf(r))
 	const gitIndex = join(rootG, ".git", "index")
 	let lockWorked = true
 	spawnSync("chmod", ["000", gitIndex])
@@ -2825,16 +2904,16 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	const probeSpeaks = lockWorked && unanswered(locked) && !warned(locked) &&
 		unanswered(noGitBinary) && warned(restored)
 
-	const noticeOnce = namesNotice(noGit) && !namesNotice(ignored) && !namesNotice(tracked)
+	const noticeOnce = namesNotice(noGit) && namesNotice(ignored) && namesNotice(tracked)
 
-	check("A36 committed bus state is caught wherever the repository root is, and the notice that prevents it is named once",
+	check("A36 committed bus state is caught wherever the repository root is, told in the model's context, beside the introduction",
 		!warned(noGit) && !warned(ignored) && warned(tracked) && tellsHow && stillDelivers &&
 		noticeOK && deepOK && noticeOnce && probeSpeaks,
 		`no repo -> ${warned(noGit) ? "WARNED (must not)" : "silent"}; repo with the rule -> ${warned(ignored) ? "WARNED (must not)" : "silent"}; ` +
 		`rule removed and .comm added -> ${warned(tracked) ? "warned" : "SILENT (must warn)"}, names the fix=${tellsHow}, mail still drained ${before}->${waiting()} with the schema intact=${stillDelivers}; ` +
 		`bus one level BELOW the git root (no .git at the bus=${noDotGitAtBus}) -> ${warned(deepFire) ? "warned" : "SILENT (must warn)"}; ` +
 		`notice: ${noticeOK ? "installed, names the update command, and its feedback directory exists" : "MISSING OR INCOMPLETE"}, ` +
-		`named by SessionStart on start 1=${namesNotice(noGit)} and NOT on starts 2-3=${!namesNotice(ignored) && !namesNotice(tracked)} (control: same stub, same project); ` +
+		`the introduction in the model's context on starts 1, 2, 3=${namesNotice(noGit)}, ${namesNotice(ignored)}, ${namesNotice(tracked)}; ` +
 		`a probe that CANNOT answer says so instead of saying "clean": ` +
 		(lockWorked
 			? `.git/index unreadable -> ${unanswered(locked) ? "named the exit code" : "SILENT (must speak)"}, ` +
@@ -3002,8 +3081,10 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		input: JSON.stringify({ cwd: join(proj42, "dev"), source: "startup" }),
 		env: { ...process.env, CLAUDE_COMM_RUNTIME: join(root, "rt42") },
 	})
-	const offers = (r) => /is available/.test(r.stderr || "")
-	const blind = (r) => /could NOT check/.test(r.stderr || "")
+	// Read where the MODEL reads (2026-09-19, FINDINGS.md#unseen-introduction): the SessionStart JSON, never stderr.
+	const ctx42 = (r) => { try { return JSON.parse(r.stdout).hookSpecificOutput.additionalContext || "" } catch { return "" } }
+	const offers = (r) => /is available/.test(ctx42(r))
+	const blind = (r) => /could NOT check/.test(ctx42(r))
 
 	// A. CONTROL: current. A tool that speaks when there is nothing to say trains its reader
 	//    to skip the line that matters.
@@ -3031,7 +3112,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 
 	check("A42 a session says its bus is out of date, once per version, without costing a delivery",
 		!offers(current) && !blind(current) &&
-		offers(behind) && /install\.mjs/.test(behind.stderr) && /CHANGELOG\.md/.test(behind.stderr) &&
+		offers(behind) && /install\.mjs/.test(ctx42(behind)) && /CHANGELOG\.md/.test(ctx42(behind)) &&
 		waiting === 1 && drained && schema42 && carried &&
 		!offers(twice42) && blind(gone),
 		`current -> ${offers(current) || blind(current) ? "SPOKE (must be silent)" : "silent"}; ` +

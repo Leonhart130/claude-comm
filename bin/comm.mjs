@@ -502,6 +502,16 @@ const liveAgents = (root, cfg) => liveAgentsImpl(root, cfg, { whoami, findRoot, 
 // ── hook handlers ───────────────────────────────────────────────────────────
 const readStdin = () => { try { return readFileSync(0, "utf8") } catch { return "" } }
 
+// WHAT THE STUB HANDS OVER WITH --notice lands in the model's context: this JSON is the one channel a
+// SessionStart has to it - its stderr never reaches the model. FINDINGS.md#unseen-introduction
+function stubNotices(argv) {
+	const out = []
+	for (let i = 0; i < argv.length && out.length < 4; i++) {
+		if (argv[i] === "--notice" && typeof argv[i + 1] === "string") out.push(argv[++i].replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, "").slice(0, 1500))
+	}
+	return out
+}
+
 function hookDeliver(event) {
 	let p = {}
 	try { p = JSON.parse(readStdin()) } catch {}
@@ -524,8 +534,12 @@ function hookDeliver(event) {
 	// stamp `stub` on every impostor row and re-create the field this fixes.
 	const idSrc = declaredAgent() ? "declared" : agentRoot ? "stub" : "cwd"
 
+	const orient = event === "session-start" ? stubNotices(process.argv.slice(2)).join("\n\n") : ""
 	const { msgs, quarantined } = pending(root, me)
-	if (!msgs.length && !quarantined) process.exit(0)
+	if (!msgs.length && !quarantined) {
+		if (orient) process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: orient } }))
+		process.exit(0)
+	}
 	// A CONTINUATION MAY BLOCK AGAIN, STOP_CHAIN times. Exiting on every stop_hook_active left mail that came during
 	// one for a ring at rest (49 of 258 blocks, max 10.5 h). The loop feared is a drain that fails: this per-session
 	// count bounds it, and a count that cannot be read exits as before. FINDINGS.md#stop-continuation
@@ -554,7 +568,7 @@ function hookDeliver(event) {
 		process.stdout.write(JSON.stringify({ decision: "block", reason }))
 	} else {
 		process.stdout.write(JSON.stringify({
-			hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: reason },
+			hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: orient ? `${reason}\n\n${orient}` : reason },
 		}))
 	}
 	process.exit(0)

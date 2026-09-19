@@ -3106,3 +3106,65 @@ stub, so it proved the rule for the one agent it was written for.
   starts ceasing to appear. No row compares an agent's sessions with its ledger records. Named, not built.
 - Claude Code's settings resolution was not measured by me: the fix rests on the reviewer's ledger evidence (every
   `review` session has exactly one record, never a twin), i.e. the root's `settings.json` never ran for them.
+
+## `#unseen-introduction` — the bus introduced itself on a channel no model reads (2026-09-19)
+
+**Asked by the owner:** is the tool easy for a leader to learn, and should it grow a skill or an MCP server? He had
+to remind getajob's leader that the bus existed. Measured before answering.
+
+- **Claude Code puts a SessionStart hook's STDOUT in the model's context, never its stderr.** In the transcript the
+  model-visible kinds are `hook_additional_context` (stdout JSON) and, at Stop, `hook_blocking_error`. A
+  `hook_success` attachment keeps `stderr` beside an empty `content`.
+- **The stub's only self-introduction went to stderr, "said once, not again".** It is in 2 of ~180 field
+  transcripts (`getajob` leader, `work/db`), both `hook_success` with `content: ""`: **no agent ever read it**, and
+  the marker then silenced it for good. Same channel for "a newer bus is available" (A42) and "live bus state is
+  committed to git" (A36): both gated as WRITTEN, neither ever READ. **Form B**: the arms reddened for the write,
+  not for the property in their titles.
+- The probe failed silently twice on the way (`ls $d` on dirs named `-home-…` read as options; `$c` not split by
+  zsh): "0 of 0" is a probe that cannot answer, not a result.
+
+**Fix.** The stub gathers what an agent can act on — its introduction (who it is, its leader or its experts, the
+commands as they run FROM ITS FOLDER), a stale bus, committed live state — before delivery and hands it to the bus
+with `--notice`; the bus puts it in the one SessionStart JSON, after the mail, at EVERY start, empty inbox
+included. Markers ("once per version") are written only once the bus that shows them has run. The installer also
+writes a **`claude-comm` skill** per agent (`.claude/skills/claude-comm/SKILL.md`): the working rules the field
+learned by incident, every command spelled for that agent's folder.
+
+**Found on the way — A76.** `restart.mjs`/`handoff.mjs` took `cwd` as the project root: from an expert's folder the
+handoff went to `<expert>/.comm/` (read by no verify and no ledger) and "who am I" was asked at the root, where the
+answer is the leader. Latent — no field tree has a stray `.comm/` — because the README's commands only ran from the
+root. Now the root is walked up to, like the bus; identity, `--read` and guards stay where the caller stands.
+
+**Why a skill and not an MCP server, on this evidence.** getajob's failures were remembering the bus and its
+conventions, not typing its commands — its letters cite the CLI's refusals as what WORKED. A skill costs one
+description line per session and is read when the work calls for it; an MCP server is a process per session, tool
+schemas in every context, and a new failure surface — and the part it would most improve (waking an idle session)
+Claude Code now does natively (`#native-path`). Revisit if transcripts show agents failing at the commands.
+
+### Not verified
+
+- **That a model uses the skill unprompted.** The first real test is `~/Dev/moneyMaker`'s new leader.
+- ~~Claude Code discovering the skill~~ **measured 2026-09-19 in one real session** (`claude -p`, Haiku, `claude`
+  2.1.278, run in a fixture expert's folder with its registry isolated): its skill list carried `claude-comm` (no
+  other source of that name on the machine), and it quoted the orientation verbatim: *"[claude-comm] You are 'app',
+  an EXPERT on this project's message bus."* One session, one model: that it READS the skill when the work calls
+  for it is not measured.
+- Every other stderr line of the stub (registry, ledger, restart signal) still reaches no model: they are operator
+  diagnostics, and nobody reads them either. Named, not moved.
+
+## `#dormant-field` — a field the owner put to sleep gates only on its tool (2026-09-19)
+
+The owner, 2026-09-19: *"je n'ai pas lancé work depuis pas mal de temps et je compte pas le faire, le jour où ce
+sera nécessaire on verra ensemble, tant qu'il a l'outil à jour c'est ce qui compte."* `field:work` had been
+acknowledged at every close for two gone-holder `zz-` claims that nobody may now release — the one cause review #11
+R4 put back on the gate because they were releasable. His decision removes the "releasable": acting in that tree is
+off until he wakes it.
+
+`FIELDS.json` (tracked) names a dormant field with **who decided and why**, printed in its row. In that row, gone-
+holder claims and mail waiting for a relaunch are shown `◦` and do not gate; drift, a stale bus, mail nothing can
+deliver, two sessions on one inbox and anything unreadable still do — *"l'outil à jour"* is exactly those. A
+`FIELDS.json` that exists and cannot be read makes nothing dormant and every field row says so. Armed in
+`boot --prove-red` (one variable against the gone-claim arm: the file; then drift under dormancy stays RED).
+
+**What would make this wrong:** a dormant field waking without the file being edited. Its row keeps printing the
+decision and its date, so a new start in that tree (the ledger records it) is the prompt to ask him.
