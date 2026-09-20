@@ -16,8 +16,8 @@ ne correspondant à rien. **Et A77 affirme exactement ce tir comme son CONTRÔLE
 l'amendement du 2026-09-04, 4ᵉ passe d'affilée à trouver son pire point dans le patch de la précédente.
 🔴 **Le `CHANGELOG` de `2026-09-20.1` dit le contraire aux six arbres** dans sa première phrase (*« compté que s'il
 est TÉMOIGNÉ »*) : c'est faux sur la branche `/proc`. **Corriger le texte fait partie du correctif, pas après.**
-Le fantôme détaché, lui, est bien mort (prouvé 3 fois) et l'audit ▶ C est FAIT : 167 starts sur six arbres,
-4 non appariés, **0 daté ≥ 2026-09-19**. Trois 🟡 et quatre 🟢 restants dans le rapport — lis-le, il est mesuré.
+Le fantôme détaché est mort (prouvé 3×) et **l'audit ▶ C est FAIT** : 167 starts/6 arbres, 4 non appariés,
+**0 daté ≥ 09-19**. Restent 3 🟡 + 4 🟢 dans le rapport, tous mesurés.
 🔴 **CE FICHIER EST LE SEUL PORTEUR : la sonnette de #13 a été DRAINÉE** par le crochet `Stop` à la frontière de
 tour, après la clôture (`inbox 'leader': empty`, livraison `via=hook` dans `.comm/log.jsonl`). **Le prochain boot
 ne sonnera pas pour elle.** Je l'avais annoncée « laissée en attente » au propriétaire — c'était faux dix minutes
@@ -26,10 +26,8 @@ plus tard, et c'est la forme même du défaut : un accusé de réception qui arr
 et `--close` ne la voit pas (la boucle `field:` exclut ROOT par conception). **Une clôture aveugle à sa propre
 sonnette** — à traiter avec E, même forme : une ligne qui ne mesure pas ce qu'elle promet.
 
-**A2 - la moitié de `review/REVIEW-12b.md` NON disposée.** Son ROUGE est corrigé, armé, publié : `2026-09-20.1`
-(print `202409de44fc`), `--check`-vert dans les **six** arbres. 🔴 **`FINDINGS.md#review12b` liste les sept points
-portés avec leur numéro de section — §2 la date `dormant-awake` étant celui qui paie les acks. Chacun est DÉJÀ
-MESURÉ dans le rapport : prends la mesure, ne la re-dérive jamais.**
+**A2 - la moitié de `REVIEW-12b.md` NON disposée.** 🔴 **`FINDINGS.md#review12b` liste les sept points portés avec
+leur n° de section** — §2 la date `dormant-awake` paie les acks. **Chacun est DÉJÀ MESURÉ : prends la mesure.**
 
 **B - `boot.mjs --hook` records with NO ownership test at all** (`boot.mjs:489`; the stub now has one). **Mesuré
 pourquoi il ne peut pas simplement adopter `witnessStart` :** ses propres `--prove-red` tirent `--hook --root
@@ -41,12 +39,12 @@ construction, et ses propres bras rougiraient. Il lui faut d'abord une couture d
 transcript sous `~/.claude/projects/` est un candidat. Base de référence sur cinq arbres : **4 non appariés, tous
 ≥ une semaine avant le correctif**. **Tout start non apparié daté après 2026-09-19 est un vrai candidat.**
 
-**D - moneyMaker: adoption MESURÉE sur son transcript** (`7c449631`, 09-19, build pré-revue), en parsant les APPELS
-D'OUTIL, jamais grep - le texte des skills nomme chaque commande, donc un grep compte la documentation (le reviewer
-y est tombé une fois). **Introduction reçue 1× ; `Skill` : `leader-expert` + `claude-in-chrome`, PAS `claude-comm` ;
-`comm.mjs inbox` 2×, spontané.** Donc la réponse au propriétaire est plus nette que « skill oui » : *il n'a jamais
-chargé la skill et s'est quand même servi du bus - c'est l'INTRODUCTION qui a produit ces deux appels.* Suite depuis
-`./-home-leonh-Dev-moneyMaker*/` (préfixe `./` : les dossiers commencent par `-`) quand il aura des experts.
+**D - moneyMaker: adoption MESURÉE** (`7c449631`, 09-19), en parsant les APPELS D'OUTIL, jamais grep — le texte des
+skills nomme chaque commande, donc un grep compte la documentation. **Introduction reçue 1× ; `Skill` :
+`leader-expert` + `claude-in-chrome`, PAS `claude-comm` ; `comm.mjs inbox` 2×, spontané.** Réponse au propriétaire,
+plus nette que « skill oui » : *il n'a jamais chargé la skill et s'est quand même servi du bus — c'est
+l'INTRODUCTION qui a produit ces deux appels.* Suite depuis `./-home-leonh-Dev-moneyMaker*/` quand il aura des
+experts.
 
 **D2 - the MID-TURN channel EXISTS, measured with its control** (`FINDINGS.md#midturn-channel`): a `PostToolUse`
 hook's `hookSpecificOutput.additionalContext` **reaches the model at the tool result**; stderr never does. Asked by
