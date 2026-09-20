@@ -30,6 +30,14 @@ forming for the owner is sharper than "skill yes": *it never loaded the skill an
 introduction produced those two calls.* Continue from `./-home-leonh-Dev-moneyMaker*/` (prefix `./`: dirs start `-`)
 once it has experts: does it reach for `send`/`launch.mjs`, does its note put the pointer first?
 
+**D2 - the MID-TURN channel exists, measured with its control** (`FINDINGS.md#midturn-channel`), asked for by
+getajob's leader with a price: a brief marked "AVANT tout le reste" was read an hour late and five real dispatches
+waited. A `PostToolUse` hook's `hookSpecificOutput.additionalContext` **reaches the model at the tool result** -
+stderr never does. 🔴 **The transport is NOT the open half: whether an agent ACTS on it is unmeasured, and
+`selftest`'s behaviour half has the agent ignoring what it is pointed at in 5 of 8 runs.** Build `--kind blocked`
+behind that only with the peer's field count, not my bench. Their parade (`comm inbox <agent>` before each big step)
+stands on its own and they were told to write it into their specs regardless.
+
 **E - two AMENDMENTS demanded at the 2026-09-20 close** (3 acks each, same cause):
 `field:getajob@stranded-untold:extension` and `channel:getajob-leader@unanswered:2026-09-19-recu-...-volontairement.md`.
 Both are the PEER's own state: mail their leader stopped on purpose, and a thread their own letter closed ("rien

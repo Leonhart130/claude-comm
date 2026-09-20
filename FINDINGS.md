@@ -3179,6 +3179,43 @@ deliver, two sessions on one inbox and anything unreadable still do — *"l'outi
 **What would make this wrong:** a dormant field waking without the file being edited. Its row keeps printing the
 decision and its date, so a new start in that tree (the ledger records it) is the prompt to ask him.
 
+## `#midturn-channel` — a hook CAN reach the model mid-turn, and it is not stderr (2026-09-20)
+
+**Asked by the leader of `getajob`**, with a price on it: he sent `cv` a brief marked *"AVANT tout le reste"* (5
+corrections blocking 5 real dispatches); the `Stop` hook delivers at the END of a turn, so it was read ~1 h later
+and **five Métropole dispatches waited an hour**. His agent's own words: *"un brief marqué AVANT peut donc être
+ignoré une heure sans que je le sache."* His question was deliberately narrow — **not** to interrupt a turn, but to
+make *"your blocking brief arrived"* VISIBLE before the turn ends. He named what he had not checked: whether Claude
+Code offers such a channel at all.
+
+**It does. Measured 2026-09-20, `claude -p`, haiku-4.5, one variable — the hook.** A `PostToolUse` hook returning
+
+```json
+{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"[claude-comm] BLOCKING BRIEF WAITING …"}}
+```
+
+| the fixture | did the model report the planted token `ZXQ7714`? |
+| --- | --- |
+| PostToolUse hook wired, exit 0 | **YES** — and it attributed it: *"(from the PostToolUse hook message)"* |
+| the same fixture, `{"hooks":{}}`, identical prompt | **NO** (control) |
+
+So the model reads it at the **tool result**, inside the turn. This is the mid-turn half of OPEN 1 (*latency is a
+mailbox, not an interrupt*), and it is a different channel from the one `#unseen-introduction` measured dead:
+**stderr reaches no model; `additionalContext` does.** `SessionStart`'s already did — this extends it to every tool
+call.
+
+### 🔴 What this does NOT establish, and it is the half that matters here
+
+- **That an agent ACTS on it.** The probe's prompt *asked* the model to list tokens it had seen. A real agent is not
+  asked to look. This repo already measures the opposite tendency: `selftest`'s behaviour half has the agent NOT
+  reading the file it was pointed at in **5 of 8** runs. A channel that reaches the model is not yet a channel the
+  model obeys, and that gap is this bus's oldest unmeasured risk — the peer's own parade (`comm inbox <agent>`
+  before each big step) is a BEHAVIOUR fix and may still beat a delivery fix.
+- **Cost and noise.** It fires per tool call. A line on every call is a warning nobody reads (this repo's own rule
+  for the `Stop` path). It must speak only when blocking mail is actually waiting, and at most once.
+- Not measured: other matchers, non-Bash tools, token cost per call, whether `PreToolUse` behaves the same, and any
+  model other than haiku-4.5.
+
 ## `#review12b` — the disposition's own fix wrote phantom starts into the reboot instrument (2026-09-20)
 
 `review/REVIEW-12b.md`, one RED, two 🟡, four 🟢. **The brief's target range was wrong and the reviewer said so
