@@ -3179,6 +3179,48 @@ deliver, two sessions on one inbox and anything unreadable still do — *"l'outi
 **What would make this wrong:** a dormant field waking without the file being edited. Its row keeps printing the
 decision and its date, so a new start in that tree (the ledger records it) is the prompt to ask him.
 
+## `#not-verified` — the standing register of what this project has NOT measured
+
+**Split out of `STATUS.md` on 2026-09-20, at 87 % of a tier-0 budget capped in BYTES.** It moved because it is
+long, stable and paid for at EVERY boot, which is exactly what tier 0 must not carry — `CLAUDE.md`'s own
+instruction is *split or cut*. 🔴 **Splitting it must not soften it:** *"Report what was NOT verified. Its absence
+is a defect in the report, not a clean bill."* `STATUS.md` keeps a pointer here, and a session that touches any of
+these areas reads this section before claiming anything about them.
+
+- **A launched session's tier over its whole life** — the field measured it ~15 s after start, twice.
+- 🔴 **NOTHING VERIFIES `close.mjs` UNDER A REAL AGENT** — every arm uses a `node` named `claude`. BEHAVIOUR
+  ⇒ `selftest`, unasked. *(Review #10 ran it for real and C1/C2 are what came back.)*
+
+
+- 🔴 **Whether `boot`'s registry `GONE` wording is reachable, in BOTH directions** (review #8 D4).
+
+- **`--release` is verified by hand, not gated** (`FINDINGS.md#release-roundtrip`): the test seam does not exist.
+- **Whether the pid→transcript descriptor returns after a cleared session takes a turn**
+  (`FINDINGS.md#clear-blind`). MOOT for the sensor now, still unmeasured — it decides whether the sensor's
+  "session CLEARED" note is permanent or transient.
+- **What the entry does on `resume` or `compact`** — a payload with no `transcript_path` leaves the old
+  entry standing: the safe direction, not the same as correct.
+- **The ledger's defects are all from ONE session**, each dated at its commit — the upper bound.
+  `FINDINGS.md#review6-disposal`.
+- **The git guard has never fired outside a fixture.**
+- **The crossing has happened ONCE** (2026-09-04): unverified that it survives an unattended relaunch, that
+  anyone repeats it, or that the arm reaches ten.
+- **`selftest`'s BEHAVIOUR half is not a gate** — 3 of 6 runs showed the agent not reading the file it was
+  pointed at, and 09-11 added a 4th miss in 4 runs. This bus rings bells nobody answers and no gate sees it.
+  🟢 Transport green 09-11 with and without `CLAUDE_COMM_AGENT` (`FINDINGS.md#one-suite-hardened`).
+- **Anything non-Linux**: `comm who` reads `/proc`, degrading to "not running" elsewhere.
+- A8's partial mutations and behaviour mid-TOOL-CALL live at `FINDINGS.md#test-debt`.
+
+## `#t1-root-half` — both halves of T1 finally seen live (2026-09-20)
+
+Review #11c's T1: an expert in `review/` loads `review/.claude/settings.json`, so reading the ROOT's settings made
+every expert stand aside for a `boot --hook` that never runs for it, and its starts stopped reaching the ledger with
+nothing saying so. The expert half was seen 09-19 (review's start: 3 → 4). **The root half was seen on this session:**
+this leader's start added **exactly ONE** line to `.comm/handoff/leader.log`, where the previous session
+(`83c9d8bd`, 09-19 13:49Z) wrote **two, 43 ms apart**. Seven of that log's eight sessions are twins; the ledger
+collapses them and prints it (*"7 duplicated start record(s) collapsed - two recorders on one root"*), so the twin
+never silently doubled a count. Both halves now measured in production.
+
 ## `#midturn-channel` — a hook CAN reach the model mid-turn, and it is not stderr (2026-09-20)
 
 **Asked by the leader of `getajob`**, with a price on it: he sent `cv` a brief marked *"AVANT tout le reste"* (5
