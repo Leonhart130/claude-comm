@@ -31,7 +31,10 @@ dernier rapport rendu : sa forme est la forme attendue.
 
 ⚠️ **Ne cours JAMAIS `boot.mjs --hook` contre un vrai arbre** — il écrit un démarrage dans le ledger de la
 racine qu'on lui donne et corrompt l'instrument de reboot.
-⚠️ `~/Dev/work`, `~/Dev/electio`, `~/Dev/getajob` portent des sessions vivantes. **Lis, n'écris pas.**
+⚠️ **SIX arbres de terrain portent le bus, et le propriétaire TRAVAILLE EN CE MOMENT dans `~/Dev/getajob` et
+`~/Dev/lucia`** (2026-09-20). `~/Dev/work`, `~/Dev/electio`, `~/Dev/moneyMaker` aussi. **Lis, n'écris pas** —
+ni fichier, ni courrier, ni sonde qui déclenche un crochet : le `.claude/comm-hook.mjs` d'un arbre réel écrit
+dans SON ledger. C'est exactement le défaut que la revue #12b a trouvé, ne le reproduis pas en le cherchant.
 ⚠️ Tu ne commites pas et tu ne pousses pas. Tu rapportes.
 
 ## Comment tu parles au leader
