@@ -18,6 +18,10 @@ l'amendement du 2026-09-04, 4ᵉ passe d'affilée à trouver son pire point dans
 est TÉMOIGNÉ »*) : c'est faux sur la branche `/proc`. **Corriger le texte fait partie du correctif, pas après.**
 Le fantôme détaché, lui, est bien mort (prouvé 3 fois) et l'audit ▶ C est FAIT : 167 starts sur six arbres,
 4 non appariés, **0 daté ≥ 2026-09-19**. Trois 🟡 et quatre 🟢 restants dans le rapport — lis-le, il est mesuré.
+🔴 **CE FICHIER EST LE SEUL PORTEUR : la sonnette de #13 a été DRAINÉE** par le crochet `Stop` à la frontière de
+tour, après la clôture (`inbox 'leader': empty`, livraison `via=hook` dans `.comm/log.jsonl`). **Le prochain boot
+ne sonnera pas pour elle.** Je l'avais annoncée « laissée en attente » au propriétaire — c'était faux dix minutes
+plus tard, et c'est la forme même du défaut : un accusé de réception qui arrive tout seul.
 ⚠️ **La clôture de 09-20 a été prononcée AVANT que ce rapport soit lu** : la sonnette était dans l'inbox du leader
 et `--close` ne la voit pas (la boucle `field:` exclut ROOT par conception). **Une clôture aveugle à sa propre
 sonnette** — à traiter avec E, même forme : une ligne qui ne mesure pas ce qu'elle promet.
