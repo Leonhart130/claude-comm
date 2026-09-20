@@ -1,47 +1,50 @@
-# STATUS — claude-comm, 2026-09-19 (sessions 4–20)
+# STATUS — claude-comm, 2026-09-20 (sessions 4–21)
 
 Design and gates are in `README.md`; **this file is only what is OPEN.** Keep it short — when it grows,
 fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(Closed 2026-09-19 late. Field = getajob; work dormant by the owner's word (`FIELDS.json`); `~/Dev/moneyMaker` is new,
-its leader not launched yet. Owner's question answered: skill yes, MCP not now — `FINDINGS.md#unseen-introduction`.)*
+*(Closed 2026-09-20. Field = getajob; `work` dormant by the owner's word (`FIELDS.json`); **`lucia` installed 09-20 at
+his request** - leader-only roster, never launched. `moneyMaker`'s leader not relaunched since 09-19.)*
 
-**A — FIRST: read `review/REVIEW-12b.md`** (the reviewer's attack on review #12's disposition, briefed at close in
-`BRIEF-adversarial-12b.md`; it closes its own window). Its ring waits in the inbox. A red ⇒ fix, arm, mutation, `.3`,
-reinstall the five trees. `#review12` in FINDINGS is the disposition it attacks.
+**A - FIRST: the half of `review/REVIEW-12b.md` this session did NOT dispose.** Its RED is fixed, armed and shipped:
+`2026-09-20.1` (print `202409de44fc`), `--check`-green in **all six** trees. 🔴 **`FINDINGS.md#review12b` lists the
+seven carried items with their section numbers - §2 the `dormant-awake` date being the one that pays ▶ NEXT E's churn.
+Every one is ALREADY MEASURED in the report: take the measurement, never re-derive it.**
 
-**B — moneyMaker: the adoption measurement is STARTED, on its own transcript.** Its leader ran 2026-09-19 18:42Z→
-~20:50Z (one session, `7c449631`, on the pre-review build; it has `2026-09-19.2` from its next start) and kickstarted
-itself with the sibling `leader-expert` skill. Measured by parsing TOOL CALLS, never grep (the skills' own text names
-every command - a grep counts the documentation): **introduction received 1×; `Skill` calls: `leader-expert`,
-`claude-in-chrome` - NOT `claude-comm`; bus commands: `comm.mjs inbox` twice, unprompted; no `send`/`launch`/
-`--add-agent` (its roster is still leader-only, so nothing to send to).** Continue from `./-home-leonh-Dev-moneyMaker*/`
-(prefix `./`: the dirs start with `-`) once it has experts: does it reach for `send`/`launch.mjs`, does it load the
-`claude-comm` skill, does its note put the pointer first? That, not an opinion, answers the owner on skill vs MCP.
+**B - `boot.mjs --hook` still records with NO ownership test at all** (`boot.mjs:489`; the stub now has one).
+**Measured why it cannot simply adopt `witnessStart`:** boot's own `--prove-red` fires `--hook --root <fixture>` from
+a chain whose `claude` ancestor is the operator's session, so those fires are FOREIGN by construction and its own
+arms would redden. It needs a declared test seam first. Prose in `CLAUDE.md` + `review/CLAUDE.md` is the only guard.
 
-**C — T1's root half, still unseen:** this leader's next start must add exactly ONE line to `.comm/handoff/leader.log`
-(read `wc -l` first). The expert half was seen live 09-19 (review's start: 3 → 4).
+**C - the phantom audit, one query, not built:** a recorded start whose `session` matches no transcript under
+`~/.claude/projects/` is a candidate phantom. Baseline across five trees: **4 unmatched, all ≥ a week before the fix**
+(a rotated transcript explains them as well). **Any unmatched start dated after 2026-09-19 is a real candidate.**
 
-**D — the gap T1 exposed: nothing reports a recorder that never runs** (`#review11c`). Measure first with
-`~/.claude/sessions/<pid>.json` against the ledger, per agent. E1's positive test (same file, `session_id` → live
-session in the project) is the same instrument — build them together or not at all.
+**D - moneyMaker: the adoption measurement is STARTED, on its own transcript** (`7c449631`, 09-19, pre-review build).
+Measured by parsing TOOL CALLS, never grep - the skills' own text names every command, so a grep counts the
+documentation, and the reviewer fell into that trap once inside the tool-call parse. **Introduction received 1×;
+`Skill`: `leader-expert` + `claude-in-chrome`, NOT `claude-comm`; `comm.mjs inbox` twice, unprompted.** So the answer
+forming for the owner is sharper than "skill yes": *it never loaded the skill and still used the bus - the
+introduction produced those two calls.* Continue from `./-home-leonh-Dev-moneyMaker*/` (prefix `./`: dirs start `-`)
+once it has experts: does it reach for `send`/`launch.mjs`, does its note put the pointer first?
 
-**E — two AMENDMENTS demanded at the 2026-09-20 close** (3 acks each, same cause):
-`field:getajob@stranded-untold:extension` and
-`channel:getajob-leader@unanswered:2026-09-19-recu-2026-09-19-1-envoi-relance-extension-attend-volontairement.md`.
+**E - two AMENDMENTS demanded at the 2026-09-20 close** (3 acks each, same cause):
+`field:getajob@stranded-untold:extension` and `channel:getajob-leader@unanswered:2026-09-19-recu-...-volontairement.md`.
 Both are the PEER's own state: mail their leader stopped on purpose, and a thread their own letter closed ("rien
 n'attend de réponse"). The 09-18 amendment already moved peer operations to shown-not-gated; `stranded-untold` was
-kept gating because the BUS mis-told the sender. Design it with an arm (what does the row measure now?) or delete
-the cause — evidence, never an opinion, and it lands as a gated change. `FINDINGS.md#peer-state`.
+kept gating because the BUS mis-told the sender. Design it with an arm (what does the row measure now?) or delete the
+cause - evidence, never an opinion, and it lands as a gated change. `FINDINGS.md#peer-state`.
 
-**Carried:** A2 (a notice's marker is written when the bus RAN, not when it SHOWED it) · the installer overwrites a
-`SKILL.md` it did not generate · the close-amendment arm went red ONCE with every clause true, cause unknown — it now
-prints its exit · every other stderr line of the stub still reaches no model · S6 (`to_state` blind after send) ·
-getajob's field-day read of `rings.jsonl` (A62, A65) · #9 A3 · C7 · `who`'s 3rd/4th states · the restart trigger
-(ledger UNKNOWN) · C3 (the channel row dates letters by filename). **Later, owner's order:** adoption (measure B) →
-Rust port → value, with getajob's leader.
+**✅ CLOSED 2026-09-20 - T1's root half, on this session:** this leader's start added **exactly ONE** line to
+`.comm/handoff/leader.log` where the previous session wrote **two** 43 ms apart. 7 of its 8 sessions are twins; the
+ledger collapses them and says so. Both halves of T1 now seen live.
+
+**Carried:** A2 (a marker written when the bus RAN, not when it SHOWED - §3(c) is a second reach to it) · the
+installer overwrites a `SKILL.md` it did not generate · every other stderr line of the stub reaches no model · S6 ·
+getajob's `rings.jsonl` read (A62, A65) · #9 A3 · C7 · `who`'s 3rd/4th states · the restart trigger (ledger UNKNOWN) ·
+C3. **Later, owner's order:** adoption (measure D) → Rust port → value, with getajob's leader.
 
 ## Where it stands
 

@@ -54,7 +54,13 @@ const ROOT = resolve(opt("--root", findRoot(HOME_DIR) || HOME_DIR))
 // and armed the leader's reboot. It is asked where the caller stands whenever that is inside the project; from outside
 // it, only --agent can say. D2: no project above the caller and no --root wrote a stray .comm/ there - refused.
 const INSIDE = HOME_DIR === ROOT || HOME_DIR.startsWith(ROOT + sep)
-const PROJECT = !!opt("--root", null) || !!findRoot(HOME_DIR)
+// 🔴 D2 AGAIN, review #12b §4: this asked whether a FLAG WAS PASSED, not whether a project is there, and the
+// refusal advertised the escape in its own text ("run this from an agent's folder, or pass --root"). Measured:
+// `prepare --root <empty dir> --agent web` exited 0, printed "✓ armed", and wrote <empty dir>/.comm/ - the exact
+// defect D2 closed, one documented flag away. A76 tested only the no-flag case. The question is about the WORLD,
+// so it is asked of the world: is there a project at ROOT. Both files' --prove-red pass --root at real fixture
+// roots, so they keep passing.
+const PROJECT = existsSync(join(ROOT, ".comm", "config.json"))
 
 function agentName() {
 	const declared = opt("--agent", null)
@@ -69,7 +75,11 @@ function agentName() {
 }
 
 function prepare() {
-	if (!PROJECT) die(`no project here: no .comm/config.json at or above ${HOME_DIR} - run this from an agent's folder, or pass --root`)
+	// Form D: this named HOME_DIR while the test is now about ROOT, so a caller who passed --root was sent to
+	// inspect the directory it was standing in. Form K: it must hand back the string to TYPE, not only the fault.
+	if (!PROJECT) die(opt("--root", null)
+		? `no project at --root ${ROOT}: no .comm/config.json there - pass --root <a project's root>, or run this from an agent's folder`
+		: `no project here: no .comm/config.json at or above ${HOME_DIR} - run this from an agent's folder, or pass --root <a project's root>`)
 	const agent = agentName() || die("cannot tell which agent you are - pass --agent, or run inside an agent's directory")
 	const obl = opt("--obligations", null)
 	if (!obl) die("--obligations <file> is required - it is what handoff.mjs refuses without, and for the same reason")
@@ -130,6 +140,10 @@ function proveRed() {
 	const run = (args) => spawnSync(process.execPath, [self, ...args, "--root", dir, "--agent", "probe"], { encoding: "utf8", cwd: dir })
 	const notePath = join(dir, ".comm", "restart", "probe.json")
 	mkdirSync(join(dir, ".comm", "handoff"), { recursive: true })
+	// 🔴 THE FIXTURE MUST BE WHAT IT STANDS FOR - see handoff.mjs's copy of this note. No `.comm/config.json` here
+	// meant every arm ran --root at a non-project; three went red the moment the PROJECT test asked the world
+	// instead of asking whether a flag was passed (review #12b §4).
+	writeFileSync(join(dir, ".comm", "config.json"), JSON.stringify({ leader: "probe", agents: { probe: "." } }))
 	const target = join(dir, "pinned.md"); writeFileSync(target, "bytes\n")
 	const obl = join(dir, "obl.md"); writeFileSync(obl, "- do not lose this\n")
 	const empty = join(dir, "empty.md"); writeFileSync(empty, "  \n")

@@ -3179,6 +3179,122 @@ deliver, two sessions on one inbox and anything unreadable still do — *"l'outi
 **What would make this wrong:** a dormant field waking without the file being edited. Its row keeps printing the
 decision and its date, so a new start in that tree (the ledger records it) is the prompt to ask him.
 
+## `#review12b` — the disposition's own fix wrote phantom starts into the reboot instrument (2026-09-20)
+
+`review/REVIEW-12b.md`, one RED, two 🟡, four 🟢. **The brief's target range was wrong and the reviewer said so
+first** (§0): it named `c8e8f95..HEAD`, which EXCLUDES `e5f458c`, the disposition commit it asked them to attack.
+Mine to fix — the brief named that commit's findings by letter in the same paragraph as the range.
+
+### The red: E1 again, in the other direction — and the arm was the worse half
+
+`ownStart = sp > 0 ? ownsSession(sp) : null` with the ledger guard `ownStart !== false`. `sessionPid()` returns 0
+for two situations that have nothing in common: a real session whose ancestor walk cannot be done (off Linux,
+another argv0), and NO SESSION AT ALL (a probe, cron, a CI runner, `systemd-run`, `setsid`). Review #12 read that 0
+as FOREIGN and dropped real starts; its disposition read it as CANNOT TELL and RECORDED. **Both were guesses, and
+the second one is worse than what it fixed:** every hand-fired stub wrote a phantom cold start into the ledger of
+any tree, byte-shaped like a real start, with nothing marking it unwitnessed. The ledger is *the* reboot instrument
+and its verdict stays UNKNOWN until ten starts per arm, so a phantom is a fabricated data point in the only
+experiment this repo runs. Shipped in all five trees, and this repo probes field stubs constantly.
+
+**And A77 certified the wrong side of it.** Its third leg pinned `sessionPid()` to 0 *while firing from a fake
+`claude` ancestor inside the project* — a legitimate fire with the walk artificially blinded — and asserted 1
+record. The real-world zero is the opposite case: there is no session. Mutation-proofing that arm could never have
+surfaced this. **Seventh instance of `CLAUDE.md`'s 2026-09-04 amendment**, and the first where the arm was written
+by the disposition that the review had just demanded.
+
+### The fix: stop guessing, ask a witness
+
+The runtime keeps a second witness this project never used: `~/.claude/sessions/<pid>.json`, one file per live
+session, carrying its `sessionId` and `cwd`. **Measured 2026-09-20 against a real `claude -p` session in an
+isolated fixture** — the question the reviewer left open: the file is already on disk **at SessionStart**, already
+carries the session's **current** id (a `/clear` re-mint rewrites it and files the old one under `formerNames`),
+and `kind` is `"interactive"` even for `-p`. So the payload's `session_id` can be matched instead of guessed at.
+
+`witnessStart()` lives in `bin/session-registry.mjs` beside `sessionPid()`, where that file's own comment already
+argued the case (*"an identity rule with three copies is an identity rule that will disagree with itself"*).
+
+🔴 **It answers for the LEDGER, not for the registry, and the two are now visibly separate in the stub.** The
+registry is keyed on /proc facts, so it still records only a session /proc itself resolved: a hand-fired stub
+carrying a real session id must not be able to point a live pid's entry at a transcript from somewhere else, which
+is `#clear-blind` silently inverted. The old stub reached that conclusion by `throw`, and its stderr line said
+*"recording nothing"* **while the ledger was recording** — the one place a reader could have caught the phantom told
+them the opposite. It now states both outcomes.
+
+| the stub fired from | pre-fix (`7d3e2a2`) | HEAD |
+| --- | --- | --- |
+| a `claude` ancestor whose cwd is **outside** the project | 0 records (control) | 0 |
+| a `claude` ancestor whose cwd is **inside** it | 1 (positive control) | 1 |
+| **no `claude` ancestor at all** (`setsid --fork`, reparented to systemd) | **1 — a phantom** | **0** |
+| the same, fired from a directory outside the project too | **1** | **0** |
+| no ancestor, runtime session file witnesses that id **inside** the project | 1 | **1** — E1's real case kept |
+| no ancestor, witnessed running **elsewhere** | **1** | **0** |
+
+One variable per row; and one variable between the columns — the build. End to end: a real `claude -p` session in a
+fixture on the new build still records its start (1 cold).
+
+**Arm: A77, rewritten.** Five rows, and the missing ancestor is REAL, never simulated — `setsid --fork` reparents
+the fire to init/systemd (measured 5/5 with no `claude` in the chain). Each detached fire reports the chain it
+actually had and `noAncestor` asserts it: **without that positive control the phantom row would pass for a fire
+that quietly still had a session above it**, which is precisely the substitution that broke the old arm.
+Mutation: the witness returns `own: true` on no match ⇒ **A77 alone reddens**, and the row that moves is the
+phantom row (0 → 1) with both positive controls and the ancestor control holding.
+
+### Named, not fixed: `boot.mjs --hook` records with no such test at all
+
+The reviewer's second half of §1, and it is pre-existing. `boot.mjs:489` calls `record start` with no `ownsSession`
+test anywhere — it is this repo's own recorder, and the hazard is covered only by prose in `CLAUDE.md` and
+`review/CLAUDE.md`. **Measured why it cannot simply adopt the witness:** boot's own `--prove-red` fires
+`--hook --root <fixture>` from a chain whose `claude` ancestor is the operator's session, so those fires are
+FOREIGN by construction and the rule would redden six of its own arms. It needs a declared test seam first. Until
+then the rule has two versions, not three.
+
+### 🟢 D2 again — `--root` was taken as proof that a project exists (§4)
+
+`PROJECT = !!opt("--root", null) || !!findRoot(HOME_DIR)` asked whether a **flag was passed**, and the refusal
+advertised the escape in its own text. Measured: `prepare --root <empty dir> --agent web` ⇒ exit 0, *"✓ armed"*,
+and `<empty dir>/.comm/{handoff,restart}` written — the exact defect D2 closed, one documented flag away. Now
+`existsSync(join(ROOT, ".comm", "config.json"))`: the question is about the world, so it is asked of the world.
+Measured after: exit 2, nothing written.
+
+🔴 **And the review was wrong about the consequence — measured, not argued.** It states *"both files' `--prove-red`
+pass `--root` at real fixture roots, so they keep passing (both re-run green just now)"*. They did not: **6 handoff
+and 3 restart properties went red at once.** Their fixtures build `.comm/handoff/` and no `.comm/config.json`, so
+every arm had been running `--root` at a directory that is **not a project** — and passing, because the test it
+would have failed did not exist yet. The control was green on a world that cannot exist. Fixtures now carry a
+`config.json`; both controls green again. *(Form: a reviewer's un-measured consequence, believed because the
+finding it rode on was correct — the same shape as form G.)*
+
+Both refusals also named `HOME_DIR` while the test is about `ROOT`, sending a caller who passed `--root` to inspect
+the directory they were standing in (form D), and neither handed back the string to type (form K). Both branches
+now name what they measured.
+### 🔴 And a mutation that moves ONE of two redundant guards proves nothing
+
+Arming D2 cost a second measurement. Mutating `restart.mjs`'s `PROJECT` back to the flag test left the suite
+**green**: `restart.mjs prepare` delegates the write to `handoff.mjs`, whose guard was still the fixed one, so the
+refusal still happened - for the sibling's reason, not the mutated one. Exit 2, zero files, arm unmoved. The
+pre-fix world had BOTH guards absent, so that is the mutation: with both moved, A76's new row reads
+`exit 0, no stray .comm/=false` and A76 alone reddens. **A redundant guard is a mutation mask** - the same shape as
+this repo's measurement traps, one level up: the variable moved was real, and something else answered for it.
+
+### Not disposed here - carried, with `review/REVIEW-12b.md` as the pointer
+
+- 🟡 **§2, the `dormant-awake` date.** `since` is a date, so `Date.parse` gives midnight UTC and a field declared
+  dormant on a day it RAN warns at every boot forever, each warn needing an `--ack`. Fix: compare against a time,
+  `since + 1 day`, or `FIELDS.json`'s mtime. Arm: the `2026-09-19T08:00Z` row, which the present arm lacks.
+- 🟡 **§3(a) `liveNames` is unarmed** - deleting `liveNames.length > 0` moves no arm; the clause works (measured by
+  the reviewer). §3(b) A1's fallback is written for an `.error` and a NUL makes `spawnSync` **throw**, which is not
+  one - `try/catch` is the shape that catches both. §3(c) when the fallback does fire it still writes `marks`, so
+  the version notice is marked as said and lost for that version.
+- 🟢 **§5** the shared-folder skill tells a hand-started second agent two false sentences, and the fix as written
+  (`isLeader || shared`) reintroduces C1 one roster shape away - `isLeader || (shared && hasLeader)`.
+- 🟢 **§6(a)** the `relived` exemption never checks the entry's `start` nor that the transcript belongs to that
+  session. **§6(b)** the close-amendment arm conjoins an exit that depends on every other row; the refusal keys on
+  the row LABEL, so only a label the snapshot did not contain can refuse - and `field:<name>`/`channel:<peer>` are
+  generated from disk. Assert it in the close arms that own it.
+- 🟢 **A comment names a guard that is not there**: `CLAUDE_COMM_PROJECTS` is claimed as overridden in
+  `boot.mjs:1917`, `claim.mjs:488` and `attack.mjs:132` and is set in none of them. It cost the reviewer a false
+  sentence in their own report. Set it in the three, or cut the clause from all three.
+
 ## `#review12` — review #12 on the onboarding batch: no red, five yellows, all disposed (2026-09-19)
 
 `review/REVIEW-12.md`, target `cd0ad2c..1e9e00a`. The reviewer measured every finding with one variable moved.

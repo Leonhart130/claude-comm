@@ -41,6 +41,22 @@ already have.
 
 
 
+
+## 2026-09-20.1 — bus print `202409de44fc` — 2026-09-20
+
+- **Your project's ledger no longer counts starts that never happened.** Until now, anything that ran your
+  `.claude/comm-hook.mjs` by hand - a probe, a script, cron, a CI runner, `systemd-run` - wrote a **cold start**
+  into `.comm/handoff/<agent>.log` that looked exactly like a real one. The ledger is what answers "did a restart
+  cost us a defect", so those records were fabricated data in it. A start is now counted only when something
+  WITNESSES it: the session resolved from `/proc`, or, when there is no `claude` ancestor to walk to, this
+  runtime's own session file (`~/.claude/sessions/<pid>.json`) carrying the same `session_id` and a `cwd` inside
+  your project. Nothing changes for a real session - yours still records exactly as before.
+- **The hook's stderr no longer contradicts itself.** When it declined to update the session registry it said
+  *"recording nothing"* while the ledger was, in fact, recording. It now states both outcomes separately.
+- **`restart.mjs` / `handoff.mjs` no longer take `--root` as proof that a project exists.** Pointing either at a
+  directory with no `.comm/config.json` used to exit 0, print "✓ armed", and leave a stray `.comm/` there. It now
+  refuses, and the refusal names the path it actually checked and the flag to type.
+
 ## 2026-09-19.2 — bus print `23b6dce41047` — 2026-09-19
 
 - **Every session now starts knowing it is on the bus.** At each start, your context gets four lines: who you are
