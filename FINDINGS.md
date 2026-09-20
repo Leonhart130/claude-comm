@@ -3276,6 +3276,19 @@ pre-fix world had BOTH guards absent, so that is the mutation: with both moved, 
 `exit 0, no stray .comm/=false` and A76 alone reddens. **A redundant guard is a mutation mask** - the same shape as
 this repo's measurement traps, one level up: the variable moved was real, and something else answered for it.
 
+### Not verified (2026-09-20)
+
+- 🔴 **`witnessStart`'s runtime branch off Linux - the configuration E1 was written for.** `sessionPid() = 0` was
+  produced by removing the ANCESTOR (`setsid --fork`), never by removing `/proc`. Whether
+  `~/.claude/sessions/<pid>.json` exists on macOS/Windows is unchecked, and if it does not, the witness refuses
+  every start there - E1's original complaint, moved rather than removed. Worse in the same place: `inside()`
+  compares with a hard-coded `"/"`, so a Windows `cwd` would not match its own project root. **The one branch
+  written for non-Linux is the one branch no arm and no machine here can exercise.**
+- **The delivery half of the stub under a real session with mail waiting** was exercised by `selftest` (green, and
+  `--prove-red` green), but the two `claude -p` sessions used for the ledger measurement had empty inboxes.
+- **`selftest`'s BEHAVIOUR half missed again**: the agent did not read the file it was pointed at. That is now 5
+  misses in 8 recorded runs, and nothing gates it.
+
 ### Not disposed here - carried, with `review/REVIEW-12b.md` as the pointer
 
 - 🟡 **§2, the `dormant-awake` date.** `since` is a date, so `Date.parse` gives midnight UTC and a field declared
