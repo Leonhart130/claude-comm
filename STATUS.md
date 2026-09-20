@@ -8,13 +8,19 @@ fold the settled parts into the README.
 *(Closed 2026-09-20. Field = getajob; `work` dormant by the owner's word (`FIELDS.json`); **`lucia` installed 09-20 at
 his request** - leader-only roster, never launched. `moneyMaker`'s leader not relaunched since 09-19.)*
 
-**A - FIRST: `review/REVIEW-13.md`.** Revue #13 **LANCÉE 2026-09-20 ~04:05Z** (opus-5, effort haut, fenêtre à part)
-contre `7d3e2a2..HEAD`; brief = `BRIEF-adversarial-13.md`. Elle ferme sa propre fenêtre et sonne le bus — **sa
-sonnette attend dans l'inbox**. 🔴 **Si le fichier n'est pas là, la session est morte avant d'écrire : vérifie
-`comm who` et le ledger AVANT de supposer qu'elle a tourné.** Un rouge ⇒ fix, bras, mutation, `.2`, réinstaller les
-**SIX** arbres (lucia est nouveau). Les deux angles où je me savais faible, et qu'elle doit trancher : ai-je RÉPARÉ
-les bacs de `handoff/restart --prove-red` ou FAIT TAIRE neuf bras ; et d'autres bras ont-ils la forme « mutation
-masquée par une garde frère » que j'ai trouvée sur D2.
+**A - FIRST, et c'est un ROUGE À MOI, déjà livré dans les six arbres : `review/REVIEW-13.md` §1.**
+🔴 **`witnessStart()` n'interroge JAMAIS le témoin quand `/proc` répond** (`session-registry.mjs:211` rend sur le
+seul `cwd`, `sid` non consulté). Donc la forme de sonde que ce dépôt pratique RÉELLEMENT — un stub déclenché à la
+main **depuis son propre projet** — écrit encore un start fantôme, stderr **vide**. Mesuré : 1 record, `session_id`
+ne correspondant à rien. **Et A77 affirme exactement ce tir comme son CONTRÔLE POSITIF** — 8ᵉ instance de
+l'amendement du 2026-09-04, 4ᵉ passe d'affilée à trouver son pire point dans le patch de la précédente.
+🔴 **Le `CHANGELOG` de `2026-09-20.1` dit le contraire aux six arbres** dans sa première phrase (*« compté que s'il
+est TÉMOIGNÉ »*) : c'est faux sur la branche `/proc`. **Corriger le texte fait partie du correctif, pas après.**
+Le fantôme détaché, lui, est bien mort (prouvé 3 fois) et l'audit ▶ C est FAIT : 167 starts sur six arbres,
+4 non appariés, **0 daté ≥ 2026-09-19**. Trois 🟡 et quatre 🟢 restants dans le rapport — lis-le, il est mesuré.
+⚠️ **La clôture de 09-20 a été prononcée AVANT que ce rapport soit lu** : la sonnette était dans l'inbox du leader
+et `--close` ne la voit pas (la boucle `field:` exclut ROOT par conception). **Une clôture aveugle à sa propre
+sonnette** — à traiter avec E, même forme : une ligne qui ne mesure pas ce qu'elle promet.
 
 **A2 - la moitié de `review/REVIEW-12b.md` NON disposée.** Son ROUGE est corrigé, armé, publié : `2026-09-20.1`
 (print `202409de44fc`), `--check`-vert dans les **six** arbres. 🔴 **`FINDINGS.md#review12b` liste les sept points
