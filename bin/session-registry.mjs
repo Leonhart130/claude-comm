@@ -47,7 +47,7 @@
  *    this replaces. That answer is plausible, in range, and wrong - strictly worse than
  *    no answer, because a loop cannot tell it from a good one. Refusal it can.
  */
-import { readFileSync, writeFileSync, mkdirSync, readdirSync, unlinkSync, renameSync, statSync } from "node:fs"
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, unlinkSync, renameSync, statSync, readlinkSync } from "node:fs"
 import { join, basename } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -160,6 +160,90 @@ export function sessionPid(from = process.pid) {
 		pid = ppidOf(pid)
 	}
 	return 0
+}
+
+/**
+ * THE SECOND WITNESS - is this START a session of THIS project's?
+ *
+ * `sessionPid()` above returns 0 for "no `claude` ancestor". That is the honest answer for
+ * two situations that have nothing to do with each other: a real session whose walk cannot
+ * be done (off Linux, another argv0), and NO SESSION AT ALL - a probe, a test, cron, a CI
+ * runner, `systemd-run`. Both readings of that 0 have now been shipped and both were wrong,
+ * because each was a GUESS about which situation it was:
+ *
+ *   review #12 E1   read 0 as FOREIGN  -> dropped real starts
+ *   its disposition read 0 as CANNOT TELL and RECORDED
+ *                   -> review #12b measured the cost: a stub fired with no `claude`
+ *                      ancestor writes a PHANTOM cold start into the ledger of any tree,
+ *                      byte-shaped like a real one, with nothing marking it unwitnessed.
+ *
+ * The ledger is THE reboot instrument and its verdict stays UNKNOWN until ten starts per
+ * arm, so a phantom is not noise - it is a fabricated data point in the only experiment
+ * this repo runs. Guessing harder is not the fix; asking a second witness is.
+ *
+ * The runtime keeps one: `~/.claude/sessions/<pid>.json`, one file per live session,
+ * carrying its `sessionId` and its `cwd`. MEASURED 2026-09-20 against a real `claude -p`
+ * session in an isolated fixture: the file is already on disk AT SessionStart, already
+ * carries the session's CURRENT id (so a `/clear` re-mint is covered - it rewrites the id
+ * and files the old one under `formerNames`), and `kind` is "interactive" even for `-p`.
+ * So the payload's `session_id` can be MATCHED instead of guessed at:
+ *
+ *   matches a session file whose cwd is inside this project  ->  ours, record it
+ *   matches one running elsewhere                            ->  foreign, refuse
+ *   matches nothing                                          ->  there is no such
+ *                                                                session: a PHANTOM
+ *
+ * `process.env.HOME`, never `homedir()`: HOME is the seam an arm moves, and a control that
+ * reads the machine's real session registry is a control that inherits the world it
+ * measures (`FINDINGS.md#measurement-traps`).
+ *
+ * 🔴 THIS ANSWERS FOR THE LEDGER, NOT FOR THIS REGISTRY. The registry is keyed on /proc
+ * facts, so it may only ever record a session /proc itself resolved - a hand-fired stub
+ * carrying a real session id must not be able to point a live pid's entry at a transcript
+ * from somewhere else, which is `FINDINGS.md#clear-blind` silently inverted. The caller
+ * keeps the two decisions apart; `by` says which witness answered.
+ *
+ * Returns { own, by: "proc" | "runtime" | "none", pid, why } - `why` is a whole clause,
+ * because it is printed to a human who has to decide what to do about it.
+ */
+export function witnessStart({ sid, root, pid = sessionPid() } = {}) {
+	const inside = (cwd) => !!cwd && !!root && (cwd === root || cwd.startsWith(root + "/"))
+	if (pid > 0) {
+		let cwd = null
+		try { cwd = readlinkSync(`/proc/${pid}/cwd`) } catch {}
+		if (cwd === null) return { own: false, by: "proc", pid,
+			why: `the session I resolved (pid ${pid}) has no readable cwd, so I cannot tell whether it runs inside ${root}` }
+		return { own: inside(cwd), by: "proc", pid,
+			why: inside(cwd) ? `pid ${pid} is a session running inside ${root}`
+				: `the session I resolved (pid ${pid}) is running in ${cwd}, not inside ${root}` }
+	}
+	if (!sid) return { own: false, by: "none", pid: 0,
+		why: `no 'claude' ancestor and the payload carried no session_id, so nothing witnesses this start` }
+	const home = process.env.HOME || ""
+	const dir = home ? join(home, ".claude", "sessions") : ""
+	// Form E: a scan that FAILED must not read like a scan that found nothing. The two
+	// refusals below say different things because they are different facts about the world.
+	let files = null, dirWhy = ""
+	try { files = readdirSync(dir).filter((f) => f.endsWith(".json")) }
+	catch (e) { dirWhy = (e && e.code) || (e && e.message) || String(e) }
+	if (files === null) return { own: false, by: "none", pid: 0,
+		why: `no 'claude' ancestor, and this runtime's session registry could not be read (${dir || "no HOME"}: ${dirWhy}), so nothing witnesses this start` }
+	// Form E again, one level down: a file that would not PARSE is skipped, so counting the
+	// files found would report them as "read" and a directory of corrupt entries would read
+	// exactly like a directory of honest misses.
+	let parsed = 0
+	for (const f of files) {
+		let j = null
+		try { j = JSON.parse(readFileSync(join(dir, f), "utf8")) } catch { continue }
+		parsed++
+		if (!j || j.sessionId !== sid) continue
+		const own = inside(j.cwd)
+		return { own, by: "runtime", pid: Number(j.pid) || 0,
+			why: own ? `no 'claude' ancestor, but this runtime's own session file witnesses session ${sid} running in ${j.cwd}`
+				: `session ${sid} is a real session of this runtime, running in ${j.cwd}, not inside ${root}` }
+	}
+	return { own: false, by: "none", pid: 0,
+		why: `no 'claude' ancestor, and no session of this runtime carries id ${sid} (${files.length} session file(s) found, ${parsed} readable): there is no such session, so this is a PHANTOM start` }
 }
 
 /** Read one entry, or null. Never throws - a corrupt entry is a miss, not a crash. */

@@ -382,24 +382,42 @@ try {
 	// never stdout: stdout carries the hook's JSON contract and one extra byte there
 	// breaks delivery. record() is called even with NO transcript_path, because its first
 	// act is to invalidate the entry this pid already had.
-	// Whether this start belongs to a session in THIS project: false only when that is KNOWN to be untrue, so
-	// the ledger below refuses a hand-fired stub (a probe, a test, another project's session) and still records
-	// when the registry cannot be asked. Measured 2026-09-19: a probe of a brand-new project's stub, fired from
-	// the claude-comm leader's session, wrote a phantom cold start into that project's ledger - the registry
-	// refused it, the ledger had no such test.
-	let ownStart = null
+	// TWO QUESTIONS, and they are deliberately not one. The REGISTRY is keyed on /proc facts, so it may
+	// only record a session /proc itself resolved: a hand-fired stub must never point a live pid's entry at
+	// a transcript from somewhere else (FINDINGS.md#clear-blind, inverted). The LEDGER asks something weaker
+	// - is this a real start in this project - and review #12b measured what GUESSING at it costs: with no
+	// \`claude\` ancestor (systemd-run, cron, a probe, a CI runner) the walk returns 0, review #12 E1's
+	// disposition read that as "cannot tell" and RECORDED, so every hand-fired stub wrote a PHANTOM cold
+	// start into the ledger of any tree - measured against the pre-fix build, and installed in all five.
+	// The ledger is the reboot instrument; a phantom is a fabricated data point in the only experiment here.
+	// So the ledger asks a WITNESS instead of guessing (\`witnessStart\`, beside sessionPid() where the
+	// identity rule lives): the payload's session_id against this runtime's own session files. No witness,
+	// no record. That KEEPS E1's real case - a genuine start whose ancestor walk cannot be done - because
+	// the witness answers for that one too, and it does so without letting a probe into this registry.
+	let ownStart = false
 	try {
 		const reg = join(binDir, "session-registry.mjs")
 		if (existsSync(reg)) {
 			const m = await import(pathToFileURL(reg).href)
 			const sp = m.sessionPid()
-			// 0 is "no claude ancestor found" (off Linux, another argv0): CANNOT TELL, so the ledger still records
-			// (review #12 E1). Only a found session running outside this project is known to be foreign.
-			ownStart = sp > 0 ? ownsSession(sp) : null
-			if (!ownsSession(sp)) throw new Error(\`the session I resolved (pid \${sp}) is not running inside \${projectRoot}; recording nothing\`)
-			const r = m.record({ pid: sp, transcript: tp, agent, source: p.source })
-			if (!r.ok) process.stderr.write(\`claude-comm: this session is NOT in the session registry (\${r.why}). \`
-				+ \`A context reading by pid will refuse for it\${r.invalidated ? "" : ", and a previous entry may still stand"}.\\n\`)
+			const sid = typeof p.session_id === "string" ? p.session_id : ""
+			// An installed registry older than this guard carries no witness. REFUSE rather than guess: guessing
+			// is the defect this replaces, and \`install --check\` is the thing that reports the staleness.
+			const w = typeof m.witnessStart === "function"
+				? m.witnessStart({ sid, root: projectRoot, pid: sp })
+				: { own: false, why: "this installed session-registry.mjs predates the ledger guard and carries no witnessStart" }
+			ownStart = w.own
+			if (ownsSession(sp)) {
+				const r = m.record({ pid: sp, transcript: tp, agent, source: p.source })
+				if (!r.ok) process.stderr.write(\`claude-comm: this session is NOT in the session registry (\${r.why}). \`
+					+ \`A context reading by pid will refuse for it\${r.invalidated ? "" : ", and a previous entry may still stand"}.\\n\`)
+			} else {
+				// Say BOTH outcomes. The line this replaces said "recording nothing" while the ledger was recording -
+				// the one place a reader could have caught the phantom told them the opposite (review #12b §1).
+				process.stderr.write(\`claude-comm: the session registry was NOT updated - \${w.why}. This start \${ownStart
+					? "IS counted by the ledger: the runtime's own session file witnesses it"
+					: "is NOT counted by the ledger either"}.\\n\`)
+			}
 		} else {
 			process.stderr.write("claude-comm: session-registry.mjs is not installed beside the bus, so this session could not be recorded AND ANY PREVIOUS ENTRY FOR THIS PID STILL STANDS - a context reading by pid may answer for a session that has ended.\\n")
 		}
