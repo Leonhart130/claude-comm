@@ -5,23 +5,24 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(Closed 2026-09-27, second session. Field = atlas; `work` dormant by the owner's word (`FIELDS.json`); `lyra`
-leader-only, never launched; `orion`'s leader not relaunched since 09-19. **`2026-09-27.6` is in all six trees**,
-`--check` in sync. The owner, 09-27: *"tu peux faire tout ce que t'as à faire … review adversarielle tu peux lancer"* -
-and he was at 84 % of his WEEKLY usage the night before: a reviewer is Opus xhigh, price it.)*
+*(2026-09-27, second session, late. Field = atlas; `work` dormant by the owner's word (`FIELDS.json`); `lyra`
+leader-only, never launched; `orion`'s leader not relaunched since 09-19; **`cobalt` installed 09-27, leader-only** (its
+leader adds its own experts with `--add-agent`). **`2026-09-27.9` is in all seven trees**, `--check` in sync. The owner:
+*"tu peux faire tout ce que t'as à faire … review adversarielle tu peux lancer"*; a reviewer is Opus xhigh, price it.)*
 
-**A0 - the public repo is being REBUILT (owner, 09-27)**: the field project is `atlas` in every tracked file, a home path
-is `~`, the history rewritten (`FINDINGS.md#leak-check`); `bin/leak-check.mjs` + git hooks + boot row `leak` stop it
-recurring - the words live in a local list outside every repo. **Never write the field's real name in a tracked file.**
-Also fixed: a ring the recipient already answered no longer silences the next (`#quiet-answered`, A84, `.6`).
+🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a
+codename here; the mapping is in no repo. The boot report prints the REAL directory names: **never copy a `field:` row
+into a tracked file as is.** `bin/leak-check.mjs` + four git hooks + boot row `leak` enforce it (`FINDINGS.md#leak-check`).
 
-**A - ✅ review #15 disposed** (`FINDINGS.md#review15`): 🔴 the ring `send` printed - and every hand-started expert's
-turn end - skipped the LEADER (wake keyed "own" on the root's name); now it skips the caller's SESSION, A82. Six 🟡
-fixed and armed: the `mail` row's roster-less mail and three unpinned rules (each mutated through the real arm),
-`mutate.mjs` calling an abort a survivor and racing tree edits, six `.3`/`.4` mutants (A83), the NOTICE outside the
-print, four sentences wider than their measurements (`.5` corrects them). **Six passes in a row found their worst
-defect in the previous patch: review #16 on `.5` is due** - aim it at A82/A83, `wake`'s `sessionPid()` skip (a nested
-`claude`? a session whose Bash call runs a ring from another project?), `mutate.mjs`'s pre-copy, the `.5` CHANGELOG.
+**A0 - ✅ the public repo was deleted and rebuilt 09-27** from a history rewritten in three passes (205 commits; the
+scanner reads 0 over every object, 5 784 on the old history), MIT licence, verified from a fresh clone and the API.
+Reviews **#16** (the push read only the tip) and **#17** (it read commits, not objects) disposed - `#review16`,
+`#review17`. **Eight passes in a row found their worst defect in the previous patch: review #18 is due on
+`leak-check` v3** - `rev-list --objects` and every tree name, `--hooks-check`, the clean mark, A85 (now ~30 cases).
+Also fixed on the way: a ring the recipient already answered no longer silences the next (`#quiet-answered`, A84).
+
+**A - ✅ review #15 disposed** (`FINDINGS.md#review15`): the ring skipped the LEADER for undeclared callers (A82), six
+🟡 fixed and armed. Its named residues are in `#review15`.
 
 **A2 - ✅ the close reads its OWN inbox** (row `mail`, `#own-mail`). **A2b - ✅ `send` names BUSY / IDLE / WAITING / CANNOT
 SAY** (`#idle-send`). **A3 - ✅ skill audited** (`.4`, `.5`); sourcing it found the installer deleting a person's hook
