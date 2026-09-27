@@ -21,6 +21,14 @@ only the FIELD's inboxes (`.filter((p) => resolve(p) !== ROOT)`, section 5). Fix
 mail that `--close` must see green or named; arm it in `boot --prove-red`. ~35 min, 12 of them the control (`--only`
 cuts output, not work) - deferred 09-27 on the owner's 30-minute line.
 
+**A3 - audit the `claude-comm` SKILL (owner, 09-27: "vérifier s'il est toujours à jour").** Byte-current: all six
+trees `--check` in sync, and A75 reddens on an edited skill. CONTENT is not: measured 09-27, it never says **do not
+run `.claude/comm-hook.mjs` by hand in a real tree** (it drains the agent's mail, rewrites the session's registry
+entry, and can write the ledger - `#review13`, `#review14`), nor that **a hook a leader puts in `settings.local.json`
+runs in every expert** (measured 09-27, atlas's letter). Read it whole against `FINDINGS.md` since 09-19; every
+claim it makes gets a source or goes. Then the sibling `leader-expert` METHOD skill, read-only: flag what 09-27
+contradicts, to its owner. A skill change is an install: `--check` drift until released.
+
 **B - the registry half of #13 §1, MEASURED 09-27 by A31 going red on my own end-to-end probe**: a hand-fire from
 inside a session in the project rewrites that session's registry entry. Design in `FINDINGS.md#review13` "Named, not
 fixed" - gate `record()` AND `refresh()` on the witness. Touches `Stop`, the hottest path: own change, own arm,
