@@ -6,7 +6,7 @@ fold the settled parts into the README.
 ## ▶ NEXT
 
 *(Closed 2026-09-27. Field = atlas; `work` dormant by the owner's word (`FIELDS.json`); `lyra` leader-only, never
-launched; `orion`'s leader not relaunched since 09-19. **`2026-09-27.3` is in all six trees**, `--check` in sync.
+launched; `orion`'s leader not relaunched since 09-19. **`2026-09-27.4` is in all six trees**, `--check` in sync.
 🔴 **The owner was at 84 % of his WEEKLY usage limit on 09-27** (seen in the reviewer's pane) - price every model
 call, every reviewer, every `selftest` against that.)*
 
@@ -16,23 +16,19 @@ the ARMS or the PROSE; eleven mutants now each redden their own row, one named s
 now carries the mutation claims of two dispositions) and at the `.2` CHANGELOG, which is the third release note in a
 row a reviewer had to correct.
 
-**A2 - the close is blind to its OWN inbox** (09-20's failure: closed before reading #13's report). `boot.mjs` walks
-only the FIELD's inboxes (`.filter((p) => resolve(p) !== ROOT)`, section 5). Fix: a row for the session's own pending
-mail that `--close` must see green or named; arm it in `boot --prove-red`. ~35 min, 12 of them the control (`--only`
-cuts output, not work) - deferred 09-27 on the owner's 30-minute line.
+**A2 - ✅ the close reads its OWN inbox**: boot row `mail` (section 1e), subject `cfg.leader` - `own-unread` gates and the
+close names it; this tree's stranded mail follows `#peer-state`. Armed in `boot --prove-red`, 0 red (`FINDINGS.md#own-mail`).
 
 **A2b - ✅ `send` names BUSY / IDLE / CANNOT SAY** from the runtime's own record, pid-reuse guarded (`FINDINGS.md#idle-send`,
 A79, 4 mutants each red on its own clause; released `2026-09-27.3`). Cause MEASURED in their logs: their leader polled
 INSIDE its turn, so no turn ended and the doorbell never tried - my 09-27 letter's wording was wrong, corrected in the
 publication letter. Open: `who` still prints only `running` (item 5); `shell` seen once; no real send to a real idle session.
 
-**A3 - audit the `claude-comm` SKILL (owner, 09-27: "vérifier s'il est toujours à jour").** Byte-current: all six
-trees `--check` in sync, and A75 reddens on an edited skill. CONTENT is not: measured 09-27, it never says **do not
-run `.claude/comm-hook.mjs` by hand in a real tree** (it drains the agent's mail, rewrites the session's registry
-entry, and can write the ledger - `#review13`, `#review14`), nor that **a hook a leader puts in `settings.local.json`
-runs in every expert** (measured 09-27, atlas's letter). Read it whole against `FINDINGS.md` since 09-19; every
-claim it makes gets a source or goes. Then the sibling `leader-expert` METHOD skill, read-only: flag what 09-27
-contradicts to **atlas's leader, who maintains it** - the owner wants us working together. A skill change is an install: `--check` drift until released.
+**A3 - ✅ skill audited, `.4`**: every command it cites checked against the code; three measured facts added (the bell
+tries only at a turn END - never wait inside your turn; a leader's `settings.local.json` hook runs in experts; never
+hand-run `comm-hook.mjs`). Sourcing one sentence found 🔴 **the installer deleted a person's hook sitting in our group**,
+and the print could not release a skill change - both fixed, A80/A81 (`#hook-merge`). `leader-expert` read (grep, not
+whole): nothing contradicted, one suggestion sent to atlas's leader.
 
 **B - the registry half of #13 §1, MEASURED 09-27 by A31 going red on my own end-to-end probe**: a hand-fire from
 inside a session in the project rewrites that session's registry entry. Design in `FINDINGS.md#review13` "Named, not

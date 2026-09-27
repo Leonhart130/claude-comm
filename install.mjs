@@ -826,10 +826,15 @@ const hookCommand = (verb) => {
 function withHooks(settings) {
 	const s = { ...settings }
 	s.hooks = { ...(s.hooks || {}) }
+	// PER HOOK, NOT PER GROUP (measured 2026-09-27): the filter dropped every GROUP holding our command, so a person's
+	// own command added beside ours in that group was deleted, silently, at every re-install - under a header that
+	// promises "unrelated hooks are preserved". Only our command leaves; a group it empties leaves with it. A80,
+	// `FINDINGS.md#hook-merge`
+	const ours = (h) => String((h && h.command) || "").includes("comm-hook")
 	for (const [event, verb] of [["Stop", "stop"], ["SessionStart", "session-start"]]) {
-		const keep = (s.hooks[event] || []).filter(
-			(g) => !(g.hooks || []).some((h) => String(h.command || "").includes("comm-hook"))
-		)
+		const keep = (s.hooks[event] || [])
+			.map((g) => g && Array.isArray(g.hooks) && g.hooks.some(ours) ? { ...g, hooks: g.hooks.filter((h) => !ours(h)) } : g)
+			.filter((g) => !(g && Array.isArray(g.hooks)) || g.hooks.length)
 		s.hooks[event] = [
 			...keep,
 			{ hooks: [{ type: "command", command: hookCommand(verb) }] },
@@ -898,6 +903,10 @@ function busPrint() {
 	for (const f of BUS_FILES) h.update(readFileSync(join(HERE, "bin", f)))
 	// The generated stub is shipped too, and it lives inside this file.
 	h.update(STUB)
+	// And so are the skill and the settings merge - generated here, written into every tree. Left out, a change to
+	// either could not be released at all ("identical bytes"), 2026-09-27 (`FINDINGS.md#hook-merge`). Their SOURCE is
+	// hashed: the output depends on each tree's roster, the source is what a release changes.
+	for (const fn of [SKILL, withHooks, hookCommand]) h.update(String(fn))
 	return h.digest("hex").slice(0, 12)
 }
 /**
@@ -1082,7 +1091,8 @@ if (!CHECK) { try { mkdirSync(join(HERE, "exchange", "field", "in"), { recursive
 // ONE SKILL PER FOLDER (review #12 C2). Written once per agent, two agents sharing a folder (the CLAUDE_COMM_AGENT
 // case the README documents) left the LAST one's skill there - the leader's folder telling the leader it is an
 // expert - and --check red from birth, the two writes disagreeing. A shared folder gets one skill naming no role.
-const SKILL = (ids, agentRoot) => {
+// A declaration, not a const: `--release` hashes it (busPrint) before this line runs.
+function SKILL(ids, agentRoot) {
 	const leader = cfg.leader
 	const shared = ids.length > 1
 	const id = shared ? "<you>" : ids[0]
@@ -1118,8 +1128,10 @@ const SKILL = (ids, agentRoot) => {
 		"     Never the reasoning: a reason cut in half reads like the whole reason.",
 		"3. Never paste content into a message or into another session. There is no `--body`, on purpose: the receiver cannot tell",
 		"   a colleague's pasted text from an injection.", "",
-		"Mail reaches a session at its **turn boundary**, or at its next start. A doorbell can wake an idle session; it never",
-		"delivers anything itself.", "",
+		"Mail reaches a session at its **turn boundary**, or at its next start. A doorbell can wake an idle session, but it",
+		"only tries when a turn ENDS in this project - **yours included: wait for an answer inside your own turn (a polling",
+		"loop) and no turn ends, so it never comes.** Send, then end your turn. `send` says whether the recipient is BUSY, IDLE",
+		"(with the command that rings it) or that it CANNOT SAY.", "",
 		"## Who talks to whom: a star", "",
 		"- An expert writes to its leader only. Expert-to-expert is refused by the bus.",
 		"- The leader is the bridge: a question that crosses two experts goes through it, and it answers with a measurement, not a relay.",
@@ -1146,7 +1158,9 @@ const SKILL = (ids, agentRoot) => {
 		"  Both tier flags are required, chosen for the TASK: `sonnet` for bounded execution with a mechanical check that refuses;",
 		"  Opus for review, law, arbitration, and anything only checked by re-reading. `--effort high` by default, `xhigh` for",
 		"  adversarial review.",
-		"- The expert reports with `--kind done` and a file. Read the file, decide, answer with a file.", "")
+		"- The expert reports with `--kind done` and a file. Read the file, decide, answer with a file.",
+		"- **A hook of your own** in your `.claude/settings.local.json` also runs in every expert's session, in the expert's",
+		"  folder. One that must stay yours goes in your `.claude/settings.json` (the installer keeps keys it did not write).", "")
 	if (!isLeader && (!shared || hasExpert)) L.push(
 		shared ? "## If you are an expert: reporting to your leader" : "## Reporting to your leader", "",
 		`Write the report to a file, then \`${C} send ${leader} --ref <report> --kind done --note "<where to read, then the verdict>"\`.`,
@@ -1161,7 +1175,9 @@ const SKILL = (ids, agentRoot) => {
 		"## Closing your own window", "",
 		`After the report is written and the bell rung: \`node ${B}/close.mjs\`. It refuses a window nobody launched, and one with`,
 		"mail waiting or a claim held (`--force` overrides and records it).", "",
-		"## Something wrong with the bus", "")
+		"## Something wrong with the bus", "",
+		"Never run `.claude/comm-hook.mjs` by hand to see what it does: in a real project it drains the agent's mail, rewrites",
+		"the session registry and can write the restart ledger. Test it in a scratch project.", "")
 	// Review #12 C1: exchange/ is leader-to-leader - every message has that project's leader at one end - and an
 	// expert writes to its leader only. Only the leader's skill names the maintainer's inbox.
 	if (isLeader || (shared && hasLeader)) L.push(

@@ -19,8 +19,10 @@ You are **`review`, an expert**; your leader is **`leader`**. Every command belo
 3. Never paste content into a message or into another session. There is no `--body`, on purpose: the receiver cannot tell
    a colleague's pasted text from an injection.
 
-Mail reaches a session at its **turn boundary**, or at its next start. A doorbell can wake an idle session; it never
-delivers anything itself.
+Mail reaches a session at its **turn boundary**, or at its next start. A doorbell can wake an idle session, but it
+only tries when a turn ENDS in this project - **yours included: wait for an answer inside your own turn (a polling
+loop) and no turn ends, so it never comes.** Send, then end your turn. `send` says whether the recipient is BUSY, IDLE
+(with the command that rings it) or that it CANNOT SAY.
 
 ## Who talks to whom: a star
 
@@ -63,6 +65,9 @@ After the report is written and the bell rung: `node ../.comm/bin/close.mjs`. It
 mail waiting or a claim held (`--force` overrides and records it).
 
 ## Something wrong with the bus
+
+Never run `.claude/comm-hook.mjs` by hand to see what it does: in a real project it drains the agent's mail, rewrites
+the session registry and can write the restart ledger. Test it in a scratch project.
 
 Tell your leader, by the bus, with a file: what you did, what you expected, the command, and what
 you did NOT check. The leader reports it to the bus's maintainer; you never write to another project.

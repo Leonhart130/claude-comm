@@ -700,6 +700,55 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 		[`behind:${!behind.length ? "refused" : list.length > 60 ? `${behind.length}#${causeSig(list)}` : list}`])
 }
 
+// -- 1e. this repo's OWN mail --------------------------------------------------
+// 2026-09-20 the close passed with review #13's report in MY inbox: the Stop hook drained it after the close and
+// STATUS.md was its only carrier for a week (`FINDINGS.md#own-mail`). The `field:` loop excludes ROOT, so no row read
+// this tree's inboxes at all - LESSONS form A a fourth time, after claims, the bus and the notes above.
+// The subject is the tree's LEADER, not "this session": the close is the leader's act, and askBus resolves through
+// the live session's cwd, so a row keyed on it would measure whoever runs the control. Mail for another agent here
+// follows the field's rule (`#peer-state`): waiting for a relaunch its sender was TOLD of is shown; otherwise it
+// gates. Silent when every inbox is empty; an inbox that cannot be read says so (form E).
+{
+	const ibx = join(ROOT, ".comm", "inbox")
+	let leader = "leader"
+	try { leader = JSON.parse(readFileSync(join(ROOT, ".comm", "config.json"), "utf8")).leader || leader } catch {}
+	let dirs = []
+	try { dirs = readdirSync(ibx) } catch (e) { if (e && e.code !== "ENOENT") dirs = null }
+	const box = new Map(), bad = []
+	for (const a of dirs || []) {
+		let files = []
+		try { files = readdirSync(join(ibx, a)).filter((f) => f.endsWith(".json")).sort() } catch (e) { if (!e || e.code !== "ENOTDIR") bad.push(a); continue }
+		for (const f of files) {
+			try { const m = JSON.parse(readFileSync(join(ibx, a, f), "utf8")); (box.get(a) || box.set(a, []).get(a)).push(m) } catch { bad.push(`${a}/${f}`) }
+		}
+	}
+	const mine = box.get(leader) || [], others = [...box.entries()].filter(([a]) => a !== leader)
+	if (dirs === null || bad.length) row("mail", WARN, `${dirs === null ? ibx : bad.join(", ")} could not be read - mail for this tree may be there`, ["unreadable"])
+	else if (mine.length || others.length) {
+		let live = null
+		if (others.length) {
+			try { live = JSON.parse(spawnSync(process.execPath, [join(ROOT, "bin", "comm.mjs"), "who", "--json"], { cwd: ROOT, encoding: "utf8", timeout: 5000 }).stdout).agents || null } catch {}
+		}
+		const running = (a) => live && ((live[a] && live[a].pids) || []).length > 0
+		const untold = live ? others.filter(([a, ms]) => !running(a) && ms.some((m) => m.to_state !== "not-running")).map(([a]) => a) : []
+		const parts = [], causes = []
+		if (mine.length) {
+			parts.push(`⚠ ${mine.length} for ${leader}, UNREAD: ${mine.slice(0, 2).map((m) => `${m.from} [${m.kind}] ${String(m.ts).slice(0, 16)} ref: ${m.refPath || m.ref}`).join("; ")}${mine.length > 2 ? "; …" : ""}` +
+				` - read before closing: node .comm/bin/comm.mjs inbox, then comm dismiss ${leader} --id <id> for each one acted on`)
+			causes.push("own-unread")
+		}
+		if (others.length && !live) { parts.push(`mail for ${others.map(([a, ms]) => `${a} (${ms.length})`).join(", ")} and the bus could not say who is running`); causes.push("unasked") }
+		for (const [a, ms] of others) {
+			if (!live) break
+			parts.push(running(a) ? `${a} (${ms.length}) in flight to a running agent`
+				: untold.includes(a) ? `⚠ ${a} (${ms.length}) NOT RUNNING and its sender was not told it would wait for a relaunch`
+				: `◦ ${a} (${ms.length}) waits for a relaunch - its sender was told`)
+		}
+		if (untold.length) causes.push(`stranded-untold:${untold.join(",")}`)
+		row("mail", causes.length ? WARN : OK, parts.join(" - "), causes.length ? causes : null)
+	}
+}
+
 // -- 2. the tree: what git says, not what a document says --------------------
 {
 	const head = git("log", "-1", "--format=%h %ct %s")
@@ -2451,6 +2500,36 @@ function proveRed() {
 		assert("claims: this tree's own gone-holder claim gates; a held one does not",
 			held.level === OK && /1 held: port:4999/.test(held.text) && gone.level === WARN && /HOLDER IS GONE/.test(gone.text) && none.level === -1,
 			`holder alive -> ${LV[held.level]}; start tick moved -> ${LV[gone.level]} (want ok, then warn); no claims at all -> ${LV[none.level]} (want absent)`)
+	}
+	// THIS TREE'S OWN MAIL (`FINDINGS.md#own-mail`: 09-20's close passed with review #13's report in the leader's
+	// inbox). One message moved between cases, the detector untouched: for the LEADER it gates AND the close names
+	// it; for a stopped agent it gates unless its sender was told; a corrupt one says unreadable. Empty inboxes are
+	// the control - no row - and the close run beside it must not name `mail`.
+	{
+		const cfgP = join(pkg, ".comm", "config.json"), cfg0 = readFileSync(cfgP, "utf8"), ib = join(pkg, ".comm", "inbox")
+		writeFileSync(cfgP, JSON.stringify({ leader: "leader", agents: { leader: ".", review: "review" } }, null, 2) + "\n")
+		const reset = () => { rmSync(ib, { recursive: true, force: true }); for (const a of ["leader", "review"]) mkdirSync(join(ib, a), { recursive: true }) }
+		const put = (agent, to_state, body) => writeFileSync(join(ib, agent, "2026-09-20T00-00-00-000Z-aaaaaa.json"), body ?? JSON.stringify({
+			id: "2026-09-20T00-00-00-000Z-aaaaaa", from: "review", to: agent, kind: "done", ref: "REVIEW-13.md", refPath: "review/REVIEW-13.md", ts: "2026-09-20T00:00:00.000Z", to_state }))
+		const closeRun = () => spawnSync(process.execPath, [SELFFILE, "--close", "--root", pkg, "--field", tmp], { encoding: "utf8" })
+		reset(); const empty = rowOf(run(true), "mail"), closeEmpty = closeRun()
+		put("leader", "running"); const mine = rowOf(run(true), "mail"), closeMine = closeRun()
+		reset(); put("review", "not-running"); const told = rowOf(run(true), "mail")
+		reset(); put("review", "running"); const untold = rowOf(run(true), "mail")
+		reset(); put("leader", null, "{"); const corrupt = rowOf(run(true), "mail")
+		rmSync(ib, { recursive: true, force: true }); writeFileSync(cfgP, cfg0)
+		const named = (r) => /--ack mail=/.test(r.stdout || "")
+		assert("mail: the leader's unread mail gates and the close names it; a stranded message gates unless its sender was told",
+			empty.level === -1 && !named(closeEmpty) &&
+			mine.level === WARN && /1 for leader, UNREAD: review \[done\].*REVIEW-13\.md/.test(mine.text) && (mine.causes || []).includes("own-unread") &&
+			closeMine.status === 1 && named(closeMine) &&
+			told.level === OK && /waits for a relaunch - its sender was told/.test(told.text) &&
+			untold.level === WARN && (untold.causes || []).includes("stranded-untold:review") &&
+			corrupt.level === WARN && /could not be read/.test(corrupt.text),
+			`empty inboxes -> ${LV[empty.level]} (want absent), close names mail=${named(closeEmpty)} (want false); ` +
+			`one message for the leader -> ${LV[mine.level]} ${JSON.stringify(mine.causes || [])}, close exit ${closeMine.status} names mail=${named(closeMine)}; ` +
+			`for a stopped reviewer, sender told -> ${LV[told.level]}; not told -> ${LV[untold.level]} ${JSON.stringify(untold.causes || [])}; ` +
+			`corrupt -> ${LV[corrupt.level]}`)
 	}
 	// THIS REPO'S OWN INSTALLED BUS AGAINST ITS OWN CODE (review #11b S2; LESSONS form A: this tree
 	// ran 09-11.7 while the field ran .8, unseen). Installed into a COPY of the fixture root - the

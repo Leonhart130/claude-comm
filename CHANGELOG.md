@@ -16,31 +16,17 @@ node <path-to-claude-comm>/install.mjs <your project> --check    # what version 
 Your project records what it has in `.comm/INSTALLED.json`. An update prints only the entries you did not
 already have.
 
+## 2026-09-27.4 — bus print `588802c0c566` — 2026-09-27
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+- 🔴 **A re-install no longer deletes a hook of yours that sits in the same group as the bus's.** The installer
+  removed every `.claude/settings.json` hook GROUP containing `comm-hook`, so a command you had added inside that group
+  (next to ours) vanished at each update, silently. Now only the bus's own command is replaced. A hook in a group of
+  its own was never affected. If you ever added one beside ours, it is gone - check that your hooks are all there.
+- **The `claude-comm` skill says three more things** (`.claude/skills/claude-comm/SKILL.md`, rewritten by this update):
+  the doorbell only tries when a turn ENDS in your project, yours included - so send, then end your turn, never wait
+  for an answer inside it; a leader's own hook in `.claude/settings.local.json` also runs in every expert's session
+  (keep it in `.claude/settings.json` if it must stay the leader's); never run `.claude/comm-hook.mjs` by hand in a
+  real project - it drains the agent's mail and rewrites the session registry.
 
 ## 2026-09-27.3 — bus print `2364c8cfab65` — 2026-09-27
 

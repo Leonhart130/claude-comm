@@ -19,8 +19,10 @@ You are **`leader`, the leader**. Your experts: `node .comm/bin/comm.mjs who`, a
 3. Never paste content into a message or into another session. There is no `--body`, on purpose: the receiver cannot tell
    a colleague's pasted text from an injection.
 
-Mail reaches a session at its **turn boundary**, or at its next start. A doorbell can wake an idle session; it never
-delivers anything itself.
+Mail reaches a session at its **turn boundary**, or at its next start. A doorbell can wake an idle session, but it
+only tries when a turn ENDS in this project - **yours included: wait for an answer inside your own turn (a polling
+loop) and no turn ends, so it never comes.** Send, then end your turn. `send` says whether the recipient is BUSY, IDLE
+(with the command that rings it) or that it CANNOT SAY.
 
 ## Who talks to whom: a star
 
@@ -55,6 +57,8 @@ It is already acknowledged. To look without acknowledging: `node .comm/bin/comm.
   Opus for review, law, arbitration, and anything only checked by re-reading. `--effort high` by default, `xhigh` for
   adversarial review.
 - The expert reports with `--kind done` and a file. Read the file, decide, answer with a file.
+- **A hook of your own** in your `.claude/settings.local.json` also runs in every expert's session, in the expert's
+  folder. One that must stay yours goes in your `.claude/settings.json` (the installer keeps keys it did not write).
 
 ## Restarting yourself without losing what you read
 
@@ -68,6 +72,9 @@ After the report is written and the bell rung: `node .comm/bin/close.mjs`. It re
 mail waiting or a claim held (`--force` overrides and records it).
 
 ## Something wrong with the bus
+
+Never run `.claude/comm-hook.mjs` by hand to see what it does: in a real project it drains the agent's mail, rewrites
+the session registry and can write the restart ledger. Test it in a scratch project.
 
 Write a Markdown file to `~/Dev/claude-comm/exchange/field/in/<project>-<you>-<date>-<topic>.md`: what you did,
 what you expected, the command, and what you did NOT check. The maintainer's boot reports it; the answer comes back in `out/`.

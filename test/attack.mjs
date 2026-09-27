@@ -5021,4 +5021,57 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		(idleOk && busyOk && reusedOk && noneOk && undatedOk ? "" : ` · ${JSON.stringify(res).slice(0, 600)}`))
 }
 
+// A80 — A RE-INSTALL KEEPS A PERSON'S OWN HOOK, even one added beside ours in the same group (`FINDINGS.md#hook-merge`).
+// Measured 2026-09-27: the installer dropped every GROUP holding `comm-hook`, so `echo MINE` pushed into that group
+// vanished at the next install while the header promised "unrelated hooks are preserved". ONE VARIABLE between the two
+// planted hooks: the group they sit in. The own-group one is the positive control (it survived the old code too); the
+// second and third installs must change nothing (`--check` in sync) and our command must appear exactly once per event.
+{
+	const r80 = mkdtempSync(join(tmpdir(), "comm-attack-hooks-"))
+	mkdirSync(join(r80, ".comm"), { recursive: true })
+	writeFileSync(join(r80, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: "." } }))
+	const inst = () => execFileSync("node", [join(PKG, "install.mjs"), r80], { stdio: "pipe" })
+	inst()
+	const sp80 = join(r80, ".claude", "settings.json")
+	const s80 = JSON.parse(readFileSync(sp80, "utf8"))
+	s80.hooks.Stop[0].hooks.push({ type: "command", command: "echo MINE-SAME-GROUP" })
+	s80.hooks.Stop.push({ hooks: [{ type: "command", command: "echo MINE-OWN-GROUP" }] })
+	writeFileSync(sp80, JSON.stringify(s80, null, 2))
+	inst(); const once = readFileSync(sp80, "utf8")
+	inst(); const twice = readFileSync(sp80, "utf8")
+	const chk80 = spawnSync("node", [join(PKG, "install.mjs"), r80, "--check"], { encoding: "utf8" })
+	rmSync(r80, { recursive: true, force: true })
+	const n = (re) => (once.match(re) || []).length
+	let ours80 = {}
+	try { const j = JSON.parse(once); for (const ev of ["Stop", "SessionStart"]) ours80[ev] = (j.hooks[ev] || []).flatMap((g) => g.hooks || []).filter((h) => /comm-hook/.test(h.command)).length } catch {}
+	check("A80 a re-install keeps a person's own hook, even one beside ours in the same group",
+		n(/MINE-SAME-GROUP/g) === 1 && n(/MINE-OWN-GROUP/g) === 1 && ours80.Stop === 1 && ours80.SessionStart === 1 && once === twice && chk80.status === 0,
+		`hook in OUR group kept=${n(/MINE-SAME-GROUP/g)} (want 1; the old filter deleted it); positive control, hook in its own group kept=${n(/MINE-OWN-GROUP/g)}; ` +
+		`our command once per event=${JSON.stringify(ours80)}; a second install changes nothing=${once === twice}; --check in sync=${chk80.status === 0}`)
+}
+
+// A81 — A CHANGE TO WHAT THE INSTALLER GENERATES CAN BE RELEASED (`FINDINGS.md#hook-merge`). The print hashed the bus
+// files and the stub only, so a skill or settings-merge change was refused as "identical bytes" while it reached every
+// tree. The control is an untouched kit: `--release` must still refuse it. ONE VARIABLE per case: one sentence of the
+// SKILL template, one line inside withHooks().
+{
+	const kit81 = mkdtempSync(join(tmpdir(), "comm-attack-print-"))
+	const setup = () => {
+		rmSync(kit81, { recursive: true, force: true }); mkdirSync(kit81, { recursive: true })
+		cpSync(join(PKG, "install.mjs"), join(kit81, "install.mjs")); cpSync(join(PKG, "bin"), join(kit81, "bin"), { recursive: true })
+		writeFileSync(join(kit81, "CHANGELOG.md"), "# notes\n")
+		return spawnSync("node", [join(kit81, "install.mjs"), "--release", "base.1"], { encoding: "utf8" }).status
+	}
+	const rel = (label) => spawnSync("node", [join(kit81, "install.mjs"), "--release", label], { encoding: "utf8" })
+	const edit = (find, repl) => { const f = join(kit81, "install.mjs"), t = readFileSync(f, "utf8"); writeFileSync(f, t.replace(find, repl)); return t.split(find).length - 1 }
+	const base = setup(), untouched = rel("same.2")
+	setup(); const skillHit = edit("Send, then end your turn.", "Send, then END your turn."), skill = rel("skill.2")
+	setup(); const mergeHit = edit("const ours = (h) =>", "const ours = (h) => h && "), merge = rel("merge.2")
+	rmSync(kit81, { recursive: true, force: true })
+	check("A81 a change to the generated skill or settings merge can be released",
+		base === 0 && untouched.status !== 0 && /has not changed/.test(untouched.stderr) && skillHit === 1 && skill.status === 0 && mergeHit === 1 && merge.status === 0,
+		`control, untouched kit -> refused "has not changed"=${untouched.status !== 0 && /has not changed/.test(untouched.stderr)}; ` +
+		`one SKILL sentence edited (found ${skillHit}x) -> released=${skill.status === 0}; one withHooks line edited (found ${mergeHit}x) -> released=${merge.status === 0}`)
+}
+
 finish(null)
