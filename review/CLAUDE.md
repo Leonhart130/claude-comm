@@ -31,8 +31,8 @@ dernier rapport rendu : sa forme est la forme attendue.
 
 ⚠️ **Ne cours JAMAIS `boot.mjs --hook` contre un vrai arbre** — il écrit un démarrage dans le ledger de la
 racine qu'on lui donne et corrompt l'instrument de reboot.
-⚠️ **SIX arbres de terrain portent le bus, et le propriétaire TRAVAILLE EN CE MOMENT dans `~/Dev/atlas` et
-`~/Dev/lyra`** (2026-09-20). `~/Dev/work`, `~/Dev/vega`, `~/Dev/orion` aussi. **Lis, n'écris pas** —
+⚠️ **Les arbres de terrain sous `~/Dev` portent le bus** (les lignes `field:` du boot les nomment ; ce dépôt est public
+et ne les nomme pas), **et le propriétaire TRAVAILLE dans certains d'entre eux en ce moment.** **Lis, n'écris pas** —
 ni fichier, ni courrier, ni sonde qui déclenche un crochet : le `.claude/comm-hook.mjs` d'un arbre réel **vide la
 boîte de l'agent** (c'est lui qui livre), **réécrit l'entrée de registre de la session au-dessus de toi** si elle
 tourne dans ce projet, et **écrit dans SON ledger** dès que le `session_id` est celui d'une session vivante
