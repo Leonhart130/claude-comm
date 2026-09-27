@@ -2813,7 +2813,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 // diagnosable happened in a FIELD project, between two agents in one tree; a claim tool
 // that lives only in this repository would have been present at none of it. So this also
 // asserts the installer carries it, which is the "two lists that had to agree" trap
-// (`1a46a4f`) pointed at the file added today.
+// (`f0b227a`) pointed at the file added today.
 {
 	const t0 = Date.now()
 	const g = spawnSync("node", [join(PKG, "bin", "claim.mjs"), "--prove-red"], { encoding: "utf8" })
