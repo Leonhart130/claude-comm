@@ -3516,10 +3516,12 @@ the transcript's last call as the witness of "answered" on a real idle leader.
 ## `#leak-check` — a private project's name in a public repo, and what now stops it (2026-09-27)
 
 **What happened.** For three weeks this public repo named one of the owner's private projects - 105 lines in 15
-tracked files and 35 commit messages, plus a home path and the names of that project's experts - each one a measured
+tracked files and 35 lines of 30 commit messages, plus a home path and the names of that project's experts - each one a measured
 field note, written by me, none of them needed to make the note true. The project's leader counted them the day it
 mattered (a public link was about to go out) and the owner decided: the name goes, from the history too, and the
 GitHub repo is deleted and rebuilt from a rewritten history, so no old commit stays reachable there by its hash.
+**Then he made it a rule, 2026-09-27: no name of his personal projects in a public project - all of them, not the
+one that was noticed.** Every field project and sub-project named here now has a neutral codename.
 
 **In the rewrite:** the project is called `atlas` everywhere, its expert names are neutral, home paths are `~`, and the
 owner's own sentences quoted in those passages are paraphrased. Every rule and finding kept its meaning; commit hashes
@@ -3527,23 +3529,29 @@ cited in this file were remapped to the rewritten ones (the tip trees before and
 
 **What stops the next one** - `bin/leak-check.mjs`, one scanner, three places:
 - **git hooks** (`--install-hooks`, written where git RUNS them - a worktree's common dir, `core.hooksPath`):
-  `pre-commit` and `pre-merge-commit` scan what is staged, `commit-msg` the message, and `pre-push` both ref names, an
-  annotated tag's message and **every commit of the pushed range** - its raw object (author, message), every path and
-  every blob - so a word that a later commit removed, or that came in by a merge, a cherry-pick or a rebase, is still
-  stopped at the push.
-- **boot row `leak`**: the tracked tree and every commit on HEAD since the last clean scan (a mark in `.git/`, keyed on
-  the list's own content: a new word re-reads all history), and the four hooks in place; **no list, an invalid list,
-  a failed scan or a missing scanner each warn under their own name** - a check that could not run never reads as clean.
+  `pre-commit` and `pre-merge-commit` scan what is staged, `commit-msg` the message, and `pre-push` the remote ref's
+  name and **every OBJECT the push sends** (`rev-list --objects`): each commit and tag raw (author, message, a tag of a
+  tag), every name in every tree, every blob - so a word that a later commit removed, that came in by a merge, a
+  cherry-pick or a rebase, or that sits behind a tag pointing at a blob or a tree, is still stopped at the push.
+- **boot row `leak`**: the tracked tree and every object on HEAD since the last clean scan (a mark in `.git/`, keyed on
+  the list's own content: a new word re-reads all history; never written while a hit stands), and the four hooks
+  **byte for byte** against what `--install-hooks` writes now; **no list, an invalid list, a failed scan or a missing
+  scanner each warn under their own name** - a check that could not run never reads as clean.
 - **A85** runs the real hooks in a scratch repo with a synthetic word, one case per hole review #16 measured; the row is
   armed in `boot --prove-red` the same way, including a word in a commit the next one removed.
 
 **The words are never in the repo** - not in clear, and not hashed either: a seven-letter word falls to a brute force
 of its SHA-256 in minutes. The list is a local file outside every repo (`bin/leak-check.mjs` names where); a hit is
-reported by file, line and rule number, and **a path that matches is itself masked** - the matched text is never printed.
+reported by file, line and rule number, **a path that matches is itself masked**, and git's own error output is
+captured, never passed through (it prints paths and arguments in clear) - the matched text is never printed.
 
 **Not verified / not covered:** anything the list does not name - a new private word is only stopped once it is added
-there; a BINARY file's content (its name is read); Unicode look-alikes and invisible characters inside a word
-(measured passing, review #16 §7 - no plausible accident of an agent's, named). Outside this repo: GitHub's own caches,
+there (write its rules with LETTER bounds, `(?<![a-z])…(?![a-z])`: JavaScript's `\b` treats `_` and digits as letters,
+so a `snake_case` file name slips past a `\b` rule - review #17 §5); a BINARY file's content (its name is read; UTF-16
+text is decoded by its BOM); Unicode look-alikes and invisible characters inside a word (measured passing, no
+plausible accident). **Nothing here guards what leaves WITHOUT a `git push`**: `push --no-verify`, a bundle, an archive
+of `.git`, a patch - nor GitHub's non-git surfaces: the repo description and topics, release notes, issue and PR
+titles and bodies, the wiki. Outside this repo: GitHub's own caches,
 and third-party archives of the OLD public repo (Software Heritage archives public GitHub repos under their URL, and
 public event feeds may have kept commit messages) - the GitHub API reported 0 forks and 0 stars before the deletion.
 
@@ -3572,6 +3580,25 @@ from the public history (the bus files were rewritten in ~100 commits) - they st
 project names); `Claude-Session:` trailers (session URLs, private by default) were removed in the second pass;
 third-party archives of the old repo. **Told to its maintainer:** the method skill's own history carries the name in
 old blobs, and a public commit message of ours linked the two.
+
+## `#review17` — the push read commits, not objects; and every personal name goes (2026-09-27)
+
+`review/REVIEW-17.md`, on the twice-rewritten clone: **publishable against the list** (0 hits, 200 commits; 2 515 on the
+original history as the positive control), the second pass touched exactly #16's four residues and the 128 session
+trailers, and the second remap is right - checked against a map the reviewer composed independently. **One 🔴, five 🟡.**
+The eighth pass in a row whose worst finding sits in the previous patch.
+
+| § | defect (measured) | fix | arm |
+| --- | --- | --- | --- |
+| 🔴 1 | `pre-push` listed COMMITS (`rev-list`): a tag pointing at a blob, a tree or another tag sent its content, and the tool printed *"nothing matched"* after reading nothing | `rev-list --objects`: every commit, tag (the whole chain), tree and blob; a single tip that yields no object is an error; **every NAME in every tree is read** - rev-list gives one path per object, so a second file with the same content under a revealing name was never listed (found by the arm below, not by the review) | A85: tag->blob, raw blob, raw tree, tag->tag, a file NAME pushed past the local hooks |
+| 2 | git's stderr passed through the mask (`fatal: bad object <path>`); `FAILED` echoed git's arguments | stderr captured; `FAILED` names the mode and git's exit status only | A85: a gitlink named with the word, no output prints it |
+| 3 | the working repo still ran the OLD scanner and hooks, with the old refs and `origin` - one `push --tags` from publishing the old history; the boot row read a hook as "in place" if it merely contained the tool's name | rebuilt from the clean clone BEFORE the first push, hooks reinstalled; `--hooks-check` compares the four hooks byte for byte | the row, in prove-red |
+| 4 | nine mutants survived: the commit object unread, a path unmasked in the push report, the clean mark written despite a hit, the mark not keyed on the list, an invalid list's exit code and echo, a type change, `core.hooksPath` | - | A85 (message and name past the hooks, type change, `core.hooksPath`, an invalid rule holding the word); prove-red `leak` (the same dirty state at the next boot; a word ADDED to the list found only in an old commit) |
+| 5 | the list's `\b` rules miss `snake_case` names and plurals | the list's rules rewritten with letter bounds and plural forms (the list is outside the repo) | - |
+| 6 | the owner's other project names were still in the tree and history | **his rule: none of his personal project names in a public project** - a third rewrite pass gave each a codename | the scanner over all history, with every name in the list |
+
+**Named, not fixed:** UTF-8 look-alikes; the surfaces listed in `#leak-check`'s last paragraph; `--ref` reads only the
+remote name (the local one does not leave).
 
 ## `#review14` — the disposition of #13: no red, and "every rule reddens for itself" was false (2026-09-27)
 

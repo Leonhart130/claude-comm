@@ -5271,6 +5271,39 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	gO("reset", "-q", "--hard", "HEAD~1"); writeFileSync(join(other85, "o.md"), "fine\n"); gO("add", "o.md"); gO("commit", "-qm", "clean side")
 	gO("push", "-q", "-f", "origin", "HEAD:refs/heads/side2")
 	g85("fetch", "-q", "origin", "side2"); const mergedClean = rec(g85("merge", "--no-ff", "-m", "merge side2", "FETCH_HEAD"))
+	// Review #17 §1: objects that are NOT commits - a tag to a blob, a raw blob, a raw tree, a tag of a tag.
+	const blobSha = execFileSync("git", ["hash-object", "-w", "--stdin"], { cwd: repo85, env: env85, input: `${W} in a blob\n` }).toString().trim()
+	g85("tag", "-a", "blobtag", blobSha, "-m", "clean"); const pushBlobTag = rec(g85("push", "-q", "origin", "refs/tags/blobtag"))
+	const pushRawBlob = rec(g85("push", "-q", "origin", `${blobSha}:refs/tags/rawblob`))
+	const treeSha = execFileSync("git", ["mktree"], { cwd: repo85, env: env85, input: `100644 blob ${blobSha}\tf.txt\n` }).toString().trim()
+	const pushRawTree = rec(g85("push", "-q", "origin", `${treeSha}:refs/tags/rawtree`))
+	g85("tag", "-a", "inner", "-m", `notes ${W}`); g85("-c", "advice.nestedTag=false", "tag", "-a", "outer", "inner", "-m", "clean outer")
+	const pushNested = rec(g85("push", "-q", "origin", "refs/tags/outer"))
+	// §4 M1: the word only in a MESSAGE, past commit-msg by --no-verify - the push must read the commit object.
+	g85("commit", "-q", "--no-verify", "--allow-empty", "-m", `${W} in the message`); const pushMsg = rec(g85("push", "-q", "origin", "HEAD:main")); g85("reset", "-q", "--hard", "HEAD~1")
+	// §4 M2: a file NAMED after the word, past pre-commit - the push refuses it and its report must mask the path.
+	writeFileSync(join(repo85, `${W}.txt`), "fine\n"); g85("add", `${W}.txt`); g85("commit", "-q", "--no-verify", "-m", "a file")
+	const pushName = rec(g85("push", "-q", "origin", "HEAD:main")); g85("reset", "-q", "--hard", "HEAD~1")
+	// §4 M8: a TYPE change - a tracked file becomes a symlink whose target carries the word.
+	rmSync(join(repo85, "a.md")); symlinkSync(`${W}-target`, join(repo85, "a.md")); g85("add", "a.md")
+	const typeChange = rec(g85("commit", "-qm", "a link")); g85("reset", "-q", "--hard", "HEAD")
+	// §2: a gitlink named after the word, its commit absent - git's own "fatal: bad object <path>" must stay captured.
+	// An id that names NO object, as a submodule's commit absent from this repo: pointing it at an existing blob made
+	// `git show` SUCCEED, so the case never exercised git's error output (a mutant proved it: it survived).
+	g85("update-index", "--add", "--cacheinfo", `160000,${"1234567890".repeat(4)},${W}-sub`)
+	const gitlink = rec(g85("commit", "-qm", "a submodule")); g85("reset", "-q", "--hard", "HEAD")
+	// UTF-16 text (what PowerShell's `>` writes): its NUL bytes read as binary and it was skipped - review #17 §8.
+	writeFileSync(join(repo85, "u.txt"), Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(`${W}\n`, "utf16le")])); g85("add", "u.txt")
+	const utf16 = rec(g85("commit", "-qm", "a utf-16 note")); g85("reset", "-q", "--hard", "HEAD")
+	// §4 M9: core.hooksPath - the hooks must be written, and run, where git looks.
+	g85("config", "core.hooksPath", ".githooks"); spawnSync("node", [lc, "--install-hooks"], { cwd: repo85, env: env85, encoding: "utf8" })
+	writeFileSync(join(repo85, "h.md"), `${W}\n`); g85("add", "h.md"); const hooksPathCommit = rec(g85("commit", "-qm", "via hooksPath"))
+	g85("reset", "-q", "--hard", "HEAD"); g85("config", "--unset", "core.hooksPath")
+	// §4 M6/M7: an INVALID rule is NOT ARMED by its own code, and never echoes its text.
+	const badList = join(r85, "bad-words"); writeFileSync(badList, `${W}(\n`)
+	const invalid = rec(spawnSync("node", [lc, "--tree"], { cwd: repo85, env: { ...env85, CLAUDE_COMM_PRIVATE_WORDS: badList }, encoding: "utf8" }))
+	// The word typed as an ARGUMENT: git's "ambiguous argument '<word>..HEAD'" must stay captured, FAILED says only the mode.
+	const typedArg = rec(spawnSync("node", [lc, "--commits", `${W}..HEAD`], { cwd: repo85, env: env85, encoding: "utf8" }))
 	const unarmed = spawnSync("node", [lc, "--tree"], { cwd: repo85, env: { ...env85, CLAUDE_COMM_PRIVATE_WORDS: join(r85, "absent") }, encoding: "utf8" })
 	const pastPublished = spawnSync("git", ["--git-dir", bare85, "cat-file", "-e", "main~1:mid.md"], { encoding: "utf8" }).status === 0
 	rmSync(r85, { recursive: true, force: true })
@@ -5278,13 +5311,18 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	const refused = (r) => r.status !== 0
 	const ok = cleanCommit.status === 0 && pushClean.status === 0 && pushTagClean.status === 0 && mergedClean.status === 0 &&
 		refused(dirtyFile) && refused(dirtyMsg) && refused(binName) && refused(pushPast) && !pastPublished &&
-		refused(pushTagMsg) && refused(pushBranch) && refused(merged) && unarmed.status === 3 && /NOT ARMED/.test(unarmed.stderr) && !leaked
-	check("A85 a private word is stopped in a file, a message, a past commit, a name, a tag, a merge; no list is NOT ARMED",
+		refused(pushTagMsg) && refused(pushBranch) && refused(merged) && unarmed.status === 3 && /NOT ARMED/.test(unarmed.stderr) && !leaked &&
+		refused(pushBlobTag) && refused(pushRawBlob) && refused(pushRawTree) && refused(pushNested) && refused(pushMsg) && refused(pushName) &&
+		refused(typeChange) && refused(gitlink) && refused(hooksPathCommit) && invalid.status === 4 && refused(utf16) && typedArg.status === 2
+	check("A85 a private word is stopped in every object a push sends, at every hook, and never printed; no list is NOT ARMED",
 		ok,
 		`controls: clean commit ${cleanCommit.status}, clean push ${pushClean.status}, clean tag ${pushTagClean.status}, clean merge ${mergedClean.status} (want 0); refused - ` +
 		`staged file=${refused(dirtyFile)} message=${refused(dirtyMsg)} binary NAME=${refused(binName)} ` +
 		`a file a later commit removed=${refused(pushPast)} (published=${pastPublished}) tag message=${refused(pushTagMsg)} branch name=${refused(pushBranch)} ` +
 		`merge from a clone with no hooks=${refused(merged)}; no list -> exit ${unarmed.status} NOT ARMED=${/NOT ARMED/.test(unarmed.stderr)}; ` +
+		`objects (#17 §1): tag->blob=${refused(pushBlobTag)} raw blob=${refused(pushRawBlob)} raw tree=${refused(pushRawTree)} tag->tag=${refused(pushNested)}; ` +
+		`pushed past the local hooks: a message=${refused(pushMsg)} a file NAME=${refused(pushName)}; type change=${refused(typeChange)} gitlink=${refused(gitlink)} ` +
+		`core.hooksPath=${refused(hooksPathCommit)} UTF-16 text=${refused(utf16)} the word as an argument -> exit ${typedArg.status} (want 2) invalid rule -> exit ${invalid.status} (want 4); ` +
 		`no output printed the word=${!leaked}`)
 }
 

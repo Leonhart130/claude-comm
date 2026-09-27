@@ -5,13 +5,14 @@
  *   node bin/leak-check.mjs --tree [<commit>]      the tracked files on disk (and their paths), or <commit>'s tree
  *   node bin/leak-check.mjs --staged               what the next commit would carry (pre-commit, pre-merge-commit)
  *   node bin/leak-check.mjs --message <file|->     a commit or tag message (commit-msg; `-` reads stdin)
- *   node bin/leak-check.mjs --commits [<range>]    EVERY commit in <range> (default HEAD): the raw commit object
- *                                                  (author, committer, message), every path and every blob of its tree
+ *   node bin/leak-check.mjs --commits [<range>]    every OBJECT in <range> (default HEAD) - `rev-list --objects`: each
+ *                                                  commit and tag raw (author, message), every path, every blob
  *   node bin/leak-check.mjs --ref <name>           a branch or tag name
  *   node bin/leak-check.mjs --all-cached           --tree + --commits since the last CLEAN scan (boot, every start);
  *                                                  the mark lives in .git/, keyed on HEAD and on the list itself
  *   node bin/leak-check.mjs --install-hooks        pre-commit, pre-merge-commit, commit-msg, pre-push
  *   node bin/leak-check.mjs --hooks-dir            where git runs this repo's hooks (worktrees, core.hooksPath)
+ *   node bin/leak-check.mjs --hooks-check          the four hooks, byte for byte against what --install-hooks writes
  *
  * WHY (2026-09-27). This public repo carried a private project's name in 105 lines of 15 files and 35 commit messages,
  * plus a home path, for three weeks - written by me, one measured field note at a time. The owner had the GitHub repo
@@ -52,8 +53,13 @@ export function scan(text, rules) {
 	return hits
 }
 
-const git = (args, cwd, input) => execFileSync("git", args, { cwd, encoding: input === undefined ? "utf8" : "utf8", input, maxBuffer: 512 * 1024 * 1024 })
-const gitBuf = (args, cwd, input) => execFileSync("git", args, { cwd, input, maxBuffer: 512 * 1024 * 1024 })
+// git's own stderr is CAPTURED, never inherited: it prints paths and arguments in clear, above the masked report (review
+// #17 §2, measured with a gitlink named after the word: "fatal: bad object :<the path>").
+const git = (args, cwd, input) => execFileSync("git", args, { cwd, encoding: "utf8", input, stdio: ["pipe", "pipe", "pipe"], maxBuffer: 512 * 1024 * 1024 })
+const gitBuf = (args, cwd, input) => execFileSync("git", args, { cwd, input, stdio: ["pipe", "pipe", "pipe"], maxBuffer: 512 * 1024 * 1024 })
+/** Text of a file or blob: UTF-16 by its BOM (PowerShell's `>` writes it; its NULs read as binary), else UTF-8. */
+const decode = (buf) => buf[0] === 0xff && buf[1] === 0xfe ? buf.slice(2).toString("utf16le")
+	: buf[0] === 0xfe && buf[1] === 0xff ? Buffer.from(buf.slice(2)).swap16().toString("utf16le") : buf.toString("utf8")
 
 /** A path shown in a report: itself, unless it matches a rule - then masked, with the blob that carries it. */
 const shown = (p, rules, blob = "") => {
@@ -75,18 +81,19 @@ function scanEntries(entries, rules, prefix = "") {
 	return out
 }
 
-/** Many blobs in ONE `git cat-file --batch`, not one spawn each. */
-function readBlobs(shas, cwd) {
+/** Many objects in ONE `git cat-file --batch`, not one spawn each: sha -> { type, buf }. */
+function readObjects(shas, cwd) {
 	const map = new Map()
-	if (!shas.length) return map
-	const buf = gitBuf(["cat-file", "--batch"], cwd, shas.join("\n") + "\n")
+	const uniq = [...new Set(shas)]
+	if (!uniq.length) return map
+	const buf = gitBuf(["cat-file", "--batch"], cwd, uniq.join("\n") + "\n")
 	let at = 0
 	while (at < buf.length) {
 		const nl = buf.indexOf(10, at)
 		const [sha, type, size] = buf.slice(at, nl).toString("utf8").split(" ")
 		if (type === "missing") { at = nl + 1; continue }
 		const n = Number(size), start = nl + 1
-		map.set(sha, buf.slice(start, start + n).toString("utf8"))
+		map.set(sha, { type, buf: buf.slice(start, start + n) })
 		at = start + n + 1
 	}
 	return map
@@ -108,29 +115,43 @@ export function check(mode, arg, { cwd = process.cwd(), rules, stdin = "" }) {
 	}
 	if (mode === "--staged") {
 		const paths = git(["diff", "--cached", "--name-only", "--diff-filter=ACMRT", "-z"], cwd).split("\0").filter(Boolean)
-		return scanEntries(paths.map((p) => ({ path: p, read: () => git(["show", `:${p}`], cwd) })), rules)
+		return scanEntries(paths.map((p) => ({ path: p, read: () => decode(gitBuf(["show", `:${p}`], cwd)) })), rules)
 	}
 	if (mode === "--tree" && !arg) {
 		const top = git(["rev-parse", "--show-toplevel"], cwd).trim()
-		return scanEntries(git(["ls-files", "-z"], cwd).split("\0").filter(Boolean).map((p) => ({ path: p, read: () => readFileSync(join(top, p), "utf8") })), rules)
+		return scanEntries(git(["ls-files", "-z"], cwd).split("\0").filter(Boolean).map((p) => ({ path: p, read: () => decode(readFileSync(join(top, p))) })), rules)
 	}
+	// THE OBJECTS, NOT THE COMMITS (review #17 §1). `rev-list <range>` lists commits only, and a tag pointing at a blob, a
+	// tree or another tag has none: nothing was read and the tool said "nothing matched". `rev-list --objects` lists what
+	// git sends - commits, trees with their paths, blobs, and every tag of a chain - and a single tip that yields NOTHING
+	// is an error, never a clean scan (form E).
 	if (mode === "--tree" || mode === "--commits") {
-		const commits = mode === "--tree" ? [git(["rev-parse", `${arg}^{commit}`], cwd).trim()]
-			: git(["rev-list", ...(arg ? arg.split(/\s+/) : ["HEAD"])], cwd).split("\n").filter(Boolean)
-		const out = [], seen = new Set(), pending = []
-		for (const c of commits) {
-			if (mode === "--commits") for (const h of scan(git(["cat-file", "commit", c], cwd), rules)) out.push(`${c.slice(0, 7)} commit object:${h.line} (rule ${h.rule})`)
-			for (const rec of git(["ls-tree", "-r", "-z", c], cwd).split("\0").filter(Boolean)) {
-				const tab = rec.indexOf("\t"), [, type, sha] = rec.slice(0, tab).split(" "), path = rec.slice(tab + 1)
-				for (const h of scan(path, rules)) out.push(`${c.slice(0, 7)} ${shown(path, rules, sha)} - the PATH itself (rule ${h.rule})`)
-				if (type === "blob" && !seen.has(sha)) { seen.add(sha); pending.push({ c, sha, path }) }
-			}
+		const spec = mode === "--tree" ? [`${arg}^{tree}`] : (arg ? arg.split(/\s+/) : ["HEAD"])
+		const lines = git(["rev-list", "--objects", ...spec], cwd).split("\n").filter(Boolean)
+		if (!lines.length && !spec.some((x) => x.includes("..") || x.startsWith("^"))) throw new Error("the range names no object - nothing was read")
+		const objs = lines.map((l) => { const i = l.indexOf(" "); return i < 0 ? { sha: l, path: "" } : { sha: l.slice(0, i), path: l.slice(i + 1) } })
+		const out = [], pathOf = new Map()
+		for (const o of objs) {
+			if (o.path && !pathOf.has(o.sha)) pathOf.set(o.sha, o.path)
+			if (o.path) for (const h of scan(o.path, rules)) out.push(`${shown(o.path, rules, o.sha)} - the PATH itself (rule ${h.rule})`)
 		}
-		const blobs = readBlobs(pending.map((p) => p.sha), cwd)
-		for (const p of pending) {
-			const text = blobs.get(p.sha) || ""
-			if (text.includes("\0")) continue
-			for (const h of scan(text, rules)) out.push(`${p.c.slice(0, 7)} ${shown(p.path, rules, p.sha)}:${h.line} (rule ${h.rule})`)
+		const read = readObjects(objs.map((o) => o.sha), cwd)
+		for (const [sha, { type, buf }] of read) {
+			// EVERY NAME IN EVERY TREE: rev-list prints one path per OBJECT, so a second file with the same content under a
+			// name carrying the word was never listed - measured, A85's "file NAME pushed" case. The tree holds all names.
+			if (type === "tree") {
+				for (let at = 0; at < buf.length;) {
+					const sp = buf.indexOf(32, at), nul = buf.indexOf(0, sp)
+					const name = buf.slice(sp + 1, nul).toString("utf8")
+					for (const h of scan(name, rules)) out.push(`<a name matching rule ${h.rule}, in tree ${sha.slice(0, 7)}> - the PATH itself (rule ${h.rule})`)
+					at = nul + 1 + sha.length / 2   // the entry's own id: 20 bytes in a SHA-1 repo, 32 in a SHA-256 one
+				}
+				continue
+			}
+			const text = decode(buf)
+			if (type === "blob" && text.includes("\0")) continue
+			const where = type === "blob" ? shown(pathOf.get(sha) || `blob ${sha.slice(0, 7)}`, rules, sha) : `${sha.slice(0, 7)} ${type} object`
+			for (const h of scan(text, rules)) out.push(`${where}:${h.line} (rule ${h.rule})`)
 		}
 		return out
 	}
@@ -153,27 +174,38 @@ export function check(mode, arg, { cwd = process.cwd(), rules, stdin = "" }) {
 	throw new Error(`unknown mode ${mode}`)
 }
 
+/** The four hooks, exactly as installed - also what `--hooks-check` compares against, byte for byte. */
+export function hookBodies(me = fileURLToPath(import.meta.url)) {
+	const h = (body) => `#!/bin/sh\n# written by bin/leak-check.mjs --install-hooks\n${body}\n`
+	return {
+		"pre-commit": h(`exec node "${me}" --staged`),
+		"pre-merge-commit": h(`exec node "${me}" --staged`),
+		"commit-msg": h(`exec node "${me}" --message "$1"`),
+		// Per pushed ref: the REMOTE ref's name (the local one does not leave), then every OBJECT of the pushed range.
+		// A remote tip unknown here is not a bound: everything reachable from the pushed object is read instead.
+		"pre-push": h([
+			"z=0000000000000000000000000000000000000000",
+			"while read lref lsha rref rsha; do",
+			"  [ \"$lsha\" = \"$z\" ] && continue",
+			`  node "${me}" --ref "$rref" || exit 1`,
+			"  if [ \"$rsha\" = \"$z\" ] || ! git cat-file -e \"$rsha\" 2>/dev/null; then range=\"$lsha\"; else range=\"$rsha..$lsha\"; fi",
+			`  node "${me}" --commits "$range" || exit 1`,
+			"done",
+		].join("\n")),
+	}
+}
+
 function installHooks(cwd) {
-	const dir = hooksDir(cwd), me = fileURLToPath(import.meta.url)
+	const dir = hooksDir(cwd)
 	mkdirSync(dir, { recursive: true })
-	const hook = (name, body) => { writeFileSync(join(dir, name), `#!/bin/sh\n# written by bin/leak-check.mjs --install-hooks\n${body}\n`); chmodSync(join(dir, name), 0o755) }
-	hook("pre-commit", `exec node "${me}" --staged`)
-	hook("pre-merge-commit", `exec node "${me}" --staged`)
-	hook("commit-msg", `exec node "${me}" --message "$1"`)
-	// Per pushed ref: both ref NAMES, an annotated tag's own message, then EVERY commit of the pushed range - not the tip.
-	// A remote tip unknown here is not a range bound: everything reachable from the pushed commit is scanned instead.
-	hook("pre-push", [
-		"z=0000000000000000000000000000000000000000",
-		"while read lref lsha rref rsha; do",
-		"  [ \"$lsha\" = \"$z\" ] && continue",
-		`  node "${me}" --ref "$lref" || exit 1`,
-		`  node "${me}" --ref "$rref" || exit 1`,
-		`  if [ "$(git cat-file -t "$lsha")" = tag ]; then git cat-file tag "$lsha" | node "${me}" --message - || exit 1; fi`,
-		"  if [ \"$rsha\" = \"$z\" ] || ! git cat-file -e \"$rsha^{commit}\" 2>/dev/null; then range=\"$lsha\"; else range=\"$rsha..$lsha\"; fi",
-		`  node "${me}" --commits "$range" || exit 1`,
-		"done",
-	].join("\n"))
+	for (const [name, body] of Object.entries(hookBodies())) { writeFileSync(join(dir, name), body); chmodSync(join(dir, name), 0o755) }
 	return dir
+}
+
+/** Which hooks are missing or differ from what --install-hooks writes now (an old version, a dead path, a comment). */
+export function hooksCheck(cwd) {
+	const dir = hooksDir(cwd)
+	return { dir, bad: Object.entries(hookBodies()).filter(([name, body]) => { try { return readFileSync(join(dir, name), "utf8") !== body } catch { return true } }).map(([n]) => n) }
 }
 
 function main() {
@@ -181,6 +213,11 @@ function main() {
 	const cwd = process.cwd()
 	if (mode === "--install-hooks") { console.log(`✓ pre-commit, pre-merge-commit, commit-msg, pre-push written to ${installHooks(cwd)}`); return }
 	if (mode === "--hooks-dir") { console.log(hooksDir(cwd)); return }
+	if (mode === "--hooks-check") {
+		const { dir, bad } = hooksCheck(cwd)
+		if (bad.length) { console.error(`✗ leak-check: ${bad.join(", ")} missing or not as --install-hooks writes them, in ${dir}`); process.exit(1) }
+		console.log(`✓ leak-check: the four hooks are current in ${dir}`); return
+	}
 	const { armed, rules, why, invalid } = loadRules()
 	if (!armed) {
 		console.error(`✗ leak-check NOT ARMED: ${why}. Nothing was checked.`)
@@ -188,7 +225,11 @@ function main() {
 	}
 	let hits
 	const stdin = arg === "-" ? readFileSync(0, "utf8") : ""
-	try { hits = check(mode, arg, { cwd, rules, stdin }) } catch (e) { console.error(`✗ leak-check FAILED (${mode}): ${String(e.message).split("\n")[0]}`); process.exit(2) }
+	// FAILED names the mode and git's exit status - never git's message or arguments, which may carry the word.
+	try { hits = check(mode, arg, { cwd, rules, stdin }) } catch (e) {
+		const why = e.status !== undefined && e.status !== null ? `git exited ${e.status}` : /nothing was read/.test(e.message) ? "the range names no object - nothing was read" : (e.code || "error")
+		console.error(`✗ leak-check FAILED (${mode}): ${why}`); process.exit(2)
+	}
 	if (hits.length) {
 		console.error(`✗ leak-check: ${hits.length} private word(s) - this must not reach the public repo:\n  ${hits.slice(0, 40).join("\n  ")}${hits.length > 40 ? `\n  … ${hits.length - 40} more` : ""}`)
 		process.exit(1)

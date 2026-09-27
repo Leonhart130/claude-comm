@@ -767,13 +767,14 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 	else if (existsSync(lc)) {
 		const r = spawnSync(process.execPath, [lc, "--all-cached"], { cwd: ROOT, encoding: "utf8", timeout: 30000 })
 		const n = Number((/(\d+) private word/.exec(r.stderr || "") || [])[1] || 0)
-		let dir = ""
-		try { dir = spawnSync(process.execPath, [lc, "--hooks-dir"], { cwd: ROOT, encoding: "utf8", timeout: 5000 }).stdout.trim() } catch {}
-		const hooks = ["pre-commit", "pre-merge-commit", "commit-msg", "pre-push"].filter((k) => { try { return !readFileSync(join(dir, k), "utf8").includes("leak-check") } catch { return true } })
+		// Byte for byte against what --install-hooks writes NOW (review #17 §3): a v1 hook, a hook naming a scanner path that
+		// no longer exists, or one holding the word only in a comment all read "in place" to a substring test.
+		const hc = spawnSync(process.execPath, [lc, "--hooks-check"], { cwd: ROOT, encoding: "utf8", timeout: 5000 })
+		const hooksBad = hc.status !== 0 ? ((hc.stderr || "").replace(/^✗ leak-check: /, "").split("\n")[0] || `--hooks-check exit ${hc.status}`) : ""
 		if (r.status === 3 || r.status === 4) row("leak", WARN, `NOT ARMED - ${(r.stderr || "").split("\n")[0].replace(/^✗ leak-check NOT ARMED: /, "")}`, ["unarmed"])
 		else if (r.status === 1) row("leak", WARN, `${n} private word(s) in the tracked tree or the history on HEAD - NOT publishable: node bin/leak-check.mjs --commits lists them (never the words)`, ["found"])
 		else if (r.status !== 0) row("leak", WARN, `the scan FAILED (exit ${r.status}${r.error ? `, ${r.error.code}` : ""}) - nothing was checked: ${(r.stderr || "").split("\n")[0].slice(0, 120)}`, ["failed"])
-		else if (hooks.length) row("leak", WARN, `clean, but ${hooks.join(", ")} not installed in ${dir || "the hooks dir"} - nothing stops the next one: node bin/leak-check.mjs --install-hooks`, ["no-hooks"])
+		else if (hooksBad) row("leak", WARN, `clean, but ${hooksBad} - nothing stops the next one: node bin/leak-check.mjs --install-hooks`, ["no-hooks"])
 		else row("leak", OK, "no private word in the tracked tree or any commit on HEAD; the four git hooks are in place")
 	}
 }
@@ -2593,7 +2594,7 @@ function proveRed() {
 		writeFileSync(list, `${W}\n`)
 		const setList = (v) => { if (v === undefined) delete process.env.CLAUDE_COMM_PRIVATE_WORDS; else process.env.CLAUDE_COMM_PRIVATE_WORDS = v }
 		const hooksDir = join(pkg, ".git", "hooks"), lcP = join(pkg, "bin", "leak-check.mjs")
-		let clean = { level: -1, text: "" }, inTree = clean, inMsg = clean, inPast = clean, unarmed = clean, noHooks = clean
+		let clean = { level: -1, text: "" }, inTree = clean, inMsg = clean, inMsgAgain = clean, inPast = clean, newWord = clean, unarmed = clean, noHooks = clean
 		try {
 			setList(list)
 			spawnSync(process.execPath, [lcP, "--install-hooks"], { cwd: pkg, encoding: "utf8" })
@@ -2601,11 +2602,20 @@ function proveRed() {
 			writeFileSync(join(pkg, "LEAK.md"), `${W}\n`); g("add", "LEAK.md"); inTree = rowOf(run(true), "leak")
 			g("rm", "-q", "--cached", "LEAK.md"); rmSync(join(pkg, "LEAK.md"), { force: true })
 			g("commit", "-q", "--no-verify", "--allow-empty", "-m", `${W} in a message`); inMsg = rowOf(run(true), "leak")
+			// Review #17 §4 (M4): the SAME dirty state at the next boot - a mark written despite the hit would make it silent.
+			inMsgAgain = rowOf(run(true), "leak")
 			g("reset", "-q", "--soft", "HEAD~1")
 			// Review #16 §1: a word in a commit that the NEXT commit removes - the tip and every message are clean.
 			writeFileSync(join(pkg, "MID.md"), `${W}\n`); g("add", "MID.md"); g("commit", "-q", "--no-verify", "-m", "adds a file")
 			g("rm", "-q", "MID.md"); g("commit", "-q", "--no-verify", "-m", "removes it"); inPast = rowOf(run(true), "leak")
 			g("reset", "-q", "--soft", "HEAD~2")
+			// Review #17 §4 (M5): a word ADDED to the list must re-read all history. W2 sits in a commit the next one removes;
+			// scanned clean under the old list (the mark moves past it), then the list gains W2.
+			const W2 = ["zq", "second", "word"].join("")
+			writeFileSync(join(pkg, "OLD.md"), `${W2}\n`); g("add", "OLD.md"); g("commit", "-q", "--no-verify", "-m", "adds a file")
+			g("rm", "-q", "OLD.md"); g("commit", "-q", "--no-verify", "-m", "removes it"); rowOf(run(true), "leak")
+			writeFileSync(list, `${W}\n${W2}\n`); newWord = rowOf(run(true), "leak")
+			writeFileSync(list, `${W}\n`); g("reset", "-q", "--soft", "HEAD~2")
 			setList(join(tmp, "no-such-list")); unarmed = rowOf(run(true), "leak"); setList(list)
 			for (const k of ["pre-commit", "pre-merge-commit", "commit-msg", "pre-push"]) rmSync(join(hooksDir, k), { force: true })
 			noHooks = rowOf(run(true), "leak")
@@ -2615,13 +2625,15 @@ function proveRed() {
 		}
 		assert("leak: a private word in the tree, a message or a PAST commit warns; no list is NOT ARMED; no hooks warns",
 			clean.level === OK && inTree.level === WARN && (inTree.causes || []).includes("found") &&
-			inMsg.level === WARN && (inMsg.causes || []).includes("found") &&
+			inMsg.level === WARN && (inMsg.causes || []).includes("found") && inMsgAgain.level === WARN &&
+			newWord.level === WARN && (newWord.causes || []).includes("found") &&
 			inPast.level === WARN && (inPast.causes || []).includes("found") &&
 			unarmed.level === WARN && (unarmed.causes || []).includes("unarmed") &&
 			noHooks.level === WARN && (noHooks.causes || []).includes("no-hooks") &&
 			!new RegExp(W, "i").test([inTree.text, inMsg.text, inPast.text].join(" ")),
 			`clean, armed, hooks in -> ${LV[clean.level]}; word in a tracked file -> ${LV[inTree.level]} ${JSON.stringify(inTree.causes || [])}; ` +
-			`in a commit message -> ${LV[inMsg.level]} ${JSON.stringify(inMsg.causes || [])}; in a file a later commit removed -> ${LV[inPast.level]}; no list -> ${LV[unarmed.level]} ${JSON.stringify(unarmed.causes || [])}; ` +
+			`in a commit message -> ${LV[inMsg.level]} ${JSON.stringify(inMsg.causes || [])}; in a file a later commit removed -> ${LV[inPast.level]}; the same message at the next boot -> ${LV[inMsgAgain.level]}; ` +
+			`a word ADDED to the list, found only in an old commit -> ${LV[newWord.level]}; no list -> ${LV[unarmed.level]} ${JSON.stringify(unarmed.causes || [])}; ` +
 			`hooks removed -> ${LV[noHooks.level]} ${JSON.stringify(noHooks.causes || [])}; the row never prints the word=${!new RegExp(W, "i").test([inTree.text, inMsg.text, inPast.text].join(" "))}`)
 	}
 	// THIS REPO'S OWN INSTALLED BUS AGAINST ITS OWN CODE (review #11b S2; LESSONS form A: this tree
