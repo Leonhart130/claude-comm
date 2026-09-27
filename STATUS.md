@@ -10,6 +10,20 @@ leader-only, never launched; `orion`'s leader not relaunched since 09-19; **`cob
 leader adds its own experts with `--add-agent`). **`2026-09-27.9` is in all seven trees**, `--check` in sync. The owner:
 *"tu peux faire tout ce que t'as à faire … review adversarielle tu peux lancer"*; a reviewer is Opus xhigh, price it.)*
 
+**▶ FIRST, TELL THE OWNER - he asked, 09-27 at the close: *"tu me rappelles tout ça demain"*.** In French, short:
+(1) the public repo was deleted and rebuilt 09-27 - 205 commits, MIT (the API says so), 0 private name over every object
+of its history, checked from a fresh clone; two adversarial reviews before it went online; (2) his rule - no name of his
+personal projects in a public project - is applied everywhere, codenames in the repo, the mapping only in my memory
+(`public-repo-private-names`), and a guard stops it recurring (the list outside every repo, four git hooks, boot row
+`leak`); what it cannot see: GitHub's non-git surfaces (description, releases, issues, wiki) - written by hand; (3) `cobalt`
+is installed leader-only, its leader adds experts itself (`--add-agent`); (4) the `claude-comm` skill is current (`.9`,
+seven trees); (5) atlas's three requests (licence, traces, the swallowed ring) are done and answered; **one letter was
+NOT delivered** - `2026-09-27-leak-check-en-ligne-mode-d-emploi.md` in atlas's channel `out/` (the bell refused twice,
+its leader was mid-turn): **ring it first** (`bin/exchange-bell.mjs --peer <atlas's channel> --ref <that file>`);
+(6) not verified: third-party archives of the OLD repo (Software Heritage) - his call; the old history is backed up
+locally, outside `~/Dev` (`~/claude-comm-backup-2026-09-27-before-rebuild.bundle`, `~/claude-comm-old-git-2026-09-27`);
+(7) next: review #18 on `leak-check` v3 (A0 below).
+
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a
 codename here; the mapping is in no repo. The boot report prints the REAL directory names: **never copy a `field:` row
 into a tracked file as is.** `bin/leak-check.mjs` + four git hooks + boot row `leak` enforce it (`FINDINGS.md#leak-check`).
