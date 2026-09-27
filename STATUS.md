@@ -35,13 +35,6 @@ Reviews **#16** (the push read only the tip) and **#17** (it read commits, not o
 `leak-check` v3** - `rev-list --objects` and every tree name, `--hooks-check`, the clean mark, A85 (now ~30 cases).
 Also fixed on the way: a ring the recipient already answered no longer silences the next (`#quiet-answered`, A84).
 
-**A - ✅ review #15 disposed** (`FINDINGS.md#review15`): the ring skipped the LEADER for undeclared callers (A82), six
-🟡 fixed and armed. Its named residues are in `#review15`.
-
-**A2 - ✅ the close reads its OWN inbox** (row `mail`, `#own-mail`). **A2b - ✅ `send` names BUSY / IDLE / WAITING / CANNOT
-SAY** (`#idle-send`). **A3 - ✅ skill audited** (`.4`, `.5`); sourcing it found the installer deleting a person's hook
-(`#hook-merge`). `leader-expert` read by grep, nothing contradicted, one suggestion sent to atlas's leader.
-
 🔴 **The bus is at 57 816 of 58 000 B (A22).** The next change to `comm.mjs`/`who.mjs` moves narrative to FINDINGS FIRST.
 
 **B - the registry half of #13 §1, MEASURED 09-27 by A31 going red on my own end-to-end probe**: a hand-fire from
@@ -96,16 +89,11 @@ order:** adoption (orion measured 09-19) → Rust port → value, with atlas's l
 2. **`--reply-to <id>` (threading).** Field-requested, then field-deprioritised: the substance lives in the
    file.
 
-3. ✅ **The wake is BUILT** (`bin/wake.mjs`, A32); 09-11 its TEXT was rewritten — it gave a conduct order in
-   the owner's own channel and promised a delivery it cannot keep (`FINDINGS.md#doorbell-text`). 🔴 Item 1's
-   table predates it. ⚠️ A wake inside `QUIET_MS` rings nobody and nothing catches up — it prints
-   `○ rung 104s ago`, which reads like success.
+3. ✅ **The wake is BUILT** (`bin/wake.mjs`, A32; its text `#doorbell-text`). ⚠️ Within `QUIET_MS` of an UNANSWERED ring
+   it rings nobody and nothing retries - an answered ring no longer silences the next (`#quiet-answered`, A84).
 
-4. **🟢 Holding a machine resource — `bin/claim.mjs`, IN PRODUCTION**, 17 arms, A38, three field trees. It
-   advises: opens nothing, kills nothing, blocks nothing. `release` refuses while the holder LIVES, and the record
-   cannot tell a crash from a forgotten release. Claims live in ONE project, so a resource shared ACROSS projects is
-   visible to nobody. `FINDINGS.md#claim-file`. ⭐ Their verdict, accepted as the scope: *a claim makes sharing
-   visible; the first answer is not to share.*
+4. 🟢 **`bin/claim.mjs`, in production** (A38): advisory only; a claim in one project is invisible to another
+   (`FINDINGS.md#claim-file`). Their verdict, the scope: *a claim makes sharing visible; the first answer is not to share.*
 
 5. **🟡 `who` reports TWO states and there are FOUR.** A leader lost **2 h 30** reading `running` for four
    sessions sitting at their prompt. ✅ `context.mjs --sessions` prints `quiet <age>` — a MEASUREMENT, never
@@ -115,16 +103,11 @@ order:** adoption (orion measured 09-19) → Rust port → value, with atlas's l
    sample each, so no threshold from it. 🔴 All of it belongs in `comm who` and cannot go there — A21 forbids
    the import ⇒ an A21 amendment **and a split — both done 09-11; the states themselves are not built.**
 
-6. **🟢 A reply must NAME what it answers** — `Answers:` in front matter on **line 1**, anchored to the first byte
-   so a quotation cannot forge one. Stateless; a failed scan says `CANNOT SAY`. Contract: `exchange/README.md`.
-   `FINDINGS.md#answered-mtime`. ⚠️ The row dates letters by FILENAME (C3, carried).
+6. 🟢 **A reply names what it answers** (`Answers:` on line 1; `exchange/README.md`, `#answered-mtime`). ⚠️ The row
+   dates letters by FILENAME (C3, carried).
 
-7. **🟢 A program launches an agent, and the agent puts its own window away.** `launch.mjs` (A46) builds the
-   child's `PATH`, resolves the runtime absolutely, splits the caller's tab (`--os-window`, `--minimized` with it),
-   refuses a launch it cannot name, and `--prompt` gives the new session a first turn. `close.mjs` (A51): an agent
-   closes ITSELF, never a sibling. ⚠️ **`--minimized` is UNARMED** — A50 asserts only that the window lands outside
-   the caller's tab, and `kitten @ ls` does not report a minimized state, so the honest arm is the `--print` argv.
-   `FINDINGS.md#self-close`, `#split-raised-the-cap`.
+7. 🟢 **`launch.mjs` launches an agent, `close.mjs` lets it close ITSELF** (A46, A51). ⚠️ **`--minimized` is UNARMED**
+   (`kitten @ ls` reports no minimized state) - `#self-close`, `#split-raised-the-cap`.
 
 8. **🟡 The autonomy mandate — self-launching experts, a self-rebooting leader.** Given 2026-09-04; settled
    parts in [`DESIGN-autonomy.md`](DESIGN-autonomy.md), **do not re-derive them here.** The finding that
