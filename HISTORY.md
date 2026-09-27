@@ -553,7 +553,7 @@ holds only what is OPEN; a settled item sitting there is read as live work and c
 
 **The reasoning archive, closed the morning of 2026-09-04.**
 
-**🔴 The reasoning archive is not in git, and one `git clean` deletes it.** `661a1aa "Removed
+**🔴 The reasoning archive is not in git, and one `git clean` deletes it.** `4dc1154 "Removed
    conversations"` deleted `FINDINGS.md` and `STATUS.md` from the index, and `.gitignore`'s `*.md` keeps them
    out. The repo now has a remote (`github.com:Leonhart130/claude-comm`), so **what is published is the bus
    with none of the reasoning that justifies its guards** — and this file, the only record of what is open,
@@ -720,7 +720,7 @@ the next defect along.
 
 **The first review this project ever launched itself.** `launch.mjs review` → a real session, on the bus,
 registered, a ledger start; then `comm send` + `wake` and it took a turn on `BRIEF-adversarial-9.md`. The
-brief's target was `a219e62..660543f` — four commits written the same day by the leader, after the owner
+brief's target was `200c300..dd6dd36` — four commits written the same day by the leader, after the owner
 had caught him not reading `STATUS.md`. That is the profile `CLAUDE.md` names as the weakest code in the
 repo, and the result argues it is right: **four reds, and the two worst are defects inside the previous
 review's own fixes.**
