@@ -5202,50 +5202,90 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	const ringAt = Date.now() - 100_000
 	writeFileSync(join(r84, ".comm", "wake", "leader.json"), JSON.stringify({ at: new Date(ringAt).toISOString(), agent: "leader", pid: process.pid, window: 7 }) + "\n")
 	const wins84 = [{ sock: "/tmp/kitty-1", id: 7, shellPid: process.pid, fg: [] }]
-	const try84 = (callAt) => wakeM.wakeAgent(r84, "leader", process.pid, { dryRun: true, wins: wins84,
-		turn: { state: "idle", why: "fixture", call: callAt ? { at: callAt, context: 1000 } : null } })
+	const try84 = (callAt, state = "idle") => wakeM.wakeAgent(r84, "leader", process.pid, { dryRun: true, wins: wins84,
+		turn: { state, why: "fixture", call: callAt ? { at: callAt, context: 1000 } : null } })
 	const answered = try84(ringAt + 30_000), unanswered = try84(ringAt - 30_000), noCall = try84(null)
+	// Review #16 §6: the same call AFTER the ring, other turn states - busy is rule 6's refusal, ending may ring, unknown may not.
+	const busy = try84(ringAt + 30_000, "busy"), ending = try84(ringAt + 30_000, "ending"), unknown = try84(ringAt + 30_000, "unknown")
 	rmSync(r84, { recursive: true, force: true })
 	check("A84 a ring the recipient answered with a turn no longer silences the next one",
-		answered.dryRun === true && !unanswered.dryRun && /no turn taken since/.test(unanswered.why || "") && !noCall.dryRun,
+		answered.dryRun === true && !unanswered.dryRun && /no turn taken since/.test(unanswered.why || "") && !noCall.dryRun &&
+		busy.busy === true && /mid-turn/.test(busy.why || "") && ending.dryRun === true && !unknown.dryRun,
 		`last call 30 s AFTER the ring -> would ring=${answered.dryRun === true} (the swallowed case); ` +
-		`control, last call BEFORE the ring -> still quiet=${!unanswered.dryRun} "${(unanswered.why || "").slice(0, 60)}"; no call at all -> quiet=${!noCall.dryRun}`)
+		`control, last call BEFORE the ring -> still quiet=${!unanswered.dryRun} "${(unanswered.why || "").slice(0, 60)}"; no call at all -> quiet=${!noCall.dryRun}; ` +
+		`busy -> rule 6 "mid-turn"=${busy.busy === true}, ending -> would ring=${ending.dryRun === true}, unknown -> quiet=${!unknown.dryRun}`)
 }
 
-// A85 — A PRIVATE WORD NEVER REACHES A COMMIT (`FINDINGS.md#leak-check`). The real list lives outside every repo, so this
-// arm arms the scanner with a SYNTHETIC word through CLAUDE_COMM_PRIVATE_WORDS and runs the installed hooks in a scratch
-// repo. ONE VARIABLE per case: whether the word is in the file, the message, a pushed commit - each against the same
-// commit made clean (the control). And no list at all must say NOT ARMED, never "nothing matched".
+// A85 — A PRIVATE WORD NEVER REACHES A PUSH (`FINDINGS.md#leak-check`, `#review16`). The real list lives outside every
+// repo, so this arms the scanner with a SYNTHETIC word through CLAUDE_COMM_PRIVATE_WORDS and runs the installed hooks
+// in a scratch repo pushing to a scratch bare one. Each case is ONE variable against a clean twin (the controls): the
+// word in a staged file, a message, a file a LATER commit removed (review #16 §1: the push read only the tip), a
+// binary's NAME (§2), an annotated tag's message and a branch name (§3), a merge from a clone without hooks. And no list
+// must say NOT ARMED, never "nothing matched"; no refusal may print the word.
 {
 	const r85 = mkdtempSync(join(tmpdir(), "comm-attack-leak-"))
-	const list85 = join(r85, "private-words"); writeFileSync(list85, "# test\nzq[p]robeword\n")
-	const repo85 = join(r85, "repo"), bare85 = join(r85, "bare.git")
+	// The word is BUILT, never written: this file is itself scanned (a fixture copies the tracked tree), and a literal
+	// here made the clean control red - measured, the first prove-red of this arm.
+	const W = ["zq", "probe", "word"].join("")
+	const list85 = join(r85, "private-words"); writeFileSync(list85, `# test\n${W}\n`)
+	const repo85 = join(r85, "repo"), bare85 = join(r85, "bare.git"), other85 = join(r85, "other")
 	mkdirSync(repo85)
 	const env85 = { ...process.env, CLAUDE_COMM_PRIVATE_WORDS: list85, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" }
-	const g85 = (...a) => spawnSync("git", a, { cwd: repo85, env: env85, encoding: "utf8" })
-	g85("init", "-q"); execFileSync("git", ["init", "-q", "--bare", bare85]); g85("remote", "add", "origin", bare85)
+	delete env85.GIT_DIR
+	const gIn = (dir) => (...a) => spawnSync("git", a, { cwd: dir, env: env85, encoding: "utf8" })
+	const g85 = gIn(repo85)
+	// The bare repo's HEAD must be `main`: on git's default it named a branch that never exists, the "no hooks" clone
+	// started from an EMPTY history, and the merge failed on "unrelated histories" - refused, for a reason that was not
+	// the hook. Measured: the mutant that removes pre-merge-commit survived until this line.
+	g85("init", "-q", "-b", "main"); execFileSync("git", ["init", "-q", "--bare", "-b", "main", bare85]); g85("remote", "add", "origin", bare85)
 	const lc = join(PKG, "bin", "leak-check.mjs")
 	spawnSync("node", [lc, "--install-hooks"], { cwd: repo85, env: env85, encoding: "utf8" })
+	const all = []
+	const rec = (r) => { all.push(r.stderr || "", r.stdout || ""); return r }
 	writeFileSync(join(repo85, "a.md"), "clean\n"); g85("add", "a.md")
-	const cleanCommit = g85("commit", "-qm", "clean message")
-	writeFileSync(join(repo85, "b.md"), "a ZQPROBEWORD here\n"); g85("add", "b.md")
-	const dirtyFile = g85("commit", "-qm", "adds b")
+	const cleanCommit = rec(g85("commit", "-qm", "clean message"))
+	writeFileSync(join(repo85, "b.md"), `a ${W.toUpperCase()} here\n`); g85("add", "b.md")
+	const dirtyFile = rec(g85("commit", "-qm", "adds b"))
 	g85("reset", "-q", "HEAD"); rmSync(join(repo85, "b.md"))
 	writeFileSync(join(repo85, "c.md"), "fine\n"); g85("add", "c.md")
-	const dirtyMsg = g85("commit", "-qm", "mentions zqprobeword in the message")
-	const pushClean = g85("push", "-q", "origin", "HEAD:main")
-	// A leak that got past the local hooks (--no-verify): the push hook must stop it.
-	g85("commit", "-q", "--no-verify", "--allow-empty", "-m", "zqprobeword slipped")
-	const pushDirty = g85("push", "-q", "origin", "HEAD:main")
+	const dirtyMsg = rec(g85("commit", "-qm", `mentions ${W} in the message`))
+	writeFileSync(join(repo85, `${W}.png`), "x\0y"); g85("add", `${W}.png`)
+	const binName = rec(g85("commit", "-qm", "an image"))
+	g85("reset", "-q", "HEAD"); rmSync(join(repo85, `${W}.png`))
+	const pushClean = rec(g85("push", "-q", "origin", "HEAD:main"))
+	// A word in a file that the NEXT commit removes: the tip and both messages are clean.
+	writeFileSync(join(repo85, "mid.md"), `${W} inside\n`); g85("add", "mid.md"); g85("commit", "-q", "--no-verify", "-m", "adds mid")
+	g85("rm", "-q", "mid.md"); g85("commit", "-q", "--no-verify", "-m", "removes mid")
+	const pushPast = rec(g85("push", "-q", "origin", "HEAD:main"))
+	g85("reset", "-q", "--hard", "origin/main")
+	g85("tag", "-a", "v1", "-m", `release notes: ${W}`); const pushTagMsg = rec(g85("push", "-q", "origin", "v1"))
+	g85("tag", "-a", "v2", "-m", "release notes"); const pushTagClean = rec(g85("push", "-q", "origin", "v2"))
+	const pushBranch = rec(g85("push", "-q", "origin", `HEAD:refs/heads/${W}`))
+	// A merge from a clone that has NO hooks: git runs pre-merge-commit, not pre-commit.
+	execFileSync("git", ["clone", "-q", bare85, other85], { env: env85 })
+	const gO = gIn(other85)
+	writeFileSync(join(other85, "o.md"), `${W}\n`); gO("add", "o.md"); gO("commit", "-qm", "from elsewhere"); gO("push", "-q", "origin", "HEAD:refs/heads/side")
+	g85("fetch", "-q", "origin", "side"); const merged = rec(g85("merge", "--no-ff", "-m", "merge side", "FETCH_HEAD"))
+	g85("merge", "--abort")
+	// Its control: the same merge of a CLEAN side branch must go through - or "refused" proves nothing about the word.
+	gO("reset", "-q", "--hard", "HEAD~1"); writeFileSync(join(other85, "o.md"), "fine\n"); gO("add", "o.md"); gO("commit", "-qm", "clean side")
+	gO("push", "-q", "-f", "origin", "HEAD:refs/heads/side2")
+	g85("fetch", "-q", "origin", "side2"); const mergedClean = rec(g85("merge", "--no-ff", "-m", "merge side2", "FETCH_HEAD"))
 	const unarmed = spawnSync("node", [lc, "--tree"], { cwd: repo85, env: { ...env85, CLAUDE_COMM_PRIVATE_WORDS: join(r85, "absent") }, encoding: "utf8" })
-	const leaked = /zqprobeword/i.test(dirtyFile.stderr + dirtyMsg.stderr + pushDirty.stderr)
+	const pastPublished = spawnSync("git", ["--git-dir", bare85, "cat-file", "-e", "main~1:mid.md"], { encoding: "utf8" }).status === 0
 	rmSync(r85, { recursive: true, force: true })
-	check("A85 a private word is stopped at commit, message and push; no list is NOT ARMED",
-		cleanCommit.status === 0 && dirtyFile.status !== 0 && dirtyMsg.status !== 0 && pushClean.status === 0 && pushDirty.status !== 0 &&
-		unarmed.status === 3 && /NOT ARMED/.test(unarmed.stderr) && !leaked,
-		`control, clean commit -> exit ${cleanCommit.status}; word in a staged file -> refused=${dirtyFile.status !== 0}; in the message -> refused=${dirtyMsg.status !== 0}; ` +
-		`control, clean push -> exit ${pushClean.status}; a --no-verify commit carrying it -> push refused=${pushDirty.status !== 0}; ` +
-		`no list -> exit ${unarmed.status} NOT ARMED=${/NOT ARMED/.test(unarmed.stderr)}; the refusals never print the word=${!leaked}`)
+	const leaked = new RegExp(W, "i").test(all.join("\n"))
+	const refused = (r) => r.status !== 0
+	const ok = cleanCommit.status === 0 && pushClean.status === 0 && pushTagClean.status === 0 && mergedClean.status === 0 &&
+		refused(dirtyFile) && refused(dirtyMsg) && refused(binName) && refused(pushPast) && !pastPublished &&
+		refused(pushTagMsg) && refused(pushBranch) && refused(merged) && unarmed.status === 3 && /NOT ARMED/.test(unarmed.stderr) && !leaked
+	check("A85 a private word is stopped in a file, a message, a past commit, a name, a tag, a merge; no list is NOT ARMED",
+		ok,
+		`controls: clean commit ${cleanCommit.status}, clean push ${pushClean.status}, clean tag ${pushTagClean.status}, clean merge ${mergedClean.status} (want 0); refused - ` +
+		`staged file=${refused(dirtyFile)} message=${refused(dirtyMsg)} binary NAME=${refused(binName)} ` +
+		`a file a later commit removed=${refused(pushPast)} (published=${pastPublished}) tag message=${refused(pushTagMsg)} branch name=${refused(pushBranch)} ` +
+		`merge from a clone with no hooks=${refused(merged)}; no list -> exit ${unarmed.status} NOT ARMED=${/NOT ARMED/.test(unarmed.stderr)}; ` +
+		`no output printed the word=${!leaked}`)
 }
 
 finish(null)

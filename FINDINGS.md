@@ -3504,6 +3504,10 @@ call (`readTurn().call.at`, the transcript) is not after the last ring. Answered
 *"and no turn taken since"*. **A84**: one variable, the recipient's last call 30 s after the ring or 30 s before it;
 no call at all stays quiet. The field leader proposed a deferred retry at the period's end; that needs a process that
 outlives the hook - declined for this, which needs none.
+**Review #16 §6:** the quiet check ran BEFORE rule 6, so a session mid-turn was refused with *"no turn taken since"* -
+right outcome, wrong reason, and the reason is what the sender reads. Rule 6 now comes first; `ending` (the reply done,
+the `Stop` hook not yet reported) counts as answered, since a ring then is queued and replayed at the turn's close;
+`unknown` does not. A84 carries all three.
 
 **Not fixed, named:** a ring typed and NEVER answered (text in the input box, no turn) still silences the next 120 s,
 and nothing retries after them - but its own turn, when it comes, delivers every message waiting. Not measured live:
@@ -3514,26 +3518,60 @@ the transcript's last call as the witness of "answered" on a real idle leader.
 **What happened.** For three weeks this public repo named one of the owner's private projects - 105 lines in 15
 tracked files and 35 commit messages, plus a home path and the names of that project's experts - each one a measured
 field note, written by me, none of them needed to make the note true. The project's leader counted them the day it
-mattered (a public link was about to go out) and the owner decided: the name goes, from the history too. The GitHub
-repo was deleted and rebuilt from a rewritten history, so no old commit stays reachable by its hash there.
+mattered (a public link was about to go out) and the owner decided: the name goes, from the history too, and the
+GitHub repo is deleted and rebuilt from a rewritten history, so no old commit stays reachable there by its hash.
 
 **In the rewrite:** the project is called `atlas` everywhere, its expert names are neutral, home paths are `~`, and the
 owner's own sentences quoted in those passages are paraphrased. Every rule and finding kept its meaning; commit hashes
-cited in this file were remapped to the rewritten ones.
+cited in this file were remapped to the rewritten ones (the tip trees before and after are byte-identical, review #16).
 
 **What stops the next one** - `bin/leak-check.mjs`, one scanner, three places:
-- **git hooks** (`--install-hooks`): `pre-commit` scans what is staged, `commit-msg` the message, `pre-push` the pushed
-  range's messages and the pushed commit's whole tree - so a `--no-verify` commit is still stopped at the push.
-- **boot row `leak`**: the tracked tree and every message on HEAD, at every start; *hooks missing* warns; **no list
-  warns NOT ARMED** - a check that could not run never reads as clean.
-- **A85** runs the real hooks in a scratch repo with a synthetic word; the row is armed in `boot --prove-red` the same way.
+- **git hooks** (`--install-hooks`, written where git RUNS them - a worktree's common dir, `core.hooksPath`):
+  `pre-commit` and `pre-merge-commit` scan what is staged, `commit-msg` the message, and `pre-push` both ref names, an
+  annotated tag's message and **every commit of the pushed range** - its raw object (author, message), every path and
+  every blob - so a word that a later commit removed, or that came in by a merge, a cherry-pick or a rebase, is still
+  stopped at the push.
+- **boot row `leak`**: the tracked tree and every commit on HEAD since the last clean scan (a mark in `.git/`, keyed on
+  the list's own content: a new word re-reads all history), and the four hooks in place; **no list, an invalid list,
+  a failed scan or a missing scanner each warn under their own name** - a check that could not run never reads as clean.
+- **A85** runs the real hooks in a scratch repo with a synthetic word, one case per hole review #16 measured; the row is
+  armed in `boot --prove-red` the same way, including a word in a commit the next one removed.
 
 **The words are never in the repo** - not in clear, and not hashed either: a seven-letter word falls to a brute force
 of its SHA-256 in minutes. The list is a local file outside every repo (`bin/leak-check.mjs` names where); a hit is
-reported by file, line and rule number, never by the matched text.
+reported by file, line and rule number, and **a path that matches is itself masked** - the matched text is never printed.
 
 **Not verified / not covered:** anything the list does not name - a new private word is only stopped once it is added
-there; binary files are skipped; GitHub may keep a deleted repo's forks or caches (it had none - 0 forks).
+there; a BINARY file's content (its name is read); Unicode look-alikes and invisible characters inside a word
+(measured passing, review #16 §7 - no plausible accident of an agent's, named). Outside this repo: GitHub's own caches,
+and third-party archives of the OLD public repo (Software Heritage archives public GitHub repos under their URL, and
+public event feeds may have kept commit messages) - the GitHub API reported 0 forks and 0 stars before the deletion.
+
+## `#review16` — the rebuilt public repo: clean against the list, and the guard had a hole in the ordinary repair (2026-09-27)
+
+`review/REVIEW-16.md`, against the rewritten clone before anything was published: **against the list, publishable** -
+0 hits in every blob of every revision, every message, path and author, with a positive control (the same tool on the
+original history: 38 messages, 3 814 tree hits). The tip trees before and after the rewrite are byte-identical; all 18
+remapped hashes resolve to the right commit (13 sampled against the sentence citing them). **One 🔴, five 🟡.** The
+seventh pass in a row whose worst finding sits in the previous patch - here in A85, whose title promised more than it armed.
+
+| § | defect (the reviewer's measurement) | fix | arm |
+| --- | --- | --- | --- |
+| 🔴 1 | `pre-push` read the pushed range's MESSAGES and the TIP's tree: a word in a file a later commit removed went public (measured on a real ref - a local backup tag of the old history passed the real hook); merges run `pre-merge-commit`, cherry-pick and rebase run nothing | `--commits <range>`: every commit's raw object, paths and blobs (one `cat-file --batch`, deduplicated - 1.6 s for 198 commits); `pre-merge-commit` installed; boot scans every commit since its last clean mark | A85 (a past commit, a merge from a clone with no hooks); prove-red `leak` (a past commit) |
+| 2 | a binary's NAME was never read; a matching path was printed in clear; an invalid rule echoed its text; an empty list read as absent | paths read before the binary skip and masked in every report; invalid rule = exit 4 naming its number only; empty list says so | A85 (a binary named with the word; no output prints it) |
+| 3 | ref names and an annotated tag's message were never read; a `0x01` byte split a message record | `pre-push` scans both ref names and a tag object's message; commits are read as raw objects, no separator | A85 (tag message, branch name) |
+| 4 | four residues outside the list: a fixture name derived from an expert's old name; fragments of the owner's quoted sentence left in 12 old revisions; the home path in its dash-encoded form (25 revisions); a French common noun that was also an expert's old name, turned into nonsense in 6 | a second rewrite pass; the list's path rule widened to the user name alone | the scanner over all history: 0 |
+| 5 | the working repo kept the OLD history and refs (a branch, a backup tag, `refs/original`), `origin` = the public URL | rebuilt on the clean history at publication; old refs gone | - |
+| 6 | A84: a session mid-turn was told *"no turn taken since"*; `ending` was not counted as answered; the `idle` condition was unarmed | rule 6 checked BEFORE the quiet period; `ending` answered, `unknown` not | A84 (busy, ending, unknown) |
+
+**§7-§10, the rest:** the boot row now finds hooks where git runs them (worktree, `core.hooksPath`), names a failed scan
+and a missing scanner, and `--staged` includes type changes. **Named, not fixed:** Unicode look-alikes and invisible
+characters inside a word pass (no plausible accident); the historical *bus prints* in `CHANGELOG.md` no longer recompute
+from the public history (the bus files were rewritten in ~100 commits) - they stay true of the bytes installed then.
+**For the owner, not mine to decide:** other names of his in the public tree (a client-like project in `work`, other
+project names); `Claude-Session:` trailers (session URLs, private by default) were removed in the second pass;
+third-party archives of the old repo. **Told to its maintainer:** the method skill's own history carries the name in
+old blobs, and a public commit message of ours linked the two.
 
 ## `#review14` — the disposition of #13: no red, and "every rule reddens for itself" was false (2026-09-27)
 

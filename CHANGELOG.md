@@ -16,6 +16,12 @@ node <path-to-claude-comm>/install.mjs <your project> --check    # what version 
 Your project records what it has in `.comm/INSTALLED.json`. An update prints only the entries you did not
 already have.
 
+## 2026-09-27.7 — bus print `d3d5a9afe537` — 2026-09-27
+
+- A doorbell refused because the agent is mid-turn now says so (*"mid-turn, not rung"*) instead of *"no turn taken
+  since"* - the old wording was wrong for a busy agent. And an agent whose reply has just ended now counts as having
+  answered the previous ring, so a new message is rung (a ring at that moment is queued and delivered at its turn's end).
+
 ## 2026-09-27.6 — bus print `0091855e7f2a` — 2026-09-27
 
 - 🔴 **A message to an idle agent is no longer swallowed by the 2-minute quiet period.** The doorbell rings an agent

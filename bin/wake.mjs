@@ -437,13 +437,16 @@ export function wakeAgent(root, agent, pid, { dryRun = false, wins, turn = null,
 	// last ring and is idle again has consumed it: a second message within 120 s was swallowed and nothing ever retried
 	// it (a field, 09-27: a `done` sat 6 min, rung 102 s after another ring, its leader idle with no turn to come).
 	// Only the unanswered ring still suppresses - its own turn will deliver everything waiting. A84, `FINDINGS.md#quiet-answered`
-	const answered = prev && turn && turn.state === "idle" && turn.call && turn.call.at > Date.parse(prev.at)
+	// Rule 6 FIRST (review #16 §6): a session mid-turn was told "no turn taken since" by the quiet check below - the
+	// right outcome for the wrong reason, and the reason is what the sender reads. Nothing is recorded, so the next hook
+	// that fires looks again instead of waiting out QUIET_MS for a ring that never happened.
+	if (turn && turn.state === "busy") return { agent, pid, sent: false, busy: true, turn: "busy", why: `mid-turn, not rung (${turn.why})` }
+	// `ending` counts as answered too: a ring typed then is queued and replayed at the turn's close (turnState, 5/5).
+	// `unknown` does not - a transcript we could not read vouches for nothing.
+	const answered = prev && turn && (turn.state === "idle" || turn.state === "ending") && turn.call && turn.call.at > Date.parse(prev.at)
 	if (prev && !answered && Date.now() - Date.parse(prev.at) < QUIET_MS) {
 		return { agent, pid, sent: false, why: `rung ${Math.round((Date.now() - Date.parse(prev.at)) / 1000)}s ago and no turn taken since, quiet period is ${QUIET_MS / 1000}s` }
 	}
-	// Rule 6, before anything is resolved. And nothing is recorded, so the next hook that fires
-	// looks again instead of waiting out QUIET_MS for a ring that never happened.
-	if (turn && turn.state === "busy") return { agent, pid, sent: false, busy: true, turn: "busy", why: `mid-turn, not rung (${turn.why})` }
 	const seen = turn ? { turn: turn.state, turnWhy: turn.why } : {}
 	// Rule 7, decided on the same read rule 6 used.
 	const decision = freshDecision(agent, cfg, turn, fresh)

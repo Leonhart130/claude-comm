@@ -757,21 +757,24 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 // -- 1f. a private word in what this repo would publish ------------------------
 // 2026-09-27: a private project's name sat in 105 lines of 15 files and 35 commit messages of this PUBLIC repo, and a
 // home path beside it - three weeks of measured field notes, written by me. The owner had the repo deleted and rebuilt
-// (`FINDINGS.md#leak-check`). The words live outside every repo; this row runs the scanner the git hooks run, on the
-// tracked tree and every commit message on HEAD, and checks the hooks are in place. NOT ARMED warns: a check that
-// could not run must never read as clean (form E).
+// (`FINDINGS.md#leak-check`). The words live outside every repo; this row runs the scanner the git hooks run: the
+// tracked tree, and EVERY commit (object, paths, blobs) since the last clean scan - review #16: reading only messages
+// and the tip let a removed word go public. It finds the hooks where git RUNS them (a worktree, core.hooksPath), and a
+// scanner that failed or is missing says so: a check that could not run never reads as clean (form E).
 {
 	const lc = join(ROOT, "bin", "leak-check.mjs")
-	if (existsSync(lc) && existsSync(join(ROOT, ".git"))) {
-		const scanOf = (m) => spawnSync(process.execPath, [lc, m], { cwd: ROOT, encoding: "utf8", timeout: 15000 })
-		const t = scanOf("--tree"), h = scanOf("--history")
-		const n = (r) => Number((/(\d+) private word/.exec(r.stderr || "") || [])[1] || 0)
-		const hooks = ["pre-commit", "commit-msg", "pre-push"].filter((k) => { try { return !readFileSync(join(ROOT, ".git", "hooks", k), "utf8").includes("leak-check") } catch { return true } })
-		if (t.status === 3 || h.status === 3) row("leak", WARN, `NOT ARMED - ${(t.stderr || h.stderr).split("\n")[0].replace(/^✗ leak-check NOT ARMED: /, "")}`, ["unarmed"])
-		else if (t.status !== 0 || h.status !== 0) row("leak", WARN, `${n(t)} private word(s) in the tracked tree, ${n(h)} in commit messages on HEAD - NOT publishable: node bin/leak-check.mjs --tree / --history lists them`,
-			[...(t.status ? ["tree"] : []), ...(h.status ? ["history"] : [])])
-		else if (hooks.length) row("leak", WARN, `clean, but ${hooks.join(", ")} not installed - nothing stops the next one: node bin/leak-check.mjs --install-hooks`, ["no-hooks"])
-		else row("leak", OK, "no private word in the tracked tree or any commit message on HEAD; the three git hooks are in place")
+	if (existsSync(join(ROOT, ".git")) && !existsSync(lc)) row("leak", WARN, "bin/leak-check.mjs is MISSING - nothing checks what this repo publishes", ["missing"])
+	else if (existsSync(lc)) {
+		const r = spawnSync(process.execPath, [lc, "--all-cached"], { cwd: ROOT, encoding: "utf8", timeout: 30000 })
+		const n = Number((/(\d+) private word/.exec(r.stderr || "") || [])[1] || 0)
+		let dir = ""
+		try { dir = spawnSync(process.execPath, [lc, "--hooks-dir"], { cwd: ROOT, encoding: "utf8", timeout: 5000 }).stdout.trim() } catch {}
+		const hooks = ["pre-commit", "pre-merge-commit", "commit-msg", "pre-push"].filter((k) => { try { return !readFileSync(join(dir, k), "utf8").includes("leak-check") } catch { return true } })
+		if (r.status === 3 || r.status === 4) row("leak", WARN, `NOT ARMED - ${(r.stderr || "").split("\n")[0].replace(/^✗ leak-check NOT ARMED: /, "")}`, ["unarmed"])
+		else if (r.status === 1) row("leak", WARN, `${n} private word(s) in the tracked tree or the history on HEAD - NOT publishable: node bin/leak-check.mjs --commits lists them (never the words)`, ["found"])
+		else if (r.status !== 0) row("leak", WARN, `the scan FAILED (exit ${r.status}${r.error ? `, ${r.error.code}` : ""}) - nothing was checked: ${(r.stderr || "").split("\n")[0].slice(0, 120)}`, ["failed"])
+		else if (hooks.length) row("leak", WARN, `clean, but ${hooks.join(", ")} not installed in ${dir || "the hooks dir"} - nothing stops the next one: node bin/leak-check.mjs --install-hooks`, ["no-hooks"])
+		else row("leak", OK, "no private word in the tracked tree or any commit on HEAD; the four git hooks are in place")
 	}
 }
 
@@ -2584,34 +2587,42 @@ function proveRed() {
 	// per case against the clean control: the word in a tracked file, in a commit message, no list, no hooks.
 	{
 		const list = join(tmp, "leak-words"), env0 = process.env.CLAUDE_COMM_PRIVATE_WORDS
-		writeFileSync(list, "zq[p]robeword\n")
+		// The word is BUILT, never written: this file is itself scanned (a fixture copies the tracked tree), and a literal
+		// here made the clean control red - measured, the first prove-red of this arm.
+		const W = ["zq", "probe", "word"].join("")
+		writeFileSync(list, `${W}\n`)
 		const setList = (v) => { if (v === undefined) delete process.env.CLAUDE_COMM_PRIVATE_WORDS; else process.env.CLAUDE_COMM_PRIVATE_WORDS = v }
 		const hooksDir = join(pkg, ".git", "hooks"), lcP = join(pkg, "bin", "leak-check.mjs")
-		let clean = { level: -1, text: "" }, inTree = clean, inMsg = clean, unarmed = clean, noHooks = clean
+		let clean = { level: -1, text: "" }, inTree = clean, inMsg = clean, inPast = clean, unarmed = clean, noHooks = clean
 		try {
 			setList(list)
 			spawnSync(process.execPath, [lcP, "--install-hooks"], { cwd: pkg, encoding: "utf8" })
 			clean = rowOf(run(true), "leak")
-			writeFileSync(join(pkg, "LEAK.md"), "zqprobeword\n"); g("add", "LEAK.md"); inTree = rowOf(run(true), "leak")
+			writeFileSync(join(pkg, "LEAK.md"), `${W}\n`); g("add", "LEAK.md"); inTree = rowOf(run(true), "leak")
 			g("rm", "-q", "--cached", "LEAK.md"); rmSync(join(pkg, "LEAK.md"), { force: true })
-			g("commit", "-q", "--no-verify", "--allow-empty", "-m", "zqprobeword in a message"); inMsg = rowOf(run(true), "leak")
+			g("commit", "-q", "--no-verify", "--allow-empty", "-m", `${W} in a message`); inMsg = rowOf(run(true), "leak")
 			g("reset", "-q", "--soft", "HEAD~1")
+			// Review #16 §1: a word in a commit that the NEXT commit removes - the tip and every message are clean.
+			writeFileSync(join(pkg, "MID.md"), `${W}\n`); g("add", "MID.md"); g("commit", "-q", "--no-verify", "-m", "adds a file")
+			g("rm", "-q", "MID.md"); g("commit", "-q", "--no-verify", "-m", "removes it"); inPast = rowOf(run(true), "leak")
+			g("reset", "-q", "--soft", "HEAD~2")
 			setList(join(tmp, "no-such-list")); unarmed = rowOf(run(true), "leak"); setList(list)
-			for (const k of ["pre-commit", "commit-msg", "pre-push"]) rmSync(join(hooksDir, k), { force: true })
+			for (const k of ["pre-commit", "pre-merge-commit", "commit-msg", "pre-push"]) rmSync(join(hooksDir, k), { force: true })
 			noHooks = rowOf(run(true), "leak")
 		} finally {
-			for (const k of ["pre-commit", "commit-msg", "pre-push"]) rmSync(join(hooksDir, k), { force: true })
+			for (const k of ["pre-commit", "pre-merge-commit", "commit-msg", "pre-push"]) rmSync(join(hooksDir, k), { force: true })
 			setList(env0)
 		}
-		assert("leak: a private word in the tree or a message warns; no list is NOT ARMED; no hooks warns",
-			clean.level === OK && inTree.level === WARN && (inTree.causes || []).includes("tree") &&
-			inMsg.level === WARN && (inMsg.causes || []).includes("history") &&
+		assert("leak: a private word in the tree, a message or a PAST commit warns; no list is NOT ARMED; no hooks warns",
+			clean.level === OK && inTree.level === WARN && (inTree.causes || []).includes("found") &&
+			inMsg.level === WARN && (inMsg.causes || []).includes("found") &&
+			inPast.level === WARN && (inPast.causes || []).includes("found") &&
 			unarmed.level === WARN && (unarmed.causes || []).includes("unarmed") &&
 			noHooks.level === WARN && (noHooks.causes || []).includes("no-hooks") &&
-			!/zqprobeword/i.test([inTree.text, inMsg.text].join(" ")),
+			!new RegExp(W, "i").test([inTree.text, inMsg.text, inPast.text].join(" ")),
 			`clean, armed, hooks in -> ${LV[clean.level]}; word in a tracked file -> ${LV[inTree.level]} ${JSON.stringify(inTree.causes || [])}; ` +
-			`in a commit message -> ${LV[inMsg.level]} ${JSON.stringify(inMsg.causes || [])}; no list -> ${LV[unarmed.level]} ${JSON.stringify(unarmed.causes || [])}; ` +
-			`hooks removed -> ${LV[noHooks.level]} ${JSON.stringify(noHooks.causes || [])}; the row never prints the word=${!/zqprobeword/i.test([inTree.text, inMsg.text].join(" "))}`)
+			`in a commit message -> ${LV[inMsg.level]} ${JSON.stringify(inMsg.causes || [])}; in a file a later commit removed -> ${LV[inPast.level]}; no list -> ${LV[unarmed.level]} ${JSON.stringify(unarmed.causes || [])}; ` +
+			`hooks removed -> ${LV[noHooks.level]} ${JSON.stringify(noHooks.causes || [])}; the row never prints the word=${!new RegExp(W, "i").test([inTree.text, inMsg.text, inPast.text].join(" "))}`)
 	}
 	// THIS REPO'S OWN INSTALLED BUS AGAINST ITS OWN CODE (review #11b S2; LESSONS form A: this tree
 	// ran 09-11.7 while the field ran .8, unseen). Installed into a COPY of the fixture root - the
