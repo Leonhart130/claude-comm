@@ -120,5 +120,7 @@ if (!baseGreen) {
 	process.exit(1)
 }
 const survived = results.filter((r) => !r.baseline && r.ran && !r.reds.length)
-console.log(survived.length ? `\n🔴 ${survived.length} mutant(s) survived - each is an unarmed property.` : `\n✓ baseline green; every mutant reddened something. Read WHICH arm and WHICH row before calling it armed.`)
+console.log(!mutants.length ? `\n✓ ${base.length}/${base.length} unmodified suites green, ${jobs} at a time - the parallelism control, nothing more`
+	: survived.length ? `\n🔴 ${survived.length} mutant(s) survived - each is an unarmed property.`
+	: `\n✓ baseline green; every mutant reddened something. Read WHICH arm and WHICH row before calling it armed.`)
 process.exit(survived.length || results.some((r) => !r.baseline && !r.ran) ? 1 : 0)

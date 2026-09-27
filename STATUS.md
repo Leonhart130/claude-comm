@@ -16,6 +16,11 @@ the ARMS or the PROSE; eleven mutants now each redden their own row, one named s
 now carries the mutation claims of two dispositions) and at the `.2` CHANGELOG, which is the third release note in a
 row a reviewer had to correct.
 
+**A2 - the close is blind to its OWN inbox** (09-20's failure: closed before reading #13's report). `boot.mjs` walks
+only the FIELD's inboxes (`.filter((p) => resolve(p) !== ROOT)`, section 5). Fix: a row for the session's own pending
+mail that `--close` must see green or named; arm it in `boot --prove-red`. ~35 min, 12 of them the control (`--only`
+cuts output, not work) - deferred 09-27 on the owner's 30-minute line.
+
 **B - the registry half of #13 §1, MEASURED 09-27 by A31 going red on my own end-to-end probe**: a hand-fire from
 inside a session in the project rewrites that session's registry entry. Design in `FINDINGS.md#review13` "Named, not
 fixed" - gate `record()` AND `refresh()` on the witness. Touches `Stop`, the hottest path: own change, own arm,
@@ -24,7 +29,7 @@ fixed" - gate `record()` AND `refresh()` on the witness. Touches `Stop`, the hot
 **C - tests faster, still reliable (owner, 09-27). `test/mutate.mjs` IS BUILT**: baseline in the same batch (not
 green ⇒ VOID), a mutant that does not match exactly once is refused, a survivor is printed as the finding. Controls
 run: refuses 2/2 inert mutants; a known-red mutant reddens A77 and a comment edit SURVIVES. **11 runs 3 wide in 238 s**
-(serial was ~11 min). The parallel control is still ONE run of 4/4 - repeat before going wider. Next: `attack` itself -
+(serial was ~11 min). Parallel controls: 4/4 green 4 wide UNDER LOAD (atlas working), 6/6 green 6 wide on an idle machine (78 s for all six). Next: `attack` itself -
 A59 8 s, A34 5 s, A20 4 s of 51 s; `--only <arm>` for iteration, the full suite stays the gate.
 
 **D - `#bell-into-typing`**: the bell reads the AGENT's turn, never the PERSON's input line - it cut the owner's
