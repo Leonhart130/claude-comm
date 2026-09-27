@@ -16,6 +16,12 @@ node <path-to-claude-comm>/install.mjs <your project> --check    # what version 
 Your project records what it has in `.comm/INSTALLED.json`. An update prints only the entries you did not
 already have.
 
+## 2026-09-27.9 — bus print `1ec5274b9011` — 2026-09-27
+
+- **The `claude-comm` skill catches up with `.5`-`.7`**: the doorbell rings an agent again once it has answered (or 2
+  minutes later), and `send` may say it CANNOT SAY because the recipient is *WAITING on permission prompt* - a person must
+  answer it, and no ring is offered. No change in how the bus behaves.
+
 ## 2026-09-27.8 — bus print `a03d7be0a41f` — 2026-09-27
 
 - **Nothing changes in how the bus behaves.** Comments in the shipped files no longer name the projects that use this
