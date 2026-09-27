@@ -33,6 +33,31 @@ const PKG = new URL("..", import.meta.url).pathname
 const exitHooks = []
 const atExit = (f) => { exitHooks.push(f) }
 process.once("exit", () => { for (const f of exitHooks) { try { f() } catch {} } })
+
+// A REAL START HAS A WITNESS (review #13 §1, FINDINGS.md#review13). The ledger counts a start only when the runtime's
+// own session file - $HOME/.claude/sessions/<pid>.json, on disk before SessionStart fires - carries the payload's
+// session_id for the `claude` process above the fire. So an arm whose control is "a real session starts" gives its fake
+// claude that file; a fire without one is the hand-fired probe, and that is a phantom. The fake claude plants it
+// ITSELF, because its pid exists only inside the fire - hence a shell prefix, not a file written from here. Each kit
+// has its own HOME: a control reading the machine's real session files inherits the world it measures.
+let plantScript = null
+const witnessKit = () => {
+	if (!plantScript) {
+		const d = mkdtempSync(join(tmpdir(), "comm-attack-witness-"))
+		atExit(() => { try { rmSync(d, { recursive: true, force: true }) } catch {} })
+		plantScript = join(d, "plant.mjs")
+		writeFileSync(plantScript, [
+			`import { readFileSync, writeFileSync } from "node:fs"`,
+			`const pp = process.ppid, t = readFileSync("/proc/" + pp + "/stat", "utf8")`,
+			`writeFileSync(process.argv[2] + "/" + pp + ".json", JSON.stringify({ pid: pp, procStart: t.slice(t.lastIndexOf(")") + 2).split(" ")[19], sessionId: process.argv[3], cwd: process.argv[4], kind: "interactive" }))`,
+		].join("\n"))
+	}
+	const home = mkdtempSync(join(tmpdir(), "comm-attack-home-"))
+	atExit(() => { try { rmSync(home, { recursive: true, force: true }) } catch {} })
+	const sessions = join(home, ".claude", "sessions")
+	mkdirSync(sessions, { recursive: true })
+	return { home, plant: (sid, cwd) => `${process.execPath} ${plantScript} ${sessions} ${sid} ${cwd} && ` }
+}
 const root = mkdtempSync(join(tmpdir(), "comm-attack-"))
 mkdirSync(join(root, "app", "docs"), { recursive: true })
 mkdirSync(join(root, ".comm", "inbox"), { recursive: true })
@@ -1427,6 +1452,7 @@ const POINTER_SOURCES = (() => {
 	// commands in the -c string so the shell cannot exec-optimise its argv[0] away.
 	const fakeClaude = join(rootA, "claude")
 	try { symlinkSync("/bin/sh", fakeClaude) } catch {}
+	const kitA = witnessKit(), sidA = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 	// THE TWO STREAMS ARE KEPT APART, and the reason is a defect this fixture was hiding.
 	// It redirected `> out 2>&1` and then parsed that file as the hook's stdout - so ANY
 	// diagnostic the stub writes to stderr landed inside the JSON and broke `schemaOK`. The
@@ -1441,10 +1467,10 @@ const POINTER_SOURCES = (() => {
 	// hook may say whatever it likes on stderr and its stdout contract stays intact.
 	const fire = (verb) => {
 		const out = join(rootA, `${verb}.out`), err = join(rootA, `${verb}.err`)
-		spawnSync(fakeClaude, ["-c", `cd ${join(rootA, "app")} && ${process.execPath} ${stub} ${verb} > ${out} 2> ${err}; echo done`], {
+		spawnSync(fakeClaude, ["-c", `cd ${join(rootA, "app")} && ${kitA.plant(sidA, join(rootA, "app"))}${process.execPath} ${stub} ${verb} > ${out} 2> ${err}; echo done`], {
 			encoding: "utf8",
-			input: JSON.stringify({ cwd: join(rootA, "app"), source: "startup", transcript_path: tp }),
-			env: { ...process.env, CLAUDE_COMM_RUNTIME: rt },
+			input: JSON.stringify({ cwd: join(rootA, "app"), source: "startup", transcript_path: tp, session_id: sidA }),
+			env: { ...process.env, HOME: kitA.home, CLAUDE_COMM_RUNTIME: rt },
 		})
 		let stdout = "", stderr = ""
 		try { stdout = readFileSync(out, "utf8") } catch {}
@@ -1455,8 +1481,8 @@ const POINTER_SOURCES = (() => {
 	// reproducing a bug, actually produces. It must record nothing at all.
 	const fireForeign = (verb) => spawnSync("node", [stub, verb], {
 		cwd: join(rootA, "app"), encoding: "utf8",
-		input: JSON.stringify({ cwd: join(rootA, "app"), source: "startup", transcript_path: tp }),
-		env: { ...process.env, CLAUDE_COMM_RUNTIME: rt },
+		input: JSON.stringify({ cwd: join(rootA, "app"), source: "startup", transcript_path: tp, session_id: sidA }),
+		env: { ...process.env, HOME: kitA.home, CLAUDE_COMM_RUNTIME: rt },
 	})
 	const mail = () => readdirSync(join(rootA, ".comm", "inbox", "app")).filter((f) => f.endsWith(".json")).length
 	const ledgerLog = () => { try { return readFileSync(join(rootA, ".comm", "handoff", "app.log"), "utf8") } catch { return "" } }
@@ -1645,18 +1671,19 @@ const POINTER_SOURCES = (() => {
 	writeFileSync(payload, JSON.stringify({ cwd: join(rootS, "app"), source: "startup", transcript_path: tp }))
 	const fakeClaude = join(rootS, "claude")
 	try { symlinkSync("/bin/sh", fakeClaude) } catch {}
+	const kitS = witnessKit()
 	// EACH START IS ITS OWN SESSION, as every real relaunch is. One transcript for all four made
 	// them one session id started four times within a second - the exact shape of a duplicated
 	// recorder, which the ledger collapses since review #11 R1 (`FINDINGS.md#armer`).
 	let startN = 0
 	const start = () => {
-		const tpN = join(rootS, `11111111-2222-3333-4444-${String(++startN).padStart(12, "0")}.jsonl`)
+		const sidN = `11111111-2222-3333-4444-${String(++startN).padStart(12, "0")}`, tpN = join(rootS, `${sidN}.jsonl`)
 		writeFileSync(tpN, "\n")
-		writeFileSync(payload, JSON.stringify({ cwd: join(rootS, "app"), source: "startup", transcript_path: tpN }))
+		writeFileSync(payload, JSON.stringify({ cwd: join(rootS, "app"), source: "startup", transcript_path: tpN, session_id: sidN }))
 		return spawnSync(fakeClaude, ["-c",
-			`cd ${join(rootS, "app")} && ${process.execPath} ${join(rootS, "app", ".claude", "comm-hook.mjs")} session-start ` +
+			`cd ${join(rootS, "app")} && ${kitS.plant(sidN, join(rootS, "app"))}${process.execPath} ${join(rootS, "app", ".claude", "comm-hook.mjs")} session-start ` +
 			`< ${payload} > /dev/null 2>&1; echo done`],
-			{ encoding: "utf8", env: { ...process.env, CLAUDE_COMM_RUNTIME: rt } })
+			{ encoding: "utf8", env: { ...process.env, HOME: kitS.home, CLAUDE_COMM_RUNTIME: rt } })
 	}
 	const lastRecord = () => {
 		try {
@@ -2204,12 +2231,13 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	withBoot.hooks.SessionStart.unshift({ hooks: [{ type: "command", command: `node "$CLAUDE_PROJECT_DIR/bin/boot.mjs" --fast --hook 2>/dev/null || true` }] })
 	const fake73 = join(r73, "claude")
 	try { symlinkSync("/bin/sh", fake73) } catch {}
+	const kit73 = witnessKit()
 	const lines73 = (agent = "leader") => { try { return readFileSync(join(r73, ".comm", "handoff", `${agent}.log`), "utf8").trim().split("\n").length } catch { return 0 } }
 	const fire73 = (sid, dir = r73) => {
 		const tp = join(r73, `${sid}.jsonl`); writeFileSync(tp, "\n")
-		const pl = join(r73, "payload.json"); writeFileSync(pl, JSON.stringify({ cwd: dir, source: "startup", transcript_path: tp }))
-		spawnSync(fake73, ["-c", `cd ${dir} && ${process.execPath} ${join(dir, ".claude", "comm-hook.mjs")} session-start < ${pl} > /dev/null 2>&1; echo done`],
-			{ encoding: "utf8", env: { ...process.env, CLAUDE_COMM_RUNTIME: join(r73, "runtime") } })
+		const pl = join(r73, "payload.json"); writeFileSync(pl, JSON.stringify({ cwd: dir, source: "startup", transcript_path: tp, session_id: sid }))
+		spawnSync(fake73, ["-c", `cd ${dir} && ${kit73.plant(sid, dir)}${process.execPath} ${join(dir, ".claude", "comm-hook.mjs")} session-start < ${pl} > /dev/null 2>&1; echo done`],
+			{ encoding: "utf8", env: { ...process.env, HOME: kit73.home, CLAUDE_COMM_RUNTIME: join(r73, "runtime") } })
 	}
 	const expertStub = existsSync(join(r73, "review", ".claude", "comm-hook.mjs"))
 	writeFileSync(settingsP, JSON.stringify(withBoot)); const b0 = lines73(); fire73("73737373-0000-0000-0000-000000000001"); const aside = lines73() - b0
@@ -2368,8 +2396,20 @@ process.stdout.write(JSON.stringify({ ops, res }))
 // So the missing ancestor is REAL here, never simulated: setsid --fork reparents the fire to init/systemd (measured
 // 5/5 with no claude anywhere in the chain). Each detached fire reports the chain it actually had and `noAncestor`
 // asserts it - without that positive control the phantom row would pass for a fire that quietly still had a session
-// above it, which is the very substitution that broke the old arm. Five rows, one variable each: what is in the
-// chain, and what witnesses the session id.
+// above it, which is the very substitution that broke the old arm.
+//
+// 🔴 AND IT CERTIFIED THE WRONG SIDE A SECOND TIME (review #13 §1, the eighth instance). Its `own` row fired from a
+// fake claude INSIDE the project with a session id that NO session file carried, and asserted 1: the witness was
+// never asked whenever /proc found an ancestor, and the arm froze that. That fire is the probe this repo actually
+// runs - a stub fired by hand from a Bash call in a session in the project - and it is a phantom. So the row now
+// asserts 0, and the honest positive control is the one a real session has: the fake claude PLANTS ITS OWN session
+// file first ($$ is known only inside the fire), exactly as the runtime writes one before SessionStart (measured
+// 2026-09-27 through a startup and two /clears, FINDINGS.md#review13).
+//
+// One variable per row: what is in the chain, and what the session file carrying that id says. Plus two the review
+// found unarmed: the REGISTRY half of the stub's ownership guard (§7a - A77 counted ledger lines and never read the
+// registry, so `ownsSession() -> true` left the whole suite green), and the stub's stderr (§2 - it said "IS counted"
+// for a start the ledger did not count, and nothing when a stale registry dropped every start).
 {
 	const r77 = mkdtempSync(join(tmpdir(), "comm-attack-ledger-own-"))
 	const out77 = mkdtempSync(join(tmpdir(), "comm-attack-ledger-out-"))
@@ -2378,33 +2418,51 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	const home77 = mkdtempSync(join(tmpdir(), "comm-attack-ledger-home-"))
 	atExit(() => { for (const d of [r77, out77, home77]) { try { rmSync(d, { recursive: true, force: true }) } catch {} } })
 	mkdirSync(join(r77, ".comm"), { recursive: true })
-	mkdirSync(join(home77, ".claude", "sessions"), { recursive: true })
+	const sess77 = join(home77, ".claude", "sessions")
+	mkdirSync(sess77, { recursive: true })
 	writeFileSync(join(r77, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: "." } }))
 	execFileSync("node", [join(PKG, "install.mjs"), r77], { stdio: "pipe" })
 	const fake77 = join(out77, "claude")
 	try { symlinkSync("/bin/sh", fake77) } catch {}
 	const stub77 = join(r77, ".claude", "comm-hook.mjs")
 	const log77 = join(r77, ".comm", "handoff", "leader.log")
-	const sessF77 = join(home77, ".claude", "sessions", "9999.json")
+	const reg77 = join(out77, "runtime", "claude-comm", "sessions")
 	const SID77 = "11111111-2222-3333-4444-555555555555"
 	const n77 = () => { try { return readFileSync(log77, "utf8").trim().split("\n").filter(Boolean).length } catch { return 0 } }
 	const env77 = { ...process.env, HOME: home77, CLAUDE_COMM_RUNTIME: join(out77, "runtime") }
-	// Every fire carries a transcript_path: the FIRST mutation run of this property was green with the guard removed,
-	// because its payload had none and the ledger call is gated on one.
-	const payload77 = () => {
+	const tick77 = (pid) => { try { const t = readFileSync(`/proc/${pid}/stat`, "utf8"); return t.slice(t.lastIndexOf(")") + 2).split(" ")[19] } catch { return null } }
+	const clear77 = () => { for (const f of readdirSync(sess77)) rmSync(join(sess77, f), { force: true }) }
+	// A session file as the runtime writes it (FINDINGS.md#review13): pid, procStart, sessionId, cwd.
+	const file77 = (pid, cwd, procStart = tick77(pid), name = `${pid}.json`) =>
+		writeFileSync(join(sess77, name), JSON.stringify({ pid, procStart, sessionId: SID77, cwd, kind: "interactive" }))
+	const witness77 = (pid, cwd, procStart) => { clear77(); file77(pid, cwd, procStart) }
+	// Every fire carries a transcript_path unless a row says otherwise: the FIRST mutation run of this property was
+	// green with the guard removed, because its payload had none and the ledger call is gated on one.
+	const payload77 = (tpToo = true) => {
 		const tp = join(r77, `${randomUUID()}.jsonl`); writeFileSync(tp, "\n")
-		const pl = join(out77, "payload.json")
-		writeFileSync(pl, JSON.stringify({ cwd: r77, source: "startup", transcript_path: tp, session_id: SID77 }))
+		const pl = join(out77, `payload-${randomUUID()}.json`)
+		writeFileSync(pl, JSON.stringify({ cwd: r77, source: "startup", ...(tpToo ? { transcript_path: tp } : {}), session_id: SID77 }))
 		return pl
 	}
-	const fire77 = (inside) => {
-		const pl = payload77(), before = n77()
-		spawnSync(fake77, ["-c", `${inside ? `cd ${r77} && ` : ""}${process.execPath} ${stub77} session-start < ${pl} > /dev/null 2>&1`],
+	// The fake claude plants ITS OWN session file when asked: its pid is known only inside the fire.
+	const plant77 = join(out77, "plant.mjs")
+	writeFileSync(plant77, [
+		`import { readFileSync, writeFileSync } from "node:fs"`,
+		`const pp = process.ppid, t = readFileSync("/proc/" + pp + "/stat", "utf8")`,
+		`writeFileSync(process.argv[2] + "/" + pp + ".json", JSON.stringify({ pid: pp, procStart: t.slice(t.lastIndexOf(")") + 2).split(" ")[19], sessionId: process.argv[3], cwd: process.argv[4], kind: "interactive" }))`,
+	].join("\n"))
+	const fire77 = (inside, plant = false) => {
+		const pl = payload77(), before = n77(), err = join(out77, `err-${randomUUID()}`)
+		const r = spawnSync(fake77, ["-c", `${inside ? `cd ${r77} && ` : ""}` +
+			`${plant ? `${process.execPath} ${plant77} ${sess77} ${SID77} ${r77} && ` : ""}` +
+			`${process.execPath} ${stub77} session-start < ${pl} > /dev/null 2> ${err}`],
 			{ cwd: out77, encoding: "utf8", env: env77 })
-		return n77() - before
+		let e = ""; try { e = readFileSync(err, "utf8") } catch {}
+		// Read at once: the next record() prunes entries whose process is gone, and this one's has just exited.
+		return { added: n77() - before, registered: existsSync(join(reg77, `${r.pid}.json`)), err: e }
 	}
-	// The detached fire records the chain it actually had, runs the stub, then writes a marker. Polled, not waited
-	// on: setsid returns as soon as it has forked, so there is nothing to wait for.
+	// The detached fire records the chain it actually had, runs the stub, then writes a marker with its stderr.
+	// Polled, not waited on: setsid returns as soon as it has forked, so there is nothing to wait for.
 	const wrap77 = join(out77, "detached.mjs")
 	writeFileSync(wrap77, [
 		`import { readFileSync, writeFileSync } from "node:fs"`,
@@ -2413,37 +2471,80 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		`const pp = (p) => { try { const s = readFileSync("/proc/" + p + "/stat", "utf8"); return Number(s.slice(s.lastIndexOf(")") + 2).split(" ")[1]) || 0 } catch { return 0 } }`,
 		`const chain = []`,
 		`for (let pid = process.pid, i = 0; i < 32 && pid > 1; i++) { chain.push(a0(pid) || "?"); pid = pp(pid) }`,
-		`const r = spawnSync(process.argv[2], [process.argv[3], "session-start"], { input: readFileSync(process.argv[4], "utf8"), stdio: ["pipe", "ignore", "ignore"] })`,
-		`writeFileSync(process.argv[5], JSON.stringify({ chain, status: r.status }))`,
+		`const r = spawnSync(process.argv[2], [process.argv[3], "session-start"], { input: readFileSync(process.argv[4], "utf8"), stdio: ["pipe", "ignore", "pipe"] })`,
+		`writeFileSync(process.argv[5], JSON.stringify({ chain, status: r.status, err: String(r.stderr || "") }))`,
 	].join("\n"))
 	const nap77 = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
-	const fireDetached77 = () => {
-		const pl = payload77(), before = n77()
+	const fireDetached77 = (tpToo = true) => {
+		const pl = payload77(tpToo), before = n77()
 		const done = join(out77, `done-${randomUUID()}.json`)
 		spawnSync("setsid", ["--fork", process.execPath, wrap77, process.execPath, stub77, pl, done],
 			{ cwd: out77, env: env77, encoding: "utf8" })
 		const deadline = Date.now() + 20000
 		while (!existsSync(done) && Date.now() < deadline) nap77(50)
-		let chain = null
-		try { chain = JSON.parse(readFileSync(done, "utf8")).chain } catch {}
-		return { added: n77() - before, chain, ran: existsSync(done) }
+		let d = {}
+		try { d = JSON.parse(readFileSync(done, "utf8")) } catch {}
+		return { added: n77() - before, chain: d.chain || null, err: d.err || "", ran: existsSync(done) }
 	}
-	const witness77 = (cwd) => writeFileSync(sessF77, JSON.stringify({ pid: 9999, sessionId: SID77, cwd, kind: "interactive" }))
+	const COUNTED = "IS counted by the ledger", DROPPED = "is NOT counted by the ledger"
+	const dead77 = spawnSync("true").pid
+	clear77()
 	const foreign = fire77(false)
-	const own = fire77(true)
+	const ownBare = fire77(true)
+	const ownPlanted = fire77(true, true)
+	witness77(process.pid, r77)
+	const ownReplay = fire77(true)
+	clear77()
 	const phantom = fireDetached77()
-	witness77(r77)
+	witness77(process.pid, r77)
 	const witnessedIn = fireDetached77()
-	witness77(join(out77, "elsewhere"))
+	const noTranscript = fireDetached77(false)
+	witness77(dead77, r77, "1")
+	const witnessedDead = fireDetached77()
+	witness77(process.pid, r77, String(Number(tick77(process.pid)) + 1))
+	const recycled = fireDetached77()
+	witness77(process.pid, join(out77, "elsewhere"))
 	const witnessedOut = fireDetached77()
-	const fires77 = [phantom, witnessedIn, witnessedOut]
+	// A dead session's leftover file carrying the SAME id beside the live one must not decide: the witness read the
+	// first match, and the arms that fire one id several times measured it refusing real starts. 🔴 The first version
+	// of this row wrote the two files in both CREATION orders and a first-match mutant sailed through it: Node's
+	// readdir comes back sorted by NAME (libuv scandir - measured, creation order never shows), so both rows listed the
+	// live file first. The leftover is now NAMED to sort first - the order a first-match witness gets wrong - and
+	// `leftoverListedFirst` asserts that it did, or this row measures nothing.
+	clear77(); file77(process.pid, r77); file77(dead77, r77, "1", "0-leftover.json")
+	const leftoverListedFirst = readdirSync(sess77)[0] === "0-leftover.json"
+	const leftover = fireDetached77()
+	// §2(b): an installed registry that predates witnessStart, on a start that is otherwise legitimate. The control is
+	// ownPlanted, the same fire with the installed registry as it ships.
+	const regF77 = join(r77, ".comm", "bin", "session-registry.mjs"), regSrc77 = readFileSync(regF77, "utf8")
+	writeFileSync(regF77, regSrc77.replace("export function witnessStart(", "function witnessStartGone("))
+	clear77()
+	const stale = fire77(true, true)
+	writeFileSync(regF77, regSrc77)
+	const fires77 = [phantom, witnessedIn, noTranscript, witnessedDead, recycled, witnessedOut, leftover]
 	const noAncestor = fires77.every((f) => f.ran && Array.isArray(f.chain) && f.chain.length > 0 && !f.chain.includes("claude"))
-	check("A77 the ledger counts a start only from a session in this project, and a start nothing witnesses is refused",
-		foreign === 0 && own === 1 && phantom.added === 0 && witnessedIn.added === 1 && witnessedOut.added === 0 && noAncestor,
-		`a claude ancestor OUTSIDE the project -> ${foreign} record(s) (want 0); the same ancestor INSIDE -> ${own} (want 1, positive control); ` +
-		`NO claude ancestor and no session file carrying that id -> ${phantom.added} (want 0: a phantom is refused); ` +
-		`the same fire once the runtime's own session file witnesses that id inside the project -> ${witnessedIn.added} ` +
-		`(want 1: a real start whose ancestor walk cannot be done is still counted); witnessed running elsewhere -> ${witnessedOut.added} (want 0); ` +
+	// The replay row asserts its REASON too: with the file's procStart present, a witness that dropped the pid rule
+	// would still refuse - as "recycled" - and the rule would be a mutation masked by its sibling (#review12b).
+	const replayNamed = ownReplay.err.includes("a replay of another session's payload")
+	const ledgerRows = foreign.added === 0 && ownBare.added === 0 && ownPlanted.added === 1 && ownReplay.added === 0 && replayNamed &&
+		phantom.added === 0 && witnessedIn.added === 1 && witnessedDead.added === 0 && recycled.added === 0 && witnessedOut.added === 0 &&
+		leftover.added === 1 && leftoverListedFirst
+	const registryRows = foreign.registered === false && ownPlanted.registered === true
+	const saidRows = witnessedIn.err.includes(COUNTED) && noTranscript.added === 0 && noTranscript.err.includes(DROPPED) && !noTranscript.err.includes(COUNTED) &&
+		!ownPlanted.err.includes(DROPPED) && stale.added === 0 && stale.err.includes(DROPPED)
+	check("A77 the ledger counts a start only when the runtime's own session file witnesses it in this project, and the stub says what the ledger did",
+		ledgerRows && registryRows && saidRows && noAncestor,
+		`a claude ancestor OUTSIDE the project -> ${foreign.added} record(s) (want 0), registry entry for it=${foreign.registered} (want false); ` +
+		`the ancestor INSIDE, no session file carries the id -> ${ownBare.added} (want 0: the hand-fired probe is a phantom, review #13 §1); ` +
+		`the same fire once it planted its OWN session file -> ${ownPlanted.added} (want 1, the positive control), registry entry=${ownPlanted.registered} (want true); ` +
+		`the ancestor inside, the id's file belongs to ANOTHER live pid -> ${ownReplay.added} (want 0), named a replay=${replayNamed}; ` +
+		`NO ancestor and no file -> ${phantom.added} (want 0); witnessed by a live pid inside -> ${witnessedIn.added} (want 1); ` +
+		`by a DEAD pid -> ${witnessedDead.added} (want 0); by a live pid whose start tick differs -> ${recycled.added} (want 0: recycled); ` +
+		`running elsewhere -> ${witnessedOut.added} (want 0); a dead session's leftover file with the same id beside the live one ` +
+		`-> ${leftover.added} (want 1: the live one decides), and the leftover was listed FIRST=${leftoverListedFirst} (the positive control); ` +
+		`stderr says "${COUNTED}" when it was=${witnessedIn.err.includes(COUNTED)}, and without a transcript_path -> ${noTranscript.added} record(s), ` +
+		`says "${DROPPED}"=${noTranscript.err.includes(DROPPED)} and never "${COUNTED}"=${!noTranscript.err.includes(COUNTED)}; ` +
+		`the common path is silent=${!ownPlanted.err.includes(DROPPED)}; a stale installed registry -> ${stale.added} (want 0) and says so=${stale.err.includes(DROPPED)}; ` +
 		`positive control, every detached fire really had no session above it=${noAncestor} ${JSON.stringify(fires77.map((f) => (f.chain || []).join("<")))}`)
 }
 
@@ -2499,11 +2600,12 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	writeFileSync(tp71, "\n")
 	const fake71 = join(r71, "claude")
 	try { symlinkSync("/bin/sh", fake71) } catch {}
+	const kit71 = witnessKit(), sid71 = "71717171-7171-7171-7171-717171717171"
 	const start71 = (source) => {
 		const pl = join(r71, `payload-${source}.json`)
-		writeFileSync(pl, JSON.stringify({ cwd: join(r71, "app"), source, transcript_path: tp71 }))
-		return spawnSync(fake71, ["-c", `cd ${join(r71, "app")} && ${process.execPath} ${join(r71, "app", ".claude", "comm-hook.mjs")} session-start < ${pl} > /dev/null 2>${pl}.err; echo done`],
-			{ encoding: "utf8", env: { ...process.env, CLAUDE_COMM_RUNTIME: join(r71, "runtime") } })
+		writeFileSync(pl, JSON.stringify({ cwd: join(r71, "app"), source, transcript_path: tp71, session_id: sid71 }))
+		return spawnSync(fake71, ["-c", `cd ${join(r71, "app")} && ${kit71.plant(sid71, join(r71, "app"))}${process.execPath} ${join(r71, "app", ".claude", "comm-hook.mjs")} session-start < ${pl} > /dev/null 2>${pl}.err; echo done`],
+			{ encoding: "utf8", env: { ...process.env, HOME: kit71.home, CLAUDE_COMM_RUNTIME: join(r71, "runtime") } })
 	}
 	const last71 = () => { try { const l = readFileSync(join(r71, ".comm", "handoff", "app.log"), "utf8").trim().split("\n"); return JSON.parse(l[l.length - 1]) } catch { return null } }
 	const arm71 = () => spawnSync("node", [rs71, "arm", "--agent", "app", "--root", r71, "--quiet", "--prev-session", "PREV-71", "--by", "attack"], { encoding: "utf8" })

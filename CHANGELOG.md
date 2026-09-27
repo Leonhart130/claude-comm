@@ -42,6 +42,24 @@ already have.
 
 
 
+
+## 2026-09-27.1 — bus print `dffe248fcc8b` — 2026-09-27
+
+- 🔴 **Correction: the 2026-09-20.1 note was wrong in the case that happens most.** It said a start is counted
+  only when something witnesses it. That was false whenever the hook was run by hand **from inside a Claude Code
+  session in your project** - a probe or a script launched from a Bash tool call, which is how agents usually test
+  a hook. The session sitting above the call was taken as the witness, so a start that never happened was still
+  written to `.comm/handoff/<agent>.log`. If you ran `.claude/comm-hook.mjs session-start` by hand since 09-20, that
+  file may carry one, at the time you ran it.
+- **A start is now counted only when Claude Code's own session file confirms it** (`~/.claude/sessions/<pid>.json`):
+  the file must carry the hook's `session_id`, belong to the session that ran the hook, and name a process that is
+  still alive. Real starts are unaffected - measured on an interactive session through a fresh start and two
+  `/clear`s: the file already carries the new id when the hook fires. A hand-run hook with a made-up or copied id is
+  no longer counted, and neither is one witnessed only by the file of a session that has died.
+- **The hook's stderr now reports what the ledger actually did.** The 09-20.1 line could say a start "IS counted"
+  when the ledger then skipped it, and said nothing when an out-of-date install dropped every start. It is silent
+  on a normal start, and speaks - with the reason - whenever a start is not counted.
+
 ## 2026-09-20.1 — bus print `202409de44fc` — 2026-09-20
 
 - **Your project's ledger no longer counts starts that never happened.** Until now, anything that ran your
@@ -51,6 +69,7 @@ already have.
   WITNESSES it: the session resolved from `/proc`, or, when there is no `claude` ancestor to walk to, this
   runtime's own session file (`~/.claude/sessions/<pid>.json`) carrying the same `session_id` and a `cwd` inside
   your project. Nothing changes for a real session - yours still records exactly as before.
+  🔴 *Wrong for a hook run by hand from INSIDE a session in your project - corrected in 2026-09-27.1.*
 - **The hook's stderr no longer contradicts itself.** When it declined to update the session registry it said
   *"recording nothing"* while the ledger was, in fact, recording. It now states both outcomes separately.
 - **`restart.mjs` / `handoff.mjs` no longer take `--root` as proof that a project exists.** Pointing either at a

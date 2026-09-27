@@ -182,16 +182,27 @@ export function sessionPid(from = process.pid) {
  * this repo runs. Guessing harder is not the fix; asking a second witness is.
  *
  * The runtime keeps one: `~/.claude/sessions/<pid>.json`, one file per live session,
- * carrying its `sessionId` and its `cwd`. MEASURED 2026-09-20 against a real `claude -p`
- * session in an isolated fixture: the file is already on disk AT SessionStart, already
- * carries the session's CURRENT id (so a `/clear` re-mint is covered - it rewrites the id
- * and files the old one under `formerNames`), and `kind` is "interactive" even for `-p`.
- * So the payload's `session_id` can be MATCHED instead of guessed at:
+ * carrying its `pid`, `procStart`, `sessionId` and `cwd`. MEASURED 2026-09-20 against a real
+ * `claude -p` session, and 2026-09-27 against an INTERACTIVE one through a startup and two
+ * `/clear`s (`FINDINGS.md#review13`): at the moment the SessionStart hook fires, the file
+ * already carries the id that hook's payload carries - 3 of 3, both re-mints included, so the
+ * reboot arm (`source: "clear"`) is witnessed as well as the cold one. So the payload's
+ * `session_id` is MATCHED instead of guessed at, and it is matched on BOTH paths:
  *
- *   matches a session file whose cwd is inside this project  ->  ours, record it
- *   matches one running elsewhere                            ->  foreign, refuse
- *   matches nothing                                          ->  there is no such
- *                                                                session: a PHANTOM
+ *   no session file carries the id              ->  there is no such session: a PHANTOM
+ *   a `claude` ancestor whose file is not it    ->  a replay of another session's payload
+ *   the file's process is dead, or recycled     ->  a stale file witnesses nothing
+ *   the session runs outside this project       ->  foreign, refuse
+ *   otherwise                                   ->  ours, record it
+ *
+ * 🔴 AN ANCESTOR IS NOT A WITNESS (review #13 §1). This function used to answer on /proc's
+ * word alone whenever a `claude` process sat above the fire, and never opened the file - so
+ * the probe this repo ACTUALLY runs, a stub fired by hand from a Bash call inside a session
+ * in the project, still wrote a phantom, stderr empty. And A77 asserted that very fire as its
+ * positive control: CLAUDE.md's 2026-09-04 amendment, eighth instance. An ancestor proves a
+ * session is ABOVE the fire; only the runtime's own file proves that session is the one
+ * STARTING. The ancestor keeps its veto - a session running elsewhere does not speak for
+ * this project, whatever id it can quote.
  *
  * `process.env.HOME`, never `homedir()`: HOME is the seam an arm moves, and a control that
  * reads the machine's real session registry is a control that inherits the world it
@@ -208,17 +219,17 @@ export function sessionPid(from = process.pid) {
  */
 export function witnessStart({ sid, root, pid = sessionPid() } = {}) {
 	const inside = (cwd) => !!cwd && !!root && (cwd === root || cwd.startsWith(root + "/"))
+	const above = pid > 0 ? `a 'claude' ancestor (pid ${pid})` : `no 'claude' ancestor`
 	if (pid > 0) {
 		let cwd = null
 		try { cwd = readlinkSync(`/proc/${pid}/cwd`) } catch {}
 		if (cwd === null) return { own: false, by: "proc", pid,
 			why: `the session I resolved (pid ${pid}) has no readable cwd, so I cannot tell whether it runs inside ${root}` }
-		return { own: inside(cwd), by: "proc", pid,
-			why: inside(cwd) ? `pid ${pid} is a session running inside ${root}`
-				: `the session I resolved (pid ${pid}) is running in ${cwd}, not inside ${root}` }
+		if (!inside(cwd)) return { own: false, by: "proc", pid,
+			why: `the session I resolved (pid ${pid}) is running in ${cwd}, not inside ${root}` }
 	}
-	if (!sid) return { own: false, by: "none", pid: 0,
-		why: `no 'claude' ancestor and the payload carried no session_id, so nothing witnesses this start` }
+	if (!sid) return { own: false, by: "none", pid,
+		why: `${above} and the payload carried no session_id, so nothing witnesses this start` }
 	const home = process.env.HOME || ""
 	const dir = home ? join(home, ".claude", "sessions") : ""
 	// Form E: a scan that FAILED must not read like a scan that found nothing. The two
@@ -226,24 +237,65 @@ export function witnessStart({ sid, root, pid = sessionPid() } = {}) {
 	let files = null, dirWhy = ""
 	try { files = readdirSync(dir).filter((f) => f.endsWith(".json")) }
 	catch (e) { dirWhy = (e && e.code) || (e && e.message) || String(e) }
-	if (files === null) return { own: false, by: "none", pid: 0,
-		why: `no 'claude' ancestor, and this runtime's session registry could not be read (${dir || "no HOME"}: ${dirWhy}), so nothing witnesses this start` }
+	if (files === null) return { own: false, by: "none", pid,
+		why: `${above}, and this runtime's session registry could not be read (${dir || "no HOME"}: ${dirWhy}), so nothing witnesses this start` }
 	// Form E again, one level down: a file that would not PARSE is skipped, so counting the
 	// files found would report them as "read" and a directory of corrupt entries would read
 	// exactly like a directory of honest misses.
+	// EVERY match, never the first (measured 2026-09-27, the arms that fire one id three times): a process that
+	// died without removing its file leaves a second file carrying the same id, and a `--resume` of that session
+	// would then be judged by whichever file readdir happened to list first.
 	let parsed = 0
+	const hits = []
 	for (const f of files) {
-		let j = null
-		try { j = JSON.parse(readFileSync(join(dir, f), "utf8")) } catch { continue }
+		let c = null
+		try { c = JSON.parse(readFileSync(join(dir, f), "utf8")) } catch { continue }
 		parsed++
-		if (!j || j.sessionId !== sid) continue
-		const own = inside(j.cwd)
-		return { own, by: "runtime", pid: Number(j.pid) || 0,
-			why: own ? `no 'claude' ancestor, but this runtime's own session file witnesses session ${sid} running in ${j.cwd}`
-				: `session ${sid} is a real session of this runtime, running in ${j.cwd}, not inside ${root}` }
+		if (c && c.sessionId === sid) hits.push(c)
 	}
-	return { own: false, by: "none", pid: 0,
-		why: `no 'claude' ancestor, and no session of this runtime carries id ${sid} (${files.length} session file(s) found, ${parsed} readable): there is no such session, so this is a PHANTOM start` }
+	if (!hits.length) return { own: false, by: "none", pid,
+		why: `${above}, and no session of this runtime carries id ${sid} (${files.length} session file(s) found, ${parsed} readable): ` +
+			(pid > 0 ? `the stub was fired BY HAND from inside a session - a probe, a script - not by a session starting, so this is a PHANTOM start`
+				: `there is no such session, so this is a PHANTOM start`) }
+	const pids = hits.map((h) => Number(h.pid) || 0)
+	if (pid > 0) {
+		const j = hits.find((h) => Number(h.pid) === pid)
+		if (!j) return { own: false, by: "runtime", pid,
+			why: `session ${sid} is pid ${pids.join("/")}, but this start was fired from under pid ${pid}: a replay of another session's payload, not a start` }
+		// Review #13 §3 applies here too: a file named for this pid may be a previous holder's.
+		const live = liveSession(pid, j.procStart)
+		if (!live.ok) return { own: false, by: "runtime", pid,
+			why: `the session file carrying ${sid} names ${live.why}, so it witnesses nothing - a stale file, not a session` }
+		return { own: true, by: "proc", pid,
+			why: `pid ${pid} is a session running inside ${root}, and this runtime's own session file says it is session ${sid}` }
+	}
+	// Review #13 §3: a file whose process is gone would witness every start that quotes its id, forever.
+	const lives = hits.map((h) => ({ h, live: liveSession(Number(h.pid) || 0, h.procStart) }))
+	const alive = lives.filter((x) => x.live.ok).map((x) => x.h)
+	if (!alive.length) return { own: false, by: "runtime", pid: pids[0],
+		why: `the session file carrying ${sid} names ${lives[0].live.why}, so it witnesses nothing - a stale file, not a session` }
+	const j = alive.find((h) => inside(h.cwd)) || alive[0]
+	const own = inside(j.cwd)
+	return { own, by: "runtime", pid: Number(j.pid) || 0,
+		why: own ? `no 'claude' ancestor, but this runtime's own session file witnesses session ${sid} running in ${j.cwd}`
+			: `session ${sid} is a real session of this runtime, running in ${j.cwd}, not inside ${root}` }
+}
+
+/**
+ * Is the process a runtime session file names still THAT process? `kill(pid, 0)` is the
+ * portable half - it answers off Linux too, where the witness is the only one there is. The
+ * start tick is the Linux half, the same (pid, start) test `lookup()` uses against reuse; a
+ * file with no `procStart` gets the portable half only, and nothing claims more than that.
+ */
+function liveSession(pid, procStart) {
+	if (!(pid > 0)) return { ok: false, why: `no pid (${JSON.stringify(pid)})` }
+	try { process.kill(pid, 0) } catch (e) {
+		if (!e || e.code !== "EPERM") return { ok: false, why: `pid ${pid}, which is not running` }
+	}
+	const start = startTimeOf(pid)
+	if (start !== null && procStart != null && String(start) !== String(procStart))
+		return { ok: false, why: `pid ${pid}, which started at tick ${start} while the file says ${procStart} - the pid was RECYCLED` }
+	return { ok: true }
 }
 
 /** Read one entry, or null. Never throws - a corrupt entry is a miss, not a crash. */

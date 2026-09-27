@@ -33,8 +33,11 @@ dernier rapport rendu : sa forme est la forme attendue.
 racine qu'on lui donne et corrompt l'instrument de reboot.
 ⚠️ **SIX arbres de terrain portent le bus, et le propriétaire TRAVAILLE EN CE MOMENT dans `~/Dev/atlas` et
 `~/Dev/lyra`** (2026-09-20). `~/Dev/work`, `~/Dev/vega`, `~/Dev/orion` aussi. **Lis, n'écris pas** —
-ni fichier, ni courrier, ni sonde qui déclenche un crochet : le `.claude/comm-hook.mjs` d'un arbre réel écrit
-dans SON ledger. C'est exactement le défaut que la revue #12b a trouvé, ne le reproduis pas en le cherchant.
+ni fichier, ni courrier, ni sonde qui déclenche un crochet : le `.claude/comm-hook.mjs` d'un arbre réel **vide la
+boîte de l'agent** (c'est lui qui livre), **réécrit l'entrée de registre de la session au-dessus de toi** si elle
+tourne dans ce projet, et **écrit dans SON ledger** dès que le `session_id` est celui d'une session vivante
+(`FINDINGS.md#review13` — le correctif du 2026-09-27 ne ferme que l'identifiant inventé). C'est le défaut des revues
+#12b et #13 : ne le reproduis pas en le cherchant.
 ⚠️ Tu ne commites pas et tu ne pousses pas. Tu rapportes.
 
 ## Comment tu parles au leader

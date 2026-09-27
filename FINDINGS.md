@@ -3246,6 +3246,12 @@ mailbox, not an interrupt*), and it is a different channel from the one `#unseen
 **stderr reaches no model; `additionalContext` does.** `SessionStart`'s already did — this extends it to every tool
 call.
 
+🟢 **The TIMING half, measured by review #13 §8** (`review/REVIEW-13.md`): the probe above showed the text arrived
+before the ANSWER, not before the next tool call. The reviewer ran it with the same hook firing in both arms and only
+the emitted context moving: an imperative note after the first of three `echo` calls ⇒ the model's next call was the
+note's command, **4/4**; control 3/3 calls as asked. One model (haiku-4.5), one imperative note shape, `PostToolUse`/Bash
+only. It does not touch D2's open half - whether an agent acts on a POINTER - and `selftest`'s 5-of-8 misses stand.
+
 ### 🔴 What this does NOT establish, and it is the half that matters here
 
 - **That an agent ACTS on it.** The probe's prompt *asked* the model to list tokens it had seen. A real agent is not
@@ -3257,6 +3263,117 @@ call.
   for the `Stop` path). It must speak only when blocking mail is actually waiting, and at most once.
 - Not measured: other matchers, non-Bash tools, token cost per call, whether `PreToolUse` behaves the same, and any
   model other than haiku-4.5.
+
+## `#review13` — an ancestor is not a witness: the probe this repo actually runs was still a phantom (2026-09-27)
+
+`review/REVIEW-13.md`, one RED, three 🟡, four 🟢 — against the `#review12b` disposition. **The fourth pass in a row
+(09-20's count) whose worst finding sits inside the previous session's patch.** It came back the day of the 09-20 close; its
+doorbell was drained by the `Stop` hook after the close, so `STATUS.md` was its only carrier for a week.
+
+### The red (§1): `witnessStart()` never opened the witness when `/proc` answered
+
+`witnessStart()` returned on `/proc/<pid>/cwd` alone whenever a `claude` process sat above the fire, and consulted
+the runtime's session file only when the walk found nothing. So a stub fired by hand from a Bash call inside a
+session in the project - the probe this repo and its reviewers ACTUALLY run - still wrote a phantom cold start,
+stderr empty. The detached case `#review12b` closed (`setsid`, cron, CI) is the rarer one. **And A77's positive
+control WAS that fire**: its `own` row fired from a fake `claude` inside the project, with a session id no file
+carried, and asserted 1. `CLAUDE.md`'s 2026-09-04 amendment, **eighth instance** - the arm froze the defect the fix
+was written against, one layer up from where `#review12b` found the seventh. The `CHANGELOG` shipped to all six
+trees said the opposite in its first sentence.
+
+**The fix asks the file on BOTH paths.** An ancestor proves a session is ABOVE the fire; only the runtime's own file
+proves that session is the one STARTING. The ancestor keeps its veto (a session running elsewhere does not speak for
+this project), and then `<pid>.json` must carry the payload's `session_id`, belong to THAT pid, and be alive.
+
+**Before shipping it, the one thing it could break was measured: does the file carry the new id when a `/clear`'s
+hook fires?** `clear` is the REBOOT arm (`ledger.mjs` classifies it so; atlas has 19 such starts). If the runtime
+rewrote the file after the hook, this fix would silently empty that arm. Measured 2026-09-27, an **interactive**
+`claude` (2.1.283) in a scratch fixture, a `SessionStart` probe reading `~/.claude/sessions/<its pid>.json` at the
+instant it fired and again 1.5 s later:
+
+| start | payload `session_id` | the file's `sessionId` at the fire | 1.5 s later |
+| --- | --- | --- | --- |
+| startup | `f2bad223…` | `f2bad223…` | same |
+| `/clear` #1 | `5a5f1d6f…` | `5a5f1d6f…` | same |
+| `/clear` #2 | `4635cf12…` | `4635cf12…` | same |
+
+**3 of 3, including both re-mints.** 🔴 **And one claim of `#review12b` did not survive it:** *"a `/clear` re-mint
+rewrites it and files the old one under `formerNames`"* - `formerNames` stayed **null** through two clears. The id is
+rewritten in place; nothing keeps the old one. Closing the probe's window removed its file (one instance, not a
+leak measurement - §3's question stays open).
+
+**End to end on the fixed build, 2026-09-27**: a real interactive session in a scratch project with this bus
+installed, and the review's own probe shape typed into it (`!node .claude/comm-hook.mjs session-start < payload`,
+Claude Code's bash mode - chain `node < sh < claude`, cwd inside, no model turn):
+
+| what happened in that one session | ledger records added |
+| --- | --- |
+| the session starts | **1** (`startup`) |
+| `/clear` | **1** (`clear` - the reboot arm, witnessed) |
+| the hand-fire, `session_id` made up | **0** - and the screen shows `this start is NOT counted by the ledger - … fired BY HAND from inside a session` |
+| the hand-fire replaying the session's OWN live id (positive control: the probe CAN record) | **1** - the residual named below |
+
+### What else the review found, and what was done
+
+| § | finding | disposition |
+| --- | --- | --- |
+| 🟡 2 | the stub printed "IS counted by the ledger" from the WITNESS's verdict, six conditions before the ledger's - so a start with no `transcript_path` read "counted" and was not; and a stale installed registry dropped every start with nothing on any stream | the stub now computes the ledger's outcome and reports THAT, once, after the ledger ran; a dropped start says so even when the registry was fine |
+| 🟡 3 | a session file for a pid that does not exist witnessed every start quoting its id, forever | `liveSession()`: `kill(pid, 0)` (portable - it answers off Linux, where the file is the only witness) and the `procStart` tick where `/proc` exists, the same (pid, start) test `lookup()` uses |
+| 🟡 7a | the REGISTRY half of the stub's ownership guard had no arm: `ownsSession() -> true`, suite 79/79 green, `#clear-blind` inverted | armed in A77: the foreign fire leaves no registry entry; the planted own fire leaves one (positive control) |
+| 🟢 4 | off Linux, `inside()`'s hard-coded `/` does not drop everything: the LEADER's starts (cwd == root) are counted and every EXPERT's are dropped - a ledger biased to one agent, harder to see than an empty one | the note below (`#review12b`, not verified) now says which half survives; code unchanged, no machine here can exercise it |
+| 🟢 5, 6 | A77 reddens alone in all three directions; the handoff/restart fixtures were repaired, not silenced | held - measured by the reviewer |
+| 🟡 7b, 7c | `handoff.mjs`'s own D2 guard is masked by `restart.mjs`'s; `INSIDE` is unarmed in both | carried |
+| 🟢 8 | `#midturn-channel`'s title outran its probe - it showed the text arrived before the ANSWER, not before the next tool call | the reviewer measured it: 4/4 (below, in `#midturn-channel`) |
+
+### 🔴 My own fix had a first-match defect, and the OLD arms found it
+
+The first version of the witness took the first file carrying the id. Moving five other arms onto planted witnesses
+(A29, A33, A71, A72, A73 - their "a real session starts" controls were all the hand-fire this red is about) turned
+A29 and A71 red with the fix in place: they fire one id several times, so dead fires' files carrying the same id sat
+beside the live one, and readdir listed a dead one first. In the field that is a crashed session's leftover file
+and a `--resume` of it. **Every match is now read**; with an ancestor the file must be THAT pid's, without one a live
+match decides. 🔴 **And my first arm for it was inert, found by mutation:** it wrote the two files in both
+creation orders, and a first-match mutant passed the whole suite - Node's `readdirSync` comes back **sorted by name**
+(libuv `scandir`; measured, creation order never shows), so both rows listed the live file first. The leftover is
+now named to sort first and the arm asserts it was listed first. The fire-in-both-orders idea was an assumption about
+the platform, not a measurement of it - `#measurement-traps`, the positive control that was missing.
+
+**The five arms had also been reading the machine's REAL `~/.claude/sessions`**: harmless while `/proc` answered
+alone, a measurement trap the moment the file is asked. Each now plants under a HOME of its own (`witnessKit()` in
+`test/attack.mjs`).
+
+### Every rule reddens for itself - mutation, one variable each, full suite on a copy of the tree
+
+| mutant | suite | the row that moved |
+| --- | --- | --- |
+| none (baseline) | green | - |
+| the ancestor answers alone (the pre-fix `/proc` return) | **✗ A77 only** | hand-fire inside, no file `0 → 1`; the replay `0 → 1` |
+| drop the "file must be THIS pid's" rule | **✗ A77 only** | the replay is refused for the wrong reason (`recycled`): `named a replay` false - asserted because the tick check masks this rule's COUNT (`#review12b`'s redundant-guard mask, avoided by asserting the reason) |
+| drop `kill(pid, 0)` | **✗ A77 only** | dead pid `0 → 1` |
+| drop the start-tick compare | **✗ A77 only** | recycled pid `0 → 1` |
+| first match instead of the live one | **✗ A77 only** *(after the arm was fixed - see above; green before)* | leftover listed first `1 → 0` |
+| the stub's registry guard `ownsSession() -> true` (§7a) | **✗ A77 only** | foreign fire's registry entry `false → true` |
+| the stub prints the witness's verdict, not the ledger's (§2, the old line) | **✗ A77 only** | no-`transcript_path` fire says "IS counted" |
+| the stub silent on a dropped start (§2, the old condition) | **✗ A77 only** | stale registry says nothing |
+
+### Named, not fixed
+
+- **A hand-fire replaying a live session's OWN id from inside it still counts** (measured above). The file cannot
+  tell a replay of a session's own payload from its start. The ledger's twin rule does not catch it either: the stub
+  files `basename(transcript_path)` as the session, not the witnessed id (review #13, "also found"), so the replay
+  landed as session `replay` - a different session to `TWIN_MS`.
+- 🔴 **A hand-fire from inside a session in the project still REWRITES that session's registry entry** - §1's
+  shape, on the registry half. **Measured by accident, and by a gate**: my end-to-end hand-fires above ran while a
+  mutation copy of `attack` was running, and **A31 went red** - *"the suite moved the machine's real registry: changed
+  `704668.json`"* - 704668 being the end-to-end session, its entry pointed at `fake.jsonl` then `replay.jsonl`. The
+  suite was innocent; the world changed (`#A20`'s rule held). The registry's guard is `ownsSession()`, `/proc` only.
+  A real `Stop` heals it at the next turn boundary (`refresh()` rewrites a differing entry - by reading the code); a
+  bash-mode `!` command takes no turn, so until then `context.mjs` reads the wrong transcript. **The design, not
+  built:** gate `record()` AND `refresh()` on the same witness (a hand-fired `stop` has the same shape); a real start
+  whose file is missing then gets its entry at its first `Stop`, since `refresh()` records a missing one. It touches
+  the hottest path in the system, so it gets its own change and its own arm, not a rider on this one.
+- **`resume` and `compact`**: whether the file carries the payload's id when THOSE hooks fire is unmeasured. Both are
+  the ledger's "other" arm, not a trial arm, so a drop there costs no verdict - but it would be silent in `ledger`.
 
 ## `#review12b` — the disposition's own fix wrote phantom starts into the reboot instrument (2026-09-20)
 
@@ -3286,7 +3403,8 @@ by the disposition that the review had just demanded.
 The runtime keeps a second witness this project never used: `~/.claude/sessions/<pid>.json`, one file per live
 session, carrying its `sessionId` and `cwd`. **Measured 2026-09-20 against a real `claude -p` session in an
 isolated fixture** — the question the reviewer left open: the file is already on disk **at SessionStart**, already
-carries the session's **current** id (a `/clear` re-mint rewrites it and files the old one under `formerNames`),
+carries the session's **current** id (a `/clear` re-mint rewrites it - 🔴 *"and files the old one under `formerNames`"* was NOT what
+2026-09-27 measured: it stayed null through two clears, `#review13`),
 and `kind` is `"interactive"` even for `-p`. So the payload's `session_id` can be matched instead of guessed at.
 
 `witnessStart()` lives in `bin/session-registry.mjs` beside `sessionPid()`, where that file's own comment already
@@ -3361,7 +3479,9 @@ this repo's measurement traps, one level up: the variable moved was real, and so
   produced by removing the ANCESTOR (`setsid --fork`), never by removing `/proc`. Whether
   `~/.claude/sessions/<pid>.json` exists on macOS/Windows is unchecked, and if it does not, the witness refuses
   every start there - E1's original complaint, moved rather than removed. Worse in the same place: `inside()`
-  compares with a hard-coded `"/"`, so a Windows `cwd` would not match its own project root. **The one branch
+  compares with a hard-coded `"/"` - and review #13 §4 measured what that does: **not** "nothing matches". The
+  LEADER, whose cwd IS the root, still matches by equality; **every EXPERT is dropped**. A ledger biased toward one
+  agent per project, harder to notice than an empty one. **The one branch
   written for non-Linux is the one branch no arm and no machine here can exercise.**
 - **The delivery half of the stub under a real session with mail waiting** was exercised by `selftest` (green, and
   `--prove-red` green), but the two `claude -p` sessions used for the ledger measurement had empty inboxes.

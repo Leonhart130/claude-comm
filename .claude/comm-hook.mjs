@@ -340,6 +340,10 @@ try {
 	// no record. That KEEPS E1's real case - a genuine start whose ancestor walk cannot be done - because
 	// the witness answers for that one too, and it does so without letting a probe into this registry.
 	let ownStart = false
+	// What the ledger is told, and what this hook SAYS about it, are computed apart and joined at the end: the line
+	// review #13 §2 measured said "IS counted by the ledger" for a start the ledger then did not count, because it was
+	// printed from the witness's verdict, six conditions before the ledger's. It now reports what HAPPENED.
+	let regLine = null, ledgerWhy = "the session registry could not be loaded, so no witness answered"
 	try {
 		const reg = join(binDir, "session-registry.mjs")
 		if (existsSync(reg)) {
@@ -352,18 +356,19 @@ try {
 				? m.witnessStart({ sid, root: projectRoot, pid: sp })
 				: { own: false, why: "this installed session-registry.mjs predates the ledger guard and carries no witnessStart" }
 			ownStart = w.own
+			ledgerWhy = w.why
 			if (ownsSession(sp)) {
 				const r = m.record({ pid: sp, transcript: tp, agent, source: p.source })
 				if (!r.ok) process.stderr.write(`claude-comm: this session is NOT in the session registry (${r.why}). `
 					+ `A context reading by pid will refuse for it${r.invalidated ? "" : ", and a previous entry may still stand"}.\n`)
 			} else {
-				// Say BOTH outcomes. The line this replaces said "recording nothing" while the ledger was recording -
-				// the one place a reader could have caught the phantom told them the opposite (review #12b §1).
-				process.stderr.write(`claude-comm: the session registry was NOT updated - ${w.why}. This start ${ownStart
-					? "IS counted by the ledger: the runtime's own session file witnesses it"
-					: "is NOT counted by the ledger either"}.\n`)
+				// Say BOTH outcomes - below, once the ledger's is known. The line before this one said "recording
+				// nothing" while the ledger was recording (review #12b §1); the one after it said "counted" while the
+				// ledger was not (#13 §2). Both were one stream reporting a decision it had not watched happen.
+				regLine = `the session registry was NOT updated - ${w.why}`
 			}
 		} else {
+			ledgerWhy = "session-registry.mjs is not installed beside the bus, so no witness answered"
 			process.stderr.write("claude-comm: session-registry.mjs is not installed beside the bus, so this session could not be recorded AND ANY PREVIOUS ENTRY FOR THIS PID STILL STANDS - a context reading by pid may answer for a session that has ended.\n")
 		}
 	} catch (e) {
@@ -393,8 +398,13 @@ try {
 				.some((h) => h && typeof h.command === "string" && /bin\/boot\.mjs["']?\s+(?:--\S+\s+)*--hook\b/.test(h.command)))
 		}
 	} catch {}
+	let counted = false
 	try {
 		const led = join(binDir, "ledger.mjs")
+		if (rootRecords) ledgerWhy = "it is left to bin/boot.mjs --hook, this checkout's own recorder"
+		else if (ownStart && !existsSync(led)) ledgerWhy = "ledger.mjs is not installed beside the bus"
+		else if (ownStart && !p.source) ledgerWhy = "the payload carried no source"
+		else if (ownStart && !tp) ledgerWhy = "the payload carried no transcript_path"
 		if (!rootRecords && ownStart !== false && existsSync(led) && p.source && tp) {
 			// THE SIGNAL THAT CROSSES THE RESTART, claimed here and nowhere else. At this
 			// hook a relaunch and a cold start are the same event — `source` is "startup"
@@ -450,6 +460,8 @@ try {
 			const rec = spawnSync(process.execPath, [led, "record", "start", "--agent", agent,
 				"--source", p.source, "--session", basename(tp).replace(/\.jsonl$/, ""),
 				"--root", projectRoot, "--quiet", "--pending-auto", ...sig], { timeout: 5000, stdio: "ignore" })
+			counted = rec.status === 0
+			if (!counted) ledgerWhy = `the ledger did not record it (${rec.error ? rec.error.code || rec.error.message : `exit ${rec.status}`})`
 			// A claim is destructive and a record is not retried. If the write failed after
 			// the note was taken, that restart is gone and this line is the only thing that
 			// will ever say so.
@@ -459,7 +471,12 @@ try {
 				process.stderr.write(`claude-comm: a restart signal for ${agent} was claimed but the ledger did not record it (exit ${rec.status}); ${back.ok ? "the note was PUT BACK for the next start" : `that restart is now UNCOUNTED (${back.why})`}.\n`)
 			}
 		}
-	} catch {}
+	} catch (e) { ledgerWhy = `the ledger could not be run (${(e && e.message) || e})` }
+	// Silent on the common path - registry written, start counted. Otherwise ONE line with both outcomes, and a start
+	// that is dropped says so even when the registry was fine: #13 §2 measured a stale installed registry refusing every
+	// legitimate start of a tree with nothing on any stream.
+	if (regLine || (!counted && !rootRecords)) process.stderr.write(`claude-comm: ${regLine ? regLine + ". This start" : "this start"} ${counted
+		? "IS counted by the ledger" : `is NOT counted by the ledger - ${ledgerWhy}`}.\n`)
 } catch { /* an instrument must never break a session */ }
 
 // 🔴 EXIT 0, ALWAYS — and say why when it is not zero. The bus's own main() wraps the
