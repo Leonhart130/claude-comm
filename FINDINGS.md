@@ -3286,6 +3286,20 @@ only. It does not touch D2's open half - whether an agent acts on a POINTER - an
 - Not measured: other matchers, non-Bash tools, token cost per call, whether `PreToolUse` behaves the same, and any
   model other than haiku-4.5.
 
+## `#settings-inheritance` — an expert runs its leader's `settings.local.json`, not its `settings.json` (2026-09-27)
+
+**Reported by atlas's leader** (field letter 09-27): a `Stop` hook he put in his root's `settings.local.json` ran
+in his expert `scribe`'s session, resolved against `scribe`'s folder (`$CLAUDE_PROJECT_DIR` = the expert's), and failed there.
+**Measured here the same night, no model call**: a scratch git repo, a `SessionStart` probe in `parent/.claude/
+settings.json`, one in `parent/.claude/settings.local.json`, one in `parent/child/.claude/settings.json`; an
+interactive session started in `child/` ran **the child's `settings.json` and the parent's `settings.local.json`**,
+both with `CLAUDE_PROJECT_DIR` = `…/child`, and **not the parent's `settings.json`**. Consistent with T1 (#11c: the
+root's `boot --hook` does not run in `review/`; one start record for the 09-27 reviewer).
+
+**The bus is unaffected** - the installer writes only `settings.json`, per agent. A leader's own hook belongs in its
+`settings.json` if it must not reach experts. *One run, `SessionStart` only, version 2.1.283; not tested without a
+git repo, nor with a parent that is not the repo root.* Also an item for the skill audit (STATUS ▶ NEXT A3).
+
 ## `#review14` — the disposition of #13: no red, and "every rule reddens for itself" was false (2026-09-27)
 
 `review/REVIEW-14.md`, launched the same night on the owner's go-ahead, under a brief whose first section was *"you

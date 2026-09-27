@@ -49,10 +49,7 @@ A59 8 s, A34 5 s, A20 4 s of 51 s; `--only <arm>` for iteration, the full suite 
 **D - `#bell-into-typing`**: the bell reads the AGENT's turn, never the PERSON's input line - it cut the owner's
 half-typed message 09-27. He says it is not serious, keep writing. Named, not fixed.
 
-**E - ✅ atlas answered 09-27: NO hand-fire, MEASURED** (114 transcripts). One field datum for D2: `net`
-rang `blocked` once and acted on the pointer. 🆕 **Their 09-27 field letter, measured here the same night**: a session in a
-subfolder runs the PARENT's `settings.local.json` (with `CLAUDE_PROJECT_DIR` = the subfolder), not its `settings.json`
-- one run, `SessionStart` only. The bus writes only `settings.json`, so it is unaffected; answered, not rung.
+**E - ✅ atlas's three 09-27 letters answered** (no hand-fire, measured; settings inheritance - `FINDINGS.md#settings-inheritance`).
 
 **F - carried, in priority order:** `REVIEW-12b.md`'s seven points (`FINDINGS.md#review12b`, each already measured) ·
 `boot.mjs --hook` records with NO ownership test (`boot.mjs:489`; needs a declared test seam first - its own
