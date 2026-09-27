@@ -9,8 +9,8 @@ the plan as it stood before the build, kept for how the decision was reached. Re
 ## Where the ask came from
 
 The owner, relayed by atlas's leader (`exchange/atlas-leader/in/2026-09-13-reveiller-un-agent-froid-a-600k-coute-cher-demande.md`;
-`exchange/` is gitignored, so it lives on this machine only): *"(paraphrased) waking an agent an hour later at
-600k, that would cost a fortune for nothing"*. atlas's measured fresh-start cost, after a hand `/clear`, a protocol re-read
+`exchange/` is gitignored, so it lives on this machine only): *(paraphrased)* waking an agent an hour later at 600k tokens
+would cost a fortune for nothing. Atlas's measured fresh-start cost, after a hand `/clear`, a protocol re-read
 and a brief: `scribe` ≈ 667 717 → ≈ 90 234, `web` ≈ 585 561 → ≈ 125 052. The proposal below was sent to them in
 `exchange/atlas-leader/out/2026-09-13-le-reveil-attend-le-repos-tes-crochets-et-le-cache-vit-une-heure.md`.
 
@@ -20,7 +20,7 @@ and a brief: `scribe` ≈ 667 717 → ≈ 90 234, `web` ≈ 585 561 → ≈ 125 
   effort `launch.mjs` gave it, its window and its pid all survive. An agent that closed itself would lose the tier
   unless relaunched with it, and its mail would wait "not running" until someone did.
 - **Opt-in per agent in `.comm/config.json`, default off.** A `/clear` loses everything an agent has not written
-  down. atlas declared its five experts safe (`db`, `web`, `extension`, `scribe`, `review` — not its leader): their
+  down. Atlas declared its five experts safe (`db`, `web`, `extension`, `scribe`, `review` — not its leader): their
   state lives in `LECONS.md`, `SPEC.md`, `RAPPORT.md`.
 - **Never on a turn that is not `idle`** — `readTurn` in `bin/wake.mjs` (A62). Not `ending`, not `unknown`.
 - **Never on every bell.** `scribe` took five turns 5–10 min apart on 2026-09-13; a warm cache made each cheap, and

@@ -4370,8 +4370,8 @@ process.stdout.write(JSON.stringify({ ops, res }))
 // A63 — a cold, big, idle agent is restarted fresh before it is rung: only if it opted in, never a leader, and
 // never claimed unless the registry names a NEW transcript. And every ring, whoever rings, is appended to a history.
 //
-// Asked by the owner 2026-09-13 through atlas's leader ("(paraphrased) waking an agent an hour later at 600k,
-// that would cost a fortune for nothing"); his answer to the design: "Build it, opt-in". The thresholds are measured and their
+// Asked by the owner 2026-09-13 through atlas's leader (paraphrased: waking an agent an hour later at 600k tokens
+// would cost a fortune for nothing); his answer to the design: "Build it, opt-in". The thresholds are measured and their
 // evidence sits at rule 7 in wake.mjs - the 1 h cache (0 of 315 resumes cold inside the hour, 53 of 55 past it), and
 // 300 000, the most the first 10 calls of a fresh start cost across 82 field-expert starts. FINDINGS.md#fresh-restart
 //
@@ -5189,6 +5189,63 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		`idle beside a session with no record -> CANNOT SAY, never IDLE=${unread}; waiting on a permission prompt -> named, no ring printed=${waiting}; ` +
 		`a record under CLAUDE_CONFIG_DIR/sessions (HOME has none) -> IDLE=${cfgdir}; 'shell' -> named, ring printed=${shell}` +
 		(busy("idle+busy") && busy("busy+idle") && unread && waiting && cfgdir && shell ? "" : ` · ${JSON.stringify(res).slice(0, 700)}`))
+}
+
+// A84 — A RING ANSWERED BY A TURN DISCHARGES THE QUIET PERIOD (`FINDINGS.md#quiet-answered`). A field leader, idle, was
+// rung for one message; it took a turn and went idle again; a `done` arrived 102 s after that ring and was swallowed by
+// the 120 s quiet period - nothing retried it, and it sat 6 min. ONE VARIABLE: when the recipient last called the API,
+// after the last ring or before it. The same ring, the same window, the same idle state; `dryRun`, nothing typed.
+{
+	const wakeM = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
+	const r84 = mkdtempSync(join(tmpdir(), "comm-attack-quiet-"))
+	mkdirSync(join(r84, ".comm", "wake"), { recursive: true })
+	const ringAt = Date.now() - 100_000
+	writeFileSync(join(r84, ".comm", "wake", "leader.json"), JSON.stringify({ at: new Date(ringAt).toISOString(), agent: "leader", pid: process.pid, window: 7 }) + "\n")
+	const wins84 = [{ sock: "/tmp/kitty-1", id: 7, shellPid: process.pid, fg: [] }]
+	const try84 = (callAt) => wakeM.wakeAgent(r84, "leader", process.pid, { dryRun: true, wins: wins84,
+		turn: { state: "idle", why: "fixture", call: callAt ? { at: callAt, context: 1000 } : null } })
+	const answered = try84(ringAt + 30_000), unanswered = try84(ringAt - 30_000), noCall = try84(null)
+	rmSync(r84, { recursive: true, force: true })
+	check("A84 a ring the recipient answered with a turn no longer silences the next one",
+		answered.dryRun === true && !unanswered.dryRun && /no turn taken since/.test(unanswered.why || "") && !noCall.dryRun,
+		`last call 30 s AFTER the ring -> would ring=${answered.dryRun === true} (the swallowed case); ` +
+		`control, last call BEFORE the ring -> still quiet=${!unanswered.dryRun} "${(unanswered.why || "").slice(0, 60)}"; no call at all -> quiet=${!noCall.dryRun}`)
+}
+
+// A85 — A PRIVATE WORD NEVER REACHES A COMMIT (`FINDINGS.md#leak-check`). The real list lives outside every repo, so this
+// arm arms the scanner with a SYNTHETIC word through CLAUDE_COMM_PRIVATE_WORDS and runs the installed hooks in a scratch
+// repo. ONE VARIABLE per case: whether the word is in the file, the message, a pushed commit - each against the same
+// commit made clean (the control). And no list at all must say NOT ARMED, never "nothing matched".
+{
+	const r85 = mkdtempSync(join(tmpdir(), "comm-attack-leak-"))
+	const list85 = join(r85, "private-words"); writeFileSync(list85, "# test\nzq[p]robeword\n")
+	const repo85 = join(r85, "repo"), bare85 = join(r85, "bare.git")
+	mkdirSync(repo85)
+	const env85 = { ...process.env, CLAUDE_COMM_PRIVATE_WORDS: list85, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" }
+	const g85 = (...a) => spawnSync("git", a, { cwd: repo85, env: env85, encoding: "utf8" })
+	g85("init", "-q"); execFileSync("git", ["init", "-q", "--bare", bare85]); g85("remote", "add", "origin", bare85)
+	const lc = join(PKG, "bin", "leak-check.mjs")
+	spawnSync("node", [lc, "--install-hooks"], { cwd: repo85, env: env85, encoding: "utf8" })
+	writeFileSync(join(repo85, "a.md"), "clean\n"); g85("add", "a.md")
+	const cleanCommit = g85("commit", "-qm", "clean message")
+	writeFileSync(join(repo85, "b.md"), "a ZQPROBEWORD here\n"); g85("add", "b.md")
+	const dirtyFile = g85("commit", "-qm", "adds b")
+	g85("reset", "-q", "HEAD"); rmSync(join(repo85, "b.md"))
+	writeFileSync(join(repo85, "c.md"), "fine\n"); g85("add", "c.md")
+	const dirtyMsg = g85("commit", "-qm", "mentions zqprobeword in the message")
+	const pushClean = g85("push", "-q", "origin", "HEAD:main")
+	// A leak that got past the local hooks (--no-verify): the push hook must stop it.
+	g85("commit", "-q", "--no-verify", "--allow-empty", "-m", "zqprobeword slipped")
+	const pushDirty = g85("push", "-q", "origin", "HEAD:main")
+	const unarmed = spawnSync("node", [lc, "--tree"], { cwd: repo85, env: { ...env85, CLAUDE_COMM_PRIVATE_WORDS: join(r85, "absent") }, encoding: "utf8" })
+	const leaked = /zqprobeword/i.test(dirtyFile.stderr + dirtyMsg.stderr + pushDirty.stderr)
+	rmSync(r85, { recursive: true, force: true })
+	check("A85 a private word is stopped at commit, message and push; no list is NOT ARMED",
+		cleanCommit.status === 0 && dirtyFile.status !== 0 && dirtyMsg.status !== 0 && pushClean.status === 0 && pushDirty.status !== 0 &&
+		unarmed.status === 3 && /NOT ARMED/.test(unarmed.stderr) && !leaked,
+		`control, clean commit -> exit ${cleanCommit.status}; word in a staged file -> refused=${dirtyFile.status !== 0}; in the message -> refused=${dirtyMsg.status !== 0}; ` +
+		`control, clean push -> exit ${pushClean.status}; a --no-verify commit carrying it -> push refused=${pushDirty.status !== 0}; ` +
+		`no list -> exit ${unarmed.status} NOT ARMED=${/NOT ARMED/.test(unarmed.stderr)}; the refusals never print the word=${!leaked}`)
 }
 
 finish(null)

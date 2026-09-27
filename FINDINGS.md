@@ -2734,8 +2734,8 @@ the property its mutation removed.
 
 ## `#cache-lives-an-hour` — resuming an idle expert after an hour re-writes its whole context
 
-**Asked by the owner 2026-09-13, through atlas's leader:** *"(paraphrased) waking an agent an hour later at
-600k, that would cost a fortune for nothing"*. Their screen said `~586k uncached`; after a hand `/clear` and a re-read of
+**Asked by the owner 2026-09-13, through atlas's leader:** *(paraphrased)* waking an agent an hour later at 600k tokens
+would cost a fortune for nothing. Their screen said `~586k uncached`; after a hand `/clear` and a re-read of
 their files, `scribe` went from ≈ 667 717 to ≈ 90 234 and `web` from ≈ 585 561 to ≈ 125 052.
 
 **Measured the same day over every transcript on this machine** — one API call per assistant `message.id`, the
@@ -2847,9 +2847,9 @@ leader, opted in by name; an agent at the project root*; confirmation always tru
 
 **Measured live, on the owner.** I rang atlas's leader with the `2026-09-27.1` letter. The bell checked its rule 6
 (`#bell-mid-turn`): the peer's turn was over (*"done 2:05 AM"*) - so it typed. **The owner was typing in that window
-at that second.** His half-written message *"…"* was cut: the bell's text was
-inserted after its fourth word, the bell pressed Enter, and the session received *"(a few words) [claude-comm]
-cross-project doorbell…"* as one submitted prompt; the rest of his sentence stayed in the input box. The peer guessed what he meant - right by luck. `bell` exited 0, `● rang`, and only the screen showed the damage.
+at that second.** His half-written message was cut: the bell's text was inserted after its fourth word, the bell pressed Enter,
+and the session received those four words followed by *"[claude-comm] cross-project doorbell…"* as one submitted
+prompt; the rest of his sentence stayed in the input box. The peer guessed what he meant - right by luck. `bell` exited 0, `● rang`, and only the screen showed the damage.
 
 **The bell asks "is the AGENT busy", and in the owner's own windows the question is "is ANYONE using this input".**
 An idle agent is exactly when a person types to it. Rule 6 cannot see that: the input line is not in the transcript.
@@ -3487,6 +3487,53 @@ A31 uses the same rule; and the control's last line counts that non-row assert a
 The prettier ignore file's header line and `readJson` are still outside the print. The stub's own `Stop`-path ring to
 a leader is exercised through `wake` (same program, same arguments), not fired through the stub. The kitty arms run
 N wide under `mutate.mjs`: green in every batch so far, three samples, not a property.
+
+## `#quiet-answered` — a ring the recipient had already answered still silenced the next one (2026-09-27)
+
+**A field leader's letter, 20:43** (read-only in their `.comm/`): the leader was rung at 18:29:28.9Z for one message
+(`rings.jsonl`, `turn: idle`, `rang: true`); a `done` for it arrived at 18:31:10.6Z, **102 s later, inside `QUIET_MS`
+(120 s)** - no ring logged for the leader until 18:37, when the owner saw the mail waiting on screen. The sender's
+expert had read `send`'s IDLE line and concluded the leader "will get it at its turn end" - an idle leader has none.
+
+**Cause:** `wakeAgent()` suppressed any ring within 120 s of the last, whatever happened since. The period exists so a
+ring that has not taken effect yet is not typed twice; once the recipient has TAKEN A TURN after that ring and is idle
+again, the ring is spent and the next message has nobody to wake it.
+
+**Fix, no timer (rule 4 stands):** a ring is still suppressed only while it is unanswered - the recipient's last API
+call (`readTurn().call.at`, the transcript) is not after the last ring. Answered and idle → ring. The refusal now says
+*"and no turn taken since"*. **A84**: one variable, the recipient's last call 30 s after the ring or 30 s before it;
+no call at all stays quiet. The field leader proposed a deferred retry at the period's end; that needs a process that
+outlives the hook - declined for this, which needs none.
+
+**Not fixed, named:** a ring typed and NEVER answered (text in the input box, no turn) still silences the next 120 s,
+and nothing retries after them - but its own turn, when it comes, delivers every message waiting. Not measured live:
+the transcript's last call as the witness of "answered" on a real idle leader.
+
+## `#leak-check` — a private project's name in a public repo, and what now stops it (2026-09-27)
+
+**What happened.** For three weeks this public repo named one of the owner's private projects - 105 lines in 15
+tracked files and 35 commit messages, plus a home path and the names of that project's experts - each one a measured
+field note, written by me, none of them needed to make the note true. The project's leader counted them the day it
+mattered (a public link was about to go out) and the owner decided: the name goes, from the history too. The GitHub
+repo was deleted and rebuilt from a rewritten history, so no old commit stays reachable by its hash there.
+
+**In the rewrite:** the project is called `atlas` everywhere, its expert names are neutral, home paths are `~`, and the
+owner's own sentences quoted in those passages are paraphrased. Every rule and finding kept its meaning; commit hashes
+cited in this file were remapped to the rewritten ones.
+
+**What stops the next one** - `bin/leak-check.mjs`, one scanner, three places:
+- **git hooks** (`--install-hooks`): `pre-commit` scans what is staged, `commit-msg` the message, `pre-push` the pushed
+  range's messages and the pushed commit's whole tree - so a `--no-verify` commit is still stopped at the push.
+- **boot row `leak`**: the tracked tree and every message on HEAD, at every start; *hooks missing* warns; **no list
+  warns NOT ARMED** - a check that could not run never reads as clean.
+- **A85** runs the real hooks in a scratch repo with a synthetic word; the row is armed in `boot --prove-red` the same way.
+
+**The words are never in the repo** - not in clear, and not hashed either: a seven-letter word falls to a brute force
+of its SHA-256 in minutes. The list is a local file outside every repo (`bin/leak-check.mjs` names where); a hit is
+reported by file, line and rule number, never by the matched text.
+
+**Not verified / not covered:** anything the list does not name - a new private word is only stopped once it is added
+there; binary files are skipped; GitHub may keep a deleted repo's forks or caches (it had none - 0 forks).
 
 ## `#review14` — the disposition of #13: no red, and "every rule reddens for itself" was false (2026-09-27)
 

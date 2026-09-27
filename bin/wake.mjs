@@ -338,8 +338,8 @@ export function readTurn(pid, lookup) {
 
 // ── RULE 7: A COLD, BIG, IDLE AGENT IS RESTARTED FRESH BEFORE IT IS RUNG ───────────────────────────
 //
-// Asked by the owner 2026-09-13 through atlas's leader - "(paraphrased) waking an agent an hour later at
-// 600k, that would cost a fortune for nothing" - and built on his answer: "Build it, opt-in". Every number is measured on
+// Asked by the owner 2026-09-13 through atlas's leader - (paraphrased: waking an agent an hour later at 600k
+// tokens would cost a fortune for nothing) - and built on his answer: "Build it, opt-in". Every number is measured on
 // this machine's transcripts, none chosen by feel. FINDINGS.md#cache-lives-an-hour, #fresh-restart
 //
 // · AGE. Every call writes the 1 h cache (29 101 of 29 120). Resumed after 10-60 min: 0 of 315 cold; after 60
@@ -433,8 +433,13 @@ function clearFresh(pid, lookup, send, confirmMs) {
 export function wakeAgent(root, agent, pid, { dryRun = false, wins, turn = null, cfg = null, lookup = null, sendText = null,
 	allowClear = true, confirmMs = FRESH_CONFIRM_MS, fresh = {} } = {}) {
 	const prev = lastWake(root, agent)
-	if (prev && Date.now() - Date.parse(prev.at) < QUIET_MS) {
-		return { agent, pid, sent: false, why: `rung ${Math.round((Date.now() - Date.parse(prev.at)) / 1000)}s ago, quiet period is ${QUIET_MS / 1000}s` }
+	// THE QUIET PERIOD GUARDS A RING THAT HAS NOT WORKED YET - not every ring. A recipient that took a turn AFTER the
+	// last ring and is idle again has consumed it: a second message within 120 s was swallowed and nothing ever retried
+	// it (a field, 09-27: a `done` sat 6 min, rung 102 s after another ring, its leader idle with no turn to come).
+	// Only the unanswered ring still suppresses - its own turn will deliver everything waiting. A84, `FINDINGS.md#quiet-answered`
+	const answered = prev && turn && turn.state === "idle" && turn.call && turn.call.at > Date.parse(prev.at)
+	if (prev && !answered && Date.now() - Date.parse(prev.at) < QUIET_MS) {
+		return { agent, pid, sent: false, why: `rung ${Math.round((Date.now() - Date.parse(prev.at)) / 1000)}s ago and no turn taken since, quiet period is ${QUIET_MS / 1000}s` }
 	}
 	// Rule 6, before anything is resolved. And nothing is recorded, so the next hook that fires
 	// looks again instead of waiting out QUIET_MS for a ring that never happened.

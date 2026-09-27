@@ -6,9 +6,14 @@ fold the settled parts into the README.
 ## ▶ NEXT
 
 *(Closed 2026-09-27, second session. Field = atlas; `work` dormant by the owner's word (`FIELDS.json`); `lyra`
-leader-only, never launched; `orion`'s leader not relaunched since 09-19. **`2026-09-27.5` is in all six trees**,
+leader-only, never launched; `orion`'s leader not relaunched since 09-19. **`2026-09-27.6` is in all six trees**,
 `--check` in sync. The owner, 09-27: *"tu peux faire tout ce que t'as à faire … review adversarielle tu peux lancer"* -
 and he was at 84 % of his WEEKLY usage the night before: a reviewer is Opus xhigh, price it.)*
+
+**A0 - the public repo is being REBUILT (owner, 09-27)**: the field project is `atlas` in every tracked file, a home path
+is `~`, the history rewritten (`FINDINGS.md#leak-check`); `bin/leak-check.mjs` + git hooks + boot row `leak` stop it
+recurring - the words live in a local list outside every repo. **Never write the field's real name in a tracked file.**
+Also fixed: a ring the recipient already answered no longer silences the next (`#quiet-answered`, A84, `.6`).
 
 **A - ✅ review #15 disposed** (`FINDINGS.md#review15`): 🔴 the ring `send` printed - and every hand-started expert's
 turn end - skipped the LEADER (wake keyed "own" on the root's name); now it skips the caller's SESSION, A82. Six 🟡

@@ -1,5 +1,10 @@
 # claude-comm — a message bus for a hub-and-spoke team of Claude Code agents
 
+**In plain words:** when several AI coding assistants (Claude Code sessions) work on one project, each in its own
+folder, this lets them pass notes to each other - a lead assistant hands out work, the others report back - without a
+person copying messages between windows. Every note points at a file; the file holds the work. Free to read, use and
+adapt under the [MIT licence](LICENSE). Trying it needs Linux, Node.js and Claude Code: see [Install](#install).
+
 **The problem it removes:** the owner is the message bus. A correction found mid-round waits for the
 round to end; an expert that finishes or blocks is invisible until you look at that split.
 

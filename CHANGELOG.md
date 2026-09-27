@@ -16,6 +16,14 @@ node <path-to-claude-comm>/install.mjs <your project> --check    # what version 
 Your project records what it has in `.comm/INSTALLED.json`. An update prints only the entries you did not
 already have.
 
+## 2026-09-27.6 — bus print `0091855e7f2a` — 2026-09-27
+
+- 🔴 **A message to an idle agent is no longer swallowed by the 2-minute quiet period.** The doorbell rings an agent
+  at most once per 2 minutes, so a ring is never typed twice before it has worked. But once the agent had ANSWERED a
+  ring - taken a turn and gone idle again - a second message inside those 2 minutes got no ring at all, and nothing
+  retried it (measured in the field: a report sat 6 minutes). Now only a ring the agent has not answered yet silences
+  the next one; its own turn, when it comes, delivers everything waiting. The refusal says *"no turn taken since"*.
+
 ## 2026-09-27.5 — bus print `6c2eaf6477e3` — 2026-09-27
 
 - 🔴 **The doorbell now reaches the LEADER from any expert.** `wake.mjs` never rang "its own" agent, and took that to be

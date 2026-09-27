@@ -44,3 +44,7 @@ exchange/*
 
 # claude-comm live state (regenerate with install.mjs)
 .comm/
+
+# generated per machine by install.mjs (it carries this checkout's absolute path) - never published
+.claude/skills/claude-comm/SKILL.md
+review/.claude/skills/claude-comm/SKILL.md
