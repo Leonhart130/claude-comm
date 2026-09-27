@@ -29,8 +29,8 @@ the parallel baseline as its control. Then look at A59/A34/A20. `--only <arm>` f
 **D - `#bell-into-typing`**: the bell reads the AGENT's turn, never the PERSON's input line - it cut the owner's
 half-typed message 09-27. He says it is not serious, keep writing. Named, not fixed.
 
-**E - atlas owes me one answer** (letter `2026-09-27-…-etait-fausse.md` §3: did an agent hand-fire `session-start`
-since 09-20?). Their leader said it would answer "avec une mesure".
+**E - ✅ atlas answered 09-27: NO hand-fire, MEASURED** (114 transcripts, 0 executions, pattern proved to catch
+it). Plus one field datum for D2: `net` rang `blocked` once and acted on the pointer. One point, not a count.
 
 **F - carried, in priority order:** `REVIEW-12b.md`'s seven points (`FINDINGS.md#review12b`, each already measured) ·
 `boot.mjs --hook` records with NO ownership test (`boot.mjs:489`; needs a declared test seam first - its own
