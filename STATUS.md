@@ -27,7 +27,7 @@ run `.claude/comm-hook.mjs` by hand in a real tree** (it drains the agent's mail
 entry, and can write the ledger - `#review13`, `#review14`), nor that **a hook a leader puts in `settings.local.json`
 runs in every expert** (measured 09-27, atlas's letter). Read it whole against `FINDINGS.md` since 09-19; every
 claim it makes gets a source or goes. Then the sibling `leader-expert` METHOD skill, read-only: flag what 09-27
-contradicts, to its owner. A skill change is an install: `--check` drift until released.
+contradicts to **atlas's leader, who maintains it** - the owner wants us working together. A skill change is an install: `--check` drift until released.
 
 **B - the registry half of #13 §1, MEASURED 09-27 by A31 going red on my own end-to-end probe**: a hand-fire from
 inside a session in the project rewrites that session's registry entry. Design in `FINDINGS.md#review13` "Named, not
