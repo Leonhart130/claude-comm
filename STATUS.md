@@ -1,71 +1,48 @@
-# STATUS — claude-comm, 2026-09-20 (sessions 4–21)
+# STATUS — claude-comm, 2026-09-27 (sessions 4–22)
 
 Design and gates are in `README.md`; **this file is only what is OPEN.** Keep it short — when it grows,
 fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(Closed 2026-09-20. Field = atlas; `work` dormant by the owner's word (`FIELDS.json`); **`lyra` installed 09-20 at
-his request** - leader-only roster, never launched. `orion`'s leader not relaunched since 09-19.)*
+*(Closed 2026-09-27. Field = atlas; `work` dormant by the owner's word (`FIELDS.json`); `lyra` leader-only, never
+launched; `orion`'s leader not relaunched since 09-19. **`2026-09-27.1` is in all six trees**, `--check` in sync.)*
 
-**A - FIRST, et c'est un ROUGE À MOI, déjà livré dans les six arbres : `review/REVIEW-13.md` §1.**
-🔴 **`witnessStart()` n'interroge JAMAIS le témoin quand `/proc` répond** (`session-registry.mjs:211` rend sur le
-seul `cwd`, `sid` non consulté). Donc la forme de sonde que ce dépôt pratique RÉELLEMENT — un stub déclenché à la
-main **depuis son propre projet** — écrit encore un start fantôme, stderr **vide**. Mesuré : 1 record, `session_id`
-ne correspondant à rien. **Et A77 affirme exactement ce tir comme son CONTRÔLE POSITIF** — 8ᵉ instance de
-l'amendement du 2026-09-04, 4ᵉ passe d'affilée à trouver son pire point dans le patch de la précédente.
-🔴 **Le `CHANGELOG` de `2026-09-20.1` dit le contraire aux six arbres** dans sa première phrase (*« compté que s'il
-est TÉMOIGNÉ »*) : c'est faux sur la branche `/proc`. **Corriger le texte fait partie du correctif, pas après.**
-Le fantôme détaché est mort (prouvé 3×) et **l'audit ▶ C est FAIT** : 167 starts/6 arbres, 4 non appariés,
-**0 daté ≥ 09-19**. Restent 3 🟡 + 4 🟢 dans le rapport, tous mesurés.
-🔴 **CE FICHIER EST LE SEUL PORTEUR : la sonnette de #13 a été DRAINÉE** par le crochet `Stop` à la frontière de
-tour, après la clôture (`inbox 'leader': empty`, livraison `via=hook` dans `.comm/log.jsonl`). **Le prochain boot
-ne sonnera pas pour elle.** Je l'avais annoncée « laissée en attente » au propriétaire — c'était faux dix minutes
-plus tard, et c'est la forme même du défaut : un accusé de réception qui arrive tout seul.
-⚠️ **La clôture de 09-20 a été prononcée AVANT que ce rapport soit lu** : la sonnette était dans l'inbox du leader
-et `--close` ne la voit pas (la boucle `field:` exclut ROOT par conception). **Une clôture aveugle à sa propre
-sonnette** — à traiter avec E, même forme : une ligne qui ne mesure pas ce qu'elle promet.
+**A - FIRST: review #14 on `2026-09-27.1`, or name why not.** Review #13 is DISPOSED (`FINDINGS.md#review13`: the
+red, §2, §3, §7a, a measurement before shipping, end to end on a real session, eight mutants each reddening A77 alone).
+**Not launched this session**: the owner's usage is the binding cost, so ask him first. Aim it where I am least sure:
+(a) `resume`/`compact` - whether the file carries the payload's id when THOSE hooks fire is unmeasured; (b) the
+`EPERM` branch of `liveSession()` counts as alive; (c) the five arms moved onto `witnessKit()` - did any lose what it
+measured?; (d) the stub's new stderr line on every non-counted start - where does it land in a real session?
 
-**A2 - la moitié de `REVIEW-12b.md` NON disposée.** 🔴 **`FINDINGS.md#review12b` liste les sept points portés avec
-leur n° de section** — §2 la date `dormant-awake` paie les acks. **Chacun est DÉJÀ MESURÉ : prends la mesure.**
+**B - the registry half of #13 §1, MEASURED 09-27 by A31 going red on my own end-to-end probe**: a hand-fire from
+inside a session in the project rewrites that session's registry entry. Design in `FINDINGS.md#review13` "Named, not
+fixed" - gate `record()` AND `refresh()` on the witness. Touches `Stop`, the hottest path: own change, own arm,
+`selftest` both ways.
 
-**B - `boot.mjs --hook` records with NO ownership test at all** (`boot.mjs:489`; the stub now has one). **Mesuré
-pourquoi il ne peut pas simplement adopter `witnessStart` :** ses propres `--prove-red` tirent `--hook --root
-<fixture>` depuis une chaîne dont l'ancêtre `claude` est la session de l'opérateur — donc ÉTRANGERS par
-construction, et ses propres bras rougiraient. Il lui faut d'abord une couture de test déclarée. La prose de
-`CLAUDE.md` + `review/CLAUDE.md` est la seule garde aujourd'hui.
+**C - tests faster, and still reliable - the owner asked 09-27.** Measured: `attack` is 51 s wall for 47 s of CPU, one
+core of twelve; the top three arms are 17 s (A59 8 s, A34 5 s, A20 4 s). **4 unmodified suites in parallel: 4/4 green,
+82 s for all four** (vs ~204 s serial) - ONE control run. Build `test/mutate.mjs` (today's runner is a scratch script:
+copy the tracked tree, apply a mutant that must match exactly once or refuse, run, report the rows) running N-wide, with
+the parallel baseline as its control. Then look at A59/A34/A20. `--only <arm>` for iteration; the full suite stays the gate.
 
-**C - l'audit fantôme, une requête, non construite :** un start enregistré dont le `session` ne correspond à aucun
-transcript sous `~/.claude/projects/` est un candidat. Base de référence sur cinq arbres : **4 non appariés, tous
-≥ une semaine avant le correctif**. **Tout start non apparié daté après 2026-09-19 est un vrai candidat.**
+**D - `#bell-into-typing`**: the bell reads the AGENT's turn, never the PERSON's input line - it cut the owner's
+half-typed message 09-27. He says it is not serious, keep writing. Named, not fixed.
 
-**D - orion: adoption MESURÉE** (`7c449631`, 09-19), en parsant les APPELS D'OUTIL, jamais grep — le texte des
-skills nomme chaque commande, donc un grep compte la documentation. **Introduction reçue 1× ; `Skill` :
-`leader-expert` + `claude-in-chrome`, PAS `claude-comm` ; `comm.mjs inbox` 2×, spontané.** Réponse au propriétaire,
-plus nette que « skill oui » : *il n'a jamais chargé la skill et s'est quand même servi du bus — c'est
-l'INTRODUCTION qui a produit ces deux appels.* Suite depuis `./-home-user-Dev-orion*/` quand il aura des
-experts.
+**E - atlas owes me one answer** (letter `2026-09-27-…-etait-fausse.md` §3: did an agent hand-fire `session-start`
+since 09-20?). Their leader said it would answer "avec une mesure".
 
-**D2 - the MID-TURN channel EXISTS, measured with its control** (`FINDINGS.md#midturn-channel`): a `PostToolUse`
-hook's `hookSpecificOutput.additionalContext` **reaches the model at the tool result**; stderr never does. Asked by
-atlas's leader with a price (a brief marked AVANT read an hour late, 5 real dispatches waited). 🔴 **Transport is
-not the open half - whether an agent ACTS on it is unmeasured, and `selftest` has the agent ignoring what it is
-pointed at in 5 of 8 runs.** Build `--kind blocked` on it only with their FIELD count, never my bench.
+**F - carried, in priority order:** `REVIEW-12b.md`'s seven points (`FINDINGS.md#review12b`, each already measured) ·
+`boot.mjs --hook` records with NO ownership test (`boot.mjs:489`; needs a declared test seam first - its own
+`--prove-red` fires are foreign by construction) · two amendments demanded by acks: `stranded-untold` (atlas's
+`extension` waits ON PURPOSE, their decision - `FINDINGS.md#peer-state`) and a close blind to its own doorbell ·
+#13 §7b/§7c (`handoff.mjs`'s D2 guard masked by `restart.mjs`'s; `INSIDE` unarmed) · the stub files
+`basename(transcript_path)` as the session, not the witnessed id · D2 mid-turn: timing now measured 4/4
+(`#midturn-channel`), obedience to a POINTER is the open half - build `--kind blocked` only on atlas's field count.
 
-**E - two AMENDMENTS demanded** (3 acks each): `field:atlas@stranded-untold:extension` et le canal, réglé 09-20.
-🟢 **L'ÉVIDENCE EST ARRIVÉE et c'est elle qui bloquait :** leur leader l'écrit — *« `extension` n'a pas de travail
-aujourd'hui. Il attend EXPRÈS »*, *« rien n'attend de réponse »*
-(`exchange/atlas-leader/in/2026-09-19-recu-...-volontairement.md`). **La ligne gate donc sur une décision qui est
-la leur et qui est juste.** L'amendement de 09-18 a déjà mis les opérations du pair en montré-non-gaté ;
-`stranded-untold` gatait encore parce que le BUS avait mal informé l'envoyeur. Conçois-le avec un bras (que mesure
-la ligne maintenant ?) ou supprime la cause. `FINDINGS.md#peer-state`.
-
-**✅ CLOSED 09-20:** T1's root half, measured on this session — `FINDINGS.md#t1-root-half`.
-
-**Carried:** A2 (a marker written when the bus RAN, not when it SHOWED - §3(c) is a second reach to it) · the
-installer overwrites a `SKILL.md` it did not generate · every other stderr line of the stub reaches no model · S6 ·
-atlas's `rings.jsonl` read (A62, A65) · #9 A3 · C7 · `who`'s 3rd/4th states · the restart trigger (ledger UNKNOWN) ·
-C3. **Later, owner's order:** adoption (measure D) → Rust port → value, with atlas's leader.
+**Carried:** A2 marker · the installer overwrites a `SKILL.md` it did not generate · S6 · atlas's `rings.jsonl`
+(A62, A65) · #9 A3 · C7 · `who`'s 3rd/4th states · the restart trigger (ledger UNKNOWN) · C3. **Later, owner's
+order:** adoption (orion measured 09-19) → Rust port → value, with atlas's leader.
 
 ## Where it stands
 
@@ -78,7 +55,7 @@ C3. **Later, owner's order:** adoption (measure D) → Rust port → value, with
 | boot | `node bin/boot.mjs` — every gating row armed; `--fast` is injected at session start, contract in `CLAUDE.md` |
 | **ledger** | `node bin/ledger.mjs` — the reboot instrument, here AND in the field (`--root <tree>`); arms run inside `attack` as A34. Each start stores `pending`, the peer's covariate — **never inbox depth**: session #41 had an empty mailbox and the largest real queue of its last five boots. **Counts live in boot's output, never here** |
 | **sensor** | `node bin/context.mjs` — pid → transcript through `bin/session-registry.mjs` (the `SessionStart` hook writes it, keyed on pid + start time + boot id); **refuses on a miss**. `FINDINGS.md#clear-blind` |
-| reviews | #1–#12 **dispositioned**; **#12b disposed 2026-09-20** (its red + D2), seven points carried — `FINDINGS.md#review12b`. **#13 IS IN FLIGHT.** #5's amendment stands in `CLAUDE.md`: *a gate that CAN redden is not yet one that reddens for the property in its own title* — **#12b was its seventh instance, inside an arm the previous disposition had just written** |
+| reviews | #1–#12b **dispositioned** (#12b's seven points carried — `FINDINGS.md#review12b`); **#13 disposed 2026-09-27** — `FINDINGS.md#review13`, released as `2026-09-27.1`. #5's amendment stands in `CLAUDE.md`: *a gate that CAN redden is not yet one that reddens for the property in its own title* — **#12b was its seventh instance, inside an arm the previous disposition had just written**; **#13 its eighth, in the arm #12b's disposition wrote** |
 
 ## ⏭️ OPEN
 1. **🔴 Latency is a mailbox, not an interrupt.** Re-derive with `node test/latency.mjs <log>`; never

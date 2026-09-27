@@ -2815,6 +2815,23 @@ leader, opted in by name; an agent at the project root*; confirmation always tru
 - **An opted-in agent that had NOT written its state down** — the opt-in rests on atlas's reading of their
   experts' `CLAUDE.md`, not on anything a clear can check.
 
+## `#bell-into-typing` — the bell reads the AGENT's turn and never the PERSON's input line (2026-09-27)
+
+**Measured live, on the owner.** I rang atlas's leader with the `2026-09-27.1` letter. The bell checked its rule 6
+(`#bell-mid-turn`): the peer's turn was over (*"done 2:05 AM"*) - so it typed. **The owner was typing in that window
+at that second.** His half-written message *"…"* was cut: the bell's text was
+inserted after its fourth word, the bell pressed Enter, and the session received *"(a few words) [claude-comm]
+cross-project doorbell…"* as one submitted prompt; the rest of his sentence stayed in the input box. The peer guessed what he meant - right by luck. `bell` exited 0, `● rang`, and only the screen showed the damage.
+
+**The bell asks "is the AGENT busy", and in the owner's own windows the question is "is ANYONE using this input".**
+An idle agent is exactly when a person types to it. Rule 6 cannot see that: the input line is not in the transcript.
+**Not fixed.** Options, none measured: read the input line from `kitten @ get-text` and refuse unless it is empty
+(screen scraping - fragile, and a race between read and type); or stop typing at all - the runtime's own
+`SendMessage` path (`#native-path`) reaches an idle session WITHOUT the input box, but this repo's rule so far is
+read-only toward other projects' sessions. **The owner's answer, the same minute: it is not serious, keep writing
+to him.** So the bell stays in use and the defect stays named - it is harmless while he is the one it interrupts and
+he sees it happen, and it is the same defect the day it truncates something that mattered.
+
 ## `#bell-mid-turn` — the exchange bell said it reused wake's rules, and never read the turn
 
 **2026-09-13, found re-reading `bin/exchange-bell.mjs` before ringing atlas's leader with the `.6` letter.**
@@ -3209,6 +3226,10 @@ these areas reads this section before claiming anything about them.
   pointed at, and 09-11 added a 4th miss in 4 runs. This bus rings bells nobody answers and no gate sees it.
   🟢 Transport green 09-11 with and without `CLAUDE_COMM_AGENT` (`FINDINGS.md#one-suite-hardened`).
 - **Anything non-Linux**: `comm who` reads `/proc`, degrading to "not running" elsewhere.
+- **The ledger's witness on `resume` and `compact`** (`#review13`): whether the runtime's session file carries the
+  payload's id when THOSE hooks fire is unmeasured - startup and `/clear` are (3/3, 09-27). Both are the ledger's
+  "other" arm, so a drop there costs no verdict, and `ledger` would not show it.
+- **`liveSession()`'s `EPERM` branch** counts a process it may not signal as alive - reasoned, never exercised.
 - A8's partial mutations and behaviour mid-TOOL-CALL live at `FINDINGS.md#test-debt`.
 
 ## `#t1-root-half` — both halves of T1 finally seen live (2026-09-20)
