@@ -5006,7 +5006,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		try { rmSync(home79, { recursive: true, force: true }) } catch {}
 	}
 	const turnEnd = /delivered when its current turn ends/
-	const idleOk = /but IDLE \(its runtime's status, set 6 min ago\)/.test(res.idle?.out) && /ring now: node \S+wake\.mjs --root /.test(res.idle?.out) &&
+	const idleOk = /but IDLE \(its runtime's status, set 6 min ago\)/.test(res.idle?.out) && /ring now: node "\S+wake\.mjs" --root "\S+" --agent app$/m.test(res.idle?.out) &&
 		!turnEnd.test(res.idle?.out) && res.idle?.state === "idle"
 	const busyOk = /and BUSY — delivered when its current turn ends/.test(res.busy?.out) && res.busy?.state === "running"
 	const reusedOk = /CANNOT SAY \(its runtime record is for process start/.test(res.reused?.out) && !/IDLE/.test(res.reused?.out) && res.reused?.state === "running"
@@ -5036,18 +5036,23 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	const s80 = JSON.parse(readFileSync(sp80, "utf8"))
 	s80.hooks.Stop[0].hooks.push({ type: "command", command: "echo MINE-SAME-GROUP" })
 	s80.hooks.Stop.push({ hooks: [{ type: "command", command: "echo MINE-OWN-GROUP" }] })
+	// Review #15 §5: a group is more than its hooks - a person's `matcher` on the group holding ours must survive too.
+	s80.hooks.SessionStart[0].matcher = "startup"; s80.hooks.SessionStart[0].hooks.push({ type: "command", command: "echo MINE-STARTUP-ONLY" })
 	writeFileSync(sp80, JSON.stringify(s80, null, 2))
 	inst(); const once = readFileSync(sp80, "utf8")
 	inst(); const twice = readFileSync(sp80, "utf8")
 	const chk80 = spawnSync("node", [join(PKG, "install.mjs"), r80, "--check"], { encoding: "utf8" })
 	rmSync(r80, { recursive: true, force: true })
 	const n = (re) => (once.match(re) || []).length
+	let matcherKept = false
+	try { matcherKept = (JSON.parse(once).hooks.SessionStart || []).some((g) => g.matcher === "startup" && (g.hooks || []).some((h) => /MINE-STARTUP-ONLY/.test(h.command))) } catch {}
 	let ours80 = {}
 	try { const j = JSON.parse(once); for (const ev of ["Stop", "SessionStart"]) ours80[ev] = (j.hooks[ev] || []).flatMap((g) => g.hooks || []).filter((h) => /comm-hook/.test(h.command)).length } catch {}
 	check("A80 a re-install keeps a person's own hook, even one beside ours in the same group",
-		n(/MINE-SAME-GROUP/g) === 1 && n(/MINE-OWN-GROUP/g) === 1 && ours80.Stop === 1 && ours80.SessionStart === 1 && once === twice && chk80.status === 0,
+		n(/MINE-SAME-GROUP/g) === 1 && n(/MINE-OWN-GROUP/g) === 1 && ours80.Stop === 1 && ours80.SessionStart === 1 && once === twice && chk80.status === 0 && matcherKept,
 		`hook in OUR group kept=${n(/MINE-SAME-GROUP/g)} (want 1; the old filter deleted it); positive control, hook in its own group kept=${n(/MINE-OWN-GROUP/g)}; ` +
-		`our command once per event=${JSON.stringify(ours80)}; a second install changes nothing=${once === twice}; --check in sync=${chk80.status === 0}`)
+		`our command once per event=${JSON.stringify(ours80)}; a second install changes nothing=${once === twice}; --check in sync=${chk80.status === 0}; ` +
+		`a person's matcher on our group kept with their command=${matcherKept}`)
 }
 
 // A81 — A CHANGE TO WHAT THE INSTALLER GENERATES CAN BE RELEASED (`FINDINGS.md#hook-merge`). The print hashed the bus
@@ -5067,11 +5072,123 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	const base = setup(), untouched = rel("same.2")
 	setup(); const skillHit = edit("Send, then end your turn.", "Send, then END your turn."), skill = rel("skill.2")
 	setup(); const mergeHit = edit("const ours = (h) =>", "const ours = (h) => h && "), merge = rel("merge.2")
+	// Review #15 §5/§6: the hook command and the NOTICE (`.comm/README.md`) reach every tree too.
+	setup(); const cmdHit = edit('if (verb !== "session-start") return', 'if (verb !== "session-start")  return'), cmd = rel("cmd.2")
+	setup(); const noticeHit = edit("Nobody is interrupted mid-thought.", "Nobody is interrupted mid-thought!"), notice = rel("notice.2")
 	rmSync(kit81, { recursive: true, force: true })
-	check("A81 a change to the generated skill or settings merge can be released",
-		base === 0 && untouched.status !== 0 && /has not changed/.test(untouched.stderr) && skillHit === 1 && skill.status === 0 && mergeHit === 1 && merge.status === 0,
+	check("A81 a change to anything the installer generates can be released",
+		base === 0 && untouched.status !== 0 && /has not changed/.test(untouched.stderr) && skillHit === 1 && skill.status === 0 && mergeHit === 1 && merge.status === 0 &&
+		cmdHit === 1 && cmd.status === 0 && noticeHit === 1 && notice.status === 0,
 		`control, untouched kit -> refused "has not changed"=${untouched.status !== 0 && /has not changed/.test(untouched.stderr)}; ` +
-		`one SKILL sentence edited (found ${skillHit}x) -> released=${skill.status === 0}; one withHooks line edited (found ${mergeHit}x) -> released=${merge.status === 0}`)
+		`one SKILL sentence edited (found ${skillHit}x) -> released=${skill.status === 0}; one withHooks line edited (found ${mergeHit}x) -> released=${merge.status === 0}; ` +
+		`hookCommand (found ${cmdHit}x) -> released=${cmd.status === 0}; the NOTICE (found ${noticeHit}x) -> released=${notice.status === 0}`)
+}
+
+// A82 — THE RING NEVER SKIPS THE LEADER FOR A CALLER THAT IS NOT THE LEADER (review #15 §1, `FINDINGS.md#review15`).
+// wake skipped `agent === who.you`, and `who --json` ran with cwd = root, so `you` was the LEADER for every caller
+// without CLAUDE_COMM_AGENT: an expert started by hand never rang it, and the ring `send` prints said "nothing is waiting
+// for anyone else", exit 0. ONE VARIABLE: which stand-in session the ringer runs INSIDE. From the expert's, the leader
+// must be considered; from the leader's own, it must not (never ring your own session - the control).
+{
+	const r82 = mkdtempSync(join(tmpdir(), "comm-attack-ring-"))
+	mkdirSync(join(r82, "app", "docs"), { recursive: true })
+	mkdirSync(join(r82, ".comm"), { recursive: true })
+	writeFileSync(join(r82, "app", "docs", "R.md"), "# r\n")
+	writeFileSync(join(r82, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app" } }))
+	execFileSync("node", [join(PKG, "install.mjs"), r82], { stdio: "pipe" })
+	const bus82 = join(r82, ".comm", "bin", "comm.mjs"), wake82 = join(r82, ".comm", "bin", "wake.mjs")
+	const env82 = { ...process.env }; delete env82.CLAUDE_COMM_AGENT
+	execFileSync("node", [bus82, "send", "leader", "--ref", "docs/R.md", "--note", "x"], { cwd: join(r82, "app"), stdio: "pipe", env: env82 })
+	// The leader's session: a stand-in whose argv0 is `claude`, alive for the whole arm.
+	const sess = join(r82, "claude"); try { symlinkSync("/bin/sh", sess) } catch {}
+	const leaderSess = spawn(sess, ["-c", "sleep 30; :"], { cwd: r82, detached: true, stdio: "ignore", env: env82 })
+	// A ring run INSIDE a session of `cwd`: the stand-in is the ringer's `claude` ancestor, as a session's Bash call is.
+	// The trailing `; :` keeps dash from exec-ing the last command, which would remove that ancestor and void the control.
+	const ringFrom = (cwd, out) => spawnSync(sess, ["-c", `${process.execPath} ${wake82} --root ${r82} --dry-run --json > ${out}; :`], { cwd, env: env82, timeout: 20000 })
+	let fromExpert = null, fromLeader = null
+	try {
+		const deadline = Date.now() + 4000
+		while (Date.now() < deadline && !/"leader":\{"pids":\[\d/.test(spawnSync("node", [bus82, "who", "--json"], { cwd: r82, encoding: "utf8" }).stdout || "")) {}
+		ringFrom(join(r82, "app"), join(r82, "e.json")); ringFrom(r82, join(r82, "l.json"))
+		try { fromExpert = JSON.parse(readFileSync(join(r82, "e.json"), "utf8")).results } catch {}
+		try { fromLeader = JSON.parse(readFileSync(join(r82, "l.json"), "utf8")).results } catch {}
+	} finally {
+		try { process.kill(-leaderSess.pid) } catch {}
+		rmSync(r82, { recursive: true, force: true })
+	}
+	// From the leader's own session there are TWO leader pids: the sleeping stand-in and the ringer's own shell.
+	// The control is that the ringer's shell is never in its own results; the other session is, correctly.
+	const leaderPids = (res) => (res || []).filter((r) => r.agent === "leader").map((r) => r.pid)
+	check("A82 a ring from an expert's session considers the leader; a session never rings itself",
+		leaderPids(fromExpert).includes(leaderSess.pid) && fromLeader !== null && leaderPids(fromLeader).length === 1 && leaderPids(fromLeader)[0] === leaderSess.pid,
+		`from the expert's session, undeclared -> leader considered=${leaderPids(fromExpert).includes(leaderSess.pid)} (the old skip: absent); ` +
+		`from a leader session -> leader pids ${JSON.stringify(leaderPids(fromLeader))} (want only the OTHER session ${leaderSess.pid}, never the ringer's own)`)
+}
+
+// A83 — `send`'s verdict over SEVERAL sessions, a relocated config dir, and a dialog (review #15 §5, §8,
+// `FINDINGS.md#review15`). Six mutants of `.3` survived A79 because it never had two sessions on one inbox, never a
+// `CLAUDE_CONFIG_DIR`, never a status outside busy/idle. Two stand-ins in `app`, each with its OWN HOME; one variable per
+// case - which record each carries. BUSY in either order (a "first session decides" verdict fails one of them); idle
+// beside an UNREAD session is never IDLE; a record under CLAUDE_CONFIG_DIR is found; `waiting` is named and gets no ring.
+{
+	const r83 = mkdtempSync(join(tmpdir(), "comm-attack-turns-"))
+	mkdirSync(join(r83, "app", "docs"), { recursive: true })
+	mkdirSync(join(r83, ".comm"), { recursive: true })
+	writeFileSync(join(r83, "app", "docs", "R.md"), "# r\n")
+	writeFileSync(join(r83, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app" } }))
+	execFileSync("node", [join(PKG, "install.mjs"), r83], { stdio: "pipe" })
+	const bus83 = join(r83, ".comm", "bin", "comm.mjs"), ibx83 = join(r83, ".comm", "inbox", "app")
+	const fake83 = join(r83, "claude")
+	writeFileSync(fake83, '#!/bin/sh\nsleep "$1"\n', { mode: 0o755 })
+	const dirs = {}
+	for (const k of ["A", "B", "C", "cfgC"]) dirs[k] = join(r83, `home-${k}`)
+	const standIn = (extra) => {
+		const env = { ...process.env, ...extra }; delete env.CLAUDE_COMM_AGENT
+		if (!extra.CLAUDE_CONFIG_DIR) delete env.CLAUDE_CONFIG_DIR
+		return spawn(fake83, ["40"], { cwd: join(r83, "app"), detached: true, stdio: "ignore", env })
+	}
+	const tickOf = (pid) => { const d = Date.now() + 4000; while (Date.now() < d) { try { const st = readFileSync(`/proc/${pid}/stat`, "utf8"); return st.slice(st.lastIndexOf(") ") + 2).split(" ")[19] } catch {} } return "" }
+	const rec = (dir, p, status, extra = {}) => {
+		mkdirSync(join(dir, "sessions"), { recursive: true }); const f = join(dir, "sessions", `${p.pid}.json`)
+		if (!status) rmSync(f, { force: true }); else writeFileSync(f, JSON.stringify({ pid: p.pid, procStart: p.tick, status, statusUpdatedAt: Date.now() - 120_000, ...extra }))
+	}
+	const res = {}
+	const send83 = (label) => {
+		const before = new Set(readdirSync(ibx83))
+		const out = spawnSync("node", [bus83, "send", "app", "--ref", "docs/R.md", "--note", label], { cwd: r83, encoding: "utf8" }).stdout || ""
+		const f = readdirSync(ibx83).find((x) => x.endsWith(".json") && !before.has(x))
+		res[label] = { out, state: f ? JSON.parse(readFileSync(join(ibx83, f), "utf8")).to_state : "NO MESSAGE" }
+	}
+	const kids = []
+	try {
+		const a = standIn({ HOME: dirs.A }), b = standIn({ HOME: dirs.B }); kids.push(a, b)
+		const A = { pid: a.pid, tick: tickOf(a.pid) }, B = { pid: b.pid, tick: tickOf(b.pid) }
+		const ha = join(dirs.A, ".claude"), hb = join(dirs.B, ".claude")
+		rec(ha, A, "idle"); rec(hb, B, "busy"); send83("idle+busy")
+		rec(ha, A, "busy"); rec(hb, B, "idle"); send83("busy+idle")
+		rec(ha, A, "idle"); rec(hb, B, null); send83("idle+unread")
+		rec(ha, A, "waiting", { waitingFor: "permission prompt" }); rec(hb, B, "idle"); send83("waiting")
+		rec(ha, A, "shell"); rec(hb, B, "idle"); send83("shell")
+		try { process.kill(-b.pid) } catch {}
+		const c = standIn({ HOME: dirs.C, CLAUDE_CONFIG_DIR: dirs.cfgC }); kids.push(c)
+		const C = { pid: c.pid, tick: tickOf(c.pid) }
+		const d = Date.now() + 3000; while (Date.now() < d) { try { process.kill(b.pid, 0) } catch { break } }
+		rec(ha, A, "idle"); rec(dirs.cfgC, C, "idle"); send83("configdir")
+	} finally {
+		for (const k of kids) { try { process.kill(-k.pid) } catch {} }
+		rmSync(r83, { recursive: true, force: true })
+	}
+	const busy = (l) => /and BUSY — delivered when its current turn ends/.test(res[l]?.out) && res[l]?.state === "running"
+	const unread = /CANNOT SAY \(.*its runtime keeps no record of it/.test(res["idle+unread"]?.out) && !/IDLE/.test(res["idle+unread"]?.out) && res["idle+unread"]?.state === "running"
+	const waiting = /CANNOT SAY \(it is WAITING on permission prompt - a person must answer it/.test(res.waiting?.out) && !/only a ring starts a turn/.test(res.waiting?.out)
+	const cfgdir = /but IDLE/.test(res.configdir?.out) && res.configdir?.state === "idle"
+	const shell = /CANNOT SAY \(its runtime says 'shell'\)/.test(res.shell?.out) && /only a ring starts a turn/.test(res.shell?.out)
+	check("A83 send's verdict holds over two sessions, a relocated config dir and an open dialog",
+		busy("idle+busy") && busy("busy+idle") && unread && waiting && cfgdir && shell,
+		`idle+busy -> BUSY=${busy("idle+busy")}, busy+idle -> BUSY=${busy("busy+idle")} (a first-session verdict fails one); ` +
+		`idle beside a session with no record -> CANNOT SAY, never IDLE=${unread}; waiting on a permission prompt -> named, no ring printed=${waiting}; ` +
+		`a record under CLAUDE_CONFIG_DIR/sessions (HOME has none) -> IDLE=${cfgdir}; 'shell' -> named, ring printed=${shell}` +
+		(busy("idle+busy") && busy("busy+idle") && unread && waiting && cfgdir && shell ? "" : ` · ${JSON.stringify(res).slice(0, 700)}`))
 }
 
 finish(null)

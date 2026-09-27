@@ -680,15 +680,15 @@ function dispatch(root, cfg, me, cmd, rest) {
 				console.log(`     — pointing at content they have already read? The substance belongs in the file, not the note.`)
 			}
 			if (m.note !== sanitizeNote(arg(rest, "note"))) console.log(`  note was flattened/truncated to ${MAX_NOTE} chars — the substance belongs in ${m.ref}`)
-			const ring = `node ${join(dirname(fileURLToPath(import.meta.url)), "wake.mjs")} --root ${root}`, run = `'${to}' is running (pid ${live?.map((l) => l.pid).join(", ")})`
+			const ring = `node "${join(dirname(fileURLToPath(import.meta.url)), "wake.mjs")}" --root "${root}" --agent ${to}`, run = `'${to}' is running (pid ${live?.map((l) => l.pid).join(", ")})`
 			const at = Math.max(0, ...t.map((x) => x.at || 0)), ago = at ? `${Math.round((Date.now() - at) / 60000)} min ago` : "when unknown"
 			console.log(!live?.length ? `  '${to}' is NOT running — held in inbox, delivered when you next launch it.`
 				: turn === "busy" ? `  ${run} and BUSY — delivered when its current turn ends.`
 				: turn === "idle" ? `  ${run} but IDLE (its runtime's status, set ${ago}) — no turn is in progress, so none ends.\n` +
-					`  The doorbell only tries at a turn END in this project, yours included: wait for its answer INSIDE this turn and it never comes.\n` +
+					`  The doorbell only tries at a turn END in this project, yours included, and only in a kitty window it can find: wait for its answer INSIDE this turn and it never comes.\n` +
 					`  End your turn, or ring now: ${ring}`
-				: `  ${run} — delivered at its next turn end. Busy or idle: CANNOT SAY (${t.map((x) => x.why).filter(Boolean).join("; ")}).\n` +
-					`  If it is idle, only a ring starts a turn: ${ring}`)
+				: `  ${run} — delivered at its next turn end. Busy or idle: CANNOT SAY (${t.map((x) => x.why).filter(Boolean).join("; ")}).` +
+					(t.some((x) => x.waiting) ? "" : `\n  If it is idle, only a ring starts a turn: ${ring}`))
 			break
 		}
 		case "inbox": {

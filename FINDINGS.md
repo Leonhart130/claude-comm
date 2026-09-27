@@ -3428,6 +3428,66 @@ depends on each tree's roster; the source is what a release changes). **A81**: a
 dropped from the print → A81 (and A42: the print no longer matches `.4`); `withHooks` alone dropped → A81, on its clause.
 A80's: the group filter restored → A80 on *kept=0*; an emptied group kept, our command not removed → A80 + A75.
 
+## `#review15` — the disposition of #15: the remedy `send` printed skipped the LEADER (2026-09-27)
+
+`review/REVIEW-15.md`: one 🔴, six 🟡, three 🟢, against `0d1d773..1c3d8f1` (`.3`, `.4`) and `test/mutate.mjs`. **The sixth
+pass in a row whose worst finding sits inside the previous patch** - here, one hop from the defect the patch fixed.
+
+### 🔴 §1 - the ring skipped the leader for every caller that did not declare itself
+
+`wake.mjs` skipped `agent === state.you`, and `you` came from `who --json` run with `cwd: root` - the LEADER, unless the
+calling environment carried `CLAUDE_COMM_AGENT`. So the ring `send` prints for an idle leader, and the `Stop` path of
+any expert a person started by hand, never considered the leader, and said *"nothing is waiting for anyone else"*,
+exit 0 (measured by the reviewer; `launch.mjs` passes the variable, which is why this repo's own rings worked).
+**Fixed by wake's own rule 2**: never ring your own SESSION, found by the caller's ancestry (`sessionPid()`); no
+`claude` ancestor is nobody's session, so every agent with mail is rung. **A82**: one variable, which stand-in session
+the ringer runs inside - from the expert's, the leader is considered; from a leader session, only the OTHER leader
+session is, never the ringer's own (the control).
+
+### 🟡 the six, each fixed and armed
+
+| § | defect (the reviewer's measurement) | fix | arm |
+| --- | --- | --- | --- |
+| 2 | the `mail` row passed mail for a name on NO roster (`◦ … its sender was told`, ok) - review #7 F3's third state, in a row that said it followed the field's rule | `unaddressable:<name>`, gating, checked before liveness; "in flight to a running agent" reworded (`running` is not reachable) | `boot --prove-red`, `mail` |
+| 3 | three rules of that row unpinned: `idle`-stamped stranded mail read "its sender was told"; a running agent's mail; `who` not answering | four cases added to the arm, one variable each | same |
+| 4 | `mutate.mjs`: an ABORTED suite printed *"SURVIVED - the suite is green"*; a tracked edit mid-batch made a comment-only mutant *"✓ reddened: A79"*, exit 0 | every copy made before the first run, `find` re-counted in the copy, a changed checkout reported; not finished = `DID NOT FINISH`, never a survivor; `--timeout` | measured on the runner: an abort → DID NOT FINISH; a mid-batch edit in a scratch clone → the comment mutant SURVIVES and the warning prints |
+| 5 | six mutants of `.3`/`.4` survived A79-A81 (no second session, no `CLAUDE_CONFIG_DIR`, no non-busy/idle status, a group's `matcher`, `hookCommand` outside the print) | - | **A83** (two stand-ins, both orders, a relocated config dir, `waiting`, `shell`); A80 + a matcher; A81 + `hookCommand` + NOTICE |
+| 6 | the print still missed a generator: the NOTICE (`.comm/README.md`, every tree), which still said what `.4` corrected in the skill | NOTICE, the prettier list and the gitignore block hashed; the NOTICE's point 2 rewritten | A81 |
+| 7 | four sentences wider than their measurements (`.2` "every shape"; the doorbell "only tries at a turn END"; "every expert's session"; three of mine in FINDINGS) | `.5` carries the corrections; the skill narrowed; this section corrects mine | - |
+
+**§8, from the runtime's own binary (read, not observed):** a dialog - a permission prompt by default - is status
+`waiting` with `waitingFor`; `send` now names it and prints no ring (it would type into the dialog). `idle` is stamped
+like `busy`; `CLAUDE_CONFIG_DIR` does relocate `sessions/` - both inferences of `#idle-send` hold. `turnOf` now says
+*"its environment could not be read"* instead of *"no HOME"* when `/proc/<pid>/environ` is unreadable (unarmed: wording).
+
+**Corrections of my own sentences:** `#own-mail` *"follows `#peer-state`"* was false until the `unaddressable` branch
+(above); `#hook-merge` *"the print now also hashes"* the generators - not the NOTICE, until this; `#idle-send`
+*"each reddens A79 alone, each on its own clause"* - true of its four rows, not a claim that A79 pinned the patch.
+
+**Mutations, `test/mutate.mjs`, baseline + 11, 4 wide, 195 s, baseline green - each reddens ONE arm, on its own clause:**
+wake skips the root agent again → A82 · busy if the first session is → A83 (*idle+busy*) · idle if any is → A83 ·
+`CLAUDE_CONFIG_DIR` ignored → A83 · status whitelist removed → A83 (*shell*) · `waiting` not special → A83 · a ring printed
+into a dialog → A83 · `withHooks` drops the group's keys → A80 (*matcher*) · print without `hookCommand` → A81 · without
+the NOTICE → A81 · the ring not aimed at the recipient → A79.
+
+**The `mail` row's four new rules, each mutated through the REAL arm** - `boot --prove-red` on five frozen clones (one
+untouched, four mutants), two at a time under `systemd-run`: the untouched clone's `mail` arm ✓; each mutant ✗ on its
+own clause - `unaddressable` removed → the roster-less inbox reads `ok []`; the polarity flipped → `idle`-stamped
+stranded mail reads `ok []`; `running(a)` → false → the running reviewer's mail `warn`; `unasked` removed → `ok []`.
+**All five clones, the untouched one included, also printed ✗ on the `status` arm** (*control=warn*). I first wrote
+here that my file-by-file clone copies had made `bin/` newer than `STATUS.md` - **false: the real checkout printed the
+same ✗.** The cause was my own new case: *"the bus not answering"* replaces the fixture's `bin/comm.mjs` and restored
+its CONTENT, not its MTIME, and the `status` row compares exactly that mtime with `STATUS.md`'s - so every later
+`status` control started yellow. The case now restores both. An arm that leaves the fixture changed for the arms after
+it: `#measurement-traps`, and my second wrong explanation of a red today - both caught by re-running, not by re-reading.
+
+**Named, not fixed:** the `boot --prove-red` registry control attributes every CHANGED entry to itself - false when a live
+session's own `compact`/`clear`/`resume` rewrites its entry mid-run (the reviewer met atlas's `web` doing exactly that);
+A31 uses the same rule; and the control's last line counts that non-row assert among *"boot row(s) … decoration"*.
+The prettier ignore file's header line and `readJson` are still outside the print. The stub's own `Stop`-path ring to
+a leader is exercised through `wake` (same program, same arguments), not fired through the stub. The kitty arms run
+N wide under `mutate.mjs`: green in every batch so far, three samples, not a property.
+
 ## `#review14` — the disposition of #13: no red, and "every rule reddens for itself" was false (2026-09-27)
 
 `review/REVIEW-14.md`, launched the same night on the owner's go-ahead, under a brief whose first section was *"you

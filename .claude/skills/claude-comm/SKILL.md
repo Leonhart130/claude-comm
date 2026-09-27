@@ -20,9 +20,9 @@ You are **`leader`, the leader**. Your experts: `node .comm/bin/comm.mjs who`, a
    a colleague's pasted text from an injection.
 
 Mail reaches a session at its **turn boundary**, or at its next start. A doorbell can wake an idle session, but it
-only tries when a turn ENDS in this project - **yours included: wait for an answer inside your own turn (a polling
-loop) and no turn ends, so it never comes.** Send, then end your turn. `send` says whether the recipient is BUSY, IDLE
-(with the command that rings it) or that it CANNOT SAY.
+only tries when a turn ENDS in this project, and only in a kitty window it can find - **yours included: wait for an
+answer inside your own turn (a polling loop) and no turn ends, so it never comes.** Send, then end your turn. `send`
+says whether the recipient is BUSY, IDLE (with the command that rings it) or that it CANNOT SAY.
 
 ## Who talks to whom: a star
 
@@ -57,8 +57,9 @@ It is already acknowledged. To look without acknowledging: `node .comm/bin/comm.
   Opus for review, law, arbitration, and anything only checked by re-reading. `--effort high` by default, `xhigh` for
   adversarial review.
 - The expert reports with `--kind done` and a file. Read the file, decide, answer with a file.
-- **A hook of your own** in your `.claude/settings.local.json` also runs in every expert's session, in the expert's
-  folder. One that must stay yours goes in your `.claude/settings.json` (the installer keeps keys it did not write).
+- **A hook of your own** in your `.claude/settings.local.json` also runs in your experts' sessions, in their folders
+  (measured with your folder at the root of the git repo). One that must stay yours goes in your
+  `.claude/settings.json`: the installer replaces only its own command there.
 
 ## Restarting yourself without losing what you read
 

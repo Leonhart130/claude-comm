@@ -16,6 +16,27 @@ node <path-to-claude-comm>/install.mjs <your project> --check    # what version 
 Your project records what it has in `.comm/INSTALLED.json`. An update prints only the entries you did not
 already have.
 
+## 2026-09-27.5 — bus print `6c2eaf6477e3` — 2026-09-27
+
+- 🔴 **The doorbell now reaches the LEADER from any expert.** `wake.mjs` never rang "its own" agent, and took that to be
+  the leader for every caller that had no `CLAUDE_COMM_AGENT` - an expert a person started by typing `claude` in its
+  folder, or the ring command `send` prints. So mail to an idle leader waited for someone to type in its window, and
+  the ring said *"nothing is waiting for anyone else"*. It now skips only the session the ring runs in. (Experts
+  started with `launch.mjs` were not affected.)
+- `send`'s ring command now rings only the recipient (`--agent <name>`), with its paths quoted.
+- `send` names a recipient **WAITING** on a permission prompt or another dialog: a person must answer it, and no ring
+  is printed - a ring would type into the dialog.
+- `.comm/README.md` now says what the skill says about the doorbell.
+- **Corrections of earlier notes** (each was wider than what was measured):
+  - `.2` *"Real starts: now measured on every shape"*: measured were a fresh start, `/clear`, `--resume` (command
+    line), `/compact` and `--fork-session`. Not measured: `/resume` inside a running session, an automatic
+    compaction, `--continue`.
+  - `.3`/`.4` *"the doorbell only tries at a turn END in your project"*: it also needs a kitty window it can find for
+    the recipient, rings an agent at most once per 2 minutes, and - until this release - never rang the leader from
+    an expert without `CLAUDE_COMM_AGENT` (above).
+  - `.4` *"a hook in `.claude/settings.local.json` also runs in every expert's session"*: measured once, at session
+    start, with the leader's folder at the root of the git repo. The skill now says so.
+
 ## 2026-09-27.4 — bus print `588802c0c566` — 2026-09-27
 
 - 🔴 **A re-install no longer deletes a hook of yours that sits in the same group as the bus's.** The installer

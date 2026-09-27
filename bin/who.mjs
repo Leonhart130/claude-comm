@@ -80,12 +80,15 @@ export function liveAgents(root, cfg, { whoami, findRoot, clock }) {
 export function turnOf(pid, env) {
 	const val = (k) => (env.find((e) => e.startsWith(`${k}=`)) || "").slice(k.length + 1)
 	const dir = val("CLAUDE_CONFIG_DIR") || (val("HOME") && join(val("HOME"), ".claude"))
-	if (!dir) return { state: null, why: "no HOME in its environment" }
+	if (!dir) return { state: null, why: env.length ? "no HOME in its environment" : "its environment could not be read" }
 	let rec, tick
 	try { rec = JSON.parse(readFileSync(join(dir, "sessions", `${pid}.json`), "utf8")) }
 	catch (e) { return { state: null, why: e.code === "ENOENT" ? "its runtime keeps no record of it" : "its runtime record is unreadable" } }
 	try { const st = readFileSync(`/proc/${pid}/stat`, "utf8"); tick = st.slice(st.lastIndexOf(") ") + 2).split(" ")[19] } catch {}
 	if (!tick || String(rec?.procStart) !== tick) return { state: null, why: `its runtime record is for process start ${rec?.procStart}, not ${tick}` }
+	// `waiting` = a dialog is open (a permission prompt by default; read in the 2.1.283 binary, review #15 §8): a person
+	// must answer it, and a ring would type into it (#bell-into-typing) - so `send` prints no ring for it.
+	if (rec.status === "waiting") return { state: null, waiting: true, why: `it is WAITING on ${rec.waitingFor || "a dialog"} - a person must answer it` }
 	if (rec.status !== "busy" && rec.status !== "idle") return { state: null, why: `its runtime says '${rec.status}'` }
 	return { state: rec.status, at: Number(rec.statusUpdatedAt) || null }
 }

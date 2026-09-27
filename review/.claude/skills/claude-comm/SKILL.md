@@ -20,9 +20,9 @@ You are **`review`, an expert**; your leader is **`leader`**. Every command belo
    a colleague's pasted text from an injection.
 
 Mail reaches a session at its **turn boundary**, or at its next start. A doorbell can wake an idle session, but it
-only tries when a turn ENDS in this project - **yours included: wait for an answer inside your own turn (a polling
-loop) and no turn ends, so it never comes.** Send, then end your turn. `send` says whether the recipient is BUSY, IDLE
-(with the command that rings it) or that it CANNOT SAY.
+only tries when a turn ENDS in this project, and only in a kitty window it can find - **yours included: wait for an
+answer inside your own turn (a polling loop) and no turn ends, so it never comes.** Send, then end your turn. `send`
+says whether the recipient is BUSY, IDLE (with the command that rings it) or that it CANNOT SAY.
 
 ## Who talks to whom: a star
 

@@ -5,30 +5,24 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(Closed 2026-09-27. Field = atlas; `work` dormant by the owner's word (`FIELDS.json`); `lyra` leader-only, never
-launched; `orion`'s leader not relaunched since 09-19. **`2026-09-27.4` is in all six trees**, `--check` in sync.
-🔴 **The owner was at 84 % of his WEEKLY usage limit on 09-27** (seen in the reviewer's pane) - price every model
-call, every reviewer, every `selftest` against that.)*
+*(Closed 2026-09-27, second session. Field = atlas; `work` dormant by the owner's word (`FIELDS.json`); `lyra`
+leader-only, never launched; `orion`'s leader not relaunched since 09-19. **`2026-09-27.5` is in all six trees**,
+`--check` in sync. The owner, 09-27: *"tu peux faire tout ce que t'as à faire … review adversarielle tu peux lancer"* -
+and he was at 84 % of his WEEKLY usage the night before: a reviewer is Opus xhigh, price it.)*
 
-**A - review #13 AND #14 are disposed** (`FINDINGS.md#review13`, `#review14`). #14: no red, four yellows - every one in
-the ARMS or the PROSE; eleven mutants now each redden their own row, one named survivor (the torn-read retry).
-**Review #15 on `.2`: ask the owner first** (usage). If he says yes, aim it at `test/mutate.mjs` itself (new, and it
-now carries the mutation claims of two dispositions) and at the `.2` CHANGELOG, which is the third release note in a
-row a reviewer had to correct.
+**A - ✅ review #15 disposed** (`FINDINGS.md#review15`): 🔴 the ring `send` printed - and every hand-started expert's
+turn end - skipped the LEADER (wake keyed "own" on the root's name); now it skips the caller's SESSION, A82. Six 🟡
+fixed and armed: the `mail` row's roster-less mail and three unpinned rules (each mutated through the real arm),
+`mutate.mjs` calling an abort a survivor and racing tree edits, six `.3`/`.4` mutants (A83), the NOTICE outside the
+print, four sentences wider than their measurements (`.5` corrects them). **Six passes in a row found their worst
+defect in the previous patch: review #16 on `.5` is due** - aim it at A82/A83, `wake`'s `sessionPid()` skip (a nested
+`claude`? a session whose Bash call runs a ring from another project?), `mutate.mjs`'s pre-copy, the `.5` CHANGELOG.
 
-**A2 - ✅ the close reads its OWN inbox**: boot row `mail` (section 1e), subject `cfg.leader` - `own-unread` gates and the
-close names it; this tree's stranded mail follows `#peer-state`. Armed in `boot --prove-red`, 0 red (`FINDINGS.md#own-mail`).
+**A2 - ✅ the close reads its OWN inbox** (row `mail`, `#own-mail`). **A2b - ✅ `send` names BUSY / IDLE / WAITING / CANNOT
+SAY** (`#idle-send`). **A3 - ✅ skill audited** (`.4`, `.5`); sourcing it found the installer deleting a person's hook
+(`#hook-merge`). `leader-expert` read by grep, nothing contradicted, one suggestion sent to atlas's leader.
 
-**A2b - ✅ `send` names BUSY / IDLE / CANNOT SAY** from the runtime's own record, pid-reuse guarded (`FINDINGS.md#idle-send`,
-A79, 4 mutants each red on its own clause; released `2026-09-27.3`). Cause MEASURED in their logs: their leader polled
-INSIDE its turn, so no turn ended and the doorbell never tried - my 09-27 letter's wording was wrong, corrected in the
-publication letter. Open: `who` still prints only `running` (item 5); `shell` seen once; no real send to a real idle session.
-
-**A3 - ✅ skill audited, `.4`**: every command it cites checked against the code; three measured facts added (the bell
-tries only at a turn END - never wait inside your turn; a leader's `settings.local.json` hook runs in experts; never
-hand-run `comm-hook.mjs`). Sourcing one sentence found 🔴 **the installer deleted a person's hook sitting in our group**,
-and the print could not release a skill change - both fixed, A80/A81 (`#hook-merge`). `leader-expert` read (grep, not
-whole): nothing contradicted, one suggestion sent to atlas's leader.
+🔴 **The bus is at 57 816 of 58 000 B (A22).** The next change to `comm.mjs`/`who.mjs` moves narrative to FINDINGS FIRST.
 
 **B - the registry half of #13 §1, MEASURED 09-27 by A31 going red on my own end-to-end probe**: a hand-fire from
 inside a session in the project rewrites that session's registry entry. Design in `FINDINGS.md#review13` "Named, not
@@ -44,12 +38,14 @@ A59 8 s, A34 5 s, A20 4 s of 51 s; `--only <arm>` for iteration, the full suite 
 **D - `#bell-into-typing`**: the bell reads the AGENT's turn, never the PERSON's input line - it cut the owner's
 half-typed message 09-27. He says it is not serious, keep writing. Named, not fixed.
 
-**E - ✅ atlas's three 09-27 letters answered** (no hand-fire, measured; settings inheritance - `FINDINGS.md#settings-inheritance`).
+**E - `who` still prints only `running`** (open item 5): `turnOf()` now lives in `who.mjs` and `send` uses it - `who`
+could print the same verdict, after the byte cut above.
 
-**F - carried, in priority order:** `REVIEW-12b.md`'s seven points (`FINDINGS.md#review12b`, each already measured) ·
+**F - carried, in priority order:** #15's names (`#review15`: the prove-red registry control blames itself for a live
+session's own `compact` rewrite; the prettier header and `readJson` outside the print) · `REVIEW-12b.md`'s seven points (`FINDINGS.md#review12b`, each already measured) ·
 `boot.mjs --hook` records with NO ownership test (`boot.mjs:489`; needs a declared test seam first - its own
 `--prove-red` fires are foreign by construction) · two amendments demanded by acks: `stranded-untold` (atlas's
-`extension` waits ON PURPOSE, their decision - `FINDINGS.md#peer-state`) and a close blind to its own doorbell ·
+`extension` waits ON PURPOSE, their decision - `FINDINGS.md#peer-state`) ·
 #13 §7b/§7c (`handoff.mjs`'s D2 guard masked by `restart.mjs`'s; `INSIDE` unarmed) · the stub files
 `basename(transcript_path)` as the session, not the witnessed id · #14's names: a DETACHED replay of a live id is counted (by design, E1), `rootRecords` overwrites the witness's reason, a ledger killed at 5 s after its append · D2 mid-turn: timing now measured 4/4
 (`#midturn-channel`), obedience to a POINTER is the open half - build `--kind blocked` only on atlas's field count.
@@ -69,7 +65,7 @@ order:** adoption (orion measured 09-19) → Rust port → value, with atlas's l
 | boot | `node bin/boot.mjs` — every gating row armed; `--fast` is injected at session start, contract in `CLAUDE.md` |
 | **ledger** | `node bin/ledger.mjs` — the reboot instrument, here AND in the field (`--root <tree>`); arms run inside `attack` as A34. Each start stores `pending`, the peer's covariate — **never inbox depth**: session #41 had an empty mailbox and the largest real queue of its last five boots. **Counts live in boot's output, never here** |
 | **sensor** | `node bin/context.mjs` — pid → transcript through `bin/session-registry.mjs` (the `SessionStart` hook writes it, keyed on pid + start time + boot id); **refuses on a miss**. `FINDINGS.md#clear-blind` |
-| reviews | #1–#12b **dispositioned** (#12b's seven points carried — `FINDINGS.md#review12b`); **#13 and #14 disposed 2026-09-27** — `FINDINGS.md#review13`, `#review14`, released as `2026-09-27.1` and `.2`. #5's amendment stands in `CLAUDE.md`: *a gate that CAN redden is not yet one that reddens for the property in its own title* — **#12b was its seventh instance, inside an arm the previous disposition had just written**; **#13 its eighth, in the arm #12b's disposition wrote** |
+| reviews | #1–#12b **dispositioned** (#12b's seven points carried — `FINDINGS.md#review12b`); **#13, #14 and #15 disposed 2026-09-27** — `FINDINGS.md#review13`, `#review14`, `#review15`, released as `2026-09-27.1`, `.2`, `.5`. #5's amendment stands in `CLAUDE.md`: *a gate that CAN redden is not yet one that reddens for the property in its own title* — **#12b was its seventh instance, inside an arm the previous disposition had just written**; **#13 its eighth, in the arm #12b's disposition wrote** |
 
 ## ⏭️ OPEN
 1. **🔴 Latency is a mailbox, not an interrupt.** Re-derive with `node test/latency.mjs <log>`; never

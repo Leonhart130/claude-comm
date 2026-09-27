@@ -710,8 +710,8 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 // gates. Silent when every inbox is empty; an inbox that cannot be read says so (form E).
 {
 	const ibx = join(ROOT, ".comm", "inbox")
-	let leader = "leader"
-	try { leader = JSON.parse(readFileSync(join(ROOT, ".comm", "config.json"), "utf8")).leader || leader } catch {}
+	let leader = "leader", roster = null
+	try { const c = JSON.parse(readFileSync(join(ROOT, ".comm", "config.json"), "utf8")); leader = c.leader || leader; roster = c.agents || null } catch {}
 	let dirs = []
 	try { dirs = readdirSync(ibx) } catch (e) { if (e && e.code !== "ENOENT") dirs = null }
 	const box = new Map(), bad = []
@@ -730,7 +730,7 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 			try { live = JSON.parse(spawnSync(process.execPath, [join(ROOT, "bin", "comm.mjs"), "who", "--json"], { cwd: ROOT, encoding: "utf8", timeout: 5000 }).stdout).agents || null } catch {}
 		}
 		const running = (a) => live && ((live[a] && live[a].pids) || []).length > 0
-		const untold = live ? others.filter(([a, ms]) => !running(a) && ms.some((m) => m.to_state !== "not-running")).map(([a]) => a) : []
+		const untold = live ? others.filter(([a, ms]) => (!roster || Object.prototype.hasOwnProperty.call(roster, a)) && !running(a) && ms.some((m) => m.to_state !== "not-running")).map(([a]) => a) : []
 		const parts = [], causes = []
 		if (mine.length) {
 			parts.push(`⚠ ${mine.length} for ${leader}, UNREAD: ${mine.slice(0, 2).map((m) => `${m.from} [${m.kind}] ${String(m.ts).slice(0, 16)} ref: ${m.refPath || m.ref}`).join("; ")}${mine.length > 2 ? "; …" : ""}` +
@@ -738,9 +738,14 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 			causes.push("own-unread")
 		}
 		if (others.length && !live) { parts.push(`mail for ${others.map(([a, ms]) => `${a} (${ms.length})`).join(", ")} and the bus could not say who is running`); causes.push("unasked") }
+		// A name on NO roster: no hook delivers it and no relaunch can - the field's third state (review #7 F3), which
+		// this row claimed to follow and did not (review #15 §2). Checked before liveness: it needs no bus to answer.
+		const lost = roster ? others.filter(([a]) => !Object.prototype.hasOwnProperty.call(roster, a)) : []
+		for (const [a, ms] of lost) parts.push(`⚠ ${a} (${ms.length}) is on NO roster - nothing can ever deliver it`)
+		if (lost.length) causes.push(`unaddressable:${lost.map(([a]) => a).join(",")}`)
 		for (const [a, ms] of others) {
-			if (!live) break
-			parts.push(running(a) ? `${a} (${ms.length}) in flight to a running agent`
+			if (!live || lost.some(([x]) => x === a)) continue
+			parts.push(running(a) ? `${a} (${ms.length}) waits for a running agent's next turn end`
 				: untold.includes(a) ? `⚠ ${a} (${ms.length}) NOT RUNNING and its sender was not told it would wait for a relaunch`
 				: `◦ ${a} (${ms.length}) waits for a relaunch - its sender was told`)
 		}
@@ -2517,6 +2522,22 @@ function proveRed() {
 		reset(); put("review", "not-running"); const told = rowOf(run(true), "mail")
 		reset(); put("review", "running"); const untold = rowOf(run(true), "mail")
 		reset(); put("leader", null, "{"); const corrupt = rowOf(run(true), "mail")
+		// Review #15 §3: the five cases above left three rules unpinned. Each one variable against the stranded case.
+		reset(); put("review", "idle"); const idleStamped = rowOf(run(true), "mail")
+		reset(); mkdirSync(join(ib, "ghost"), { recursive: true }); put("ghost", "not-running"); const ghost = rowOf(run(true), "mail")
+		// A running reviewer: a stand-in whose cmdline ends in `claude`, cwd in review/ - what the bus calls running.
+		reset(); put("review", "running"); mkdirSync(join(pkg, "review"), { recursive: true })
+		mkdirSync(join(tmp, "mail-standin"), { recursive: true }); const fakeR = join(tmp, "mail-standin", "claude"); writeFileSync(fakeR, '#!/bin/sh\nsleep "$1"\n', { mode: 0o755 })
+		const standR = spawn(fakeR, ["30"], { cwd: join(pkg, "review"), detached: true, stdio: "ignore" })
+		let inFlight = { level: -1, text: "" }
+		try { const d = Date.now() + 3000; while (Date.now() < d && existsSync(`/proc/${standR.pid}`) && !(() => { try { return readlinkSync(`/proc/${standR.pid}/cwd`) } catch { return "" } })().endsWith("review")) {} inFlight = rowOf(run(true), "mail") }
+		finally { try { process.kill(-standR.pid) } catch {} }
+		// The bus not answering `who --json`: the row cannot classify the mail and must not pass it.
+		// Content AND mtime put back: the `status` row compares bin/comm.mjs's mtime with STATUS.md's, and a restore that
+		// left it at "now" turned every later `status` control yellow - measured, the first run of this case.
+		const busP = join(pkg, "bin", "comm.mjs"), bus0 = readFileSync(busP, "utf8"), busSt = statSync(busP)
+		reset(); put("review", "not-running"); writeFileSync(busP, "process.exit(3)\n"); const unasked = rowOf(run(true), "mail")
+		writeFileSync(busP, bus0); utimesSync(busP, busSt.atime, busSt.mtime)
 		rmSync(ib, { recursive: true, force: true }); writeFileSync(cfgP, cfg0)
 		const named = (r) => /--ack mail=/.test(r.stdout || "")
 		assert("mail: the leader's unread mail gates and the close names it; a stranded message gates unless its sender was told",
@@ -2525,11 +2546,17 @@ function proveRed() {
 			closeMine.status === 1 && named(closeMine) &&
 			told.level === OK && /waits for a relaunch - its sender was told/.test(told.text) &&
 			untold.level === WARN && (untold.causes || []).includes("stranded-untold:review") &&
-			corrupt.level === WARN && /could not be read/.test(corrupt.text),
+			corrupt.level === WARN && /could not be read/.test(corrupt.text) &&
+			idleStamped.level === WARN && (idleStamped.causes || []).includes("stranded-untold:review") &&
+			ghost.level === WARN && (ghost.causes || []).includes("unaddressable:ghost") &&
+			inFlight.level === OK && /review \(1\) waits for a running agent's next turn end/.test(inFlight.text) &&
+			unasked.level === WARN && (unasked.causes || []).includes("unasked"),
 			`empty inboxes -> ${LV[empty.level]} (want absent), close names mail=${named(closeEmpty)} (want false); ` +
 			`one message for the leader -> ${LV[mine.level]} ${JSON.stringify(mine.causes || [])}, close exit ${closeMine.status} names mail=${named(closeMine)}; ` +
 			`for a stopped reviewer, sender told -> ${LV[told.level]}; not told -> ${LV[untold.level]} ${JSON.stringify(untold.causes || [])}; ` +
-			`corrupt -> ${LV[corrupt.level]}`)
+			`corrupt -> ${LV[corrupt.level]}; stopped reviewer, stamped idle -> ${LV[idleStamped.level]} ${JSON.stringify(idleStamped.causes || [])} (told idle is not told "waits for a relaunch"); ` +
+			`an inbox on NO roster, sender told -> ${LV[ghost.level]} ${JSON.stringify(ghost.causes || [])}; reviewer RUNNING -> ${LV[inFlight.level]}; ` +
+			`the bus not answering -> ${LV[unasked.level]} ${JSON.stringify(unasked.causes || [])}`)
 	}
 	// THIS REPO'S OWN INSTALLED BUS AGAINST ITS OWN CODE (review #11b S2; LESSONS form A: this tree
 	// ran 09-11.7 while the field ran .8, unseen). Installed into a COPY of the fixture root - the

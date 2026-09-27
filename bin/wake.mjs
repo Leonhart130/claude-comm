@@ -486,8 +486,8 @@ export function wakeAgent(root, agent, pid, { dryRun = false, wins, turn = null,
 async function main() {
 	// Rule 6's instrument, imported rather than reimplemented. A registry that cannot be loaded
 	// degrades to ringing as before - every result then says so - never to silence.
-	let lookup = null
-	try { ({ lookup } = await import(new URL("session-registry.mjs", import.meta.url).href)) } catch {}
+	let lookup = null, sessionPid = null
+	try { ({ lookup, sessionPid } = await import(new URL("session-registry.mjs", import.meta.url).href)) } catch {}
 	if (has("--resolve")) {
 		const pid = Number(opt("--resolve", 0))
 		const r = resolveWindow(pid)
@@ -507,15 +507,21 @@ async function main() {
 	// Rule 7 reads the roster itself: `who --json` carries no opt-in. Unreadable means nobody is opted in.
 	let cfg = null
 	try { cfg = JSON.parse(readFileSync(join(root, ".comm", "config.json"), "utf8")) } catch {}
+	// NEVER RING YOUR OWN SESSION - and "own" is the calling PROCESS's session, found by its ancestry (rule 2), never a
+	// name. This skipped `agent === state.you`, and `you` comes from `who --json` run with cwd = root: the LEADER, for
+	// every caller without CLAUDE_COMM_AGENT. So an expert a person started by hand, or the ring `send` prints, never
+	// rang the leader, and said "nothing is waiting for anyone else", exit 0 (review #15 §1, measured). No `claude`
+	// ancestor - a plain shell, cron - is nobody's session: every agent with mail is rung. `FINDINGS.md#review15`
+	const self = sessionPid ? sessionPid() : 0
 	const wins = windows()
 	const results = []
 	let clearsLeft = 1
 	for (const [agent, a] of Object.entries(state.agents)) {
 		if (only && agent !== only) continue
-		if (agent === state.you) continue          // never ring your own doorbell
 		if (!a.pending) continue
 		if (!a.pids.length) { results.push({ agent, sent: false, why: "not running — its mail waits for its next start, which is correct" }); continue }
 		for (const pid of a.pids) {
+			if (pid === self) continue          // never ring your own session
 			const r = wakeAgent(root, agent, pid, { dryRun: has("--dry-run"), wins, turn: readTurn(pid, lookup), cfg, lookup, allowClear: clearsLeft > 0 })
 			if (r.clearTyped) clearsLeft--
 			results.push(r)

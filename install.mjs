@@ -565,6 +565,9 @@ process.exit(0)
  * because `--check` compares it byte for byte and a notice that drifted every day would
  * make that comparison worthless.
  */
+// Two more things the installer writes into a tree, named so the print can hash them (review #15 §6).
+const PRETTIER_IGNORED = [".claude/comm-hook.mjs", ".claude/settings.json", ".claude/skills/claude-comm/SKILL.md"]
+const GITIGNORE_BLOCK = "# claude-comm live state (regenerate with install.mjs)\n.comm/\n"
 const NOTICE = (here, root) => [
 	"# claude-comm — what `.comm/` is, and the one thing you must not do",
 	"",
@@ -579,7 +582,9 @@ const NOTICE = (here, root) => [
 	"",
 	"**2. Mail arrives at your TURN BOUNDARY, not immediately.** A hook drains your inbox when your turn",
 	"ends, or when you next start. Nobody is interrupted mid-thought. If someone is idle, a doorbell can",
-	"make them take a turn — it still never delivers anything itself.",
+	"make them take a turn — it still never delivers anything itself, and it only tries when a turn ENDS in",
+	"this project (yours included) and it can find their kitty window. So send, then end your turn: an",
+	"answer awaited INSIDE your turn never comes. `send` says whether they are BUSY, IDLE, or it CANNOT SAY.",
 	"",
 	"**3. The bus does not coordinate LOCAL RESOURCES — if you open one, say where.** Ports, sockets,",
 	"containers, dev servers: nothing here sees them, and two agents in one tree will take the same one",
@@ -906,7 +911,9 @@ function busPrint() {
 	// And so are the skill and the settings merge - generated here, written into every tree. Left out, a change to
 	// either could not be released at all ("identical bytes"), 2026-09-27 (`FINDINGS.md#hook-merge`). Their SOURCE is
 	// hashed: the output depends on each tree's roster, the source is what a release changes.
-	for (const fn of [SKILL, withHooks, hookCommand]) h.update(String(fn))
+	// Review #15 §6: the NOTICE (`.comm/README.md`, every tree) was still outside, and still said what `.4` corrected.
+	for (const fn of [SKILL, withHooks, hookCommand, NOTICE]) h.update(String(fn))
+	h.update(PRETTIER_IGNORED.join("\n")); h.update(GITIGNORE_BLOCK)
 	return h.digest("hex").slice(0, 12)
 }
 /**
@@ -1129,9 +1136,9 @@ function SKILL(ids, agentRoot) {
 		"3. Never paste content into a message or into another session. There is no `--body`, on purpose: the receiver cannot tell",
 		"   a colleague's pasted text from an injection.", "",
 		"Mail reaches a session at its **turn boundary**, or at its next start. A doorbell can wake an idle session, but it",
-		"only tries when a turn ENDS in this project - **yours included: wait for an answer inside your own turn (a polling",
-		"loop) and no turn ends, so it never comes.** Send, then end your turn. `send` says whether the recipient is BUSY, IDLE",
-		"(with the command that rings it) or that it CANNOT SAY.", "",
+		"only tries when a turn ENDS in this project, and only in a kitty window it can find - **yours included: wait for an",
+		"answer inside your own turn (a polling loop) and no turn ends, so it never comes.** Send, then end your turn. `send`",
+		"says whether the recipient is BUSY, IDLE (with the command that rings it) or that it CANNOT SAY.", "",
 		"## Who talks to whom: a star", "",
 		"- An expert writes to its leader only. Expert-to-expert is refused by the bus.",
 		"- The leader is the bridge: a question that crosses two experts goes through it, and it answers with a measurement, not a relay.",
@@ -1159,8 +1166,9 @@ function SKILL(ids, agentRoot) {
 		"  Opus for review, law, arbitration, and anything only checked by re-reading. `--effort high` by default, `xhigh` for",
 		"  adversarial review.",
 		"- The expert reports with `--kind done` and a file. Read the file, decide, answer with a file.",
-		"- **A hook of your own** in your `.claude/settings.local.json` also runs in every expert's session, in the expert's",
-		"  folder. One that must stay yours goes in your `.claude/settings.json` (the installer keeps keys it did not write).", "")
+		"- **A hook of your own** in your `.claude/settings.local.json` also runs in your experts' sessions, in their folders",
+		"  (measured with your folder at the root of the git repo). One that must stay yours goes in your",
+		"  `.claude/settings.json`: the installer replaces only its own command there.", "")
 	if (!isLeader && (!shared || hasExpert)) L.push(
 		shared ? "## If you are an expert: reporting to your leader" : "## Reporting to your leader", "",
 		`Write the report to a file, then \`${C} send ${leader} --ref <report> --kind done --note "<where to read, then the verdict>"\`.`,
@@ -1236,7 +1244,7 @@ for (const [id, relPath] of Object.entries(cfg.agents)) {
 	if (prettierHere) {
 		const piPath = join(agentRoot, ".prettierignore")
 		const pi = existsSync(piPath) ? readFileSync(piPath, "utf8") : ""
-		const wanted = [".claude/comm-hook.mjs", ".claude/settings.json", ".claude/skills/claude-comm/SKILL.md"].filter((l) => !pi.split("\n").some((x) => x.trim() === l))
+		const wanted = PRETTIER_IGNORED.filter((l) => !pi.split("\n").some((x) => x.trim() === l))
 		if (wanted.length) {
 			if (CHECK) results.drift.push(piPath)
 			else {
@@ -1261,7 +1269,7 @@ const gi = existsSync(giPath) ? readFileSync(giPath, "utf8") : ""
 if (!/^\.comm\/?$/m.test(gi)) {
 	if (CHECK) results.drift.push(giPath)
 	else {
-		writeFileSync(giPath, (gi ? gi.replace(/\n*$/, "\n") + "\n" : "") + "# claude-comm live state (regenerate with install.mjs)\n.comm/\n")
+		writeFileSync(giPath, (gi ? gi.replace(/\n*$/, "\n") + "\n" : "") + GITIGNORE_BLOCK)
 		results.wrote.push(giPath)
 	}
 } else results.ok.push(giPath)
