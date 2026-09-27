@@ -21,6 +21,12 @@ only the FIELD's inboxes (`.filter((p) => resolve(p) !== ROOT)`, section 5). Fix
 mail that `--close` must see green or named; arm it in `boot --prove-red`. ~35 min, 12 of them the control (`--only`
 cuts output, not work) - deferred 09-27 on the owner's 30-minute line.
 
+**A2b - `send` promises a turn end that never comes** (atlas's field letter, 09-27): to a session that is alive
+but IDLE it prints *"running - delivered when its current turn ends"*; there is no current turn, the bell waited 6 min
+until a hand `wake.mjs`. `~/.claude/sessions/<pid>.json` carries `status: busy|idle` live (`#native-path`): say
+IDLE + the wake command, or wake - measure first, a wake types into a window (`#bell-into-typing`). Answered; tell
+him when published.
+
 **A3 - audit the `claude-comm` SKILL (owner, 09-27: "vérifier s'il est toujours à jour").** Byte-current: all six
 trees `--check` in sync, and A75 reddens on an edited skill. CONTENT is not: measured 09-27, it never says **do not
 run `.claude/comm-hook.mjs` by hand in a real tree** (it drains the agent's mail, rewrites the session's registry
