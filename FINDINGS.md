@@ -103,6 +103,20 @@ identity and cannot wander. `cwd` remains correct for the CLI, where "who is typ
 question. The cwd fallback stays so a stub installed before this change keeps delivering instead of going
 silent.
 
+**The whoami root and roster, moved here from `bin/comm.mjs` 2026-09-27 (A22 cap), verbatim:**
+
+> THE ROOT AND THE ROSTER MUST COME FROM THE SAME PROJECT. Written an hour
+> before this comment as `whoami(findRoot(ar) || root, cfg, ar)`: the root
+> followed --agent-root while `cfg` stayed the one loaded from the CWD, so
+> asking about an agent in another project resolved its name against THIS
+> project's roster. Measured: two projects each with an agent at `sub/`,
+> asking about B's from A's cwd answered `gamma` — A's name for that
+> relative path — with exit 0. A plausible name from the wrong world is the
+> mislabelling the ledger counts, and cwd deciding an identity is the exact
+> failure `--agent-root` exists to remove (FINDINGS.md#A13). Invisible in
+> the only caller that exists today, because the hook stub happens to spawn
+> with cwd set to agentRoot. That is what made it worth fixing at once.
+
 ## `#A10` — render BEFORE drain, and the assertion that could not fail
 
 Draining first means any exception in rendering destroys the message while the hook still exits 0 — a
@@ -1688,6 +1702,20 @@ Both refusals (missing file, escaping the root) and the success line now name th
 appears **only when the resolved path differs from what was typed**, which is its own negative control: a
 project whose agents sit at the root prints nothing, because there is nothing to disambiguate. A notice that
 fires for everybody is how a real signal gets skipped. Armed as **A44**, whose third clause is that control.
+
+**The suggestion on a miss, moved here from `bin/comm.mjs` 2026-09-27 (A22 cap), verbatim:**
+
+> WHEN THE REF MISSES, SAY WHERE THE FILE ACTUALLY IS. The base rule is correct and it is
+> still not obvious: the leader of ~/Dev/atlas got the depth wrong THREE TIMES IN A ROW
+> on 2026-09-10 and said so as a compliment - the guard caught every one. A guard that
+> refuses the same person three times for the same reason is working AND telling you the
+> contract is hard to hold in the head. The maintainer made the identical mistake the same
+> morning, sending a brief to his own reviewer.
+>
+> So the refusal now does the one thing that turns three refusals into one: it looks for
+> the same basename at the project root and at the sender's own spoke, and prints the ref
+> string that WOULD have resolved. It suggests, never rewrites - a bus that guessed what
+> you meant would be a bus that delivers a pointer nobody chose.
 
 ## `#stale-ref` — a pointer at a file you did not write for this message, and the limiter I nearly shipped
 
@@ -3299,6 +3327,49 @@ root's `boot --hook` does not run in `review/`; one start record for the 09-27 r
 **The bus is unaffected** - the installer writes only `settings.json`, per agent. A leader's own hook belongs in its
 `settings.json` if it must not reach experts. *One run, `SessionStart` only, version 2.1.283; not tested without a
 git repo, nor with a parent that is not the repo root.* Also an item for the skill audit (STATUS ▶ NEXT A3).
+
+## `#idle-send` — `send` promised a turn end to a session that had no turn (2026-09-27)
+
+**atlas's field letter** (`exchange/field/in/atlas-leader-2026-09-27-cloche-vers-une-session-au-repos.md`), then
+measured here the same day from THEIR logs, before anything was changed:
+
+| | measured | source |
+| --- | --- | --- |
+| two sends, leader → `review` | 01:19:38Z and 01:26:01Z, both stamped `to_state: running` | their `.comm/log.jsonl` |
+| delivered | 01:24:55Z and 01:33:48Z (5 min 17 s, 7 min 47 s) | the same |
+| rings for `review` | 01:17:49 (its own Stop), then 01:24:17 and 01:32:56, **both from a shell - the hand wakes**; none in between | `.comm/wake/rings.jsonl` |
+| the sender's turn | **ONE turn, 01:19:03Z → 01:35:38Z.** After each send it polled for the answer INSIDE that turn (`until … inbox \| grep 'from review'; sleep`) | their leader's transcript |
+
+**The mechanism, as far as that goes.** The doorbell rings at a turn END in the project (the stub's Stop path runs
+`wake.mjs --root`). The recipient was idle and the sender waited inside its own turn, so no turn ended anywhere and
+nothing rang until a hand did. **My first guess was the 120 s quiet period and it is wrong here**: it needs a Stop
+that the transcript shows never happened - measured, not believed. **And my 09-27 reply to atlas was wrong as
+worded** (*"la cloche seule ne pouvait pas relancer un expert au repos"*): the bell CAN, at a turn end; there was none.
+
+**The fix.** `liveAgents` carries each session's turn from the runtime's own record `<config>/sessions/<pid>.json`
+(`#native-path`), believed only when its `procStart` equals `/proc/<pid>/stat` field 22 - a reused pid must not read
+a dead session. `send`: any session BUSY → *"delivered when its current turn ends"*; ALL idle → no turn ends, the
+doorbell rings at the next turn END in the project **the sender's included**, waiting inside this turn never ends it,
+and the ring command; anything else → `CANNOT SAY (<why>)` and the ring command. `to_state` gains `idle`: boot's
+stranded check trusts only `not-running`, so mail told `idle` gates as untold - right, nobody was told it waits for a
+relaunch. **A79** moves ONE variable (the record's `procStart`, off by one) and the verdict goes from IDLE to CANNOT
+SAY; the idle case with the right tick is its positive control. Mutations (`test/mutate.mjs`, baseline + 4 mutants 5 wide, 67 s,
+baseline green): the pid-reuse guard removed, the idle branch removed, `idle` not stamped, the undated-age guard
+removed - **each reddens A79 alone, each on its own clause.**
+
+**Measured for the design:** `statusUpdatedAt` is the flip time - my own session: turn end 12:41:35.1Z, the owner's
+message 12:41:45.554Z, record `busy` at 12:41:45.572Z. `procStart` = stat field 22 (472544 both ways).
+
+**Not done, on purpose:** `send` does not ring by itself - A21 forbids the bus `spawn(`, and a ring types into a window
+(`#bell-into-typing`). **Not verified:** that `CLAUDE_CONFIG_DIR` relocates `sessions/` (read if set - inferred from the
+name); the status during a permission prompt or a background task; what `shell` means - it prints CANNOT SAY; that the `idle` flip is timestamped like the `busy` one (only `busy` was
+seen). **`shell`, seen ONCE, read-only, 09-27** on atlas's live `relay`: its turn ended 12:50:57.981Z (`turn_duration`),
+the record went `shell` at 12:50:58.004Z and stayed so ≥ 80 s with a `zsh -c` child alive - a turn that ended with a
+background shell still running. No turn in progress, and probably one to come when that shell exits; one sample, so
+not built into the verdict. Checked the same minute: `turnOf` agreed with the raw record on all four live sessions
+here, and said `no record` for the Chrome native host (a `claude` binary that is not a session). **`who` still says only `running`** - open item 5; the reader is now in `who.mjs`, the rendering is not.
+The bus paid for this in bytes: 57 355 → 59 019 of 58 000, back to 57 265 by moving three comment narratives here
+verbatim (`#A13`, `#ref-base`).
 
 ## `#review14` — the disposition of #13: no red, and "every rule reddens for itself" was false (2026-09-27)
 

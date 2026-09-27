@@ -42,7 +42,21 @@ already have.
 
 
 
+## 2026-09-27.3 — bus print `2364c8cfab65` — 2026-09-27
 
+- 🔴 **`send` no longer promises a turn end to a session that has none.** It printed *"running — delivered when
+  its current turn ends"* for any live recipient; to an IDLE one there is no current turn, so nothing was delivered
+  until something woke it (measured in the field: 5 and 8 minutes, twice in one night). `send` now reads the
+  recipient's status from Claude Code's own record (`~/.claude/sessions/<pid>.json`) and says which case you are in:
+  - **BUSY** → the same line as before: delivered when its current turn ends.
+  - **IDLE** → no turn will end by itself. The doorbell only tries at a turn END in your project - **yours
+    included: if you wait for its answer INSIDE your own turn (a polling loop), it never comes.** End your turn, or
+    ring now with the `wake.mjs` command it prints.
+  - **anything else** → *"Busy or idle: CANNOT SAY"* with the reason, and the same ring command. Seen once: a session whose
+    turn ended while a background shell still runs (its runtime says `shell`).
+- The record is believed only for that exact process (its start time must match), so a reused pid never lends a
+  dead session's status to a live one.
+- **If you parse `.comm/log.jsonl`:** `to_state` has a third value, `idle` (besides `running` and `not-running`).
 
 ## 2026-09-27.2 — bus print `c663e54a94dc` — 2026-09-27
 

@@ -177,16 +177,9 @@ const safeRef = (s) => String(s ?? "").replace(/[\u0000-\u001f\u007f-\u009f]+/g,
 // both sides mean by `docs/REVIEW.md`.
 const subjectOf = (cfg, from, to) => (from === cfg.leader ? to : from)
 
-// The BASE a --ref resolves against: the SPOKE's directory, whoever sends. This was
-// already true and already written down -- in the comment above, at the point it
-// applies, exactly as this project's doctrine prescribes. It still cost two agents a
-// day: on 2026-09-06 and 2026-09-07 the two ends of ONE bus each wrote a rule into
-// their own charter from the same tool -- the leader "a ref is relative to the
-// RECIPIENT", the spoke "relative to THIS repo" -- each true on its own side and
-// false on the other. The rule is not sayable as "relative to X"; it is only sayable
-// as "relative to the SPOKE". A rule documented where its users never look is not
-// documented, so the TOOL says it now, at the refusal AND at the success.
-// FINDINGS.md#ref-base
+// The BASE a --ref resolves against: the SPOKE's directory, whoever sends. Not sayable as
+// "relative to X" - both ends of one bus wrote opposite rules from it - so the TOOL says it,
+// at the refusal AND at the success. FINDINGS.md#ref-base
 function refBase(cfg, from, to) {
 	const subject = subjectOf(cfg, from, to)
 	return { subject, dir: cfg.agents[subject] ?? "." }
@@ -199,17 +192,9 @@ const baseNote = (b) => b.dir === "." ? "" :
 	`  base: ${b.dir}/ — a ref resolves against the '${b.subject}' spoke, whoever sends\n`
 
 /**
- * WHEN THE REF MISSES, SAY WHERE THE FILE ACTUALLY IS. The base rule is correct and it is
- * still not obvious: the leader of ~/Dev/atlas got the depth wrong THREE TIMES IN A ROW
- * on 2026-09-10 and said so as a compliment - the guard caught every one. A guard that
- * refuses the same person three times for the same reason is working AND telling you the
- * contract is hard to hold in the head. The maintainer made the identical mistake the same
- * morning, sending a brief to his own reviewer.
- *
- * So the refusal now does the one thing that turns three refusals into one: it looks for
- * the same basename at the project root and at the sender's own spoke, and prints the ref
- * string that WOULD have resolved. It suggests, never rewrites - a bus that guessed what
- * you meant would be a bus that delivers a pointer nobody chose.
+ * WHEN THE REF MISSES, SAY WHERE THE FILE ACTUALLY IS. Looks for the basename at the root and at
+ * the sender's spoke and prints the ref that WOULD resolve. Suggests, never rewrites: a bus that
+ * guessed would deliver a pointer nobody chose. FINDINGS.md#ref-base
  */
 function whereItActuallyIs(root, cfg, from, to, ref) {
 	const bare = basename(String(ref))
@@ -650,17 +635,9 @@ function dispatch(root, cfg, me, cmd, rest) {
 		// means. Exit 1 and print nothing when no agent resolves — a caller must be able
 		// to tell "off the bus" from a name, and an empty string on stdout cannot.
 		case "whoami": {
-			// THE ROOT AND THE ROSTER MUST COME FROM THE SAME PROJECT. Written an hour
-			// before this comment as `whoami(findRoot(ar) || root, cfg, ar)`: the root
-			// followed --agent-root while `cfg` stayed the one loaded from the CWD, so
-			// asking about an agent in another project resolved its name against THIS
-			// project's roster. Measured: two projects each with an agent at `sub/`,
-			// asking about B's from A's cwd answered `gamma` — A's name for that
-			// relative path — with exit 0. A plausible name from the wrong world is the
-			// mislabelling the ledger counts, and cwd deciding an identity is the exact
-			// failure `--agent-root` exists to remove (FINDINGS.md#A13). Invisible in
-			// the only caller that exists today, because the hook stub happens to spawn
-			// with cwd set to agentRoot. That is what made it worth fixing at once.
+			// THE ROOT AND THE ROSTER MUST COME FROM THE SAME PROJECT: a root that followed
+			// --agent-root with the cwd's roster named another project's agent by THIS one's
+			// roster, exit 0. FINDINGS.md#A13
 			const ar = arg(process.argv.slice(2), "agent-root")
 			const r2 = ar ? findRoot(ar) : root
 			if (!r2) process.exit(1)
@@ -682,9 +659,11 @@ function dispatch(root, cfg, me, cmd, rest) {
 			const from = me === cfg.leader ? (claimed || cfg.leader) : me
 			if (!from) throw new Error(`cannot tell which agent you are: cwd is not inside a known agent directory`)
 
-			const live = liveAgents(root, cfg)[to]
+			// Busy if any session is, idle only if all are, else CANNOT SAY. `FINDINGS.md#idle-send`
+			const live = liveAgents(root, cfg)[to], t = (live || []).map((l) => l.turn)
+			const turn = !live?.length ? null : t.some((x) => x.state === "busy") ? "busy" : t.every((x) => x.state === "idle") ? "idle" : null
 			const m = send(root, cfg, { from, to, kind: arg(rest, "kind", from === cfg.leader ? "nudge" : "done"), ref: arg(rest, "ref"), note: arg(rest, "note"), force: rest.includes("--force"),
-				toState: live?.length ? "running" : "not-running" })
+				toState: !live?.length ? "not-running" : turn === "idle" ? "idle" : "running" })
 			console.log(`✓ ${m.from} → ${m.to}  [${m.kind}]  they will read: ${refForRecipient(root, cfg, m)}`)
 			// The SILENT case, and the reason the refusal alone was not enough: type
 			// `LEAD.md` with a LEAD.md at the root and another in the spoke, and the send
@@ -701,9 +680,15 @@ function dispatch(root, cfg, me, cmd, rest) {
 				console.log(`     — pointing at content they have already read? The substance belongs in the file, not the note.`)
 			}
 			if (m.note !== sanitizeNote(arg(rest, "note"))) console.log(`  note was flattened/truncated to ${MAX_NOTE} chars — the substance belongs in ${m.ref}`)
-			console.log(live?.length
-				? `  '${to}' is running (pid ${live.map((l) => l.pid).join(", ")}) — delivered when its current turn ends.`
-				: `  '${to}' is NOT running — held in inbox, delivered when you next launch it.`)
+			const ring = `node ${join(dirname(fileURLToPath(import.meta.url)), "wake.mjs")} --root ${root}`, run = `'${to}' is running (pid ${live?.map((l) => l.pid).join(", ")})`
+			const at = Math.max(0, ...t.map((x) => x.at || 0)), ago = at ? `${Math.round((Date.now() - at) / 60000)} min ago` : "when unknown"
+			console.log(!live?.length ? `  '${to}' is NOT running — held in inbox, delivered when you next launch it.`
+				: turn === "busy" ? `  ${run} and BUSY — delivered when its current turn ends.`
+				: turn === "idle" ? `  ${run} but IDLE (its runtime's status, set ${ago}) — no turn is in progress, so none ends.\n` +
+					`  The doorbell only tries at a turn END in this project, yours included: wait for its answer INSIDE this turn and it never comes.\n` +
+					`  End your turn, or ring now: ${ring}`
+				: `  ${run} — delivered at its next turn end. Busy or idle: CANNOT SAY (${t.map((x) => x.why).filter(Boolean).join("; ")}).\n` +
+					`  If it is idle, only a ring starts a turn: ${ring}`)
 			break
 		}
 		case "inbox": {

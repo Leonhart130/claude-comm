@@ -2,24 +2,13 @@
 /**
  * claude-comm WHO — which sessions are alive, and what state each one is really in.
  *
- * SPLIT OUT OF bin/comm.mjs, 2026-09-11, and not for tidiness. Two gates disagreed:
- * **A22 went red at 48 370 B saying "split it or cut it", and A21's import allowlist made
- * a split impossible** — it permits `node:*` only, so `comm.mjs` could not import a sibling.
- * The amendment allows a relative import of a BUS file and applies A21's own checks to that
- * file TRANSITIVELY, so the property A21 protects (the bus cannot become a daemon) is
- * unchanged while the remedy A22 names becomes available. `FINDINGS.md#bus-split`.
+ * Split out of comm.mjs 2026-09-11: A22 (size) and A21 (imports) contradicted each other at the
+ * cap, and A21 now checks this file transitively. The seam is open item 5 — liveness reads the
+ * MACHINE, not the mailbox, so it is the part that keeps wanting imports. `FINDINGS.md#bus-split`.
  *
- * And the seam was chosen by an OPEN ITEM, not by size: STATUS open item 5 has said since
- * 2026-09-08 that `who` reports two states where there are more, and that the missing ones
- * "cannot go there — A21 forbids the bus that import ⇒ an A21 amendment AND a split". This
- * is that split. Liveness is the part of the bus that reads the machine rather than the
- * mailbox, so it is the part that keeps wanting imports the bus must not have.
- *
- * 🔴 DEPENDENCIES FLOW ONE WAY. This file imports nothing from `comm.mjs`; `comm.mjs`
- * imports from here and passes `whoami`, `findRoot`, `clock` and `pending` in. A circular
- * import would work in Node and would be a trap for the next reader, and there is exactly
- * one implementation of "which claude process is which agent" either way — which is the
- * property review #5 (F7, G7) was bitten by twice in one day.
+ * 🔴 DEPENDENCIES FLOW ONE WAY: nothing is imported from `comm.mjs`, which passes `whoami`,
+ * `findRoot`, `clock` and `pending` in. One implementation of "which claude process is which
+ * agent" — a second one disagreed with the first twice in a day (review #5, F7 and G7).
  */
 import { readdirSync, readFileSync, readlinkSync, statSync, existsSync } from "node:fs"
 import { join, resolve } from "node:path"
@@ -52,10 +41,10 @@ export function liveAgents(root, cfg, { whoami, findRoot, clock }) {
 		try { cwd = readlinkSync(`/proc/${pid}/cwd`) } catch { continue }
 		// Each process's OWN declaration, so `who` reports what the hook will
 		// actually do for that session rather than what our cwd implies.
-		let declared = null
+		let declared = null, env = []
 		try {
-			const env = readFileSync(`/proc/${pid}/environ`, "utf8")
-			const hit = env.split("\0").find((e) => e.startsWith("CLAUDE_COMM_AGENT="))
+			env = readFileSync(`/proc/${pid}/environ`, "utf8").split("\0")
+			const hit = env.find((e) => e.startsWith("CLAUDE_COMM_AGENT="))
 			if (hit) declared = hit.slice("CLAUDE_COMM_AGENT=".length).trim() || null
 		} catch { /* not readable — fall back to cwd, same as before */ }
 		const who = whoami(root, cfg, cwd, declared)
@@ -78,11 +67,28 @@ export function liveAgents(root, cfg, { whoami, findRoot, clock }) {
 		// Local, via clock(): this decides armed-vs-not against the hook file's
 		// mtime. In UTC a stale session reads as freshly started. FINDINGS.md#A26
 		try { started = clock(statSync(`/proc/${pid}`).mtime, true) } catch {}
-		;(out[who] ||= []).push({ pid: Number(pid), since: started })
+		;(out[who] ||= []).push({ pid: Number(pid), since: started, turn: turnOf(pid, env) })
 	}
 	return finish()
 }
 
+// A live session's TURN — "running" says nothing about it, and mail lands at a turn END: `send`
+// promised one to an idle session and the mail sat 6 min until a hand wake (`FINDINGS.md#idle-send`).
+// The runtime keeps it, <config>/sessions/<pid>.json `status` (#native-path) — believed only when
+// its `procStart` is THIS process's start tick, or a reused pid reads a dead session. Every miss
+// says why, never a guess (LESSONS form E).
+export function turnOf(pid, env) {
+	const val = (k) => (env.find((e) => e.startsWith(`${k}=`)) || "").slice(k.length + 1)
+	const dir = val("CLAUDE_CONFIG_DIR") || (val("HOME") && join(val("HOME"), ".claude"))
+	if (!dir) return { state: null, why: "no HOME in its environment" }
+	let rec, tick
+	try { rec = JSON.parse(readFileSync(join(dir, "sessions", `${pid}.json`), "utf8")) }
+	catch (e) { return { state: null, why: e.code === "ENOENT" ? "its runtime keeps no record of it" : "its runtime record is unreadable" } }
+	try { const st = readFileSync(`/proc/${pid}/stat`, "utf8"); tick = st.slice(st.lastIndexOf(") ") + 2).split(" ")[19] } catch {}
+	if (!tick || String(rec?.procStart) !== tick) return { state: null, why: `its runtime record is for process start ${rec?.procStart}, not ${tick}` }
+	if (rec.status !== "busy" && rec.status !== "idle") return { state: null, why: `its runtime says '${rec.status}'` }
+	return { state: rec.status, at: Number(rec.statusUpdatedAt) || null }
+}
 
 /** The `who` command, exactly as it rendered inside the bus. */
 export function renderWho(root, cfg, me, rest, { liveAgents: live_, pending }) {

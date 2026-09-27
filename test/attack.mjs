@@ -4955,4 +4955,70 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		`(exit 0 without the message would be the silent failure this project keeps paying for)`)
 }
 
+// A79 — `send` NAMES THE RECIPIENT'S TURN, and believes the runtime only about THIS process
+// (`FINDINGS.md#idle-send`). atlas 09-27: "running — delivered when its current turn ends" of an
+// idle session; there was no turn, and the mail sat 6 min until a hand wake. The failure this arm
+// forbids is a STALE record believed: a reused pid reading a dead session's `idle`. So the one
+// variable moved is the record's `procStart`, the detector byte-identical; the idle case with the
+// right tick is the positive control proving the detector can say IDLE at all.
+{
+	const r79 = mkdtempSync(join(tmpdir(), "comm-attack-turn-"))
+	const home79 = mkdtempSync(join(tmpdir(), "comm-attack-home-"))
+	mkdirSync(join(r79, "app", "docs"), { recursive: true })
+	mkdirSync(join(r79, ".comm"), { recursive: true })
+	writeFileSync(join(r79, "app", "docs", "REVIEW.md"), "# review\n")
+	writeFileSync(join(r79, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app" } }))
+	execFileSync("node", [join(PKG, "install.mjs"), r79], { stdio: "pipe" })
+	const bus79 = join(r79, ".comm", "bin", "comm.mjs"), ibx79 = join(r79, ".comm", "inbox", "app")
+	const fake79 = join(r79, "claude")
+	writeFileSync(fake79, '#!/bin/sh\nsleep "$1"\n', { mode: 0o755 })
+	// HOME is the stand-in's OWN: the runtime record is read from the RECIPIENT's environment,
+	// and a probe that wrote into my real ~/.claude/sessions would write into the world it measures.
+	const env79 = { ...process.env, HOME: home79 }
+	delete env79.CLAUDE_CONFIG_DIR; delete env79.CLAUDE_COMM_AGENT
+	const child = spawn(fake79, ["30"], { cwd: join(r79, "app"), detached: true, stdio: "ignore", env: env79 })
+	const res = {}
+	let alive = false, tick = ""
+	try {
+		const deadline = Date.now() + 4000
+		while (Date.now() < deadline && !tick) {
+			try { const st = readFileSync(`/proc/${child.pid}/stat`, "utf8"); tick = st.slice(st.lastIndexOf(") ") + 2).split(" ")[19] } catch {}
+		}
+		mkdirSync(join(home79, ".claude", "sessions"), { recursive: true })
+		const rec = join(home79, ".claude", "sessions", `${child.pid}.json`)
+		const once = (label, record) => {
+			rmSync(rec, { force: true })
+			if (record) writeFileSync(rec, JSON.stringify({ pid: child.pid, statusUpdatedAt: Date.now() - 360_000, ...record }))
+			const before = new Set(readdirSync(ibx79))
+			const out = spawnSync("node", [bus79, "send", "app", "--ref", "docs/REVIEW.md", "--note", label], { cwd: r79, encoding: "utf8" }).stdout || ""
+			const f = readdirSync(ibx79).find((x) => x.endsWith(".json") && !before.has(x))
+			res[label] = { out, state: f ? JSON.parse(readFileSync(join(ibx79, f), "utf8")).to_state : "NO MESSAGE" }
+		}
+		once("idle", { procStart: tick, status: "idle" })
+		once("busy", { procStart: tick, status: "busy" })
+		once("reused", { procStart: String(Number(tick) + 1), status: "idle" })
+		once("none", null)
+		once("undated", { procStart: tick, status: "idle", statusUpdatedAt: undefined })
+		try { process.kill(child.pid, 0); alive = true } catch {}
+	} finally {
+		try { process.kill(-child.pid) } catch {}
+		try { rmSync(r79, { recursive: true, force: true }) } catch {}
+		try { rmSync(home79, { recursive: true, force: true }) } catch {}
+	}
+	const turnEnd = /delivered when its current turn ends/
+	const idleOk = /but IDLE \(its runtime's status, set 6 min ago\)/.test(res.idle?.out) && /ring now: node \S+wake\.mjs --root /.test(res.idle?.out) &&
+		!turnEnd.test(res.idle?.out) && res.idle?.state === "idle"
+	const busyOk = /and BUSY — delivered when its current turn ends/.test(res.busy?.out) && res.busy?.state === "running"
+	const reusedOk = /CANNOT SAY \(its runtime record is for process start/.test(res.reused?.out) && !/IDLE/.test(res.reused?.out) && res.reused?.state === "running"
+	const noneOk = /CANNOT SAY \(its runtime keeps no record of it\)/.test(res.none?.out) && res.none?.state === "running"
+	// An idle record with no timestamp must not print an age computed from the epoch (29 million minutes).
+	const undatedOk = /but IDLE \(its runtime's status, set when unknown\)/.test(res.undated?.out)
+	check("A79 send names an IDLE recipient, and a record for another process is not believed",
+		alive && !!tick && idleOk && busyOk && reusedOk && noneOk && undatedOk,
+		`stand-in alive=${alive}, start tick read=${!!tick}; positive control, idle record -> IDLE + ring command + stamped 'idle'=${idleOk}; ` +
+		`busy -> 'current turn ends' + 'running'=${busyOk}; ONE VARIABLE, procStart off by one -> CANNOT SAY, never IDLE=${reusedOk} ` +
+		`(a reused pid reading a dead session is the failure this forbids); no record -> CANNOT SAY=${noneOk}; idle with no timestamp -> no invented age=${undatedOk}` +
+		(idleOk && busyOk && reusedOk && noneOk && undatedOk ? "" : ` · ${JSON.stringify(res).slice(0, 600)}`))
+}
+
 finish(null)

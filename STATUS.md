@@ -6,7 +6,7 @@ fold the settled parts into the README.
 ## ▶ NEXT
 
 *(Closed 2026-09-27. Field = atlas; `work` dormant by the owner's word (`FIELDS.json`); `lyra` leader-only, never
-launched; `orion`'s leader not relaunched since 09-19. **`2026-09-27.2` is in all six trees**, `--check` in sync.
+launched; `orion`'s leader not relaunched since 09-19. **`2026-09-27.3` is in all six trees**, `--check` in sync.
 🔴 **The owner was at 84 % of his WEEKLY usage limit on 09-27** (seen in the reviewer's pane) - price every model
 call, every reviewer, every `selftest` against that.)*
 
@@ -21,11 +21,10 @@ only the FIELD's inboxes (`.filter((p) => resolve(p) !== ROOT)`, section 5). Fix
 mail that `--close` must see green or named; arm it in `boot --prove-red`. ~35 min, 12 of them the control (`--only`
 cuts output, not work) - deferred 09-27 on the owner's 30-minute line.
 
-**A2b - `send` promises a turn end that never comes** (atlas's field letter, 09-27): to a session that is alive
-but IDLE it prints *"running - delivered when its current turn ends"*; there is no current turn, the bell waited 6 min
-until a hand `wake.mjs`. `~/.claude/sessions/<pid>.json` carries `status: busy|idle` live (`#native-path`): say
-IDLE + the wake command, or wake - measure first, a wake types into a window (`#bell-into-typing`). Answered; tell
-him when published.
+**A2b - ✅ `send` names BUSY / IDLE / CANNOT SAY** from the runtime's own record, pid-reuse guarded (`FINDINGS.md#idle-send`,
+A79, 4 mutants each red on its own clause; released `2026-09-27.3`). Cause MEASURED in their logs: their leader polled
+INSIDE its turn, so no turn ended and the doorbell never tried - my 09-27 letter's wording was wrong, corrected in the
+publication letter. Open: `who` still prints only `running` (item 5); `shell` seen once; no real send to a real idle session.
 
 **A3 - audit the `claude-comm` SKILL (owner, 09-27: "vérifier s'il est toujours à jour").** Byte-current: all six
 trees `--check` in sync, and A75 reddens on an edited skill. CONTENT is not: measured 09-27, it never says **do not
