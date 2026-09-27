@@ -3226,10 +3226,11 @@ these areas reads this section before claiming anything about them.
   pointed at, and 09-11 added a 4th miss in 4 runs. This bus rings bells nobody answers and no gate sees it.
   🟢 Transport green 09-11 with and without `CLAUDE_COMM_AGENT` (`FINDINGS.md#one-suite-hardened`).
 - **Anything non-Linux**: `comm who` reads `/proc`, degrading to "not running" elsewhere.
-- **The ledger's witness on `resume` and `compact`** (`#review13`): whether the runtime's session file carries the
-  payload's id when THOSE hooks fire is unmeasured - startup and `/clear` are (3/3, 09-27). Both are the ledger's
-  "other" arm, so a drop there costs no verdict, and `ledger` would not show it.
-- **`liveSession()`'s `EPERM` branch** counts a process it may not signal as alive - reasoned, never exercised.
+- **The ledger's witness**: startup, `/clear`, `resume`, `compact`, `fork` measured (8/8, `#review13` + `#review14`).
+  NOT measured: an in-process `/resume` (same pid, id switched), an AUTO-compaction, `--continue`.
+- **A torn read of the in-place-rewritten `<pid>.json`**: the rewrite is observed, the race is not. The retry that
+  guards it is unarmed (`#review14`).
+- **Whether the runtime ever garbage-collects the session files a `kill -9` leaks** (`#review14`).
 - A8's partial mutations and behaviour mid-TOOL-CALL live at `FINDINGS.md#test-debt`.
 
 ## `#t1-root-half` — both halves of T1 finally seen live (2026-09-20)
@@ -3285,6 +3286,57 @@ only. It does not touch D2's open half - whether an agent acts on a POINTER - an
 - Not measured: other matchers, non-Bash tools, token cost per call, whether `PreToolUse` behaves the same, and any
   model other than haiku-4.5.
 
+## `#review14` — the disposition of #13: no red, and "every rule reddens for itself" was false (2026-09-27)
+
+`review/REVIEW-14.md`, launched the same night on the owner's go-ahead, under a brief whose first section was *"you
+disturb no other agent"* (atlas was working with four experts; the reviewer read no field tree, ran suites one at
+a time, opened panes only beside its own window). **No 🔴, four 🟡, five 🟢. Fifth pass in a row whose findings sit in
+the previous patch - and again in the ARMS and the PROSE, not in the behaviour.**
+
+**What it measured that I had not** - on the real runtime (2.1.283), nested sessions in a fixture:
+
+| start | the file at the hook's fire carries the payload's id | ledger |
+| --- | --- | --- |
+| `resume` (`-p --resume`, and interactive `--resume`) | yes, 2/2 | +1 each |
+| `compact` (`/compact` via `-p`) | yes | +1 |
+| `fork` (`--resume --fork-session`) - **`source: "fork"`, a value this repo did not know** | yes | +1, classified `other` |
+
+**5/5.** With #13's 3/3, every start shape measured so far is witnessed. **And the runtime DOES leak**: a `kill -9`'d
+session left its `<pid>.json` behind (normal exits, 5 of 5, removed theirs) - so the dead-pid rule is load-bearing.
+
+| § | finding | disposition |
+| --- | --- | --- |
+| 🟡 1 | **the ancestor's veto went UNARMED** - my own patch did it: the foreign fire had no file, so the new no-file rule refused it one line after the veto, and `if (false)` for the veto left 79/79 green. #review12b's redundant-guard mask, the exact form | the foreign fire plants its own live file; its REASON (`not inside`) is asserted. Plus a `<root>-sibling` row: `startsWith(root)` without `/` was never armed (pre-existing) |
+| 🟡 2 | **`counted = true` passed the whole suite** - no fire reached a ledger that RUNS and fails without a note | A72 asserts the `NOT counted … (exit 1)` line |
+| 🟡 3 | **"a dropped resume/compact costs no verdict" - FALSE.** An `other` start still ENDS the previous start's span; the reviewer built a ledger that goes `UNKNOWN -> WORSE` on dropping ten of them | corrected here, in `#not-verified`, and in `ledger.mjs`'s docstring (which also learns `fork`) |
+| 🟡 4 | seven mutants survived: the two above, `inside()`'s separator, the ancestor-branch tick check, first-LIVE-match, `EPERM`, the no-`procStart` fallback | each has a row now; see the table |
+| 🟡 7 | **the `.1` CHANGELOG overclaimed again**, and A77 itself asserted the opposite of one sentence (a live in-project id replayed by a detached fire IS counted - that is E1's positive control) | the `.2` entry says what `.1` got wrong |
+| 🟢 5 | `EPERM` counted as alive | now refused: a pid this user cannot signal, in this user's 0700 session directory, is a pid recycled away from a dead session. A torn `<pid>.json` (the runtime rewrites it IN PLACE around SessionStart) gets one retry, and if still unreadable is named as such, never as a hand-fire |
+| 🟢 6 | A29's registry half was masked by its own first arm (the `stop` wrote an entry with the same transcript) | A29 now asserts the entry is the START's (`source: "startup"`) |
+
+**Mutation, `test/mutate.mjs` (new, built for the owner's "faster, still reliable"), 3 wide, 11 runs in 238 s:**
+
+| mutant | suite | the row that moved |
+| --- | --- | --- |
+| baseline | green | - |
+| `counted = true` | **✗ A72** | `says NOT counted, from the ledger's exit` false |
+| the veto `if (false)` | **✗ A77** | the foreign fire's `not inside` gone; the sibling `0 → 1` |
+| `inside()` without `/` | **✗ A77** | the sibling `0 → 1` |
+| the ancestor branch skips liveness | **✗ A77** | own file with another start tick `0 → 1` |
+| the first live file decides | **✗ A77** | two live files, the one elsewhere listed first: `1 → 0` |
+| `EPERM` alive | **✗ A77** | pid 1 `0 → 1` |
+| a file without `procStart` refused | **✗ A77** | the portable half `1 → 0` |
+| a torn own file named as a hand-fire | **✗ A77** | the reason |
+| the start's `record()` skipped | **✗ A29 + A77** | A29's registry half, no longer masked |
+| **the retry removed** | 🔴 **SURVIVED - named, not armed**: a file that heals within 30 ms cannot be built deterministically here |
+
+**Named, not fixed, and worse than #13's two (review #14 §7c):** the no-ancestor branch cannot tell a real start
+whose walk failed from a DETACHED replay of any live in-project session's id - by design, that is E1's case. Every
+descendant of a session carries its id in the environment, and `source` is copied from the payload, so such a replay
+can file itself in the reboot arm. **The honest statement: the witness stops invented ids and dead sessions; it does
+not stop someone replaying a live one.** Small, same shape: a hand-fire from a session launched with
+`CLAUDE_COMM_AGENT` files its start as `unnamed` in another project.
+
 ## `#review13` — an ancestor is not a witness: the probe this repo actually runs was still a phantom (2026-09-27)
 
 `review/REVIEW-13.md`, one RED, three 🟡, four 🟢 — against the `#review12b` disposition. **The fourth pass in a row
@@ -3321,7 +3373,7 @@ instant it fired and again 1.5 s later:
 **3 of 3, including both re-mints.** 🔴 **And one claim of `#review12b` did not survive it:** *"a `/clear` re-mint
 rewrites it and files the old one under `formerNames`"* - `formerNames` stayed **null** through two clears. The id is
 rewritten in place; nothing keeps the old one. Closing the probe's window removed its file (one instance, not a
-leak measurement - §3's question stays open).
+leak measurement - §3's question stays open). *Answered by review #14: a `kill -9` leaks it.*
 
 **End to end on the fixed build, 2026-09-27**: a real interactive session in a scratch project with this bus
 installed, and the review's own probe shape typed into it (`!node .claude/comm-hook.mjs session-start < payload`,
@@ -3363,7 +3415,10 @@ the platform, not a measurement of it - `#measurement-traps`, the positive contr
 alone, a measurement trap the moment the file is asked. Each now plants under a HOME of its own (`witnessKit()` in
 `test/attack.mjs`).
 
-### Every rule reddens for itself - mutation, one variable each, full suite on a copy of the tree
+### Eight rules redden for themselves - mutation, one variable each, full suite on a copy of the tree
+
+🔴 *This heading first said "Every rule reddens for itself". Review #14 found seven more mutants that survived,
+two in code this patch wrote - `#review14`.*
 
 | mutant | suite | the row that moved |
 | --- | --- | --- |
@@ -3393,8 +3448,9 @@ alone, a measurement trap the moment the file is asked. Each now plants under a 
   built:** gate `record()` AND `refresh()` on the same witness (a hand-fired `stop` has the same shape); a real start
   whose file is missing then gets its entry at its first `Stop`, since `refresh()` records a missing one. It touches
   the hottest path in the system, so it gets its own change and its own arm, not a rider on this one.
-- **`resume` and `compact`**: whether the file carries the payload's id when THOSE hooks fire is unmeasured. Both are
-  the ledger's "other" arm, not a trial arm, so a drop there costs no verdict - but it would be silent in `ledger`.
+- **`resume` and `compact`**: ✅ measured by review #14 - witnessed, with `fork`, 5/5 (`#review14`). 🔴 *This line
+  first said a drop there "costs no verdict". False: an `other` start ends the previous span, so a drop moves the
+  verdict - #14 built a ledger that goes UNKNOWN -> WORSE on it.*
 
 ## `#review12b` — the disposition's own fix wrote phantom starts into the reboot instrument (2026-09-20)
 

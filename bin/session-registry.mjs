@@ -245,14 +245,25 @@ export function witnessStart({ sid, root, pid = sessionPid() } = {}) {
 	// EVERY match, never the first (measured 2026-09-27, the arms that fire one id three times): a process that
 	// died without removing its file leaves a second file carrying the same id, and a `--resume` of that session
 	// would then be judged by whichever file readdir happened to list first.
+	// ONE RETRY on a file that will not parse (review #14 §5): the runtime rewrites `<pid>.json` IN PLACE, several
+	// times within ~0.5 s of SessionStart - the very moment this runs - so a torn read is the likeliest way a real
+	// start meets an unreadable file. Unobserved either way; the retry costs nothing unless a parse fails.
 	let parsed = 0
-	const hits = []
+	const hits = [], unreadable = []
 	for (const f of files) {
 		let c = null
-		try { c = JSON.parse(readFileSync(join(dir, f), "utf8")) } catch { continue }
+		for (let tries = 0; tries < 2 && c === null; tries++) {
+			if (tries) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 30)
+			try { c = JSON.parse(readFileSync(join(dir, f), "utf8")) } catch {}
+		}
+		if (c === null) { unreadable.push(f); continue }
 		parsed++
 		if (c && c.sessionId === sid) hits.push(c)
 	}
+	// Form D: "fired by hand" is a claim about the world, and an unreadable OWN file is not evidence for it.
+	if (!hits.length && pid > 0 && unreadable.includes(`${pid}.json`)) return { own: false, by: "runtime", pid,
+		why: `this session's own file (${pid}.json) could not be parsed, twice - torn mid-rewrite or corrupt - so nothing witnesses ` +
+			`this start; if it was a real start, it is LOST, not a probe` }
 	if (!hits.length) return { own: false, by: "none", pid,
 		why: `${above}, and no session of this runtime carries id ${sid} (${files.length} session file(s) found, ${parsed} readable): ` +
 			(pid > 0 ? `the stub was fired BY HAND from inside a session - a probe, a script - not by a session starting, so this is a PHANTOM start`
@@ -286,11 +297,17 @@ export function witnessStart({ sid, root, pid = sessionPid() } = {}) {
  * portable half - it answers off Linux too, where the witness is the only one there is. The
  * start tick is the Linux half, the same (pid, start) test `lookup()` uses against reuse; a
  * file with no `procStart` gets the portable half only, and nothing claims more than that.
+ *
+ * `EPERM` is NOT alive (review #14 §5, which measured it counting as alive). These files live
+ * in this user's HOME, mode 0700, written by this user's runtime; a pid this user may not
+ * signal belongs to someone else, so it is a pid recycled out from under a dead session - the
+ * tick catches that on Linux, and off Linux nothing else would.
  */
 function liveSession(pid, procStart) {
-	if (!(pid > 0)) return { ok: false, why: `no pid (${JSON.stringify(pid)})` }
+	if (!Number.isInteger(pid) || pid <= 0) return { ok: false, why: `no usable pid (${JSON.stringify(pid)})` }
 	try { process.kill(pid, 0) } catch (e) {
-		if (!e || e.code !== "EPERM") return { ok: false, why: `pid ${pid}, which is not running` }
+		return { ok: false, why: e && e.code === "EPERM" ? `pid ${pid}, which belongs to ANOTHER user - not a session of this user's runtime`
+			: `pid ${pid}, which is not running` }
 	}
 	const start = startTimeOf(pid)
 	if (start !== null && procStart != null && String(start) !== String(procStart))

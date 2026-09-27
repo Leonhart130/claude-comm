@@ -43,6 +43,23 @@ already have.
 
 
 
+
+## 2026-09-27.2 — bus print `c663e54a94dc` — 2026-09-27
+
+- 🔴 **Correction of `2026-09-27.1`, which overclaimed.** It said the session file must "belong to the session that
+  ran the hook" - true only when the hook runs inside a session; run from outside any session (cron, `setsid`, a
+  detached script), any live session of your project whose id the payload carries is enough. And it said a hand-run
+  hook with a "made-up or copied" id is no longer counted - **a copied id of a session that is still RUNNING in your
+  project is still counted**, including as a restart if the payload says `"source": "clear"`. What IS closed: made-up
+  ids, and ids of sessions that have ended. **So still: never run `.claude/comm-hook.mjs` by hand in a real project -
+  test it in a scratch one.**
+- **Real starts: now measured on every shape** - a fresh start, `/clear`, `--resume`, a compaction, and
+  `--fork-session`: the session file carries the new id when the hook fires, and each is counted.
+- **A process you are not allowed to signal no longer vouches for a start.** Session files are yours alone, so a pid
+  that belongs to another user means the session that wrote the file has died and its pid was reused.
+- **A session file caught mid-rewrite is read twice** before giving up, and if it is still unreadable the hook says
+  so, instead of calling the start a hand-run probe. The hook also no longer prints the same reason twice in one line.
+
 ## 2026-09-27.1 — bus print `dffe248fcc8b` — 2026-09-27
 
 - 🔴 **Correction: the 2026-09-20.1 note was wrong in the case that happens most.** It said a start is counted

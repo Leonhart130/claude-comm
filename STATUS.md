@@ -6,38 +6,39 @@ fold the settled parts into the README.
 ## ▶ NEXT
 
 *(Closed 2026-09-27. Field = atlas; `work` dormant by the owner's word (`FIELDS.json`); `lyra` leader-only, never
-launched; `orion`'s leader not relaunched since 09-19. **`2026-09-27.1` is in all six trees**, `--check` in sync.)*
+launched; `orion`'s leader not relaunched since 09-19. **`2026-09-27.2` is in all six trees**, `--check` in sync.
+🔴 **The owner was at 84 % of his WEEKLY usage limit on 09-27** (seen in the reviewer's pane) - price every model
+call, every reviewer, every `selftest` against that.)*
 
-**A - FIRST: review #14 on `2026-09-27.1`, or name why not.** Review #13 is DISPOSED (`FINDINGS.md#review13`: the
-red, §2, §3, §7a, a measurement before shipping, end to end on a real session, eight mutants each reddening A77 alone).
-**Not launched this session**: the owner's usage is the binding cost, so ask him first. Aim it where I am least sure:
-(a) `resume`/`compact` - whether the file carries the payload's id when THOSE hooks fire is unmeasured; (b) the
-`EPERM` branch of `liveSession()` counts as alive; (c) the five arms moved onto `witnessKit()` - did any lose what it
-measured?; (d) the stub's new stderr line on every non-counted start - where does it land in a real session?
+**A - review #13 AND #14 are disposed** (`FINDINGS.md#review13`, `#review14`). #14: no red, four yellows - every one in
+the ARMS or the PROSE; eleven mutants now each redden their own row, one named survivor (the torn-read retry).
+**Review #15 on `.2`: ask the owner first** (usage). If he says yes, aim it at `test/mutate.mjs` itself (new, and it
+now carries the mutation claims of two dispositions) and at the `.2` CHANGELOG, which is the third release note in a
+row a reviewer had to correct.
 
 **B - the registry half of #13 §1, MEASURED 09-27 by A31 going red on my own end-to-end probe**: a hand-fire from
 inside a session in the project rewrites that session's registry entry. Design in `FINDINGS.md#review13` "Named, not
 fixed" - gate `record()` AND `refresh()` on the witness. Touches `Stop`, the hottest path: own change, own arm,
 `selftest` both ways.
 
-**C - tests faster, and still reliable - the owner asked 09-27.** Measured: `attack` is 51 s wall for 47 s of CPU, one
-core of twelve; the top three arms are 17 s (A59 8 s, A34 5 s, A20 4 s). **4 unmodified suites in parallel: 4/4 green,
-82 s for all four** (vs ~204 s serial) - ONE control run. Build `test/mutate.mjs` (today's runner is a scratch script:
-copy the tracked tree, apply a mutant that must match exactly once or refuse, run, report the rows) running N-wide, with
-the parallel baseline as its control. Then look at A59/A34/A20. `--only <arm>` for iteration; the full suite stays the gate.
+**C - tests faster, still reliable (owner, 09-27). `test/mutate.mjs` IS BUILT**: baseline in the same batch (not
+green ⇒ VOID), a mutant that does not match exactly once is refused, a survivor is printed as the finding. Controls
+run: refuses 2/2 inert mutants; a known-red mutant reddens A77 and a comment edit SURVIVES. **11 runs 3 wide in 238 s**
+(serial was ~11 min). The parallel control is still ONE run of 4/4 - repeat before going wider. Next: `attack` itself -
+A59 8 s, A34 5 s, A20 4 s of 51 s; `--only <arm>` for iteration, the full suite stays the gate.
 
 **D - `#bell-into-typing`**: the bell reads the AGENT's turn, never the PERSON's input line - it cut the owner's
 half-typed message 09-27. He says it is not serious, keep writing. Named, not fixed.
 
-**E - ✅ atlas answered 09-27: NO hand-fire, MEASURED** (114 transcripts, 0 executions, pattern proved to catch
-it). Plus one field datum for D2: `net` rang `blocked` once and acted on the pointer. One point, not a count.
+**E - ✅ atlas answered 09-27: NO hand-fire, MEASURED** (114 transcripts). One field datum for D2: `net`
+rang `blocked` once and acted on the pointer.
 
 **F - carried, in priority order:** `REVIEW-12b.md`'s seven points (`FINDINGS.md#review12b`, each already measured) ·
 `boot.mjs --hook` records with NO ownership test (`boot.mjs:489`; needs a declared test seam first - its own
 `--prove-red` fires are foreign by construction) · two amendments demanded by acks: `stranded-untold` (atlas's
 `extension` waits ON PURPOSE, their decision - `FINDINGS.md#peer-state`) and a close blind to its own doorbell ·
 #13 §7b/§7c (`handoff.mjs`'s D2 guard masked by `restart.mjs`'s; `INSIDE` unarmed) · the stub files
-`basename(transcript_path)` as the session, not the witnessed id · D2 mid-turn: timing now measured 4/4
+`basename(transcript_path)` as the session, not the witnessed id · #14's names: a DETACHED replay of a live id is counted (by design, E1), `rootRecords` overwrites the witness's reason, a ledger killed at 5 s after its append · D2 mid-turn: timing now measured 4/4
 (`#midturn-channel`), obedience to a POINTER is the open half - build `--kind blocked` only on atlas's field count.
 
 **Carried:** A2 marker · the installer overwrites a `SKILL.md` it did not generate · S6 · atlas's `rings.jsonl`
@@ -55,7 +56,7 @@ order:** adoption (orion measured 09-19) → Rust port → value, with atlas's l
 | boot | `node bin/boot.mjs` — every gating row armed; `--fast` is injected at session start, contract in `CLAUDE.md` |
 | **ledger** | `node bin/ledger.mjs` — the reboot instrument, here AND in the field (`--root <tree>`); arms run inside `attack` as A34. Each start stores `pending`, the peer's covariate — **never inbox depth**: session #41 had an empty mailbox and the largest real queue of its last five boots. **Counts live in boot's output, never here** |
 | **sensor** | `node bin/context.mjs` — pid → transcript through `bin/session-registry.mjs` (the `SessionStart` hook writes it, keyed on pid + start time + boot id); **refuses on a miss**. `FINDINGS.md#clear-blind` |
-| reviews | #1–#12b **dispositioned** (#12b's seven points carried — `FINDINGS.md#review12b`); **#13 disposed 2026-09-27** — `FINDINGS.md#review13`, released as `2026-09-27.1`. #5's amendment stands in `CLAUDE.md`: *a gate that CAN redden is not yet one that reddens for the property in its own title* — **#12b was its seventh instance, inside an arm the previous disposition had just written**; **#13 its eighth, in the arm #12b's disposition wrote** |
+| reviews | #1–#12b **dispositioned** (#12b's seven points carried — `FINDINGS.md#review12b`); **#13 and #14 disposed 2026-09-27** — `FINDINGS.md#review13`, `#review14`, released as `2026-09-27.1` and `.2`. #5's amendment stands in `CLAUDE.md`: *a gate that CAN redden is not yet one that reddens for the property in its own title* — **#12b was its seventh instance, inside an arm the previous disposition had just written**; **#13 its eighth, in the arm #12b's disposition wrote** |
 
 ## ⏭️ OPEN
 1. **🔴 Latency is a mailbox, not an interrupt.** Re-derive with `node test/latency.mjs <log>`; never

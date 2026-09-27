@@ -510,9 +510,13 @@ function signalIsFresh(sig) {
  *
  *   reboot — a lifecycle restart: the mechanism fired, or the session was cleared
  *   cold   — a fresh session nobody restarted
- *   other  — a resume or a compaction: neither a fresh start nor a restart. Counted,
+ *   other  — a resume, a compaction, or a fork (`--fork-session` reports `source: "fork"`,
+ *            measured by review #14): neither a fresh start nor a restart. Counted,
  *            reported, and kept OUT of the comparison rather than dropped, because
- *            silently folding it into either arm would move the answer.
+ *            silently folding it into either arm would move the answer. 🔴 Kept out of
+ *            the comparison is NOT irrelevant to it: an `other` start still ENDS the
+ *            previous start's span, so a dropped one lengthens that window - review #14
+ *            measured a constructed ledger going UNKNOWN -> WORSE on that alone.
  */
 function classify(r) {
 	if (r.trigger) return "reboot"

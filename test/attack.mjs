@@ -1542,7 +1542,9 @@ const POINTER_SOURCES = (() => {
 	let regOK = false
 	try {
 		const d = join(rt, "claude-comm", "sessions")
-		regOK = readdirSync(d).some((f) => JSON.parse(readFileSync(join(d, f), "utf8")).transcript === tp)
+		// The entry must be the START's: ARM 1's stop already wrote one with this same transcript through refresh(), so
+		// "any entry with tp" was satisfied before session-start ran - review #14 §6 removed record() here and A29 held.
+		regOK = readdirSync(d).some((f) => { const e = JSON.parse(readFileSync(join(d, f), "utf8")); return e.transcript === tp && e.source === "startup" })
 	} catch {}
 
 	check("A29 the field hook records a start in both instruments, and still delivers - its mail and introduction in one JSON",
@@ -2448,13 +2450,21 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	const plant77 = join(out77, "plant.mjs")
 	writeFileSync(plant77, [
 		`import { readFileSync, writeFileSync } from "node:fs"`,
-		`const pp = process.ppid, t = readFileSync("/proc/" + pp + "/stat", "utf8")`,
-		`writeFileSync(process.argv[2] + "/" + pp + ".json", JSON.stringify({ pid: pp, procStart: t.slice(t.lastIndexOf(")") + 2).split(" ")[19], sessionId: process.argv[3], cwd: process.argv[4], kind: "interactive" }))`,
+		`const pp = process.ppid, t = readFileSync("/proc/" + pp + "/stat", "utf8"), tick = t.slice(t.lastIndexOf(")") + 2).split(" ")[19]`,
+		// mode: "own" as the runtime writes it; "tick" a previous holder of this pid (another start tick); "torn" a
+		// file caught mid-rewrite, which no retry will cure.
+		`const mode = process.argv[5], f = process.argv[2] + "/" + pp + ".json"`,
+		`writeFileSync(f, mode === "torn" ? '{"pid":' + pp + ',"sessionId":"' : JSON.stringify({ pid: pp, procStart: mode === "tick" ? String(Number(tick) + 1) : tick, sessionId: process.argv[3], cwd: process.argv[4], kind: "interactive" }))`,
 	].join("\n"))
-	const fire77 = (inside, plant = false) => {
+	const sib77 = `${r77}-sibling`
+	mkdirSync(sib77, { recursive: true })
+	atExit(() => { try { rmSync(sib77, { recursive: true, force: true }) } catch {} })
+	// where: "in" the project, "out" of it, or "sibling" - a directory whose path merely STARTS with the project's.
+	const fire77 = (where, plant = false) => {
 		const pl = payload77(), before = n77(), err = join(out77, `err-${randomUUID()}`)
-		const r = spawnSync(fake77, ["-c", `${inside ? `cd ${r77} && ` : ""}` +
-			`${plant ? `${process.execPath} ${plant77} ${sess77} ${SID77} ${r77} && ` : ""}` +
+		const at = where === "in" ? r77 : where === "sibling" ? sib77 : out77
+		const r = spawnSync(fake77, ["-c", `${where === "out" ? "" : `cd ${at} && `}` +
+			`${plant ? `${process.execPath} ${plant77} ${sess77} ${SID77} ${at} ${plant === true ? "own" : plant} && ` : ""}` +
 			`${process.execPath} ${stub77} session-start < ${pl} > /dev/null 2> ${err}`],
 			{ cwd: out77, encoding: "utf8", env: env77 })
 		let e = ""; try { e = readFileSync(err, "utf8") } catch {}
@@ -2489,11 +2499,21 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	const COUNTED = "IS counted by the ledger", DROPPED = "is NOT counted by the ledger"
 	const dead77 = spawnSync("true").pid
 	clear77()
-	const foreign = fire77(false)
-	const ownBare = fire77(true)
-	const ownPlanted = fire77(true, true)
+	// The foreign fires carry their OWN live session file (review #14 §1): without one, the no-file rule refused them
+	// one line after the veto, so a mutant with no veto passed this row - and the reason is asserted, not the count.
+	const foreign = fire77("out", true)
+	clear77()
+	const sibling = fire77("sibling", true)
+	clear77()
+	const ownBare = fire77("in")
+	const ownPlanted = fire77("in", true)
+	clear77()
+	const ownOldTick = fire77("in", "tick")
+	clear77()
+	const ownTorn = fire77("in", "torn")
+	clear77()
 	witness77(process.pid, r77)
-	const ownReplay = fire77(true)
+	const ownReplay = fire77("in")
 	clear77()
 	const phantom = fireDetached77()
 	witness77(process.pid, r77)
@@ -2514,27 +2534,46 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	clear77(); file77(process.pid, r77); file77(dead77, r77, "1", "0-leftover.json")
 	const leftoverListedFirst = readdirSync(sess77)[0] === "0-leftover.json"
 	const leftover = fireDetached77()
+	// Two LIVE files with the id, the one running elsewhere listed first (review #14 §4): the one inside decides.
+	clear77(); file77(process.pid, r77); file77(process.ppid, join(out77, "elsewhere"), tick77(process.ppid), "0-elsewhere.json")
+	const otherListedFirst = readdirSync(sess77)[0] === "0-elsewhere.json"
+	const twoLive = fireDetached77()
+	// A file with no procStart gets the portable half (kill 0) and is counted; pid 1 is a process this user may not
+	// signal (EPERM), which in a 0700 directory of this user's sessions means a pid recycled away from them.
+	clear77(); writeFileSync(join(sess77, `${process.pid}.json`), JSON.stringify({ pid: process.pid, sessionId: SID77, cwd: r77 }))
+	const noTick = fireDetached77()
+	const eperm77 = (() => { try { process.kill(1, 0); return false } catch (e) { return e.code === "EPERM" } })()
+	witness77(1, r77)
+	const otherUser = fireDetached77()
 	// §2(b): an installed registry that predates witnessStart, on a start that is otherwise legitimate. The control is
 	// ownPlanted, the same fire with the installed registry as it ships.
 	const regF77 = join(r77, ".comm", "bin", "session-registry.mjs"), regSrc77 = readFileSync(regF77, "utf8")
 	writeFileSync(regF77, regSrc77.replace("export function witnessStart(", "function witnessStartGone("))
 	clear77()
-	const stale = fire77(true, true)
+	const stale = fire77("in", true)
 	writeFileSync(regF77, regSrc77)
-	const fires77 = [phantom, witnessedIn, noTranscript, witnessedDead, recycled, witnessedOut, leftover]
+	const fires77 = [phantom, witnessedIn, noTranscript, witnessedDead, recycled, witnessedOut, leftover, twoLive, noTick, otherUser]
 	const noAncestor = fires77.every((f) => f.ran && Array.isArray(f.chain) && f.chain.length > 0 && !f.chain.includes("claude"))
 	// The replay row asserts its REASON too: with the file's procStart present, a witness that dropped the pid rule
 	// would still refuse - as "recycled" - and the rule would be a mutation masked by its sibling (#review12b).
 	const replayNamed = ownReplay.err.includes("a replay of another session's payload")
 	const ledgerRows = foreign.added === 0 && ownBare.added === 0 && ownPlanted.added === 1 && ownReplay.added === 0 && replayNamed &&
 		phantom.added === 0 && witnessedIn.added === 1 && witnessedDead.added === 0 && recycled.added === 0 && witnessedOut.added === 0 &&
-		leftover.added === 1 && leftoverListedFirst
+		leftover.added === 1 && leftoverListedFirst &&
+		sibling.added === 0 && ownOldTick.added === 0 && ownTorn.added === 0 &&
+		twoLive.added === 1 && otherListedFirst && noTick.added === 1 && otherUser.added === 0 && eperm77
+	const reasonRows = foreign.err.includes("not inside") && sibling.err.includes("not inside") && ownOldTick.err.includes("RECYCLED") &&
+		ownTorn.err.includes("could not be parsed") && otherUser.err.includes("ANOTHER user")
 	const registryRows = foreign.registered === false && ownPlanted.registered === true
 	const saidRows = witnessedIn.err.includes(COUNTED) && noTranscript.added === 0 && noTranscript.err.includes(DROPPED) && !noTranscript.err.includes(COUNTED) &&
 		!ownPlanted.err.includes(DROPPED) && stale.added === 0 && stale.err.includes(DROPPED)
 	check("A77 the ledger counts a start only when the runtime's own session file witnesses it in this project, and the stub says what the ledger did",
-		ledgerRows && registryRows && saidRows && noAncestor,
+		ledgerRows && reasonRows && registryRows && saidRows && noAncestor,
 		`a claude ancestor OUTSIDE the project -> ${foreign.added} record(s) (want 0), registry entry for it=${foreign.registered} (want false); ` +
+		`refused BY THE VETO (named "not inside")=${foreign.err.includes("not inside")}; ` +
+		`a session in <root>-sibling with its own live file -> ${sibling.added} (want 0), named "not inside"=${sibling.err.includes("not inside")}; ` +
+		`the ancestor's own file carrying ANOTHER start tick -> ${ownOldTick.added} (want 0), named RECYCLED=${ownOldTick.err.includes("RECYCLED")}; ` +
+		`its own file torn -> ${ownTorn.added} (want 0), named "could not be parsed" rather than a hand-fire=${ownTorn.err.includes("could not be parsed")}; ` +
 		`the ancestor INSIDE, no session file carries the id -> ${ownBare.added} (want 0: the hand-fired probe is a phantom, review #13 §1); ` +
 		`the same fire once it planted its OWN session file -> ${ownPlanted.added} (want 1, the positive control), registry entry=${ownPlanted.registered} (want true); ` +
 		`the ancestor inside, the id's file belongs to ANOTHER live pid -> ${ownReplay.added} (want 0), named a replay=${replayNamed}; ` +
@@ -2542,6 +2581,9 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		`by a DEAD pid -> ${witnessedDead.added} (want 0); by a live pid whose start tick differs -> ${recycled.added} (want 0: recycled); ` +
 		`running elsewhere -> ${witnessedOut.added} (want 0); a dead session's leftover file with the same id beside the live one ` +
 		`-> ${leftover.added} (want 1: the live one decides), and the leftover was listed FIRST=${leftoverListedFirst} (the positive control); ` +
+		`two LIVE files, the one elsewhere listed first=${otherListedFirst} -> ${twoLive.added} (want 1); ` +
+		`a live file with no procStart -> ${noTick.added} (want 1: the portable half); ` +
+		`pid 1, which this user cannot signal (EPERM=${eperm77}) -> ${otherUser.added} (want 0), named ANOTHER user=${otherUser.err.includes("ANOTHER user")}; ` +
 		`stderr says "${COUNTED}" when it was=${witnessedIn.err.includes(COUNTED)}, and without a transcript_path -> ${noTranscript.added} record(s), ` +
 		`says "${DROPPED}"=${noTranscript.err.includes(DROPPED)} and never "${COUNTED}"=${!noTranscript.err.includes(COUNTED)}; ` +
 		`the common path is silent=${!ownPlanted.err.includes(DROPPED)}; a stale installed registry -> ${stale.added} (want 0) and says so=${stale.err.includes(DROPPED)}; ` +
@@ -2634,9 +2676,13 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	let said = ""
 	try { said = readFileSync(join(r71, "payload-startup.json.err"), "utf8") } catch {}
 	writeFileSync(led71, ledSrc)
-	check("A72 a start the ledger cannot record gives the restart note back",
-		backAfterFail && /PUT BACK/.test(said),
-		`ledger replaced by exit(1), note armed, startup -> note still there=${backAfterFail}; stderr says so=${/PUT BACK/.test(said)} ` +
+	// ...and says the start was NOT counted, from the ledger's own exit: review #14 §2 set `counted = true` in the stub
+	// and the whole suite stayed green, because no other fire reaches a ledger that runs and fails.
+	const saidDropped = /is NOT counted by the ledger - the ledger did not record it \(exit 1\)/.test(said)
+	check("A72 a start the ledger cannot record gives the restart note back, and says it was not counted",
+		backAfterFail && /PUT BACK/.test(said) && saidDropped,
+		`ledger replaced by exit(1), note armed, startup -> note still there=${backAfterFail}; stderr says so=${/PUT BACK/.test(said)}, ` +
+		`and says the start is NOT counted, from the ledger's exit=${saidDropped} ` +
 		`(A71's startup, same fixture with a working ledger, is the control: it takes the note)`)
 }
 

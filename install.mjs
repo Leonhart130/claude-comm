@@ -398,7 +398,7 @@ try {
 	// What the ledger is told, and what this hook SAYS about it, are computed apart and joined at the end: the line
 	// review #13 §2 measured said "IS counted by the ledger" for a start the ledger then did not count, because it was
 	// printed from the witness's verdict, six conditions before the ledger's. It now reports what HAPPENED.
-	let regLine = null, ledgerWhy = "the session registry could not be loaded, so no witness answered"
+	let regLine = null, witnessWhy = null, ledgerWhy = "the session registry could not be loaded, so no witness answered"
 	try {
 		const reg = join(binDir, "session-registry.mjs")
 		if (existsSync(reg)) {
@@ -411,7 +411,7 @@ try {
 				? m.witnessStart({ sid, root: projectRoot, pid: sp })
 				: { own: false, why: "this installed session-registry.mjs predates the ledger guard and carries no witnessStart" }
 			ownStart = w.own
-			ledgerWhy = w.why
+			ledgerWhy = witnessWhy = w.why
 			if (ownsSession(sp)) {
 				const r = m.record({ pid: sp, transcript: tp, agent, source: p.source })
 				if (!r.ok) process.stderr.write(\`claude-comm: this session is NOT in the session registry (\${r.why}). \`
@@ -530,8 +530,11 @@ try {
 	// Silent on the common path - registry written, start counted. Otherwise ONE line with both outcomes, and a start
 	// that is dropped says so even when the registry was fine: #13 §2 measured a stale installed registry refusing every
 	// legitimate start of a tree with nothing on any stream.
+	// One reason, said once: review #14 measured the witness's clause printed twice in one line, as the registry's
+	// reason AND the ledger's.
 	if (regLine || (!counted && !rootRecords)) process.stderr.write(\`claude-comm: \${regLine ? regLine + ". This start" : "this start"} \${counted
-		? "IS counted by the ledger" : \`is NOT counted by the ledger - \${ledgerWhy}\`}.\\n\`)
+		? "IS counted by the ledger" : regLine && ledgerWhy === witnessWhy ? "is NOT counted by the ledger either"
+		: \`is NOT counted by the ledger - \${ledgerWhy}\`}.\\n\`)
 } catch { /* an instrument must never break a session */ }
 
 // 🔴 EXIT 0, ALWAYS — and say why when it is not zero. The bus's own main() wraps the
