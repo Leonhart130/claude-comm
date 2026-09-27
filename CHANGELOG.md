@@ -16,6 +16,12 @@ node <path-to-claude-comm>/install.mjs <your project> --check    # what version 
 Your project records what it has in `.comm/INSTALLED.json`. An update prints only the entries you did not
 already have.
 
+## 2026-09-27.8 — bus print `a03d7be0a41f` — 2026-09-27
+
+- **Nothing changes in how the bus behaves.** Comments in the shipped files no longer name the projects that use this
+  bus: this repository is public, and project names stay private. Your `--check` would otherwise report the bytes as
+  changed with nothing said.
+
 ## 2026-09-27.7 — bus print `d3d5a9afe537` — 2026-09-27
 
 - A doorbell refused because the agent is mid-turn now says so (*"mid-turn, not rung"*) instead of *"no turn taken
