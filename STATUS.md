@@ -1,39 +1,38 @@
-# STATUS — claude-comm, 2026-09-27 (sessions 4–22)
+# STATUS — claude-comm, 2026-09-28 (sessions 4–23)
 
 Design and gates are in `README.md`; **this file is only what is OPEN.** Keep it short — when it grows,
 fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-09-27, second session, late. Field = atlas; `work` dormant by the owner's word (`FIELDS.json`); `lyra`
-leader-only, never launched; `orion`'s leader not relaunched since 09-19; **`cobalt` installed 09-27, leader-only** (its
-leader adds its own experts with `--add-agent`). **`2026-09-27.9` is in all seven trees**, `--check` in sync. The owner:
-*"tu peux faire tout ce que t'as à faire … review adversarielle tu peux lancer"*; a reviewer is Opus xhigh, price it.)*
+*(2026-09-28, evening. Field = atlas, whose leader the owner relaunches "maybe tomorrow"; `work` dormant (`FIELDS.json`);
+`lyra` leader-only, never launched; `orion` not relaunched since 09-19; `cobalt` leader-only; **`rigel` installed 09-28**
+(an empty dir, leader-only - the owner kickstarted it himself that evening: 6 agents by 21:45). `2026-09-27.9` is in all
+eight trees. A reviewer is Opus xhigh, priced 09-28 on #16/#17: ~120 calls, ~24 M cache reads, ~145 k out, 35-40 min.)*
 
-**▶ FIRST, TELL THE OWNER - he asked, 09-27 at the close: *"tu me rappelles tout ça demain"*.** In French, short:
-(1) the public repo was deleted and rebuilt 09-27 - 205 commits, MIT (the API says so), 0 private name over every object
-of its history, checked from a fresh clone; two adversarial reviews before it went online; (2) his rule - no name of his
-personal projects in a public project - is applied everywhere, codenames in the repo, the mapping only in my memory
-(`public-repo-private-names`), and a guard stops it recurring (the list outside every repo, four git hooks, boot row
-`leak`); what it cannot see: GitHub's non-git surfaces (description, releases, issues, wiki) - written by hand; (3) `cobalt`
-is installed leader-only, its leader adds experts itself (`--add-agent`); (4) the `claude-comm` skill is current (`.9`,
-seven trees); (5) atlas's three requests (licence, traces, the swallowed ring) are done and answered; **one letter was
-NOT delivered** - `2026-09-27-leak-check-en-ligne-mode-d-emploi.md` in atlas's channel `out/` (the bell refused twice,
-its leader was mid-turn): **ring it first** (`bin/exchange-bell.mjs --peer <atlas's channel> --ref <that file>`);
-(6) not verified: third-party archives of the OLD repo (Software Heritage) - his call; the old history is backed up
-locally, outside `~/Dev` (`~/claude-comm-backup-2026-09-27-before-rebuild.bundle`, `~/claude-comm-old-git-2026-09-27`);
-(7) next: review #18 on `leak-check` v3 (A0 below).
+1. **Review #19** - target: #18's disposition (`#review18`: the NUL runs, the X bit, the mark keyed on the scanner,
+   `GIT_NO_REPLACE_OBJECTS`, the arms) AND the email rewrite of the recreated repo. Report `review/REVIEW-19.md`, its bell
+   to `leader`; dispose it as #18 was. **If this section says nothing more, check `who` and the report before relaunching.**
+2. **atlas's leader has TWO letters waiting** in its channel's `out/` (the bell refuses while it is stopped): the
+   `leak-check` guide (09-27) and what to do so its public method skill carries neither the owner's personal address nor
+   the five lines that tell the domain (09-28, at the owner's request). Ring both when it runs:
+   `node bin/exchange-bell.mjs --peer <atlas's channel> --ref <file>`.
+3. **The owner deleted the public repo and it was rebuilt a SECOND time, 09-28**: every commit's address is GitHub's
+   masked one (his choice, set in THIS repo's `.git/config` only - his global address stays, so never advise GitHub's
+   "block command line pushes"); 210 commits, every tree identical to before; 20 cited hashes remapped, checked by mapping
+   them back; wiki disabled; MIT per the API; 0 hits over all 1 330 objects with 14 rules - the address is rule 14. From
+   a fresh clone; old hashes answer "No commit found".
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a
 codename here; the mapping is in no repo. The boot report prints the REAL directory names: **never copy a `field:` row
 into a tracked file as is.** `bin/leak-check.mjs` + four git hooks + boot row `leak` enforce it (`FINDINGS.md#leak-check`).
 
-**A0 - ✅ the public repo was deleted and rebuilt 09-27** from a history rewritten in three passes (205 commits; the
-scanner reads 0 over every object, 5 784 on the old history), MIT licence, verified from a fresh clone and the API.
-Reviews **#16** (the push read only the tip) and **#17** (it read commits, not objects) disposed - `#review16`,
-`#review17`. **Eight passes in a row found their worst defect in the previous patch: review #18 is due on
-`leak-check` v3** - `rev-list --objects` and every tree name, `--hooks-check`, the clean mark, A85 (now ~30 cases).
-Also fixed on the way: a ring the recipient already answered no longer silences the next (`#quiet-answered`, A84).
+**A0 - ✅ review #18 disposed 09-28** (`#review18`): online, clean; but ONE NUL hid a file from every mode (this repo's
+`test/latency.mjs` has two) - now read as printable runs; hooks must be executable; the mark trusts only its own
+scanner; replace refs are not followed; the arms assert their REASONS. Mutation: A85 6/6, prove-red `leak` 3/3. The 🔴
+was NOT in the previous patch (v1's NUL skip) - three of five 🟡 were. **`boot --prove-red` took ~49 min 4 wide under
+load** (the memory said ~12): budget for it.
+
 
 🔴 **The bus is at 57 816 of 58 000 B (A22).** The next change to `comm.mjs`/`who.mjs` moves narrative to FINDINGS FIRST.
 
