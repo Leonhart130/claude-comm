@@ -32,7 +32,7 @@
  * A21's import allowlist by design — and stays a short-lived process for exactly the
  * reason the bus does: nothing here lives long enough to leak.
  */
-import { readFileSync, writeFileSync, renameSync, existsSync, readdirSync, statSync, utimesSync, mkdtempSync, mkdirSync, cpSync, rmSync, symlinkSync, readlinkSync } from "node:fs"
+import { readFileSync, writeFileSync, renameSync, existsSync, readdirSync, statSync, utimesSync, mkdtempSync, mkdirSync, cpSync, rmSync, symlinkSync, readlinkSync, chmodSync } from "node:fs"
 import { tmpdir, homedir } from "node:os"
 import { join, dirname, resolve, basename } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
@@ -2595,6 +2595,8 @@ function proveRed() {
 		const setList = (v) => { if (v === undefined) delete process.env.CLAUDE_COMM_PRIVATE_WORDS; else process.env.CLAUDE_COMM_PRIVATE_WORDS = v }
 		const hooksDir = join(pkg, ".git", "hooks"), lcP = join(pkg, "bin", "leak-check.mjs")
 		let clean = { level: -1, text: "" }, inTree = clean, inMsg = clean, inMsgAgain = clean, inPast = clean, newWord = clean, unarmed = clean, noHooks = clean
+		let beforeNew = clean, beforeSwap = clean, swapped = clean, staleHook = clean, noX = clean
+		const W2 = ["zq", "second", "word"].join(""), W3 = ["zq", "third", "word"].join("")
 		try {
 			setList(list)
 			spawnSync(process.execPath, [lcP, "--install-hooks"], { cwd: pkg, encoding: "utf8" })
@@ -2611,30 +2613,47 @@ function proveRed() {
 			g("reset", "-q", "--soft", "HEAD~2")
 			// Review #17 §4 (M5): a word ADDED to the list must re-read all history. W2 sits in a commit the next one removes;
 			// scanned clean under the old list (the mark moves past it), then the list gains W2.
-			const W2 = ["zq", "second", "word"].join("")
+			// Its PRECONDITION is asserted (review #18 §5): the first scan must be CLEAN, or the mark never moved past OLD.md and
+			// the case is not armed - with nothing to say so.
 			writeFileSync(join(pkg, "OLD.md"), `${W2}\n`); g("add", "OLD.md"); g("commit", "-q", "--no-verify", "-m", "adds a file")
-			g("rm", "-q", "OLD.md"); g("commit", "-q", "--no-verify", "-m", "removes it"); rowOf(run(true), "leak")
+			g("rm", "-q", "OLD.md"); g("commit", "-q", "--no-verify", "-m", "removes it"); beforeNew = rowOf(run(true), "leak")
 			writeFileSync(list, `${W}\n${W2}\n`); newWord = rowOf(run(true), "leak")
 			writeFileSync(list, `${W}\n`); g("reset", "-q", "--soft", "HEAD~2")
+			// Review #18 §5 (M5b survived): a rule REPLACED at an equal count - what the real list went through on 09-27 (its
+			// rules rewritten with letter bounds). A mark keyed on the NUMBER of rules caught an added word and missed this.
+			writeFileSync(join(pkg, "OLD.md"), `${W3}\n`); g("add", "OLD.md"); g("commit", "-q", "--no-verify", "-m", "adds a file")
+			g("rm", "-q", "OLD.md"); g("commit", "-q", "--no-verify", "-m", "removes it"); beforeSwap = rowOf(run(true), "leak")
+			writeFileSync(list, `${W3}\n`); swapped = rowOf(run(true), "leak")
+			writeFileSync(list, `${W}\n`); g("reset", "-q", "--soft", "HEAD~2")
 			setList(join(tmp, "no-such-list")); unarmed = rowOf(run(true), "leak"); setList(list)
+			// Review #18 §5: removing the hooks did not tell byte-for-byte from the old substring test. A STALE hook - still
+			// naming the scanner, at a path that no longer exists - and a hook without its x bit (§2: git skips it).
+			const prePush = join(hooksDir, "pre-push")
+			writeFileSync(prePush, readFileSync(prePush, "utf8").split(lcP).join(join(tmp, "gone", "leak-check.mjs"))); staleHook = rowOf(run(true), "leak")
+			spawnSync(process.execPath, [lcP, "--install-hooks"], { cwd: pkg, encoding: "utf8" })
+			chmodSync(join(hooksDir, "pre-commit"), 0o644); noX = rowOf(run(true), "leak")
 			for (const k of ["pre-commit", "pre-merge-commit", "commit-msg", "pre-push"]) rmSync(join(hooksDir, k), { force: true })
 			noHooks = rowOf(run(true), "leak")
 		} finally {
 			for (const k of ["pre-commit", "pre-merge-commit", "commit-msg", "pre-push"]) rmSync(join(hooksDir, k), { force: true })
 			setList(env0)
 		}
+		// "Never prints the word" reads EVERY row of the arm, for every word of the arm (review #18 §5: it read three fixed
+		// texts for W alone - the rows that RELAY the scanner's output, `unarmed` and `no-hooks`, were never read).
+		const texts = [clean, inTree, inMsg, inMsgAgain, inPast, beforeNew, newWord, beforeSwap, swapped, unarmed, staleHook, noX, noHooks].map((r) => r.text).join(" ")
+		const silent = ![W, W2, W3].some((w) => new RegExp(w, "i").test(texts))
+		const found = (r) => r.level === WARN && (r.causes || []).includes("found"), hooksBad = (r) => r.level === WARN && (r.causes || []).includes("no-hooks")
 		assert("leak: a private word in the tree, a message or a PAST commit warns; no list is NOT ARMED; no hooks warns",
-			clean.level === OK && inTree.level === WARN && (inTree.causes || []).includes("found") &&
-			inMsg.level === WARN && (inMsg.causes || []).includes("found") && inMsgAgain.level === WARN &&
-			newWord.level === WARN && (newWord.causes || []).includes("found") &&
-			inPast.level === WARN && (inPast.causes || []).includes("found") &&
+			clean.level === OK && found(inTree) && found(inMsg) && found(inMsgAgain) && beforeNew.level === OK && found(newWord) &&
+			beforeSwap.level === OK && found(swapped) && found(inPast) &&
 			unarmed.level === WARN && (unarmed.causes || []).includes("unarmed") &&
-			noHooks.level === WARN && (noHooks.causes || []).includes("no-hooks") &&
-			!new RegExp(W, "i").test([inTree.text, inMsg.text, inPast.text].join(" ")),
+			hooksBad(staleHook) && hooksBad(noX) && hooksBad(noHooks) && silent,
 			`clean, armed, hooks in -> ${LV[clean.level]}; word in a tracked file -> ${LV[inTree.level]} ${JSON.stringify(inTree.causes || [])}; ` +
 			`in a commit message -> ${LV[inMsg.level]} ${JSON.stringify(inMsg.causes || [])}; in a file a later commit removed -> ${LV[inPast.level]}; the same message at the next boot -> ${LV[inMsgAgain.level]}; ` +
-			`a word ADDED to the list, found only in an old commit -> ${LV[newWord.level]}; no list -> ${LV[unarmed.level]} ${JSON.stringify(unarmed.causes || [])}; ` +
-			`hooks removed -> ${LV[noHooks.level]} ${JSON.stringify(noHooks.causes || [])}; the row never prints the word=${!new RegExp(W, "i").test([inTree.text, inMsg.text, inPast.text].join(" "))}`)
+			`a word ADDED to the list, found only in an old commit -> ${LV[newWord.level]} (the scan before it -> ${LV[beforeNew.level]}); ` +
+			`a rule REPLACED at an equal count -> ${LV[swapped.level]} (the scan before it -> ${LV[beforeSwap.level]}); no list -> ${LV[unarmed.level]} ${JSON.stringify(unarmed.causes || [])}; ` +
+			`a stale hook -> ${LV[staleHook.level]} ${JSON.stringify(staleHook.causes || [])}; a hook not executable -> ${LV[noX.level]} ${JSON.stringify(noX.causes || [])}; ` +
+			`hooks removed -> ${LV[noHooks.level]} ${JSON.stringify(noHooks.causes || [])}; no row prints any of the three words=${silent}`)
 	}
 	// THIS REPO'S OWN INSTALLED BUS AGAINST ITS OWN CODE (review #11b S2; LESSONS form A: this tree
 	// ran 09-11.7 while the field ran .8, unseen). Installed into a COPY of the fixture root - the

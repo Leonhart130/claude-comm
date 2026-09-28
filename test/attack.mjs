@@ -5295,6 +5295,42 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	// UTF-16 text (what PowerShell's `>` writes): its NUL bytes read as binary and it was skipped - review #17 §8.
 	writeFileSync(join(repo85, "u.txt"), Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(`${W}\n`, "utf16le")])); g85("add", "u.txt")
 	const utf16 = rec(g85("commit", "-qm", "a utf-16 note")); g85("reset", "-q", "--hard", "HEAD")
+	// Review #18 §1: ONE NUL made a file "binary" and its content was never read - `test/latency.mjs` carries two. A text
+	// file with a NUL separator, a PNG's tEXt chunk, UTF-16 with NO BOM. Control: a CLEAN binary still commits.
+	const png = (text) => Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 13, 10, 26, 10, 0, 0, 0, 20]), Buffer.from(`tEXtAuthor\0${text}`), Buffer.alloc(4)])
+	writeFileSync(join(repo85, "n.mjs"), `const sep = "\0"\n// ${W}\n`); g85("add", "n.mjs")
+	const nulText = rec(g85("commit", "-qm", "a separator")); g85("reset", "-q", "--hard", "HEAD")
+	writeFileSync(join(repo85, "p.png"), png(W)); g85("add", "p.png"); const pngText = rec(g85("commit", "-qm", "an image")); g85("reset", "-q", "--hard", "HEAD")
+	writeFileSync(join(repo85, "v.txt"), Buffer.from(`note ${W}\n`, "utf16le")); g85("add", "v.txt")
+	const utf16NoBom = rec(g85("commit", "-qm", "a utf-16 note, no BOM")); g85("reset", "-q", "--hard", "HEAD")
+	writeFileSync(join(repo85, "q.png"), png("someone")); g85("add", "q.png"); const cleanBin = rec(g85("commit", "-qm", "a clean image"))
+	// Review #18 §4: `git replace` - rev-list and cat-file read the stand-in, the push sends the ORIGINAL. A dirty commit,
+	// its clean twin as replacement, the dirty one pushed by id. Control: the twin itself pushes.
+	writeFileSync(join(repo85, "r.md"), `${W}\n`); g85("add", "r.md"); g85("commit", "-q", "--no-verify", "-m", "dirty")
+	const dirtySha = g85("rev-parse", "HEAD").stdout.trim(); g85("reset", "-q", "--hard", "HEAD~1")
+	writeFileSync(join(repo85, "r.md"), "fine\n"); g85("add", "r.md"); g85("commit", "-q", "-m", "clean twin")
+	const twinSha = g85("rev-parse", "HEAD").stdout.trim(); g85("replace", dirtySha, twinSha)
+	const pushReplaced = rec(g85("push", "-q", "origin", `${dirtySha}:refs/heads/replaced`))
+	const replacedPublished = spawnSync("git", ["--git-dir", bare85, "cat-file", "-e", "replaced:r.md"], { env: { ...env85, GIT_NO_REPLACE_OBJECTS: "1" } }).status === 0
+	const pushTwin = rec(g85("push", "-q", "origin", `${twinSha}:refs/heads/twin`))
+	g85("replace", "-d", dirtySha); g85("reset", "-q", "--hard", "HEAD~2")
+	// Review #18 §2: a hook without its x bit is SKIPPED by git, and --hooks-check read it "current" byte for byte.
+	const hooks85 = spawnSync("node", [lc, "--hooks-dir"], { cwd: repo85, env: env85, encoding: "utf8" }).stdout.trim()
+	const hcFresh = spawnSync("node", [lc, "--hooks-check"], { cwd: repo85, env: env85, encoding: "utf8" })
+	chmodSync(join(hooks85, "pre-push"), 0o644)
+	const hcNoX = spawnSync("node", [lc, "--hooks-check"], { cwd: repo85, env: env85, encoding: "utf8" })
+	chmodSync(join(hooks85, "pre-push"), 0o755)
+	// Review #18 §3: a clean mark written by a WEAKER scanner must not be believed by this one. The weaker twin is this
+	// scanner with its NUL reading removed; it clears a history whose only word sits in a NUL-carrying file that a later
+	// commit removed. Its positive control: it RAN and said "nothing matched" (an empty file would "pass" too).
+	const lcSrc = readFileSync(lc, "utf8"), anchor = "function textOf(buf) {"
+	const weak = join(r85, "weak-leak-check.mjs")
+	writeFileSync(weak, lcSrc.split(anchor).length === 2 ? lcSrc.replace(anchor, `${anchor}\n\tif (buf.includes(0)) return ""`) : "")
+	writeFileSync(join(repo85, "old.mjs"), `const s = "\0"\n// ${W}\n`); g85("add", "old.mjs"); g85("commit", "-q", "--no-verify", "-m", "adds old")
+	g85("rm", "-q", "old.mjs"); g85("commit", "-q", "--no-verify", "-m", "removes old")
+	const weakScan = spawnSync("node", [weak, "--all-cached"], { cwd: repo85, env: env85, encoding: "utf8" })
+	const afterWeak = rec(spawnSync("node", [lc, "--all-cached"], { cwd: repo85, env: env85, encoding: "utf8" }))
+	g85("reset", "-q", "--hard", "HEAD~2")
 	// §4 M9: core.hooksPath - the hooks must be written, and run, where git looks.
 	g85("config", "core.hooksPath", ".githooks"); spawnSync("node", [lc, "--install-hooks"], { cwd: repo85, env: env85, encoding: "utf8" })
 	writeFileSync(join(repo85, "h.md"), `${W}\n`); g85("add", "h.md"); const hooksPathCommit = rec(g85("commit", "-qm", "via hooksPath"))
@@ -5308,12 +5344,18 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	const pastPublished = spawnSync("git", ["--git-dir", bare85, "cat-file", "-e", "main~1:mid.md"], { encoding: "utf8" }).status === 0
 	rmSync(r85, { recursive: true, force: true })
 	const leaked = new RegExp(W, "i").test(all.join("\n"))
-	const refused = (r) => r.status !== 0
+	// Refused FOR THE WORD (review #18 §5): under a mutant listing commits only, three "object" cases were refused because
+	// NOTHING was read - the guard fired, not the reading, and `status !== 0` counted both. A refusal names a private word.
+	const refused = (r) => r.status !== 0 && /private word/.test(r.stderr || "") && !/FAILED/.test(r.stderr || "")
+	const weakRan = weakScan.status === 0 && /nothing matched/.test(weakScan.stdout || "")
 	const ok = cleanCommit.status === 0 && pushClean.status === 0 && pushTagClean.status === 0 && mergedClean.status === 0 &&
 		refused(dirtyFile) && refused(dirtyMsg) && refused(binName) && refused(pushPast) && !pastPublished &&
 		refused(pushTagMsg) && refused(pushBranch) && refused(merged) && unarmed.status === 3 && /NOT ARMED/.test(unarmed.stderr) && !leaked &&
 		refused(pushBlobTag) && refused(pushRawBlob) && refused(pushRawTree) && refused(pushNested) && refused(pushMsg) && refused(pushName) &&
-		refused(typeChange) && refused(gitlink) && refused(hooksPathCommit) && invalid.status === 4 && refused(utf16) && typedArg.status === 2
+		refused(typeChange) && refused(gitlink) && refused(hooksPathCommit) && invalid.status === 4 && refused(utf16) && typedArg.status === 2 &&
+		refused(nulText) && refused(pngText) && refused(utf16NoBom) && cleanBin.status === 0 &&
+		refused(pushReplaced) && !replacedPublished && pushTwin.status === 0 &&
+		hcFresh.status === 0 && hcNoX.status === 1 && weakRan && afterWeak.status === 1 && /private word/.test(afterWeak.stderr || "")
 	check("A85 a private word is stopped in every object a push sends, at every hook, and never printed; no list is NOT ARMED",
 		ok,
 		`controls: clean commit ${cleanCommit.status}, clean push ${pushClean.status}, clean tag ${pushTagClean.status}, clean merge ${mergedClean.status} (want 0); refused - ` +
@@ -5323,6 +5365,10 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		`objects (#17 §1): tag->blob=${refused(pushBlobTag)} raw blob=${refused(pushRawBlob)} raw tree=${refused(pushRawTree)} tag->tag=${refused(pushNested)}; ` +
 		`pushed past the local hooks: a message=${refused(pushMsg)} a file NAME=${refused(pushName)}; type change=${refused(typeChange)} gitlink=${refused(gitlink)} ` +
 		`core.hooksPath=${refused(hooksPathCommit)} UTF-16 text=${refused(utf16)} the word as an argument -> exit ${typedArg.status} (want 2) invalid rule -> exit ${invalid.status} (want 4); ` +
+		`binary (#18 §1): NUL text=${refused(nulText)} PNG tEXt=${refused(pngText)} UTF-16 no BOM=${refused(utf16NoBom)} a clean binary -> ${cleanBin.status} (want 0); ` +
+		`git replace (#18 §4): the original pushed=${!refused(pushReplaced)} published=${replacedPublished}, its twin -> ${pushTwin.status} (want 0); ` +
+		`hooks (#18 §2): fresh -> ${hcFresh.status} (want 0), pre-push not executable -> ${hcNoX.status} (want 1); ` +
+		`a WEAKER scanner's mark (#18 §3): it ran clean=${weakRan}, this scanner after it -> ${afterWeak.status} (want 1); ` +
 		`no output printed the word=${!leaked}`)
 }
 

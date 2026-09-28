@@ -28,7 +28,7 @@
  * a commit that a later commit removed went public; a binary's NAME was never read; the refusal printed a matching path;
  * ref names and annotated-tag messages were never read; merges run `pre-merge-commit`, not `pre-commit`.
  */
-import { readFileSync, writeFileSync, existsSync, chmodSync, mkdirSync } from "node:fs"
+import { readFileSync, writeFileSync, existsSync, chmodSync, mkdirSync, accessSync, constants } from "node:fs"
 import { join, resolve } from "node:path"
 import { execFileSync, spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
@@ -55,11 +55,41 @@ export function scan(text, rules) {
 
 // git's own stderr is CAPTURED, never inherited: it prints paths and arguments in clear, above the masked report (review
 // #17 §2, measured with a gitlink named after the word: "fatal: bad object :<the path>").
-const git = (args, cwd, input) => execFileSync("git", args, { cwd, encoding: "utf8", input, stdio: ["pipe", "pipe", "pipe"], maxBuffer: 512 * 1024 * 1024 })
-const gitBuf = (args, cwd, input) => execFileSync("git", args, { cwd, input, stdio: ["pipe", "pipe", "pipe"], maxBuffer: 512 * 1024 * 1024 })
-/** Text of a file or blob: UTF-16 by its BOM (PowerShell's `>` writes it; its NULs read as binary), else UTF-8. */
-const decode = (buf) => buf[0] === 0xff && buf[1] === 0xfe ? buf.slice(2).toString("utf16le")
-	: buf[0] === 0xfe && buf[1] === 0xff ? Buffer.from(buf.slice(2)).swap16().toString("utf16le") : buf.toString("utf8")
+// And git's REPLACE refs are not followed (review #18 §4): `rev-list` and `cat-file` read a replacement, `pack-objects`
+// sends the original - measured, a dirty commit behind `git replace` was pushed while the hook read its clean stand-in.
+const gitEnv = () => ({ ...process.env, GIT_NO_REPLACE_OBJECTS: "1" })
+const git = (args, cwd, input) => execFileSync("git", args, { cwd, env: gitEnv(), encoding: "utf8", input, stdio: ["pipe", "pipe", "pipe"], maxBuffer: 512 * 1024 * 1024 })
+const gitBuf = (args, cwd, input) => execFileSync("git", args, { cwd, env: gitEnv(), input, stdio: ["pipe", "pipe", "pipe"], maxBuffer: 512 * 1024 * 1024 })
+/** Our own refusals: their text is fixed, so FAILED may print it (git's own message may carry the word, never printed). */
+const unread = (why) => Object.assign(new Error(why), { ours: true })
+
+const swap16 = (b) => Buffer.from(b.slice(0, b.length - (b.length % 2))).swap16()
+/**
+ * Text of a file or blob: UTF-16 by its BOM (PowerShell's `>` writes it), else UTF-8 - and a buffer holding a NUL is NOT
+ * skipped as "binary". Review #18 §1, measured: ONE NUL anywhere made a file unread and the tool printed "nothing
+ * matched" - a `.mjs` with a NUL separator (`test/latency.mjs` has two), a PNG's `tEXt` chunk, a PDF's `/Author`, UTF-16
+ * with no BOM, a stored zip's inner file NAME. Such a buffer is read as its printable RUNS (4 characters or more, `strings`
+ * style), decoded as UTF-8, latin1 and UTF-16 in both byte orders and both alignments. Compressed content (a deflated PDF
+ * stream, a docx) stays unread: no byte scanner sees it.
+ */
+function textOf(buf) {
+	if (buf[0] === 0xff && buf[1] === 0xfe) return buf.slice(2).toString("utf16le")
+	if (buf[0] === 0xfe && buf[1] === 0xff) return swap16(buf.slice(2)).toString("utf16le")
+	if (!buf.includes(0)) return buf.toString("utf8")
+	const runs = (s) => s.split(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\ufffd]+/).filter((r) => r.trim().length >= 4)
+	const odd = buf.slice(1)
+	return [buf.toString("utf8"), buf.toString("latin1"), buf.slice(0, buf.length - (buf.length % 2)).toString("utf16le"),
+		odd.slice(0, odd.length - (odd.length % 2)).toString("utf16le"), swap16(buf).toString("utf16le"), swap16(odd).toString("utf16le")]
+		.flatMap(runs).join("\n")
+}
+
+/** Hits in a buffer. A binary's are one per RULE, with no line: its runs are decoded several ways, so a line would name
+ * nothing, and one word would count once per decoding. */
+function hitsOf(buf, rules) {
+	const h = scan(textOf(buf), rules)
+	if (!buf.includes(0)) return h.map((x) => ({ ...x, at: `:${x.line}` }))
+	return [...new Set(h.map((x) => x.rule))].map((rule) => ({ rule, at: " (binary, its printable runs)" }))
+}
 
 /** A path shown in a report: itself, unless it matches a rule - then masked, with the blob that carries it. */
 const shown = (p, rules, blob = "") => {
@@ -67,16 +97,15 @@ const shown = (p, rules, blob = "") => {
 	return h.length ? `<a path matching rule ${h[0].rule}${blob ? `, blob ${blob.slice(0, 7)}` : ""}>` : p
 }
 
-/** Scan `entries` = [{ path, read() }]: the PATH first (a binary's name counts), then the content if it is text. */
+/** Scan `entries` = [{ path, read() -> Buffer }]: the PATH first, then the content - a binary's printable runs included. */
 function scanEntries(entries, rules, prefix = "") {
 	const out = []
 	for (const e of entries) {
 		const p = shown(e.path, rules, e.blob)
 		for (const h of scan(e.path, rules)) out.push(`${prefix}${p} - the PATH itself (rule ${h.rule})`)
-		let text
-		try { text = e.read() } catch { continue }
-		if (text.includes("\0")) continue
-		for (const h of scan(text, rules)) out.push(`${prefix}${p}:${h.line} (rule ${h.rule})`)
+		let buf
+		try { buf = e.read() } catch { continue }
+		for (const h of hitsOf(buf, rules)) out.push(`${prefix}${p}${h.at} (rule ${h.rule})`)
 	}
 	return out
 }
@@ -92,6 +121,8 @@ function readObjects(shas, cwd) {
 		const nl = buf.indexOf(10, at)
 		const [sha, type, size] = buf.slice(at, nl).toString("utf8").split(" ")
 		if (type === "missing") { at = nl + 1; continue }
+		// `ambiguous`, or anything new: Number(undefined) made the loop stop IN SILENCE, every later object unread (review #18 §8).
+		if (!["blob", "tree", "commit", "tag"].includes(type)) throw unread("git could not read an object - nothing after it was read")
 		const n = Number(size), start = nl + 1
 		map.set(sha, { type, buf: buf.slice(start, start + n) })
 		at = start + n + 1
@@ -115,11 +146,11 @@ export function check(mode, arg, { cwd = process.cwd(), rules, stdin = "" }) {
 	}
 	if (mode === "--staged") {
 		const paths = git(["diff", "--cached", "--name-only", "--diff-filter=ACMRT", "-z"], cwd).split("\0").filter(Boolean)
-		return scanEntries(paths.map((p) => ({ path: p, read: () => decode(gitBuf(["show", `:${p}`], cwd)) })), rules)
+		return scanEntries(paths.map((p) => ({ path: p, read: () => gitBuf(["show", `:${p}`], cwd) })), rules)
 	}
 	if (mode === "--tree" && !arg) {
 		const top = git(["rev-parse", "--show-toplevel"], cwd).trim()
-		return scanEntries(git(["ls-files", "-z"], cwd).split("\0").filter(Boolean).map((p) => ({ path: p, read: () => decode(readFileSync(join(top, p))) })), rules)
+		return scanEntries(git(["ls-files", "-z"], cwd).split("\0").filter(Boolean).map((p) => ({ path: p, read: () => readFileSync(join(top, p)) })), rules)
 	}
 	// THE OBJECTS, NOT THE COMMITS (review #17 §1). `rev-list <range>` lists commits only, and a tag pointing at a blob, a
 	// tree or another tag has none: nothing was read and the tool said "nothing matched". `rev-list --objects` lists what
@@ -128,7 +159,7 @@ export function check(mode, arg, { cwd = process.cwd(), rules, stdin = "" }) {
 	if (mode === "--tree" || mode === "--commits") {
 		const spec = mode === "--tree" ? [`${arg}^{tree}`] : (arg ? arg.split(/\s+/) : ["HEAD"])
 		const lines = git(["rev-list", "--objects", ...spec], cwd).split("\n").filter(Boolean)
-		if (!lines.length && !spec.some((x) => x.includes("..") || x.startsWith("^"))) throw new Error("the range names no object - nothing was read")
+		if (!lines.length && !spec.some((x) => x.includes("..") || x.startsWith("^"))) throw unread("the range names no object - nothing was read")
 		const objs = lines.map((l) => { const i = l.indexOf(" "); return i < 0 ? { sha: l, path: "" } : { sha: l.slice(0, i), path: l.slice(i + 1) } })
 		const out = [], pathOf = new Map()
 		for (const o of objs) {
@@ -148,24 +179,25 @@ export function check(mode, arg, { cwd = process.cwd(), rules, stdin = "" }) {
 				}
 				continue
 			}
-			const text = decode(buf)
-			if (type === "blob" && text.includes("\0")) continue
 			const where = type === "blob" ? shown(pathOf.get(sha) || `blob ${sha.slice(0, 7)}`, rules, sha) : `${sha.slice(0, 7)} ${type} object`
-			for (const h of scan(text, rules)) out.push(`${where}:${h.line} (rule ${h.rule})`)
+			for (const h of hitsOf(buf, rules)) out.push(`${where}${h.at} (rule ${h.rule})`)
 		}
 		return out
 	}
 	if (mode === "--history") return check("--commits", arg, { cwd, rules })
 	if (mode === "--all-cached") {
-		// A new rule re-reads ALL history: the mark is keyed on the list's own content, never on its mtime.
+		// A new rule re-reads ALL history: the mark is keyed on the list's own content, never on its mtime - AND on this
+		// scanner's own bytes (review #18 §3, measured): a mark written by a WEAKER scanner was believed by a stronger one, so
+		// history it had "cleared" was never re-read with the new coverage (v2 skipped UTF-16, v3 every NUL).
 		const top = git(["rev-parse", "--show-toplevel"], cwd).trim()
 		const mark = resolve(top, git(["rev-parse", "--git-path", "leak-check-clean"], cwd).trim())
-		const key = createHash("sha256").update(rules.map((r) => r.source).join("\n")).digest("hex").slice(0, 16)
+		const key = createHash("sha256").update(rules.map((r) => r.source).join("\n")).update("\0")
+			.update(readFileSync(fileURLToPath(import.meta.url))).digest("hex").slice(0, 16)
 		const head = git(["rev-parse", "HEAD"], cwd).trim()
 		let since = ""
 		try {
 			const [h, k] = readFileSync(mark, "utf8").trim().split(" ")
-			if (k === key && spawnSync("git", ["merge-base", "--is-ancestor", h, head], { cwd }).status === 0) since = h
+			if (k === key && spawnSync("git", ["merge-base", "--is-ancestor", h, head], { cwd, env: gitEnv() }).status === 0) since = h
 		} catch {}
 		const hits = [...check("--tree", "", { cwd, rules }), ...(since === head ? [] : check("--commits", since ? `${since}..${head}` : head, { cwd, rules }))]
 		if (!hits.length) writeFileSync(mark, `${head} ${key}\n`)
@@ -202,10 +234,17 @@ function installHooks(cwd) {
 	return dir
 }
 
-/** Which hooks are missing or differ from what --install-hooks writes now (an old version, a dead path, a comment). */
+/**
+ * Which hooks are missing, differ from what --install-hooks writes now (an old version, a dead path, a comment), or are
+ * NOT EXECUTABLE - git skips such a hook with a hint that `advice.ignoredHook=false` silences, and this read it "current"
+ * byte for byte (review #18 §2, measured: a word committed and pushed past four `chmod -x` hooks).
+ */
 export function hooksCheck(cwd) {
 	const dir = hooksDir(cwd)
-	return { dir, bad: Object.entries(hookBodies()).filter(([name, body]) => { try { return readFileSync(join(dir, name), "utf8") !== body } catch { return true } }).map(([n]) => n) }
+	const bad = Object.entries(hookBodies()).filter(([name, body]) => {
+		try { accessSync(join(dir, name), constants.X_OK); return readFileSync(join(dir, name), "utf8") !== body } catch { return true }
+	})
+	return { dir, bad: bad.map(([n]) => n) }
 }
 
 function main() {
@@ -215,7 +254,7 @@ function main() {
 	if (mode === "--hooks-dir") { console.log(hooksDir(cwd)); return }
 	if (mode === "--hooks-check") {
 		const { dir, bad } = hooksCheck(cwd)
-		if (bad.length) { console.error(`✗ leak-check: ${bad.join(", ")} missing or not as --install-hooks writes them, in ${dir}`); process.exit(1) }
+		if (bad.length) { console.error(`✗ leak-check: ${bad.join(", ")} missing, not executable, or not as --install-hooks writes them, in ${dir}`); process.exit(1) }
 		console.log(`✓ leak-check: the four hooks are current in ${dir}`); return
 	}
 	const { armed, rules, why, invalid } = loadRules()
@@ -227,7 +266,7 @@ function main() {
 	const stdin = arg === "-" ? readFileSync(0, "utf8") : ""
 	// FAILED names the mode and git's exit status - never git's message or arguments, which may carry the word.
 	try { hits = check(mode, arg, { cwd, rules, stdin }) } catch (e) {
-		const why = e.status !== undefined && e.status !== null ? `git exited ${e.status}` : /nothing was read/.test(e.message) ? "the range names no object - nothing was read" : (e.code || "error")
+		const why = e.ours ? e.message : e.status !== undefined && e.status !== null ? `git exited ${e.status}` : (e.code || "error")
 		console.error(`✗ leak-check FAILED (${mode}): ${why}`); process.exit(2)
 	}
 	if (hits.length) {

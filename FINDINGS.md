@@ -3534,8 +3534,9 @@ cited in this file were remapped to the rewritten ones (the tip trees before and
   tag), every name in every tree, every blob - so a word that a later commit removed, that came in by a merge, a
   cherry-pick or a rebase, or that sits behind a tag pointing at a blob or a tree, is still stopped at the push.
 - **boot row `leak`**: the tracked tree and every object on HEAD since the last clean scan (a mark in `.git/`, keyed on
-  the list's own content: a new word re-reads all history; never written while a hit stands), and the four hooks
-  **byte for byte** against what `--install-hooks` writes now; **no list, an invalid list, a failed scan or a missing
+  the list's own content AND the scanner's own bytes: a new or changed word, or a new scanner, re-reads all history;
+  never written while a hit stands), and the four hooks **byte for byte, and executable**, against what
+  `--install-hooks` writes now; **no list, an invalid list, a failed scan or a missing
   scanner each warn under their own name** - a check that could not run never reads as clean.
 - **A85** runs the real hooks in a scratch repo with a synthetic word, one case per hole review #16 measured; the row is
   armed in `boot --prove-red` the same way, including a word in a commit the next one removed.
@@ -3547,8 +3548,12 @@ captured, never passed through (it prints paths and arguments in clear) - the ma
 
 **Not verified / not covered:** anything the list does not name - a new private word is only stopped once it is added
 there (write its rules with LETTER bounds, `(?<![a-z])…(?![a-z])`: JavaScript's `\b` treats `_` and digits as letters,
-so a `snake_case` file name slips past a `\b` rule - review #17 §5); a BINARY file's content (its name is read; UTF-16
-text is decoded by its BOM); Unicode look-alikes and invisible characters inside a word (measured passing, no
+so a `snake_case` file name slips past a `\b` rule - review #17 §5 - and the letter bounds still let camelCase, plurals
+and two-word forms through: choose them word by word, review #18 §8); COMPRESSED content - a deflated PDF stream, a
+zip or docx entry (a file holding a NUL is read as its printable runs, UTF-8, latin1 and UTF-16, review #18 §1 - it is
+not decompressed); `--tree` on disk reads a symlink's TARGET, not the link text git publishes (`--staged` and
+`--commits` read the right object); git's replace refs are NOT followed (the push sends the original), but
+`.git/info/grafts` is unmeasured; Unicode look-alikes and invisible characters inside a word (measured passing, no
 plausible accident). **Nothing here guards what leaves WITHOUT a `git push`**: `push --no-verify`, a bundle, an archive
 of `.git`, a patch - nor GitHub's non-git surfaces: the repo description and topics, release notes, issue and PR
 titles and bodies, the wiki. Outside this repo: GitHub's own caches,
@@ -3580,6 +3585,53 @@ from the public history (the bus files were rewritten in ~100 commits) - they st
 project names); `Claude-Session:` trailers (session URLs, private by default) were removed in the second pass;
 third-party archives of the old repo. **Told to its maintainer:** the method skill's own history carries the name in
 old blobs, and a public commit message of ours linked the two.
+
+## `#review18` — the repo ONLINE: clean, and one NUL made a file unread (2026-09-28)
+
+`review/REVIEW-18.md`, against `1602c08` AND the published repo from a fresh clone. **Published and clean against the
+list** - 0 hits over all 1 315 objects of the pack, by the tool and by an independent scanner (the old history, the
+positive control: 6 005), and GitHub's non-git surfaces empty (no release, issue, page, fork; the wiki enabled but never
+created). The third rewrite pass and its remap **hold**: 197 origin/final commit pairs, every changed token a list word
+or a known residue, except two paraphrased owner quotes in comments; 18/18 cited hashes resolve and match their
+sentence. **One 🔴, five 🟡.** The series, stated exactly: **the 🔴 is NOT in the previous patch** - the NUL skip dates
+from v1; #17's patch only redrew its edge (UTF-16 by BOM). Three of the five 🟡 (§2, §4, §5) are in that patch.
+
+| § | defect (measured) | fix | arm |
+| --- | --- | --- | --- |
+| 🔴 1 | ONE NUL anywhere made a blob "binary" and its content was never read, by any mode, and the tool printed *"nothing matched"* (form E) - **this repo's own `test/latency.mjs` carries two**; a PNG `tEXt`, a PDF `/Author`, UTF-16 with no BOM, a stored zip's inner NAME were all committed and pushed | a buffer with a NUL is read as its printable RUNS (4+ characters), as UTF-8, latin1 and UTF-16 in both byte orders and alignments; one hit per rule per binary, no line (a line would name nothing). Real list, all history: 0 new hits, 1.2 s; old history: 6 005 before and after | A85: a `.mjs` with a NUL, a PNG `tEXt`, UTF-16 with no BOM - against a clean binary that must commit |
+| 2 | `--hooks-check` compared bytes, never the MODE: four `chmod -x` hooks read "in place", and git skipped them (a hint, silenced by `advice.ignoredHook=false`) | the X bit is checked (`access(X_OK)`, what git does) | A85 (`pre-push` 0644 -> exit 1, fresh -> 0); prove-red `leak` (a hook not executable -> `no-hooks`) |
+| 3 | the clean mark was keyed on the list only: a mark written by a WEAKER scanner was believed by a stronger one - measured v2 -> v3 | the key hashes the scanner's own bytes too | A85: this scanner with its NUL reading removed writes a clean mark; the real one must still find the word (positive control: the weak one RAN clean) |
+| 4 | `git replace`: `rev-list`/`cat-file` read the stand-in, `pack-objects` pushed the ORIGINAL - a dirty commit went out past `pre-push` | `GIT_NO_REPLACE_OBJECTS=1` on every git call of the scanner | A85: the original pushed by id is refused and absent from the remote; its clean twin pushes |
+| 5 | the arms: A85 counted *"refused because nothing was read"* as *"refused for the word"* (three #17 §1 object cases, under a commits-only mutant); the prove-red clause *"never prints the word"* read three FIXED texts for W alone; `inMsgAgain` asserted only the level; `newWord`'s precondition was thrown away; a mark keyed on the rule COUNT survived (M5b); deleted hooks could not tell byte-for-byte from the old substring test | A85 asserts the REASON (`private word`, never `FAILED`); the clause reads every row of the arm for all three words; `found` for `inMsgAgain`; both clean preconditions asserted; a rule REPLACED at an equal count; a STALE hook (a dead scanner path) | the mutation tables below |
+| 🟢 8 | `readObjects` read an unknown `cat-file` answer (`ambiguous`) as a size, `NaN`, and stopped in silence | any unknown type is an error that names itself (`FAILED`, the reason, never git's text) | unreachable today (full ids only) - unarmed, named |
+
+**Mutation, A85** (`test/mutate.mjs`, 3 wide, 197 s, baseline green in the same batch) - each mutant moved ITS row
+only, read line by line: NUL skipped again -> the three binary cases (and the weak-mark case, whose strong scanner is
+now as weak); no UTF-16 without a BOM -> that case alone; replace refs followed -> the `git replace` case alone; X bit
+unchecked -> the hook case alone; mark not keyed on the scanner -> the weak-mark case alone; `rev-list` without
+`--objects` (#18's A1) -> the four #17 §1 object cases now fail **for their reason**, plus a file NAME, `git replace`
+and the weak mark.
+
+**Mutation, the `leak` arm of `boot --prove-red`** - four copies of the tree, 4 wide under `systemd-run`, the baseline in
+the same batch; the arm's own line read case by case:
+
+| copy | mutation in `bin/leak-check.mjs` | the case that moved (and only it) |
+| --- | --- | --- |
+| baseline | - | `✓ every gating boot row demonstrated able to go red` - ~49 min, 4 wide (the mutants: `✗ 8 rows` for M5b and x bit, `✗ 1 row` for substring) |
+| M5b (#18's survivor) | the mark keyed on the NUMBER of rules | *a rule REPLACED at an equal count* `warn -> ok` |
+| x bit | `hooksCheck` without `access(X_OK)` | *a hook not executable* `warn -> ok` |
+| substring | `hooksCheck` back to `includes("leak-check")` | *a stale hook* `warn -> ok` |
+
+Both preconditions held in every copy (*the scan before it -> ok*). M5b and x-bit also reddened the arms that run the
+`attack` gate inside prove-red (`gate`, F8/F9, R11, `close`, `state`): A85 catches both mutants too, so the gate is red
+there - the substring mutant, which A85 does not reach, reddened `leak` alone.
+
+**Also measured by the review, disposed here:** `.8`'s entry was incomplete - see its correction in `CHANGELOG.md`.
+`prove-red` took 37-39 min a run under `systemd-run` on a shared machine (the memory said ~12): re-measure before
+planning batches. **Named, not fixed:** `.git/info/grafts` (unmeasured); the SHA-256 null id (a branch DELETION is
+refused wrongly - harmless); the synthetic word of the arms sits in clear in old revisions of `boot.mjs`/`attack.mjs` -
+never put it in a real list; the owner's OTHER public repos let a reader infer a private project's domain, and the
+author email is a personal address - both told to the owner 09-28, his calls (the email: a rewrite is decided).
 
 ## `#review17` — the push read commits, not objects; and every personal name goes (2026-09-27)
 

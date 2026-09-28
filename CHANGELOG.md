@@ -27,6 +27,11 @@ already have.
 - **Nothing changes in how the bus behaves.** Comments in the shipped files no longer name the projects that use this
   bus: this repository is public, and project names stay private. Your `--check` would otherwise report the bytes as
   changed with nothing said.
+- *Correction, 2026-09-28 (review #18 §6):* this entry's commit changes nothing but this file. The history was rewritten
+  after `.8` shipped, so the published `.7` already carries `.8`'s bytes: `git diff` between them shows no change, and
+  older entries' prints no longer recompute from the published history. And **not only comments** changed in the shipped
+  files: seven lines of `ledger.mjs`'s `--prove-red` fixture were renamed with them - consistently (`ledger --prove-red`
+  passes on the published tip), so how the bus behaves is still unchanged.
 
 ## 2026-09-27.7 — bus print `d3d5a9afe537` — 2026-09-27
 
