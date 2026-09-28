@@ -10,9 +10,11 @@ fold the settled parts into the README.
 (an empty dir, leader-only - the owner kickstarted it himself that evening: 6 agents by 21:45). `2026-09-27.9` is in all
 eight trees. A reviewer is Opus xhigh, priced 09-28 on #16/#17: ~120 calls, ~24 M cache reads, ~145 k out, 35-40 min.)*
 
-1. **Review #19** - target: #18's disposition (`#review18`: the NUL runs, the X bit, the mark keyed on the scanner,
-   `GIT_NO_REPLACE_OBJECTS`, the arms) AND the email rewrite of the recreated repo. Report `review/REVIEW-19.md`, its bell
-   to `leader`; dispose it as #18 was. **If this section says nothing more, check `who` and the report before relaunching.**
+1. **Review #19 - NOT RUN: the owner stopped it at launch, 09-28 ~22:20** (*"ne lance pas la revue … on continuera
+   demain ou un autre jour"*; its window was closed within a minute, nothing written). The brief is ready:
+   `BRIEF-adversarial-19.md` (target: #18's disposition in `#review18` - the NUL runs, the X bit, the mark keyed on the
+   scanner, `GIT_NO_REPLACE_OBJECTS`, the arms - AND the email rewrite of the recreated repo). **Launch it only on his
+   word.**
 2. **atlas's leader has TWO letters waiting** in its channel's `out/` (the bell refuses while it is stopped): the
    `leak-check` guide (09-27) and what to do so its public method skill carries neither the owner's personal address nor
    the five lines that tell the domain (09-28, at the owner's request). Ring both when it runs:
