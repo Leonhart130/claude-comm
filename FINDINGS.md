@@ -1451,7 +1451,7 @@ this repo and it is a flaw in the mechanism that governs every other one.
 
 ## `#review7-disposal` — disposing review #7, and the defect the disposal made before it shipped
 
-**2026-09-05.** Fourteen findings, all fixed and armed in `9941880`. What is written here is only what the
+**2026-09-05.** Fourteen findings, all fixed and armed in `043a719`. What is written here is only what the
 review did **not** already say: the measurements taken during the disposal, including the ones against me.
 
 ### The ratio inverted, and the reviewer's explanation is the right one
@@ -1459,7 +1459,7 @@ review did **not** already say: the measurements taken during the disposal, incl
 Reviews #5 and #6 each put five of seven findings in the ARMS. #7 put two of fourteen there (F5, and the arm
 half of F4), one more in a missing arm (F10), and eleven in shipped code. The reviewer's reading — *"today
 shipped more NEW code than usual, and new code outruns its arms"* — is supported by the attribution: **six of
-the fourteen were authored by one commit**, `8645a71`, the commit that shipped `bin/claim.mjs` with eight
+the fourteen were authored by one commit**, `e98998e`, the commit that shipped `bin/claim.mjs` with eight
 arms of its own. Eight arms, six defects, all in one file, all found within three hours by somebody who ran
 it instead of reading it.
 
@@ -1473,7 +1473,7 @@ one thing a fixture cannot check about itself. The new arms 9–14 run the CLI f
 
 ### The ledger's numbers after recording, and what they still do not say
 
-`25 defects — 22 attributed + 3 unattributable`. Two of the fourteen (F2 at `5ad5b3d`, F10 at `4532cd3`)
+`25 defects — 22 attributed + 3 unattributable`. Two of the fourteen (F2 at `18efb21`, F10 at `e31571a`)
 were authored **before this ledger's first start**, so they joined `F9`'s pool: property 3 exercised by real
 data for the second time. **Still 0 of 25 inside the 15-minute window**, and the bias named in
 `#review6-disposal` is unchanged — every defect is dated at its commit, which is the upper bound of when it
@@ -2534,7 +2534,7 @@ recent fix* holding for a fourth consecutive session. Alongside C4:
   nothing about the ones that never did. ⚠️ **Its first red proof was invalid and said so:** the fake suite
   used `await new Promise(() => {})`, which exits immediately on an empty event loop, so the probe never
   hung. `setInterval` made it speak. ⇒ `#prove-the-probe`, again.
-  ⚠️ C6's *named site* (A9's unbounded drain) was already bounded in `1937003`, after the brief's pinned
+  ⚠️ C6's *named site* (A9's unbounded drain) was already bounded in `5af7e90`, after the brief's pinned
   range — **the reviewer read a tree that moved under it, and that is my fault for reviewing a live branch.**
 
 ### The three ambers, and one of them is a better design than mine
@@ -3124,11 +3124,11 @@ the stub's step-aside removed → A73 alone · the orphan branch removed → A69
 
 ## `#review11c` — the third pass found its red inside the second pass's fix, a third time running
 
-**2026-09-18, the same reviewer, `REVIEW-11c.md`; disposed 2026-09-19.** Target `52c07ec` (#11b's disposal).
+**2026-09-18, the same reviewer, `REVIEW-11c.md`; disposed 2026-09-19.** Target `47ad809` (#11b's disposal).
 
 - **T1 🔴 — S2's inverted rule silenced every EXPERT of this repo.** The stub stood aside when the ROOT's
   `settings.json` wired `bin/boot.mjs --hook`. But a session launched in `review/` loads `review/.claude/settings.json`,
-  which runs only the stub: `boot --hook` never runs for it. Measured by the reviewer on `git archive 52c07ec`: root
+  which runs only the stub: `boot --hook` never runs for it. Measured by the reviewer on `git archive 47ad809`: root
   wired → **0** records in `review.log`, unwired → 1. *"Either detection can only miss toward a twin"* (S2 above) was
   false for every agent but the root's. It was **not live**: the installed stubs predate it, and the `bus` row's
   advice (`node install.mjs .`) would have put it live. **Fix:** the stub reads the hooks of its OWN directory
@@ -3182,7 +3182,7 @@ root. Now the root is walked up to, like the bus; identity, `--read` and guards 
 
 **Two more, found by my own controls the same afternoon.**
 - **The leader's skill listed its experts**, so one hand edit of `config.json` made the generated file drift and
-  turned boot's unaddressable-mail arm RED for a reason foreign to it (`boot --prove-red`, HEAD `873dbae`). A
+  turned boot's unaddressable-mail arm RED for a reason foreign to it (`boot --prove-red`, HEAD `6cd3aff`). A
   generated file must not copy volatile state: the roster is given live by the introduction at every start.
 - **The ledger recorded a hand-fired stub.** A probe of orion's brand-new stub, fired from my own session,
   wrote a phantom cold start into its ledger: the registry refuses a session not running inside the project, the
@@ -3430,7 +3430,7 @@ A80's: the group filter restored → A80 on *kept=0*; an emptied group kept, our
 
 ## `#review15` — the disposition of #15: the remedy `send` printed skipped the LEADER (2026-09-27)
 
-`review/REVIEW-15.md`: one 🔴, six 🟡, three 🟢, against `567bf66..253ed82` (`.3`, `.4`) and `test/mutate.mjs`. **The sixth
+`review/REVIEW-15.md`: one 🔴, six 🟡, three 🟢, against `704222a..ddf06e9` (`.3`, `.4`) and `test/mutate.mjs`. **The sixth
 pass in a row whose worst finding sits inside the previous patch** - here, one hop from the defect the patch fixed.
 
 ### 🔴 §1 - the ring skipped the leader for every caller that did not declare itself
@@ -3588,7 +3588,7 @@ old blobs, and a public commit message of ours linked the two.
 
 ## `#review18` — the repo ONLINE: clean, and one NUL made a file unread (2026-09-28)
 
-`review/REVIEW-18.md`, against `1602c08` AND the published repo from a fresh clone. **Published and clean against the
+`review/REVIEW-18.md`, against `af8eb31` AND the published repo from a fresh clone. **Published and clean against the
 list** - 0 hits over all 1 315 objects of the pack, by the tool and by an independent scanner (the old history, the
 positive control: 6 005), and GitHub's non-git surfaces empty (no release, issue, page, fork; the wiki enabled but never
 created). The third rewrite pass and its remap **hold**: 197 origin/final commit pairs, every changed token a list word
@@ -3821,7 +3821,7 @@ two in code this patch wrote - `#review14`.*
 ## `#review12b` — the disposition's own fix wrote phantom starts into the reboot instrument (2026-09-20)
 
 `review/REVIEW-12b.md`, one RED, two 🟡, four 🟢. **The brief's target range was wrong and the reviewer said so
-first** (§0): it named `1a7fc6d..HEAD`, which EXCLUDES `04a238d`, the disposition commit it asked them to attack.
+first** (§0): it named `088465f..HEAD`, which EXCLUDES `9608b00`, the disposition commit it asked them to attack.
 Mine to fix — the brief named that commit's findings by letter in the same paragraph as the range.
 
 ### The red: E1 again, in the other direction — and the arm was the worse half
@@ -3860,7 +3860,7 @@ is `#clear-blind` silently inverted. The old stub reached that conclusion by `th
 *"recording nothing"* **while the ledger was recording** — the one place a reader could have caught the phantom told
 them the opposite. It now states both outcomes.
 
-| the stub fired from | pre-fix (`0e6818f`) | HEAD |
+| the stub fired from | pre-fix (`6fb0a38`) | HEAD |
 | --- | --- | --- |
 | a `claude` ancestor whose cwd is **outside** the project | 0 records (control) | 0 |
 | a `claude` ancestor whose cwd is **inside** it | 1 (positive control) | 1 |
@@ -3952,7 +3952,7 @@ this repo's measurement traps, one level up: the variable moved was real, and so
 
 ## `#review12` — review #12 on the onboarding batch: no red, five yellows, all disposed (2026-09-19)
 
-`review/REVIEW-12.md`, target `d68175d..305917c`. The reviewer measured every finding with one variable moved.
+`review/REVIEW-12.md`, target `db8fd58..2090bfe`. The reviewer measured every finding with one variable moved.
 
 | # | finding | disposition | arm | mutation → red |
 | --- | --- | --- | --- | --- |
