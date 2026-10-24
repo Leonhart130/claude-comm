@@ -27,7 +27,10 @@ THE MAIN FIELD** - atlas inactive, not relaunched for days; "c'est Work qui pren
 5. **Named, unarmed**: the `briefs` row's unreadable-root branch and its reply-older-than-brief branch (only the
    presence arms ran in `--prove-red`); boot's own registry control still blames itself for a live session's rewrite
    (A31's twin, fixed 10-25 - F below).
-6. **Letters waiting for a bell**: deneb's (its own new channel `exchange/<deneb>-leader/`) and atlas's - both leaders
+6. 🔴 **AMEND `stranded-untold`, demanded by the close 10-25**: acked 15x (atlas), 4x (rigel), 4x (cobalt), each for an old
+   letter to an agent not running in a field I do not run. Measure a NEW strand: key the ack on the letter's id, so a
+   letter once named stays named and only a newly stranded one warns. Gated change, its own arm, `--amended`.
+7. **Letters waiting for a bell**: deneb's (its own new channel `exchange/<deneb>-leader/`) and atlas's - both leaders
    not running; ring with `node bin/exchange-bell.mjs --peer <channel> --ref <file>` when they run.
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a
