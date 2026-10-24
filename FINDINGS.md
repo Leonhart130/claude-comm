@@ -2476,7 +2476,10 @@ closer work in a real kitty), but none needs to be SEEN. So `bench()` opens ONE 
 fake `claude` running a job loop, and `benchRun()` runs a command from inside it: the launcher finds the bench as its
 caller exactly as it finds a leader. Re-measured: **12 windows, 0 in the session's tab**, 10 in the bench and 2 in
 A50's own minimized `--os-window`. ⚠️ NOT armed: a bench that leaked into the active tab is not run as a mutant,
-because the active tab is the owner's.
+because the active tab is the owner's. **A suite killed mid-run** (SIGKILL, so no exit hook; measured): the runner
+leaves with the suite, and what is left is A50/A53's fake `claude`, an `exec sleep 120`, gone by 120 s - every one of
+them inside a minimized window. The first probe of this read 0 windows WHILE the suite ran - it could not speak
+(form J) - and only a positive control (10 alive) made its 0 afterwards mean anything.
 
 ## `#doorbell-shares-the-human-s-line` — a wake landed inside a command the owner was typing
 

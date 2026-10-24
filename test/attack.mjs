@@ -3769,9 +3769,11 @@ const besideMe = (w) => ["--match", `window_id:${w.id}`, "--next-to", `id:${w.id
 // opens goes beside the bench. Opened on first use, closed at exit; no kitty, or a bench whose runner is not
 // its window's foreground process, is null, and each arm then says it COULD NOT RUN.
 const nap = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
-const BENCH_RUNNER = `const fs=require("fs"),{spawnSync}=require("child_process"),D=process.argv[2];` +
+// The runner leaves when the suite does: a suite killed before its exit hooks (mutate's --timeout) would otherwise
+// leave a minimized window looping on the owner's desktop for good.
+const BENCH_RUNNER = `const fs=require("fs"),{spawnSync}=require("child_process"),D=process.argv[2],P=Number(process.argv[3]);` +
 	`fs.writeFileSync(D+"/ready",String(process.pid));` +
-	`setInterval(()=>{for(const f of fs.readdirSync(D).filter((f)=>f.endsWith(".job")).sort((a,b)=>parseInt(a)-parseInt(b))){` +
+	`setInterval(()=>{try{process.kill(P,0)}catch{process.exit(0)}for(const f of fs.readdirSync(D).filter((f)=>f.endsWith(".job")).sort((a,b)=>parseInt(a)-parseInt(b))){` +
 	`const p=D+"/"+f;let j;try{j=JSON.parse(fs.readFileSync(p,"utf8"))}catch{continue}fs.unlinkSync(p);` +
 	`const r=spawnSync(j.argv[0],j.argv.slice(1),{cwd:j.cwd,env:j.env,encoding:"utf8",timeout:120000}),o=p.slice(0,-4);` +
 	`fs.writeFileSync(o+".tmp",JSON.stringify({status:r.status,stdout:r.stdout||"",stderr:r.stderr||""}));fs.renameSync(o+".tmp",o+".out")}},50)`
@@ -3789,7 +3791,7 @@ async function bench() {
 	symlinkSync(process.execPath, fake)
 	writeFileSync(join(dir, "runner.cjs"), BENCH_RUNNER)
 	const id = Number(spawnSync("kitten", ["@", "--to", `unix:${sock}`, "launch", "--type=os-window", "--os-window-state=minimized",
-		"--keep-focus", `--cwd=${dir}`, fake, join(dir, "runner.cjs"), dir], { encoding: "utf8", timeout: 10000 }).stdout)
+		"--keep-focus", `--cwd=${dir}`, fake, join(dir, "runner.cjs"), dir, String(process.pid)], { encoding: "utf8", timeout: 10000 }).stdout)
 	atExit(() => {
 		if (id > 0) try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
 		try { rmSync(dir, { recursive: true, force: true }) } catch {}
@@ -4166,7 +4168,8 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 		// a STARTED session: it keeps a runtime record, or A88's guard would rightly refuse to type into it
 		writeFileSync(ls, `const fs=require("fs");fs.writeFileSync(${JSON.stringify(join(cfg87, "sessions"))}+"/"+process.pid+".json","{}");` +
 			`fs.writeFileSync(${JSON.stringify(typed)},"");` +
-			`if(process.stdin.setRawMode)process.stdin.setRawMode(true);process.stdin.on("data",(d)=>fs.appendFileSync(${JSON.stringify(typed)},d))`)
+			`if(process.stdin.setRawMode)process.stdin.setRawMode(true);process.stdin.on("data",(d)=>fs.appendFileSync(${JSON.stringify(typed)},d));` +
+			`setTimeout(()=>process.exit(0),60000)`)
 		const lid = pane(r87, "leader", ls)
 		for (const until = Date.now() + 8000; Date.now() < until && !leaderUp; nap(100)) leaderUp = !!lid && existsSync(typed)
 	}
@@ -4224,7 +4227,8 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 	if (b88) {
 		const script = join(r88, "db.cjs")
 		writeFileSync(script, `const fs=require("fs");fs.writeFileSync(${JSON.stringify(pidFile)},String(process.pid));fs.writeFileSync(${JSON.stringify(typed)},"");` +
-			`if(process.stdin.setRawMode)process.stdin.setRawMode(true);process.stdin.on("data",(d)=>fs.appendFileSync(${JSON.stringify(typed)},d))`)
+			`if(process.stdin.setRawMode)process.stdin.setRawMode(true);process.stdin.on("data",(d)=>fs.appendFileSync(${JSON.stringify(typed)},d));` +
+			`setTimeout(()=>process.exit(0),60000)`)
 		const id = Number(spawnSync("kitten", ["@", "--to", `unix:${b88.sock}`, "launch", "--type=window", "--keep-focus", ...besideMe(b88),
 			`--cwd=${join(r88, "db")}`, "--env=CLAUDE_COMM_AGENT=db", `--env=CLAUDE_CONFIG_DIR=${join(r88, "cfg")}`, fake88, script], { encoding: "utf8", timeout: 10000 }).stdout)
 		if (Number.isInteger(id) && id > 0) opened88.push([b88.sock, id])
