@@ -16,6 +16,26 @@ node <path-to-claude-comm>/install.mjs <your project> --check    # what version 
 Your project records what it has in `.comm/INSTALLED.json`. An update prints only the entries you did not
 already have.
 
+
+## 2026-10-24.1 — bus print `66e75cfb08ba` — 2026-10-24
+
+- **`wake` rings a session that compacted while idle.** Under *"Compacted while idle, before the prompt cache
+  expired"* it read `mid-turn, not rung (last transcript row: a prompt, …)`, and nothing rang it until someone typed
+  into the window. It now reads idle. A compaction in the middle of a turn still reads busy.
+- **`wake` knows that another session's message starts a turn.** The runtime's *"Another Claude session sent a
+  message"* starts a model turn; a bell typed in the seconds before the model's first row landed inside it.
+- **`wake` never types into a session that has not started.** A session still at Claude Code's trust dialog
+  (*"Quick safety check … ❯ No, exit"*, preselected) took the bell's Enter as "No" and exited. With no registry entry
+  AND no runtime record, `wake` now answers `not started yet` and types nothing; the session's start delivers its mail.
+  Answer the dialog yourself, or open the folder once in Claude Code before launching an expert into it.
+- **`close.mjs` rings before it closes.** `send --kind done` then `close.mjs` in the same turn never rang an idle
+  recipient: the bell rides the Stop hook at a turn END, and a closed window has none. The close now runs that turn
+  end's `wake` first and writes what it did into `.comm/close/<agent>.json` (`rings`). `--dry-run` shows who would be
+  rung.
+- **`launch.mjs` splits beside YOUR window, or refuses.** It fell back to whichever kitty tab was active, which is the
+  person's when they work elsewhere. It now places the pane next to the caller (`--match` + `--next-to`), and with no
+  caller window it refuses and prints the `--os-window --minimized` command to use instead, in `--print` too.
+
 ## 2026-09-27.9 — bus print `1ec5274b9011` — 2026-09-27
 
 - **The `claude-comm` skill catches up with `.5`-`.7`**: the doorbell rings an agent again once it has answered (or 2
