@@ -5,6 +5,7 @@
  *   node .comm/bin/close.mjs                 close the window this session is running in
  *   node .comm/bin/close.mjs --dry-run       resolve and check everything, close nothing
  *   node .comm/bin/close.mjs --force         close over waiting mail / held claims
+ *   node .comm/bin/close.mjs --now           close at once, inside this turn (the old default)
  *
  * WHY THIS EXISTS. The owner, 2026-09-10: *"c'est super d'ouvrir une fenetre et lancer un
  * agent, mais ce serait aussi super de pouvoir fermer celle-ci lorsqu'il a fini, sinon dans
@@ -126,6 +127,62 @@ if (ARGV[0] === "--verify") {
 	process.exit(gone === true ? 0 : gone === false ? 1 : 2)
 }
 
+// ── the deferred closer: the window goes AFTER the turn that asked, never during it ──────
+// The owner, 2026-09-26: "quand tu ferme un agent je veux le voir avoir fini son report et 1-2secs après tu ferme
+// sa fenêtre, ça me rassurera que tout se passe bien". Measured in atlas's tree that day: four experts closed 4.0 to
+// 11.0 s after their final bell, every one finished and unforced - and each window vanished while its last answer was
+// still being WRITTEN, because the close ran inside the very turn that was writing it. So the default arms this
+// detached process and returns: it reads the session's own transcript with wake's reader until THAT turn has ended,
+// waits GRACE_MS with the whole report on screen, and closes only if no turn began meanwhile and no mail came in that
+// the agent never saw. A turn it cannot read (no registry entry) closes after the grace alone, and says so. A89.
+const GRACE_MS = 2000, AFTER_TURN_MAX_MS = 30 * 60_000
+const nap = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+/** null when nothing waits for `agent`, else why the close must not happen (an unreadable inbox included). */
+function mailWaiting(root, agent) {
+	const box = spawnSync(process.execPath, [fileURLToPath(new URL("comm.mjs", import.meta.url)), "inbox", agent], { cwd: root, encoding: "utf8", timeout: 5000 })
+	// NOT KNOWING IS NOT "EMPTY". An inbox we could not read is a block of its own.
+	if (box.status !== 0) return `could not read the inbox for '${agent}' (exit ${box.status}) — not the same as empty`
+	if (!/\bempty\b/.test(box.stdout) && /\bpending\b/.test(box.stdout))
+		return `mail is waiting: ${(box.stdout.match(/^inbox.*$/m) || [""])[0].trim()} — somebody expects this agent to act, and a window that closes on unread mail loses it until the agent is relaunched`
+	return null
+}
+if (ARGV[0] === "--after-turn") {
+	const [, me, sock, id, statePath, root, agent] = ARGV
+	const wake = await import(new URL("wake.mjs", import.meta.url))
+	let lookup = null
+	try { ({ lookup } = await import(new URL("session-registry.mjs", import.meta.url))) } catch {}
+	const note = (o) => {
+		let prev
+		try { prev = JSON.parse(readFileSync(statePath, "utf8")) } catch { prev = { intent_unreadable: true } }
+		try { writeFileSync(statePath, JSON.stringify({ ...prev, ...o }, null, 1) + "\n") } catch {}
+	}
+	const armed = Date.now()
+	let how = null
+	for (;;) {
+		const t = wake.readTurn(Number(me), lookup)
+		if (t.state === "unknown") how = `its turn could not be read (${t.why}) - closed after the grace alone`
+		else if (t.state === "idle") how = "the turn that asked for the close ended"
+		if (how) {
+			nap(GRACE_MS)
+			// a turn begun in the grace - a doorbell, the person typing - is waited out like the first one
+			if (t.state === "idle" && wake.readTurn(Number(me), lookup).state !== "idle") { how = null; continue }
+			break
+		}
+		if (Date.now() - armed > AFTER_TURN_MAX_MS) {
+			note({ abandoned_at: new Date().toISOString(), abandoned: `the turn did not end within ${AFTER_TURN_MAX_MS / 60_000} min - the window was left open, not closed on a working session` })
+			process.exit(1)
+		}
+		nap(300)
+	}
+	const late = mailWaiting(root, agent)
+	if (late) { note({ cancelled_at: new Date().toISOString(), cancelled: `${late} — it came after the close was asked, so the window stays and the agent's next turn reads it` }); process.exit(1) }
+	note({ turn_ended: how, closing_at: new Date().toISOString(), waited_ms: Date.now() - armed })
+	spawn(process.execPath, [fileURLToPath(import.meta.url), "--verify", sock, String(id), statePath], { detached: true, stdio: "ignore" }).unref()
+	const out = spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { encoding: "utf8", timeout: 5000 })
+	if (out.status !== 0) note({ close_failed: `kitten @ close-window exit ${out.status}: ${(out.stderr || "").trim()}` })
+	process.exit(out.status === 0 ? 0 : 4)
+}
+
 // ── who am I, and which window is mine ───────────────────────────────────────────────
 const { sessionPid } = await import(new URL("session-registry.mjs", import.meta.url))
 const wake = await import(new URL("wake.mjs", import.meta.url))
@@ -184,13 +241,10 @@ while (!existsSync(join(root, ".comm", "config.json"))) {
 }
 const blocks = []
 if (root) {
-	const commBin = fileURLToPath(new URL("comm.mjs", import.meta.url))
-	const box = spawnSync(process.execPath, [commBin, "inbox", launchedFor], { cwd: root, encoding: "utf8", timeout: 5000 })
-	// NOT KNOWING IS NOT "EMPTY". An inbox we could not read is reported as a block of its
-	// own, because the alternative is closing over mail on the strength of a failed probe.
-	if (box.status !== 0) blocks.push(`could not read the inbox for '${launchedFor}' (exit ${box.status}) — not the same as empty`)
-	else if (!/\bempty\b/.test(box.stdout) && /\bpending\b/.test(box.stdout))
-		blocks.push(`mail is waiting: ${(box.stdout.match(/^inbox.*$/m) || [""])[0].trim()} — somebody expects this agent to act, and a window that closes on unread mail loses it until the agent is relaunched`)
+	// NOT KNOWING IS NOT "EMPTY": an inbox we could not read is a block of its own (mailWaiting, above),
+	// because the alternative is closing over mail on the strength of a failed probe.
+	const mail = mailWaiting(root, launchedFor)
+	if (mail) blocks.push(mail)
 
 	// 🔴 REVIEW #10 C1: THIS REFUSAL HAD NEVER RUN. `claim list --json` answers an OBJECT,
 	// `{ root, claims: [...] }`, and this loop iterated it directly: `for…of` on an object throws,
@@ -259,6 +313,16 @@ if (root) {
 		statePath = join(root, ".comm", "close", `${launchedFor}.json`)
 		writeFileSync(statePath, JSON.stringify({ ...state, verified_at: null, gone: null }, null, 1) + "\n")
 	} catch { statePath = null }
+}
+// THE DEFAULT IS AFTER THIS TURN (header of the deferred closer, above). It needs the record and the project to
+// work from; without them, or with --now, the close happens here, inside the turn, as it always did.
+if (statePath && root && !has("--now")) {
+	writeFileSync(statePath, JSON.stringify({ ...state, deferred: true, grace_ms: GRACE_MS, verified_at: null, gone: null }, null, 1) + "\n")
+	spawn(process.execPath, [fileURLToPath(import.meta.url), "--after-turn", String(me), win.sock, String(win.id), statePath, root, launchedFor],
+		{ detached: true, stdio: "ignore" }).unref()
+	console.log(`close: armed - window ${win.id} closes ${GRACE_MS / 1000} s after THIS turn ends, so your last answer stays on screen, whole.\n` +
+		`  Write your final report now, then end your turn. The outcome lands in ${statePath}.`)
+	process.exit(0)
 }
 if (statePath) {
 	const self = fileURLToPath(import.meta.url)

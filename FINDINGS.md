@@ -2812,6 +2812,30 @@ types nothing; `send done` then close makes the bell ARRIVE. Mutated 2/2 (no rin
 
 ⚠️ Not verified: a REAL leader session receiving it (A87's leader is a fake `claude`; the field will tell).
 
+## `#close-after-the-turn` — the window vanished mid-paragraph, so the owner read "closed before it finished" (2026-10-24)
+
+**The owner, 2026-09-26, through atlas's leader:** *"j'ai un peu l'impression que tu ferme les agents avant qu'ils aient
+fini ? … je veux le voir avoir fini son report et 1-2secs après tu ferme sa fenêtre"*. Measured in atlas's tree that day:
+four experts closed **4.0 to 11.0 s** after their final bell, all four finished and unforced. They HAD finished, but the
+expert runs `close.mjs` inside its own turn, so each window vanished while its last answer was still being written.
+That brief sat unanswered for four weeks at the repo root, a place no boot row reads.
+
+⇒ **The default is now after the turn.** `close.mjs` makes every check and rings as before, then arms a detached
+`--after-turn` closer and returns (`armed`). The closer reads the session's own transcript with wake's reader until the
+turn that asked has ENDED, waits `GRACE_MS` (2 s) with the report on screen, re-reads (a turn begun in the grace is
+waited out too), re-checks the inbox (mail that came after the call cancels the close and says so), then closes and
+hands the outcome to the same `--verify` probe. If the turn cannot be read (no registry entry), it closes after the
+grace alone and records that. If it does not end within 30 min, it gives up and the window stays: a working session
+is never closed. `--now` is the old immediate close.
+
+A89 is a fake expert with a REAL registry entry in its own `CLAUDE_COMM_RUNTIME`, naming a transcript the arm writes by
+hand. While the turn runs, the window is still open 6 s after the close was armed. Once the turn's end is written, it
+goes **2.5 s** later. Mutated 3/3: a closer that does not read the turn closes during it, no grace closes in 464 ms, and
+the immediate default arms nothing. A51 moved to `--now`, the path whose closer dies with its own terminal.
+
+⚠️ Not verified: a REAL session's turn end (A89's transcript is hand-written in the shape wake reads, `#wake-mid-turn`).
+The claims are not re-checked at the close, only at the call.
+
 ## `#unstarted-session` — the bell answered Claude Code's trust dialog "No, exit" (2026-10-24)
 
 **deneb's leader, 2026-10-11:** `install.mjs --add-agent` made two folders Claude Code had never opened, `launch.mjs`
