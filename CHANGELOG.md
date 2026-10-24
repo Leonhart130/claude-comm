@@ -17,6 +17,24 @@ Your project records what it has in `.comm/INSTALLED.json`. An update prints onl
 already have.
 
 
+
+## 2026-10-24.2 — bus print `2b3abfd19cf2` — 2026-10-24
+
+- **`close.mjs` closes AFTER your turn, not during it.** It used to close the window while your last answer was still
+  being written, so the person watching saw it vanish mid-paragraph. Now it makes its checks, rings, answers
+  `close: armed`, and the window closes **2 s after your turn ends**. So write your final report AFTER calling it, then
+  end your turn. Mail that arrives after the call cancels the close (see `.comm/close/<agent>.json`). `--now` is the old
+  immediate close.
+- **A `send` rings an idle recipient at once.** The doorbell used to wait for the end of YOUR turn, so a leader that sent
+  and kept working woke nobody. A new `PostToolUse` hook on `Bash` (installed with this update, in your
+  `.claude/settings*.json`) runs the doorbell right after a `comm.mjs send`. It delivers nothing itself: mail still
+  lands at the recipient's turn boundary.
+- **`comm who` says what each session is doing**: `· working`, `· IDLE <n> min`, `· WAITING on a dialog`, or the
+  runtime's own word (`· shell`, a session waiting on a background shell). An expert idle for an hour with an empty
+  inbox is one waiting for a bell nobody sent.
+- **A missed `--ref` suggests the path you typed, from the project root.** `--ref redaction/X.md` sent to `agence`
+  now answers `found at the project root: pass --ref ../redaction/X.md`, not just a missing file.
+
 ## 2026-10-24.1 — bus print `66e75cfb08ba` — 2026-10-24
 
 - **`wake` rings a session that compacted while idle.** Under *"Compacted while idle, before the prompt cache
