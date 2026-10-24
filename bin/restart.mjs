@@ -2,7 +2,8 @@
 /**
  * claude-comm RESTART — a declared restart, in the one order that survives.
  *
- *   node bin/restart.mjs prepare --obligations <file> [--read <p>]... [--guard "<cmd>"]...
+ *   node bin/restart.mjs prepare --obligations <file> [--read <p>]... [--guard "<cmd>"]... [--ttl <s>]
+ *   node bin/restart.mjs prepare ... [--agent <a>] [--root <dir>] [--prev-session <id>]   when it cannot tell them itself
  *   node bin/restart.mjs --prove-red
  *
  * WHY A THIRD TOOL RATHER THAN TWO CALLS BY HAND. `handoff.mjs` writes what survives and
@@ -38,6 +39,14 @@ import { tmpdir } from "node:os"
 import { join, resolve, dirname, sep } from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
+
+// --help: this header's usage lines and NOTHING else - no window, no mail, no write (A92). The field's .comm/README.md is
+// generated from the same lines, so the two cannot disagree (the owner, 2026-10-24: docs every user can trust are current).
+if (process.argv.includes("--help")) {
+	console.log(readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").filter((l) => /^ \*\s{2,}node \S*bin\/[\w-]+\.mjs/.test(l))
+		.map((l) => l.replace(/^ \*\s+/, "").replace(/^node (\.comm\/)?bin\//, "node .comm/bin/")).join("\n"))
+	process.exit(0)
+}
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ARGV = process.argv.slice(2)

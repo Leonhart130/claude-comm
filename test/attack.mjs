@@ -4468,6 +4468,82 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 		`a fresh send typed as 'node $C send' -> exit ${loudExit}, the bell ARRIVED=${arrived}`)
 }
 
+// A92 — EVERY COMMAND IS DOCUMENTED BY THE CODE ITSELF, AND --help DOES NOTHING ELSE. The owner, 2026-10-24: "tu
+// t'assures également que les experts et leaders, et enfin tous les utilisateurs du projet aient facilement accès à une
+// documentation constamment à jour". Measured that evening: the hand-written docs had drifted - wake.mjs documented none
+// of its user flags. Five legs: (1) every option a shipped tool's code names is in that tool's own header, or declared
+// FOREIGN here with its owner; (2) every flag of every comm command is on that command's help line; (3) --help on each
+// tool exits 0, prints its usage, and does NOTHING - a recording kitten logs no call, the waiting mail stays, no wake or
+// close record appears; (4) the field README a real install writes carries every one of those lines; (5) an agent is
+// told a new version's changelog entry at its first start on it, and only once. Positive controls on (1) and (3).
+{
+	// kitty's own (launch, close, wake); wake's, which close passes on; close's own detached closer and probe; comm
+	// whoami's (claim); restart-signal's (restart); git's (handoff)
+	const FOREIGN = { launch: ["--keep-focus", "--match", "--next-to", "--to"], close: ["--match", "--to", "--root", "--json", "--after-turn", "--verify"],
+		wake: ["--match", "--to"], claim: ["--agent-root"], restart: ["--by"], handoff: ["--porcelain", "--short", "--stdin"], ledger: [] }
+	const undocumented = (src, foreign) => { const head = src.slice(0, src.indexOf("*/"))
+		return [...new Set([...src.matchAll(/["'](--[a-z][a-z0-9-]+)["']/g)].map((m) => m[1]))].filter((f) => f !== "--help" && !head.includes(f) && !foreign.includes(f)) }
+	const gaps = {}
+	for (const [t, foreign] of Object.entries(FOREIGN)) { const u = undocumented(readFileSync(join(PKG, "bin", `${t}.mjs`), "utf8"), foreign); if (u.length) gaps[t] = u }
+	const ctlCaught = undocumented(readFileSync(join(PKG, "bin", "wake.mjs"), "utf8") + '\nconst a92 = opt("--a92-undocumented")\n', FOREIGN.wake).includes("--a92-undocumented")
+
+	const r92 = mkdtempSync(join(tmpdir(), "comm-attack-docs-"))
+	atExit(() => { try { rmSync(r92, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(r92, ".comm"), { recursive: true }); mkdirSync(join(r92, "db"), { recursive: true })
+	writeFileSync(join(r92, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", db: "db" } }))
+	execFileSync("node", [join(PKG, "install.mjs"), r92], { stdio: "pipe" })
+	const bus92 = join(r92, ".comm", "bin", "comm.mjs")
+	writeFileSync(join(r92, "db", "B.md"), "b\n")
+	spawnSync(process.execPath, [bus92, "send", "db", "--ref", "B.md", "--note", "a92"], { cwd: r92, encoding: "utf8" })
+	const pendingDb = () => readdirSync(join(r92, ".comm", "inbox", "db")).filter((f) => f.endsWith(".json")).length
+
+	// (2) comm's FLAGS, read from its source, against the help its users read
+	let FLAGS = {}
+	try { FLAGS = JSON.parse(((readFileSync(join(PKG, "bin", "comm.mjs"), "utf8").match(/const FLAGS = (\{[\s\S]*?\})\n/) || [])[1] || "{}").replace(/(\w+):/g, '"$1":')) } catch {}
+	const help = (spawnSync(process.execPath, [bus92, "help"], { cwd: r92, encoding: "utf8" }).stdout || "").split("\n")
+	const helpOf = (cmd) => { const i = help.findIndex((l) => new RegExp(`^\\s+comm ${cmd}\\b`).test(l)); if (i < 0) return null
+		let t = help[i]; for (let j = i + 1; j < help.length && /^\s{6,}\S/.test(help[j]) && !/^\s+comm /.test(help[j]); j++) t += help[j]; return t }
+	const commGaps = Object.entries(FLAGS).filter(([c]) => c !== "whoami").flatMap(([c, fl]) => { const h = helpOf(c); return h ? fl.filter((f) => !h.includes(f)).map((f) => `${c} ${f}`) : [`${c} (no help line)`] })
+
+	// (3) --help does nothing: a recording kitten, mail waiting, then every tool's --help
+	const rec92 = join(r92, "recbin"), log92 = join(r92, "kitten.log")
+	mkdirSync(rec92, { recursive: true }); writeFileSync(log92, "")
+	writeFileSync(join(rec92, "kitten"), `#!${process.execPath}\nrequire("fs").appendFileSync(${JSON.stringify(log92)},process.argv.slice(2).join(" ")+"\\n")\n`, { mode: 0o755 })
+	const env92 = { ...process.env, PATH: `${rec92}${delimiter}${process.env.PATH}` }
+	const helpRuns = Object.keys(FOREIGN).map((t) => { const r = spawnSync(process.execPath, [join(r92, ".comm", "bin", `${t}.mjs`), "--help"], { cwd: r92, encoding: "utf8", env: env92, timeout: 15000 })
+		return { t, ok: r.status === 0 && new RegExp(`^node \\.comm/bin/${t}\\.mjs`, "m").test(r.stdout || ""), lines: (r.stdout || "").trim().split("\n") } })
+	const commHelp = spawnSync(process.execPath, [bus92, "--help"], { cwd: r92, encoding: "utf8", env: env92 })
+	// and from a folder with NO project: the installer generates the reference from a checkout that may have none - a
+	// fresh clone has no .comm/ - and the first version wrote "(comm help could not be read)" there (a VOID baseline found it)
+	const helpAnywhere = spawnSync(process.execPath, [join(PKG, "bin", "comm.mjs"), "help"], { cwd: tmpdir(), encoding: "utf8" })
+	const quiet = readFileSync(log92, "utf8") === "" && pendingDb() === 1 && !existsSync(join(r92, ".comm", "wake")) && !existsSync(join(r92, ".comm", "close"))
+	spawnSync(process.execPath, [join(r92, ".comm", "bin", "wake.mjs"), "--root", r92, "--dry-run"], { cwd: r92, encoding: "utf8", env: env92, timeout: 15000 })
+	const recorderRecords = /\bls\b/.test(readFileSync(log92, "utf8"))
+
+	// (4) the README a real install wrote carries every line --help prints, and comm's help
+	const readme = readFileSync(join(r92, ".comm", "README.md"), "utf8")
+	const notInReadme = [...helpRuns.flatMap((h) => h.lines), ...help.filter((l) => /^\s+comm /.test(l)).map((l) => l.trim().replace(/^comm /, "node .comm/bin/comm.mjs "))].filter((l) => l && !readme.includes(l))
+
+	// (5) the news: the entry for the installed version, at the first start, once
+	const label = String(JSON.parse(readFileSync(join(r92, ".comm", "INSTALLED.json"), "utf8")).label || "").replace(/\+unreleased$/, "")
+	const entry = (readFileSync(join(PKG, "CHANGELOG.md"), "utf8").split(/^## /m).find((e) => e.startsWith(label + " ")) || "")
+	const firstLine = entry.split("\n").slice(1).find((l) => l.trim()) || "\u0000none"
+	const start = () => { const out = spawnSync(process.execPath, [join(r92, "db", ".claude", "comm-hook.mjs"), "session-start"], { cwd: join(r92, "db"), encoding: "utf8",
+		input: JSON.stringify({ hook_event_name: "SessionStart", session_id: "a92", transcript_path: join(r92, "none.jsonl"), source: "startup" }) }).stdout || ""
+		try { return JSON.parse(out).hookSpecificOutput.additionalContext || "" } catch { return "" } }
+	const s1 = start(), s2 = start()
+	const told = s1.includes(`claude-comm is now ${label}`) && s1.includes(firstLine.trim().slice(0, 60)), once = !s2.includes("claude-comm is now")
+
+	check("A92 every command is documented by the code itself, --help does nothing else, and each agent is told what changed",
+		!Object.keys(gaps).length && ctlCaught && !commGaps.length && helpRuns.every((h) => h.ok) && commHelp.status === 0 && /comm send/.test(commHelp.stdout || "") && helpAnywhere.status === 0 && /comm send/.test(helpAnywhere.stdout || "") &&
+			quiet && recorderRecords && !notInReadme.length && !!entry && told && once,
+		`(1) options neither in their tool's header nor declared foreign: ${Object.keys(gaps).length ? JSON.stringify(gaps) : "none"}; positive control, one more parsed flag is named=${ctlCaught}; ` +
+		`(2) comm flags missing from their help line: ${commGaps.join(", ") || "none"}; ` +
+		`(3) --help exits 0 with its usage: ${helpRuns.filter((h) => !h.ok).map((h) => h.t).join(",") || "all 7"}, comm --help=${commHelp.status === 0}, comm help outside any project=${helpAnywhere.status === 0}; nothing done (no kitten call, mail still waiting, no wake/close record)=${quiet}; positive control, the recorder records a real wake=${recorderRecords}; ` +
+		`(4) lines missing from the generated README: ${notInReadme.length ? notInReadme.slice(0, 3).join(" | ") : "none"}; ` +
+		`(5) ${label}'s entry at the first start=${told}, not again at the second=${once}`)
+}
+
 // A58 — close REFUSES over a claim this agent holds, and over claims it cannot read.
 //
 // 🔴 Review #10 C1: this refusal had NEVER RUN. `claim list --json` answers an object, the loop

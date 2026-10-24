@@ -5,6 +5,8 @@
  *   node bin/wake.mjs --root <project>        wake every agent that has mail waiting
  *   node bin/wake.mjs --resolve <pid>         diagnostic: which window is that session in?
  *   node bin/wake.mjs --root <p> --dry-run    resolve and rate-limit, send nothing
+ *   node bin/wake.mjs --root <p> --agent <a>  that agent only - the line `send` prints as "ring now"
+ *   node bin/wake.mjs --root <p> --json       the same answer as JSON (what close.mjs reads)
  *
  *   .comm/config.json  "freshRestart": ["scribe", "web"]   agents that may be restarted fresh before a ring (rule 7)
  *   .comm/wake/rings.jsonl                            every ring, append-only, whoever called - hooks included
@@ -604,4 +606,12 @@ async function main() {
 // Run only when this file IS the program. The first version keyed on a flag, and importing
 // it for a test therefore ran main(), which called process.exit(2) and killed the whole
 // suite before it printed a line. Same guard bin/session-registry.mjs uses.
-if (process.argv[1] && process.argv[1] === fileURLToPath(import.meta.url)) await main()
+if (process.argv[1] && process.argv[1] === fileURLToPath(import.meta.url)) {
+	// --help: the usage lines of this header and nothing else run (A92) - before main(), which rings
+	if (process.argv.includes("--help")) {
+		console.log(readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").filter((l) => /^ \*\s{2,}node \S*bin\/[\w-]+\.mjs/.test(l))
+			.map((l) => l.replace(/^ \*\s+/, "").replace(/^node (\.comm\/)?bin\//, "node .comm/bin/")).join("\n"))
+		process.exit(0)
+	}
+	await main()
+}

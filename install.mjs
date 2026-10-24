@@ -369,6 +369,28 @@ try {
 			}
 		}
 	} catch { /* a version check must never break a session */ }
+	// WHAT CHANGED, TOLD TO EACH AGENT ONCE (the owner, 2026-10-24: docs every user can find, and always current). The
+	// notice above speaks only when this project is BEHIND, and the maintainer installs every release himself - so no
+	// agent was ever told what a release changed for it. This hands each agent, at its first start on a version, the
+	// changelog entry written for it, once: the marker is per agent directory, beside the project's own.
+	try {
+		let inst = null
+		try { inst = JSON.parse(readFileSync(join(projectRoot, ".comm", "INSTALLED.json"), "utf8")) } catch {}
+		const label = inst && inst.from ? String(inst.label || "").replace(/\\+unreleased$/, "") : ""
+		const seenP = join(projectRoot, ".comm", \`.seen-\${(relative(projectRoot, agentRoot) || "root").replace(/[^\\w.-]/g, "_")}\`)
+		let seen = ""
+		try { seen = readFileSync(seenP, "utf8").trim() } catch {}
+		if (label && seen !== label) {
+			const entry = readFileSync(join(inst.from, "CHANGELOG.md"), "utf8").split(/^## /m).find((e) => e.startsWith(label + " "))
+			if (entry) {
+				const body = entry.slice(entry.indexOf("\\n") + 1).trim()
+				notices.push(\`claude-comm is now \${label} in this project - what changed for you, said once per version:\\n\` +
+					(body.length > 2400 ? body.slice(0, 2400) + " …" : body) +
+					\`\\n  Every command, generated from the installed code: \${join(projectRoot, ".comm", "README.md")} - or any tool's --help.\`)
+				marks.push([seenP, label + "\\n"])
+			}
+		}
+	} catch { /* a notice must never break a session */ }
 
 // DELIVERY FIRST, and its status is this hook's status. Everything below is an
 // instrument: it may not delay delivery, may not fail it, and may not change one byte
@@ -592,6 +614,25 @@ process.exit(0)
 // Two more things the installer writes into a tree, named so the print can hash them (review #15 §6).
 const PRETTIER_IGNORED = [".claude/comm-hook.mjs", ".claude/settings.json", ".claude/skills/claude-comm/SKILL.md"]
 const GITIGNORE_BLOCK = "# claude-comm live state (regenerate with install.mjs)\n.comm/\n"
+// ── THE REFERENCE, GENERATED FROM THE CODE BEING INSTALLED ──────────────────────────────────────────────
+// The owner, 2026-10-24: "tu t'assures également que les experts et leaders, et enfin tous les utilisateurs du projet
+// aient facilement accès à une documentation constamment à jour". Measured that evening: the hand-written docs had
+// drifted - wake.mjs documented none of its user flags, `who --all` and `comm log` were nowhere. So this section is
+// BUILT, at every install, from each tool's own usage lines (what its --help prints) and from `comm help`, read from
+// the very files written beside it: it cannot describe a version other than the one installed. A92 gates both ends.
+const CLI_TOOLS = ["launch", "close", "wake", "claim", "restart", "handoff", "ledger"]
+const usageLines = (src) => src.split("\n").filter((l) => /^ \*\s{2,}node \S*bin\/[\w-]+\.mjs/.test(l))
+	.map((l) => l.replace(/^ \*\s+/, "").replace(/^node (\.comm\/)?bin\//, "node .comm/bin/"))
+function REFERENCE(here) {
+	const help = spawnSync(process.execPath, [join(here, "bin", "comm.mjs"), "help"], { cwd: here, encoding: "utf8" })
+	return ["## Every command — generated from the code installed here", "",
+		"Rewritten by the installer at every update, from each tool's own usage lines: it describes exactly the version in",
+		"`.comm/INSTALLED.json`. Any tool's `--help` prints its part.", "",
+		// the long form: in a non-interactive shell a bare `comm` is coreutils' (A47)
+		"```", ...(help.status === 0 ? help.stdout.trim().split("\n").map((l) => l.replace(/^(\s*)comm (?=[a-z])/, "$1node .comm/bin/comm.mjs ")) : ["(comm help could not be read)"]), "```", "",
+		...CLI_TOOLS.flatMap((t) => [`**${t}**`, "", "```", ...usageLines(readFileSync(join(here, "bin", `${t}.mjs`), "utf8")), "```", ""])].join("\n")
+}
+
 const NOTICE = (here, root) => [
 	"# claude-comm — what `.comm/` is, and the one thing you must not do",
 	"",
@@ -703,6 +744,7 @@ const NOTICE = (here, root) => [
 	"**So close yourself once your work is written down:** `node .comm/bin/close.mjs`. Run it AFTER the report",
 	"is written and the bell is rung — the file is the artifact, and a window closing hands nothing over. It answers",
 	"`close: armed` and the window goes **2 s after your turn ends**: say your last words, then end the turn (`--now`: at once).",
+	"Anything that starts another turn disarms it - a prompt, an Esc, a message delivered at your turn end - and so does `--cancel`.",
 	"",
 	"🔴 **It refuses more often than it closes, and each refusal is the point:**",
 	"",
@@ -1112,7 +1154,7 @@ write(join(commDir, "bin", "comm.mjs"), busSrcForLastWrite, results)
 // feedback path that does not exist, so the directory is CREATED here rather than
 // documented and hoped for - a notice naming a directory nobody made is a dangling
 // pointer, which this project holds to be worse than no pointer at all (A27/A28).
-write(join(commDir, "README.md"), NOTICE(HERE, ROOT) + "\n", results)
+write(join(commDir, "README.md"), NOTICE(HERE, ROOT) + "\n\n" + REFERENCE(HERE) + "\n", results)
 if (!CHECK) { try { mkdirSync(join(HERE, "exchange", "field", "in"), { recursive: true })
 	mkdirSync(join(HERE, "exchange", "field", "out"), { recursive: true }) } catch {} }
 
@@ -1214,7 +1256,8 @@ function SKILL(ids, agentRoot) {
 		"## Closing your own window", "",
 		`After the report is written and the bell rung: \`node ${B}/close.mjs\`. It refuses a window nobody launched, and one with`,
 		"mail waiting or a claim held (`--force` overrides and records it). Otherwise it answers `close: armed`: your window",
-		"closes 2 s after THIS turn ends, so your last answer is seen whole. Say it, then end your turn.", "",
+		"closes 2 s after THIS turn ends, so your last answer is seen whole. Say it, then end your turn. Anything that starts",
+		"another turn disarms it (a prompt, an Esc, a message delivered at your turn end), and so does `close.mjs --cancel`.", "",
 		"## Something wrong with the bus", "",
 		"Never run `.claude/comm-hook.mjs` by hand to see what it does: in a real project it drains the agent's mail, rewrites",
 		"the session registry and can write the restart ledger. Test it in a scratch project.", "")
@@ -1226,7 +1269,7 @@ function SKILL(ids, agentRoot) {
 	if (!isLeader && (!shared || hasExpert)) L.push(
 		`${shared ? "An expert tells" : "Tell"} your leader, by the bus, with a file: what you did, what you expected, the command, and what`,
 		"you did NOT check. The leader reports it to the bus's maintainer; you never write to another project.")
-	L.push("", `Full reference: \`${rel(".comm", "README.md")}\`.`, "")
+	L.push("", `Full reference: \`${rel(".comm", "README.md")}\` - its last section, "Every command", is generated from the installed code; any tool's \`--help\` prints its part.`, "")
 	return L.join("\n")
 }
 

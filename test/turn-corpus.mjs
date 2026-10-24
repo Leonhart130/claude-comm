@@ -75,7 +75,17 @@ function measure(dir, hideStarters) {
 					// A remove CARRIES what it removes (1 226 of 1 226, review #19 §6): FIFO gave a later notification's
 					// absorption to the message before it - 9 of the 10 misreads. FIFO stays as the fallback, and is counted.
 					else for (const e of r.operation === "popAll" ? pending.splice(0)
-						: (() => { const k = r.content ? pending.findIndex((p) => p.content === String(r.content)) : -1; if (k < 0) m.fifo++; return pending.splice(k < 0 ? 0 : k, 1) })()) {
+						: (() => {
+							let k = r.content ? pending.findIndex((p) => p.content === String(r.content)) : -1
+							// a dequeue carries nothing: what it took is the next user row's text (review #19 §6, >= 512 of 631)
+							if (k < 0 && r.operation === "dequeue") {
+								const next = rows.slice(i + 1).find((x) => x && x.type === "user" && !x.isSidechain)
+								const t = next ? textOf(next.message?.content) : ""
+								k = t ? pending.findIndex((p) => p.content && t.includes(p.content.slice(0, 80))) : -1
+							}
+							if (k < 0) m.fifo++
+							return pending.splice(k < 0 ? 0 : k, 1)
+						})()) {
 						m.t3++
 						if (r.operation === "remove" && /absorbed/.test(String(r.reason || "")) && e.s !== "busy")
 							(e.internal ? m.t3internal : m.t3typed).push(`${e.at} read ${e.s}`)

@@ -2,7 +2,9 @@
 /**
  * claude-comm LAUNCH — start an agent's session, or REFUSE. Never both.
  *
- *   node bin/launch.mjs <agent> --model <m> --effort <e> [--prompt "<first turn>"] [--print] [--os-window]
+ *   node bin/launch.mjs <agent> --model <m> --effort <e> [--prompt "<first turn>"]     a pane beside YOUR window; refused if none
+ *   node bin/launch.mjs <agent> --model <m> --effort <e> ... --print                   the launch it would make; nothing launched
+ *   node bin/launch.mjs <agent> --model <m> --effort <e> ... --os-window [--minimized]  a separate OS window (minimized: out of view)
  *
  * WHY THIS REFUSES INSTEAD OF TRYING. `kitten @ launch` starts the child from the
  * KITTY process, so the child inherits kitty's environment — and kitty here was
@@ -70,6 +72,14 @@ import { existsSync, accessSync, constants, readFileSync } from "node:fs"
 import { join, dirname, delimiter, relative } from "node:path"
 import { spawnSync } from "node:child_process"
 import { homedir } from "node:os"
+
+// --help: this header's usage lines and NOTHING else - no window, no mail, no write (A92). The field's .comm/README.md is
+// generated from the same lines, so the two cannot disagree (the owner, 2026-10-24: docs every user can trust are current).
+if (process.argv.includes("--help")) {
+	console.log(readFileSync(new URL(import.meta.url).pathname, "utf8").split("\n").filter((l) => /^ \*\s{2,}node \S*bin\/[\w-]+\.mjs/.test(l))
+		.map((l) => l.replace(/^ \*\s+/, "").replace(/^node (\.comm\/)?bin\//, "node .comm/bin/")).join("\n"))
+	process.exit(0)
+}
 
 const die = (msg) => { console.error(`✗ ${msg}`); process.exit(1) }
 

@@ -2,9 +2,11 @@
 /**
  * claude-comm RESOURCE CLAIMS — the thing an agent is HOLDING, written down.
  *
- *   node bin/claim.mjs take <resource> --purpose "what for" [--force]
+ *   node bin/claim.mjs take <resource> --purpose "what for" [--pid <holder>] [--agent <name>] [--force] [--quiet]
  *   node bin/claim.mjs list [--json]
- *   node bin/claim.mjs release <resource>
+ *   node bin/claim.mjs release <resource> [--force] [--quiet]
+ *   node bin/claim.mjs ... --root <project>    another project's claims, not the one above your cwd
+ *   node bin/claim.mjs --prove-red             its own negative control
  *
  * WHY THIS FILE EXISTS. Two agents in ONE project root collided over a port on
  * 2026-09-04 and killed each other's dev servers. **The failure is not transport**, which
@@ -63,6 +65,14 @@ import { tmpdir } from "node:os"
 import { fileURLToPath } from "node:url"
 import { spawnSync } from "node:child_process"
 import { startTimeOf, bootId, sessionPid, processState } from "./session-registry.mjs"
+
+// --help: this header's usage lines and NOTHING else - no window, no mail, no write (A92). The field's .comm/README.md is
+// generated from the same lines, so the two cannot disagree (the owner, 2026-10-24: docs every user can trust are current).
+if (process.argv.includes("--help")) {
+	console.log(readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").filter((l) => /^ \*\s{2,}node \S*bin\/[\w-]+\.mjs/.test(l))
+		.map((l) => l.replace(/^ \*\s+/, "").replace(/^node (\.comm\/)?bin\//, "node .comm/bin/")).join("\n"))
+	process.exit(0)
+}
 
 const SCHEMA = 1
 const ARGV = process.argv.slice(2)

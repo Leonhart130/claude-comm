@@ -2959,8 +2959,10 @@ binary, rule by rule, and that choice is the owner's. Not changed tonight.
 
 ### 🟢 §6 — turn-corpus: 9 of the 10 were its own FIFO pairing
 
-A remove carries what it removes (1 226 of 1 226): the corpus pairs by content now, with FIFO as a counted fallback. The
-leader's guess (8 of 10) was low by one: the "unexamined" case was pairing too.
+A remove carries what it removes (1 226 of 1 226), and a dequeue's catch is the next user row's text. The corpus pairs
+both that way now, with FIFO as a counted fallback (50 of 2 098). Re-run 10-25: **10 → 1**, the late `!` row of
+`#compacted-at-rest`; control 19, so the corpus still tells the readers apart. Removes alone gave 7. The leader's guess
+(8 of 10) was low by one: the "unexamined" case was pairing too.
 
 ### 🟢 §7, §8 — named and fixed
 
@@ -2968,6 +2970,41 @@ The suggestion's `../` is counted from the resolved base (`./review`, `review/`)
 resolves a relative `CLAUDE_CONFIG_DIR` from the session's cwd. The `briefs` row requires a reply at least as new as its
 brief, and names the oldest first. The suite removes its own runtime dir.
 **Not done:** the `briefs` row's unreadable-root branch has no arm.
+
+## `#docs-from-code` — the docs drifted, and nobody was ever told what changed (2026-10-25)
+
+**The owner, 2026-10-24:** *"tu t'assures également que les experts et leaders, et enfin tous les utilisateurs du projet
+aient facilement accès à une documentation constamment à jour … pour savoir tout ce qu'ils peuvent faire avec l'outil et
+comment."* Measured that evening against the generated field docs (`.comm/README.md`, the per-role skill): `wake.mjs`,
+the ring command, documented 0 of its user options. `who --all`, `comm log`, `close --dry-run`, `launch --print` and
+`--minimized` were nowhere. Each tool's own header usage lines missed some options too, and `ledger` left 19 of its
+record options unnamed. And **no field agent was ever told what a release changed**: the update notice speaks only when a
+project is BEHIND, and the maintainer installs every release himself.
+
+⇒ **The docs are generated from the code, and gated.**
+- **One source per tool:** the usage lines of its header (` *   node bin/<tool>.mjs …`). `--help` on every shipped tool
+  prints them and does NOTHING else. It is handled first, before any action: `wake --help` used to ring everyone with mail.
+- **The installer writes them**, with `comm help`, into the field README's last section, *"Every command"*, at every
+  install, from the very files it installs beside it. Comm's lines are written in their long form,
+  `node .comm/bin/comm.mjs …`: A47 caught the first version printing a bare `comm`, which is coreutils' in a
+  non-interactive shell.
+- **Each agent is told a version's CHANGELOG entry once, at its first start on it.** A per-agent marker
+  `.comm/.seen-<agent>` keeps it to once, and the entry is written for that agent anyway.
+- **A92 holds it**, in five legs. (1) Every option a shipped tool's code names is in its header, or declared FOREIGN with
+  its owner: kitty's, git's, wake's, comm whoami's, restart-signal's, close's own detached processes. (2) Every flag in
+  comm's `FLAGS` table is on its command's help line. (3) `--help` exits 0, prints its usage and does nothing: a
+  recording kitten logs no call, the waiting mail stays, no wake or close record appears. (4) The README a real install
+  writes carries every one of those lines. (5) The entry is told at the first start, and not at the second. Positive
+  controls on (1), one more parsed flag is named, and on (3), the recorder records a real wake.
+
+🔴 **Found by a VOID baseline, not by an arm.** The first mutation batch's unmutated copy went red: `test/mutate.mjs` copies
+the TRACKED tree, which has no `.comm/`, and `comm help` refused there (*"no .comm/ found above cwd"*). The README came
+out without comm. **A fresh clone of the public repo is exactly that copy**: every install from one would have shipped it.
+⇒ `comm help` needs no project. A92 now runs it from a folder with none, and a mutant restoring the old order reddens it.
+The bus is at 57 936 of 58 000 B after it: the next change to `comm.mjs`/`who.mjs` cuts first.
+
+⚠️ Not verified: whether agents READ the section. The news reaches their context, and what they do with it is behaviour,
+which this repo reports but never gates (`selftest`'s rule).
 
 ## `#cache-lives-an-hour` — resuming an idle expert after an hour re-writes its whole context
 

@@ -573,6 +573,8 @@ function main() {
 	}
 
 	if (cmd === "init") return cmdInit()
+	// help is documentation: it needs no project (the generated reference runs it from a checkout that may have none)
+	if (!cmd || cmd === "help" || cmd === "--help" || cmd === "-h") return dispatch(null, null, null, "help", [])
 
 	const root = findRoot()
 	if (!root) {
@@ -801,11 +803,12 @@ function dispatch(root, cfg, me, cmd, rest) {
 		default:
 			console.log(`claude-comm — hub-and-spoke message bus for Claude Code agents
 
-  comm who                          roster · who is actually running · pending counts
+  comm who [--all] [--json]         roster · who runs, and what each is doing · pending counts
   comm send <to> --ref <file>       ring the bell  [--note <text>] [--kind ${Object.keys(KINDS).join("|")}]
+                                    [--force: the file is not there yet] [--from <you>: refused unless it is you]
   comm inbox [<agent>]              list pending mail (a PEEK — does not acknowledge)
   comm sent [<agent>] [--n 20]      what you sent, and whether it actually landed
-  comm dismiss [<agent>] [--id X]   clear mail SAFELY (moves to delivered/ + logs; never deletes)
+  comm dismiss [<agent>] [--id X]   clear mail SAFELY (moves to delivered/ + logs; never deletes) [--force: not yours]
   comm log [--n 20]                 delivery audit trail
   comm init                         create .comm/ at the project root
 

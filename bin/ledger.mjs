@@ -7,6 +7,7 @@
  *   node bin/ledger.mjs --window 15         minutes after a start that count as "first minutes"
  *   node bin/ledger.mjs --json | --prove-red
  *   node bin/ledger.mjs record <event> ...  the writer (see RECORDS below)
+ *   node bin/ledger.mjs --root <tree>       another tree's ledger - a field's
  *
  * The `~/Dev/work` leader's charter, and the reason this file exists before the reboot
  * mechanism does: *"nobody can answer whether a rebooted session is measurably worse,
@@ -31,6 +32,11 @@
  *   start    {v,at,event,agent,session,source,prev_session,signal,trigger,context,manifest}
  *   handoff  {v,at,event,agent,session,context,trigger,manifest,ref}
  *   defect   {v,at,event,agent,ref,authored_at,authored_session,found_at}
+ *
+ * Written through `record <event>`, by the hook stub and the restart tools - not by hand (A92 holds this list to the
+ * code): --agent --session --source --prev-session --trigger --context --manifest-checked --manifest-moved --ref
+ * --signal-src --signal-age --signal-ttl --signal-armer --signal-quiet --pending --pending-auto --authored-at
+ * --authored-session --authored-unknown --found-at --quiet
  *
  * FOUR PROPERTIES THIS FILE REFUSES TO GIVE UP, each of which is a way to produce a
  * confident wrong number — this project's signature failure:
@@ -66,6 +72,14 @@ import { fileURLToPath } from "node:url"
 import { spawnSync } from "node:child_process"
 import { armerOf } from "./restart-signal.mjs"
 import { bootId, startTimeOf } from "./session-registry.mjs"
+
+// --help: this header's usage lines and NOTHING else - no window, no mail, no write (A92). The field's .comm/README.md is
+// generated from the same lines, so the two cannot disagree (the owner, 2026-10-24: docs every user can trust are current).
+if (process.argv.includes("--help")) {
+	console.log(readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").filter((l) => /^ \*\s{2,}node \S*bin\/[\w-]+\.mjs/.test(l))
+		.map((l) => l.replace(/^ \*\s+/, "").replace(/^node (\.comm\/)?bin\//, "node .comm/bin/")).join("\n"))
+	process.exit(0)
+}
 
 const ARGV = process.argv.slice(2)
 const has = (f) => ARGV.includes(f)

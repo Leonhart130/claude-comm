@@ -70,6 +70,14 @@ import { join, dirname } from "node:path"
 import { spawnSync, spawn } from "node:child_process"
 import { fileURLToPath } from "node:url"
 
+// --help: this header's usage lines and NOTHING else - no window, no mail, no write (A92). The field's .comm/README.md is
+// generated from the same lines, so the two cannot disagree (the owner, 2026-10-24: docs every user can trust are current).
+if (process.argv.includes("--help")) {
+	console.log(readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").filter((l) => /^ \*\s{2,}node \S*bin\/[\w-]+\.mjs/.test(l))
+		.map((l) => l.replace(/^ \*\s+/, "").replace(/^node (\.comm\/)?bin\//, "node .comm/bin/")).join("\n"))
+	process.exit(0)
+}
+
 const ARGV = process.argv.slice(2)
 const has = (f) => ARGV.includes(f)
 const die = (msg, code = 2) => { console.error(`close: ${msg}`); process.exit(code) }
