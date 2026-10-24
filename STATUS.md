@@ -1,40 +1,43 @@
-# STATUS — claude-comm, 2026-09-28 (sessions 4–23)
+# STATUS — claude-comm, 2026-10-24 (sessions 4–24)
 
 Design and gates are in `README.md`; **this file is only what is OPEN.** Keep it short — when it grows,
 fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-09-28, evening. Field = atlas, whose leader the owner relaunches "maybe tomorrow"; `work` dormant (`FIELDS.json`);
-`lyra` leader-only, never launched; `orion` not relaunched since 09-19; `cobalt` leader-only; **`rigel` installed 09-28**
-(an empty dir, leader-only - the owner kickstarted it himself that evening: 6 agents by 21:45). `2026-09-27.9` is in all
-eight trees. A reviewer is Opus xhigh, priced 09-28 on #16/#17: ~120 calls, ~24 M cache reads, ~145 k out, 35-40 min.)*
+*(2026-10-24, late evening, after 26 days off. `2026-10-24.1` is in all ten trees and boot reads "bus current" in each.
+**`work` is AWAKE** - out of `FIELDS.json`'s dormant list on the owner's word: its leader idles between its experts'
+bells and answers them, and he said to talk to it directly. atlas's, deneb's, rigel's and cobalt's leaders: not running.)*
 
-1. **Review #19 - NOT RUN: the owner stopped it at launch, 09-28 ~22:20** (*"ne lance pas la revue … on continuera
-   demain ou un autre jour"*; its window was closed within a minute, nothing written). The brief is ready:
-   `BRIEF-adversarial-19.md` (target: #18's disposition in `#review18` - the NUL runs, the X bit, the mark keyed on the
-   scanner, `GIT_NO_REPLACE_OBJECTS`, the arms - AND the email rewrite of the recreated repo). **Launch it only on his
-   word.**
-2. **atlas's leader has TWO letters waiting** in its channel's `out/` (the bell refuses while it is stopped): the
-   `leak-check` guide (09-27) and what to do so its public method skill carries neither the owner's personal address nor
-   the five lines that tell the domain (09-28, at the owner's request). Ring both when it runs:
-   `node bin/exchange-bell.mjs --peer <atlas's channel> --ref <file>`.
-3. **The owner deleted the public repo and it was rebuilt a SECOND time, 09-28**: every commit's address is GitHub's
-   masked one (his choice, set in THIS repo's `.git/config` only - his global address stays, so never advise GitHub's
-   "block command line pushes"); 210 commits, every tree identical to before; 20 cited hashes remapped, checked by mapping
-   them back; wiki disabled; MIT per the API; 0 hits over all 1 330 objects with 14 rules - the address is rule 14. From
-   a fresh clone; old hashes answer "No commit found".
+1. **Three letters wait for their bell** (rung once tonight: work's leader mid-turn, atlas's and deneb's not running):
+   `node bin/exchange-bell.mjs --peer <channel> --ref <file>`, each its channel's newest `out/` file dated 10-24. deneb
+   has a NEW channel (it had none and wrote into `field/in/`); its answer carries the terminal its leader runs in.
+2. **What tonight's fixes still owe the field** ("not verified" in their FINDINGS entries): a REAL leader rung by
+   `close.mjs` (A87's is a fake; work's next `done` + close measures it), and deneb's next `launch.mjs` line - its 10-23
+   launch printed "no caller window" and split WORK's tab.
+3. **`turn-corpus` is still red - 10 inputs absorbed by a turn that read ringable** (`#compacted-at-rest`, 23 before
+   tonight's starter): 8 look like the corpus's own FIFO pairing (unverified), 1 is a `!` command whose input row lands
+   late (no transcript shows it; try the runtime's `sessions/<pid>.json` status), 1 unexamined. Settle the 8 FIRST: an
+   instrument that miscounts blinds the other two.
+4. **A31 blamed the suite again for a live session's own registry rewrite** (#15's first name, F below): work's leader
+   ran `/clear` during tonight's boot gate (`source: clear`); the re-run with the field quiet was 88/88. Fix it before the
+   next prove-red, which runs A31 dozens of times.
+5. **Review #19 - still waiting for the owner's word** (`BRIEF-adversarial-19.md`). When he gives it, add tonight's
+   commits `59aa2a0..01e54a5` to the target - bench, placement refusal, compaction clause, new turn-starter, close's ring,
+   unstarted guard. Attack the recent fix.
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a
 codename here; the mapping is in no repo. The boot report prints the REAL directory names: **never copy a `field:` row
 into a tracked file as is.** `bin/leak-check.mjs` + four git hooks + boot row `leak` enforce it (`FINDINGS.md#leak-check`).
+**10-24: the pre-commit hook refused my own FINDINGS** - real field names, one of them not yet codenamed. A new field
+gets its codename and its rule BEFORE its name is written (deneb, rule 15), and an expert's name is not written either.
 
-**A0 - ✅ review #18 disposed 09-28** (`#review18`): online, clean; but ONE NUL hid a file from every mode (this repo's
-`test/latency.mjs` has two) - now read as printable runs; hooks must be executable; the mark trusts only its own
-scanner; replace refs are not followed; the arms assert their REASONS. Mutation: A85 6/6, prove-red `leak` 3/3. The 🔴
-was NOT in the previous patch (v1's NUL skip) - three of five 🟡 were. **`boot --prove-red` took ~49 min 4 wide under
-load** (the memory said ~12): budget for it.
+🔴 **THE OWNER'S WINDOW RULE (09-19, 10-24): nothing a test opens lands in his view** (*"t'as besoin d'ouvrir ces 50
+fenêtres ?"*). Every kitty arm runs in ONE minimized bench (`bench()`, `test/attack.mjs`; measured 0 panes in a visible
+tab). A new kitty arm uses `bench()`/`benchRun()`/`besideMe()`, never a bare `kitten @ launch`.
 
+**A0 - ✅ review #18 disposed 09-28** (`#review18`). **`boot --prove-red` took ~49 min 4 wide under load** (the memory
+said ~12): budget for it.
 
 🔴 **The bus is at 57 816 of 58 000 B (A22).** The next change to `comm.mjs`/`who.mjs` moves narrative to FINDINGS FIRST.
 
@@ -43,11 +46,8 @@ inside a session in the project rewrites that session's registry entry. Design i
 fixed" - gate `record()` AND `refresh()` on the witness. Touches `Stop`, the hottest path: own change, own arm,
 `selftest` both ways.
 
-**C - tests faster, still reliable (owner, 09-27). `test/mutate.mjs` IS BUILT**: baseline in the same batch (not
-green ⇒ VOID), a mutant that does not match exactly once is refused, a survivor is printed as the finding. Controls
-run: refuses 2/2 inert mutants; a known-red mutant reddens A77 and a comment edit SURVIVES. **11 runs 3 wide in 238 s**
-(serial was ~11 min). Parallel controls: 4/4 green 4 wide UNDER LOAD (atlas working), 6/6 green 6 wide on an idle machine (78 s for all six). Next: `attack` itself -
-A59 8 s, A34 5 s, A20 4 s of 51 s; `--only <arm>` for iteration, the full suite stays the gate.
+**C - tests faster, still reliable (owner, 09-27): `test/mutate.mjs` is built and in use** (10-24: 4 batches, 13 mutants,
+3-4 wide, ~95 s each, baselines green). Next: `attack` itself faster, `--only <arm>` for iteration; the full suite stays the gate.
 
 **D - `#bell-into-typing`**: the bell reads the AGENT's turn, never the PERSON's input line - it cut the owner's
 half-typed message 09-27. He says it is not serious, keep writing. Named, not fixed.
@@ -56,7 +56,7 @@ half-typed message 09-27. He says it is not serious, keep writing. Named, not fi
 could print the same verdict, after the byte cut above.
 
 **F - carried, in priority order:** #15's names (`#review15`: the prove-red registry control blames itself for a live
-session's own `compact` rewrite; the prettier header and `readJson` outside the print) · `REVIEW-12b.md`'s seven points (`FINDINGS.md#review12b`, each already measured) ·
+session's own `compact` rewrite - and A31 for a `/clear`, 10-24, ▶ NEXT 4; the prettier header and `readJson` outside the print) · `REVIEW-12b.md`'s seven points (`FINDINGS.md#review12b`, each already measured) ·
 `boot.mjs --hook` records with NO ownership test (`boot.mjs:489`; needs a declared test seam first - its own
 `--prove-red` fires are foreign by construction) · two amendments demanded by acks: `stranded-untold` (atlas's
 `extension` waits ON PURPOSE, their decision - `FINDINGS.md#peer-state`) ·
