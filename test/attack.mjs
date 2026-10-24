@@ -3752,6 +3752,12 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		`(if this were false the line above would pass for a launcher that inherits kitty's env, which is the defect)`)
 }
 
+// A pane ANY arm opens goes beside the suite's own window: `--match` picks the tab, `--next-to` the window in it
+// (kitty ignores --next-to outside the target tab). Without them kitty splits the ACTIVE tab, and that is the
+// owner's whenever he works elsewhere - 2026-10-24: "ça divise toujours la fenêtre qui est focus … fais en sorte
+// que ça divise seulement la tienne". A50 ⑤ measures that --match, not focus, decides.
+const besideMe = (w) => ["--match", `window_id:${w.id}`, "--next-to", `id:${w.id}`]
+
 // A50 — the launcher SPLITS the caller's tab, captures the window id, and marks the window.
 //
 // Asked by the owner 2026-09-10: an autonomy design that only ever opens fills the screen.
@@ -3792,19 +3798,22 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	writeFileSync(join(fakeBin, "claude"), "#!/bin/sh\nexec sleep 120\n", { mode: 0o755 })
 	const env50 = { ...process.env, PATH: `${fakeBin}${delimiter}${process.env.PATH}` }
 
-	// ① THE ID GUARD, armed: a kitten that exits 0 and prints no id at all.
+	// ① THE ID GUARD, armed: a kitten that exits 0 and prints no id at all. It still answers `ls` with
+	// the session in a window: a kitten that showed NO window was refused by the placement guard (④)
+	// before any launch, and ① read that refusal as this one - red for the wrong guard, 2026-10-24.
+	const wk = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
+	const { sessionPid: sp50 } = await import(pathToFileURL(join(PKG, "bin", "session-registry.mjs")).href)
 	const mute = join(r50, "mutebin")
 	mkdirSync(mute, { recursive: true })
-	writeFileSync(join(mute, "kitten"), "#!/bin/sh\nexit 0\n", { mode: 0o755 })
+	const muteTree = JSON.stringify([{ id: 1, tabs: [{ id: 7, windows: [{ id: 77, pid: 999999, foreground_processes: [{ pid: sp50() }], user_vars: {} }] }] }])
+	writeFileSync(join(mute, "kitten"), `#!${process.execPath}\nif(process.argv.includes("ls"))process.stdout.write(${JSON.stringify(muteTree)})\n`, { mode: 0o755 })
 	writeFileSync(join(mute, "claude"), "#!/bin/sh\nexec sleep 120\n", { mode: 0o755 })
 	const noId = spawnSync(process.execPath, [L50, "db", ...T50],
 		{ cwd: r50, encoding: "utf8", env: { ...process.env, PATH: `${mute}${delimiter}${process.env.PATH}` } })
-	const refusesNoId = noId.status !== 0 && /no window id/.test(noId.stderr)
+	const refusesNoId = noId.status !== 0 && /no window id/.test(noId.stderr) && !/REFUSING to split/.test(noId.stderr)
 
 	// ② THE SPLIT. Where is the suite sitting? The launcher answers this the same way, so
-	// the arm asks the same module rather than a second implementation of the question.
-	const wk = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
-	const { sessionPid: sp50 } = await import(pathToFileURL(join(PKG, "bin", "session-registry.mjs")).href)
+	// the arm asks the same module rather than a second implementation of the question (imported at ①).
 	const callerR = wk.resolveWindow(sp50(), wk.windows())
 	const caller = callerR.ok && callerR.how === "foreground process" ? callerR.win : null
 
@@ -3826,7 +3835,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	// ③ POSITIVE CONTROL for the tab check: the opt-out must land SOMEWHERE ELSE. Without
 	// it, `sameTab` would pass for a launcher that ignored --os-window and always split --
 	// and equally for a box where every window happens to be in one tab.
-	let optOutElsewhere = false
+	let optOutElsewhere = false, optOutWin = null
 	if (caller) {
 		// --minimized: the owner asked (2026-09-19) that this control stop popping a window over his work at every run.
 		const run = spawnSync(process.execPath, [L50, "db", ...T50, "--os-window", "--minimized"], { cwd: r50, encoding: "utf8", env: env50 })
@@ -3835,17 +3844,69 @@ process.stdout.write(JSON.stringify({ ops, res }))
 			opened.push([caller.sock, id])
 			const w = wk.windows().find((x) => x.id === id)
 			optOutElsewhere = !!w && !(w.sock === caller.sock && w.tab === caller.tab)
+			if (optOutElsewhere) optOutWin = w
 		}
 	}
 
-	check("A50 the launcher splits the CALLER'S tab, refuses a window it cannot name, and marks what it opened",
-		refusesNoId && !!caller && ranReal && idEchoed && splitOk && sameTab && marked && optOutElsewhere,
+	// ④ THE CALLER DECIDES WHERE, NEVER FOCUS (owner, 2026-10-24). ② cannot show it: while the suite's
+	// own tab is the active one, a launcher that splits "the active tab" lands in the caller's tab too.
+	// So a RECORDING kitten answers `ls` with a tree this arm wrote and logs every argv, and the
+	// launcher is run against three trees: the session as a window's foreground process, the session
+	// only as a window's shell (the ancestor answer, which used to fall through to the active tab), and
+	// the session in no window at all - which must REFUSE, in --print too (A53), and call no `launch`.
+	const recBin = join(r50, "recbin"), recLog = join(r50, "kitten.log"), recTree = join(r50, "tree.json")
+	mkdirSync(recBin, { recursive: true })
+	writeFileSync(join(recBin, "kitten"), `#!${process.execPath}\n` +
+		`const fs=require("fs"),a=process.argv.slice(2);fs.appendFileSync(${JSON.stringify(recLog)},JSON.stringify(a)+"\\n");` +
+		`if(a.includes("ls"))process.stdout.write(fs.readFileSync(${JSON.stringify(recTree)},"utf8"));` +
+		`else if(a.includes("launch"))process.stdout.write("4242\\n")`, { mode: 0o755 })
+	writeFileSync(join(recBin, "claude"), "#!/bin/sh\nexec sleep 120\n", { mode: 0o755 })
+	const me50 = sp50()
+	const recRun = (callerWin, extra = []) => {
+		writeFileSync(recTree, JSON.stringify([{ id: 1, tabs: [{ id: 7, windows: [callerWin,
+			{ id: 4242, pid: 999998, foreground_processes: [], user_vars: {} }] }] }]))
+		writeFileSync(recLog, "")
+		const run = spawnSync(process.execPath, [L50, "db", ...T50, ...extra], { cwd: r50, encoding: "utf8",
+			env: { ...process.env, PATH: `${recBin}${delimiter}${process.env.PATH}` } })
+		const launches = readFileSync(recLog, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)).filter((a) => a.includes("launch"))
+		return { run, launches }
+	}
+	const beside77 = (a) => a.join(" ").includes("--match window_id:77 --next-to id:77")
+	const viaFg = recRun({ id: 77, pid: 999999, foreground_processes: [{ pid: me50 }], user_vars: {} })
+	const viaShell = recRun({ id: 77, pid: me50, foreground_processes: [], user_vars: {} })
+	const nowhere = recRun({ id: 77, pid: 999999, foreground_processes: [{ pid: 999999 }], user_vars: {} })
+	const nowherePrint = recRun({ id: 77, pid: 999999, foreground_processes: [{ pid: 999999 }], user_vars: {} }, ["--print"])
+	const fgBeside = viaFg.launches.length === 1 && beside77(viaFg.launches[0])
+	const shellBeside = viaShell.launches.length === 1 && beside77(viaShell.launches[0])
+	const refusal = (x) => x.run.status !== 0 && /REFUSING to split/.test(x.run.stderr) && /--os-window --minimized/.test(x.run.stderr) && !x.launches.length
+	const nowhereRefused = refusal(nowhere), nowherePrintRefused = refusal(nowherePrint)
+
+	// ⑤ THE MECHANISM ④ RELIES ON, in a real kitty: `--match window_id:` beats focus. ③'s window is in a
+	// minimized OS window, so its tab is NOT the active one; a pane told to go beside it must land there.
+	// (The inverse - a pane with no --match landing in the active tab - is not run: that tab is the owner's.)
+	let matchBeatsFocus = false
+	if (optOutWin) {
+		const id = Number(spawnSync("kitten", ["@", "--to", `unix:${optOutWin.sock}`, "launch", "--type=window", "--keep-focus",
+			...besideMe(optOutWin), `--cwd=${r50}`, join(fakeBin, "claude")], { encoding: "utf8", timeout: 10000 }).stdout)
+		if (Number.isInteger(id) && id > 0) {
+			opened.push([optOutWin.sock, id])
+			const w = wk.windows().find((x) => x.id === id && x.sock === optOutWin.sock)
+			matchBeatsFocus = !!w && w.tab === optOutWin.tab && w.tab !== caller.tab
+		}
+	}
+
+	check("A50 the launcher splits beside the CALLER, never the active tab, refuses a window it cannot name, and marks what it opened",
+		refusesNoId && !!caller && ranReal && idEchoed && splitOk && sameTab && marked && optOutElsewhere &&
+			fgBeside && shellBeside && nowhereRefused && nowherePrintRefused && matchBeatsFocus,
 		`kitten answering with no id -> REFUSED=${refusesNoId}; ` +
 		`caller window resolved=${!!caller}${caller ? ` (tab ${caller.tab})` : " — THE ARM COULD NOT RUN: no kitty window for this suite"}; ` +
 		`real launch exit 0=${ranReal}, id echoed=${idEchoed}, window EXISTS in kitty=${splitOk} (re-read, not assumed); ` +
 		`landed in the caller's tab=${sameTab}; marked CLAUDE_COMM_LAUNCHED=db=${marked}; ` +
 		`positive control, --os-window lands OUTSIDE that tab=${optOutElsewhere} ` +
-		`(without it "same tab" would pass for a launcher that ignores the opt-out, and on any box with one tab)`)
+		`(without it "same tab" would pass for a launcher that ignores the opt-out, and on any box with one tab); ` +
+		`recording kitten: session as foreground -> launch beside it=${fgBeside}, session as the window's shell -> beside it=${shellBeside}, ` +
+		`in no window -> REFUSED with no launch call=${nowhereRefused} (--print too=${nowherePrintRefused}); ` +
+		`a real pane told --match a NON-active tab lands there=${matchBeatsFocus}`)
 }
 
 // A51 — an agent closes its OWN window, and every other shape is refused.
@@ -3906,7 +3967,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 			`fs.writeFileSync(${JSON.stringify(uf)},JSON.stringify({s:r.status,e:r.stderr,o:r.stdout}));` +
 			`setTimeout(()=>{},20000)`)
 		const uid = Number(spawnSync("kitten", ["@", "--to", `unix:${caller51.sock}`, "launch", "--type=window",
-			"--keep-focus", `--cwd=${r51}`, fake51, us], { encoding: "utf8", timeout: 10000 }).stdout)
+			"--keep-focus", ...besideMe(caller51), `--cwd=${r51}`, fake51, us], { encoding: "utf8", timeout: 10000 }).stdout)
 		if (Number.isInteger(uid) && uid > 0) {
 			opened51.push([caller51.sock, uid])
 			const until = Date.now() + 10000
@@ -3945,7 +4006,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 			`fs.writeFileSync(${JSON.stringify(outFile)},JSON.stringify({s:r.status}));` +
 			`setTimeout(()=>{},20000)`)
 		const id = Number(spawnSync("kitten", ["@", "--to", `unix:${caller51.sock}`, "launch", "--type=window",
-			"--keep-focus", `--cwd=${r51}`, fake51, script], { encoding: "utf8", timeout: 10000 }).stdout)
+			"--keep-focus", ...besideMe(caller51), `--cwd=${r51}`, fake51, script], { encoding: "utf8", timeout: 10000 }).stdout)
 		if (Number.isInteger(id) && id > 0) {
 			opened51.push([caller51.sock, id])
 			spawnSync("kitten", ["@", "--to", `unix:${caller51.sock}`, "set-user-vars", "--match", `id:${id}`,
@@ -4052,7 +4113,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 			`fs.renameSync(K,K+".away");out.blind=dry();fs.renameSync(K+".away",K);` +
 			`fs.writeFileSync(${J(out58)},JSON.stringify(out));setTimeout(()=>{},20000)`)
 		const id = Number(spawnSync("kitten", ["@", "--to", `unix:${caller58.sock}`, "launch", "--type=window",
-			"--keep-focus", `--cwd=${r58}`, fake58, script], { encoding: "utf8", timeout: 10000 }).stdout)
+			"--keep-focus", ...besideMe(caller58), `--cwd=${r58}`, fake58, script], { encoding: "utf8", timeout: 10000 }).stdout)
 		if (Number.isInteger(id) && id > 0) {
 			opened58.push([caller58.sock, id])
 			const mark = spawnSync("kitten", ["@", "--to", `unix:${caller58.sock}`, "set-user-vars", "--match", `id:${id}`,

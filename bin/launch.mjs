@@ -131,7 +131,7 @@ if (pi > -1 && (prompt === undefined || prompt.startsWith("-")))
 	    `  If you meant a bullet, drop the leading "- " or start with the word.`)
 if (!agent || agent.startsWith("--")) die(`usage: launch.mjs <agent> --model <model> --effort <level> [--prompt "<first turn>"] [--print] [--os-window [--minimized]]\n` +
 	`  --model and --effort are REQUIRED: the tier is chosen for each task, never inherited.\n` +
-	`  default: a pane in the CURRENT tab. --os-window opens a separate OS window instead.\n` +
+	`  default: a pane beside YOUR window, refused if none is found. --os-window opens a separate OS window.\n` +
 	`  --prompt is what makes the new session TAKE A TURN. Without it, it sits at its prompt\n` +
 	`  and does nothing, while 'comm who' reports it as running.`)
 
@@ -233,8 +233,28 @@ const wake = await import(new URL("wake.mjs", import.meta.url))
 const { sessionPid } = await import(new URL("session-registry.mjs", import.meta.url))
 const before = wake.windows()
 const mine = wake.resolveWindow(sessionPid(), before)
-const myTab = mine.ok && mine.how === "foreground process" ? mine.win : null
-if (!osWindow && myTab) argv.splice(2, 0, "--match", `window_id:${myTab.id}`)
+// EITHER resolution names the caller's window, and for PLACEMENT either is right: a subprocess
+// the session spawned runs in that same window. close.mjs refuses the ancestor answer because it
+// would hand that subprocess the power to close its parent - a question of who may act, not where.
+// Requiring "foreground process" here sent every ancestor-resolved launch into the active tab.
+const myTab = mine.ok ? mine.win : null
+// 🔴 NO CALLER WINDOW ⇒ NO SPLIT. This used to fall back to kitty's default, "the ACTIVE tab", and
+// the active tab is the OWNER's whenever he is working elsewhere - 2026-10-24, about this repo's
+// own tests: "ça divise toujours la fenêtre qui est focus … fais en sorte que ça divise seulement
+// la tienne. Parce que ça me dérange." A pane in his tab is not a fallback, it is an intrusion,
+// so this refuses and prints the launch that cannot land on him. Before --print, which must refuse
+// exactly as the real launch does (A53).
+if (!osWindow && !myTab) {
+	const q = (s) => /^[\w@%+=:,./-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`
+	die(`REFUSING to split: no kitty window of this session was found to put the pane beside (${mine.why}).\n` +
+	    `  Without one, kitty splits whichever tab is ACTIVE - the owner's, when he is working in it.\n` +
+	    `  To open it in a separate, minimized OS window instead:\n` +
+	    `    ${[process.execPath, new URL(import.meta.url).pathname, ...process.argv.slice(2), "--os-window", "--minimized"].map(q).join(" ")}`)
+}
+// `--match` picks the TAB and `--next-to` the window inside it: kitty ignores --next-to unless the
+// window it names is in the target tab, and without it the split goes beside that tab's ACTIVE
+// window, which in a tab of several panes need not be the caller's.
+if (!osWindow) argv.splice(2, 0, "--match", `window_id:${myTab.id}`, "--next-to", `id:${myTab.id}`)
 if (myTab) argv.splice(1, 0, "--to", `unix:${myTab.sock}`)
 
 if (printOnly) {
@@ -268,9 +288,9 @@ if (printOnly) {
 // (65) while the caller sat in tab 1. For a leader launching several experts while windows
 // come and go around it — the whole point of this launcher — "active" is the wrong target
 // and it fails silently, because the window IS created and IS returned.
-// `--match window_id:<caller>` names the tab by a window we resolved ourselves. Omitted
-// when there is no caller window: there is then no "beside" to mean, and kitty's default
-// is the honest fallback.
+// `--match window_id:<caller>` names the tab by a window we resolved ourselves. With no caller
+// window this file now REFUSES (above): "kitty's default is the honest fallback" was written
+// here until 2026-10-24, and kitty's default is the owner's tab.
 // 🔴 NAME THE INSTANCE. Review #10 A2: the caller is resolved across EVERY socket (wake.mjs
 // rule 3) and this was the only kitty call in the repo that then trusted the ambient
 // $KITTY_LISTEN_ON — `set-user-vars` two lines below passes --to, so does close.mjs, so does
