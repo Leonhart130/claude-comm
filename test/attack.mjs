@@ -15,7 +15,7 @@
  * directives? Measuring the wrong thing produced a confident, plausible, wrong
  * result, which is this project's signature failure mode.
  */
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync, statSync, lstatSync, symlinkSync, cpSync, utimesSync, chmodSync } from "node:fs"
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync, statSync, lstatSync, symlinkSync, cpSync, utimesSync, chmodSync, renameSync } from "node:fs"
 import { join, delimiter, resolve } from "node:path"
 import { execFileSync, spawnSync, spawn } from "node:child_process"
 import { createHash, randomUUID } from "node:crypto"
@@ -3752,11 +3752,65 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		`(if this were false the line above would pass for a launcher that inherits kitty's env, which is the defect)`)
 }
 
-// A pane ANY arm opens goes beside the suite's own window: `--match` picks the tab, `--next-to` the window in it
+// A pane ANY arm opens goes beside a window the arm names: `--match` picks the tab, `--next-to` the window in it
 // (kitty ignores --next-to outside the target tab). Without them kitty splits the ACTIVE tab, and that is the
 // owner's whenever he works elsewhere - 2026-10-24: "ça divise toujours la fenêtre qui est focus … fais en sorte
 // que ça divise seulement la tienne". A50 ⑤ measures that --match, not focus, decides.
 const besideMe = (w) => ["--match", `window_id:${w.id}`, "--next-to", `id:${w.id}`]
+
+// ── THE BENCH ─────────────────────────────────────────────────────────────────────────────────────────
+// The owner, the same evening: "t'as besoin d'ouvrir ces 50 fenêtres et ces 50 onglets à chaque fois ? …
+// visuellement c'est vraiment dérangeant." Measured by polling every socket through one run: 11 windows, 9 of
+// them split into the session's OWN window - and a mutation batch or a boot control multiplies that. Every one
+// is needed: they are the only proof that launch.mjs and close.mjs work in a REAL kitty. None needs to be SEEN.
+// So the suite opens ONE minimized OS window, the bench, whose own process is a fake `claude` (node under that
+// name - sessionPid() matches argv0) running a job loop. A command run THROUGH it is that window's descendant,
+// so the launcher finds the bench as its caller exactly as it finds a leader's window, and every pane an arm
+// opens goes beside the bench. Opened on first use, closed at exit; no kitty, or a bench whose runner is not
+// its window's foreground process, is null, and each arm then says it COULD NOT RUN.
+const nap = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+const BENCH_RUNNER = `const fs=require("fs"),{spawnSync}=require("child_process"),D=process.argv[2];` +
+	`fs.writeFileSync(D+"/ready",String(process.pid));` +
+	`setInterval(()=>{for(const f of fs.readdirSync(D).filter((f)=>f.endsWith(".job")).sort((a,b)=>parseInt(a)-parseInt(b))){` +
+	`const p=D+"/"+f;let j;try{j=JSON.parse(fs.readFileSync(p,"utf8"))}catch{continue}fs.unlinkSync(p);` +
+	`const r=spawnSync(j.argv[0],j.argv.slice(1),{cwd:j.cwd,env:j.env,encoding:"utf8",timeout:120000}),o=p.slice(0,-4);` +
+	`fs.writeFileSync(o+".tmp",JSON.stringify({status:r.status,stdout:r.stdout||"",stderr:r.stderr||""}));fs.renameSync(o+".tmp",o+".out")}},50)`
+let benchWin
+async function bench() {
+	if (benchWin !== undefined) return benchWin
+	benchWin = null
+	const wk = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
+	const { sessionPid } = await import(pathToFileURL(join(PKG, "bin", "session-registry.mjs")).href)
+	const me = wk.resolveWindow(sessionPid(), wk.windows())
+	const sock = me.ok ? me.win.sock : (process.env.KITTY_LISTEN_ON || "").replace(/^unix:/, "")
+	if (!sock) return null
+	const dir = mkdtempSync(join(tmpdir(), "comm-attack-bench-"))
+	const fake = join(dir, "claude")
+	symlinkSync(process.execPath, fake)
+	writeFileSync(join(dir, "runner.cjs"), BENCH_RUNNER)
+	const id = Number(spawnSync("kitten", ["@", "--to", `unix:${sock}`, "launch", "--type=os-window", "--os-window-state=minimized",
+		"--keep-focus", `--cwd=${dir}`, fake, join(dir, "runner.cjs"), dir], { encoding: "utf8", timeout: 10000 }).stdout)
+	atExit(() => {
+		if (id > 0) try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
+		try { rmSync(dir, { recursive: true, force: true }) } catch {}
+	})
+	if (!(id > 0)) return null
+	let pid = 0
+	for (const until = Date.now() + 10000; Date.now() < until && !pid; nap(50)) try { pid = Number(readFileSync(join(dir, "ready"), "utf8")) } catch {}
+	const win = wk.windows().find((w) => w.sock === sock && w.id === id)
+	if (!win || !pid || !win.fg.includes(pid)) return null
+	return (benchWin = { ...win, dir, pid })
+}
+let benchJobs = 0
+/** spawnSync's answer for `argv`, run by the bench's own process - so from INSIDE the bench window. */
+function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
+	const n = ++benchJobs, job = join(b.dir, `${n}.job`), out = join(b.dir, `${n}.out`)
+	writeFileSync(`${job}.tmp`, JSON.stringify({ argv, cwd, env }))
+	renameSync(`${job}.tmp`, job)
+	for (const until = Date.now() + timeout; Date.now() < until; nap(50))
+		if (existsSync(out)) try { return JSON.parse(readFileSync(out, "utf8")) } catch {}
+	return { status: null, stdout: "", stderr: `bench: job ${n} had no answer in ${timeout} ms` }
+}
 
 // A50 — the launcher SPLITS the caller's tab, captures the window id, and marks the window.
 //
@@ -3812,14 +3866,12 @@ const besideMe = (w) => ["--match", `window_id:${w.id}`, "--next-to", `id:${w.id
 		{ cwd: r50, encoding: "utf8", env: { ...process.env, PATH: `${mute}${delimiter}${process.env.PATH}` } })
 	const refusesNoId = noId.status !== 0 && /no window id/.test(noId.stderr) && !/REFUSING to split/.test(noId.stderr)
 
-	// ② THE SPLIT. Where is the suite sitting? The launcher answers this the same way, so
-	// the arm asks the same module rather than a second implementation of the question (imported at ①).
-	const callerR = wk.resolveWindow(sp50(), wk.windows())
-	const caller = callerR.ok && callerR.how === "foreground process" ? callerR.win : null
+	// ② THE SPLIT, from inside the bench: the launcher must find the bench as its caller and split beside it.
+	const caller = await bench()
 
 	let splitOk = false, marked = false, sameTab = false, idEchoed = false, ranReal = false
 	if (caller) {
-		const run = spawnSync(process.execPath, [L50, "db", ...T50], { cwd: r50, encoding: "utf8", env: env50 })
+		const run = benchRun(caller, [process.execPath, L50, "db", ...T50], { cwd: r50, env: env50 })
 		ranReal = run.status === 0
 		const id = Number((run.stdout.match(/window: (\d+)/) || [])[1])
 		idEchoed = Number.isInteger(id) && id > 0
@@ -3838,7 +3890,7 @@ const besideMe = (w) => ["--match", `window_id:${w.id}`, "--next-to", `id:${w.id
 	let optOutElsewhere = false, optOutWin = null
 	if (caller) {
 		// --minimized: the owner asked (2026-09-19) that this control stop popping a window over his work at every run.
-		const run = spawnSync(process.execPath, [L50, "db", ...T50, "--os-window", "--minimized"], { cwd: r50, encoding: "utf8", env: env50 })
+		const run = benchRun(caller, [process.execPath, L50, "db", ...T50, "--os-window", "--minimized"], { cwd: r50, env: env50 })
 		const id = Number((run.stdout.match(/window: (\d+)/) || [])[1])
 		if (Number.isInteger(id) && id > 0) {
 			opened.push([caller.sock, id])
@@ -3899,7 +3951,7 @@ const besideMe = (w) => ["--match", `window_id:${w.id}`, "--next-to", `id:${w.id
 		refusesNoId && !!caller && ranReal && idEchoed && splitOk && sameTab && marked && optOutElsewhere &&
 			fgBeside && shellBeside && nowhereRefused && nowherePrintRefused && matchBeatsFocus,
 		`kitten answering with no id -> REFUSED=${refusesNoId}; ` +
-		`caller window resolved=${!!caller}${caller ? ` (tab ${caller.tab})` : " — THE ARM COULD NOT RUN: no kitty window for this suite"}; ` +
+		`bench window as the caller=${!!caller}${caller ? ` (tab ${caller.tab})` : " — THE ARM COULD NOT RUN: no kitty bench for this suite"}; ` +
 		`real launch exit 0=${ranReal}, id echoed=${idEchoed}, window EXISTS in kitty=${splitOk} (re-read, not assumed); ` +
 		`landed in the caller's tab=${sameTab}; marked CLAUDE_COMM_LAUNCHED=db=${marked}; ` +
 		`positive control, --os-window lands OUTSIDE that tab=${optOutElsewhere} ` +
@@ -3942,9 +3994,7 @@ const besideMe = (w) => ["--match", `window_id:${w.id}`, "--next-to", `id:${w.id
 	try { symlinkSync(process.execPath, fake51) } catch {}
 
 	const wk51 = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
-	const { sessionPid: sp51 } = await import(pathToFileURL(join(PKG, "bin", "session-registry.mjs")).href)
-	const cr = wk51.resolveWindow(sp51(), wk51.windows())
-	const caller51 = cr.ok && cr.how === "foreground process" ? cr.win : null
+	const caller51 = await bench()
 
 	// ① is armed INSIDE the marked window, below. Running it from the suite's own window
 	// proved nothing: that window carries no mark, so the refusal came from the MARK guard
@@ -4092,9 +4142,7 @@ const besideMe = (w) => ["--match", `window_id:${w.id}`, "--next-to", `id:${w.id
 	const go58 = join(r58, "go"), out58 = join(r58, "out.json")
 
 	const wk58 = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
-	const { sessionPid: sp58 } = await import(pathToFileURL(join(PKG, "bin", "session-registry.mjs")).href)
-	const cr58 = wk58.resolveWindow(sp58(), wk58.windows())
-	const caller58 = cr58.ok && cr58.how === "foreground process" ? cr58.win : null
+	const caller58 = await bench()
 
 	let res = null, marked58 = false
 	if (caller58) {
@@ -4699,12 +4747,9 @@ const besideMe = (w) => ["--match", `window_id:${w.id}`, "--next-to", `id:${w.id
 	// ② WITHOUT a prompt the launcher must SAY SO. Silence here is the whole defect: the
 	//    launcher is the one place a reader is certainly looking when the session is born.
 	let warnsWhenSilent = false, quietId = null
-	const wk53 = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
-	const { sessionPid: sp53 } = await import(pathToFileURL(join(PKG, "bin", "session-registry.mjs")).href)
-	const cr53 = wk53.resolveWindow(sp53(), wk53.windows())
-	const caller53 = cr53.ok && cr53.how === "foreground process" ? cr53.win : null
+	const caller53 = await bench()
 	if (caller53) {
-		const run = spawnSync(process.execPath, [L53, "db", ...T53], { cwd: r53, encoding: "utf8", env: env53 })
+		const run = benchRun(caller53, [process.execPath, L53, "db", ...T53], { cwd: r53, env: env53 })
 		quietId = Number((run.stdout.match(/window: (\d+)/) || [])[1])
 		if (Number.isInteger(quietId) && quietId > 0) opened53.push([caller53.sock, quietId])
 		warnsWhenSilent = /NO --prompt/.test(run.stdout) && /take NO TURN/.test(run.stdout)
@@ -4715,7 +4760,7 @@ const besideMe = (w) => ["--match", `window_id:${w.id}`, "--next-to", `id:${w.id
 	if (caller53) {
 		try { rmSync(argvFile, { force: true }) } catch {}
 		const TEXT = "read BRIEF-7.md and report to leader"
-		const run = spawnSync(process.execPath, [L53, "db", ...T53, "--prompt", TEXT], { cwd: r53, encoding: "utf8", env: env53 })
+		const run = benchRun(caller53, [process.execPath, L53, "db", ...T53, "--prompt", TEXT], { cwd: r53, env: env53 })
 		ranWithPrompt = run.status === 0
 		const id = Number((run.stdout.match(/window: (\d+)/) || [])[1])
 		if (Number.isInteger(id) && id > 0) opened53.push([caller53.sock, id])
@@ -4733,7 +4778,7 @@ const besideMe = (w) => ["--match", `window_id:${w.id}`, "--next-to", `id:${w.id
 	let quietArgvEmpty = false
 	if (caller53) {
 		try { rmSync(argvFile, { force: true }) } catch {}
-		const run = spawnSync(process.execPath, [L53, "db", ...T53], { cwd: r53, encoding: "utf8", env: env53 })
+		const run = benchRun(caller53, [process.execPath, L53, "db", ...T53], { cwd: r53, env: env53 })
 		const id = Number((run.stdout.match(/window: (\d+)/) || [])[1])
 		if (Number.isInteger(id) && id > 0) opened53.push([caller53.sock, id])
 		const until = Date.now() + 10000
@@ -4811,13 +4856,10 @@ const besideMe = (w) => ["--match", `window_id:${w.id}`, "--next-to", `id:${w.id
 	} catch {}
 
 	// ④ WHERE IT LANDS: two real launches, two different tiers, each read back from the child's own argv
-	const wk57 = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
-	const { sessionPid: sp57 } = await import(pathToFileURL(join(PKG, "bin", "session-registry.mjs")).href)
-	const cr57 = wk57.resolveWindow(sp57(), wk57.windows())
-	const caller57 = cr57.ok && cr57.how === "foreground process" ? cr57.win : null
+	const caller57 = await bench()
 	const landed57 = (tier) => {
 		try { rmSync(argv57, { force: true }) } catch {}
-		const run = run57([...tier, "--prompt", "report to leader"])
+		const run = benchRun(caller57, [process.execPath, L57, "db", ...tier, "--prompt", "report to leader"], { cwd: r57, env: env57 })
 		const id = Number((run.stdout.match(/window: (\d+)/) || [])[1])
 		if (Number.isInteger(id) && id > 0) opened57.push([caller57.sock, id])
 		const until = Date.now() + 10000
