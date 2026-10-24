@@ -19,6 +19,12 @@ already have.
 
 
 
+
+## 2026-10-25.2 — bus print `ea0d5ca8c0be` — 2026-10-24
+
+- **The note you get at your first session after an update now spells its commands from YOUR folder** (`../.comm/bin/…`
+  for an expert), not from the project root, where they did not run for you.
+
 ## 2026-10-25.1 — bus print `270adeb1c6cb` — 2026-10-24
 
 - **Every command is now documented from the code you have.** The last section of `.comm/README.md`, *"Every command"*,
