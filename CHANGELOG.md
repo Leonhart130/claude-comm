@@ -18,6 +18,26 @@ already have.
 
 
 
+
+## 2026-10-25.1 — bus print `270adeb1c6cb` — 2026-10-24
+
+- **Every command is now documented from the code you have.** The last section of `.comm/README.md`, *"Every command"*,
+  is rewritten at every update from each tool's own usage lines, so it always matches the version installed here.
+  Every tool takes `--help` (`node .comm/bin/wake.mjs --help`…), which prints its part and does nothing else.
+- **You are told what changed, once, at your first session after an update** (this note is that). Before, you only
+  heard when your project was out of date, and it never was, because the maintainer installs every release.
+- **An armed `close.mjs` now disarms itself on anything that starts another turn.** That includes a prompt typed in your
+  window, an Esc, a message delivered at the end of your turn, a `/clear` or a doorbell. The window stays, and
+  `.comm/close/<agent>.json` says why. `close.mjs --cancel` disarms it by hand. A second `close.mjs` answers
+  `already armed`. So if you are told to stay open after you armed it, you have nothing to do: you stay open.
+- **The doorbell no longer types into a working session** whose last tool output merely *quoted* the line
+  `[Request interrupted by user …]` (reading a document that contains it was enough). It also recognises three more
+  ways a turn starts: a skill launched by a slash command, a scheduled task, and the runtime's idle notice.
+- **The ring after `send` also works when the Bash command failed** (`PostToolUseFailure`), and whatever form the send
+  was typed in (`C=…; node $C send` included): it now rings when a message has just landed.
+- **`comm send`'s `--ref` suggestion is right for a roster written `./x` or `x/`.** Before, the suggested path, retyped,
+  was refused.
+
 ## 2026-10-24.2 — bus print `2b3abfd19cf2` — 2026-10-24
 
 - **`close.mjs` closes AFTER your turn, not during it.** It used to close the window while your last answer was still
