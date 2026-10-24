@@ -49,6 +49,23 @@ const forward = (input, notices = []) => spawnSync(process.execPath,
 	[bus, "hook", ...process.argv.slice(2), "--agent-root", agentRoot, ...notices.flatMap((n) => ["--notice", n])],
 	input === null ? { stdio: "inherit" } : { input, stdio: ["pipe", "inherit", "inherit"] })
 
+// AFTER A SEND, RING (work's leader, 2026-10-24): the doorbell rode only the Stop hook, so a leader that sent to an
+// idle expert and went on working woke nobody until its own turn ended - measured that evening, its bell to a resting
+// expert sat until it rang by hand. The bus cannot ring (it spawns nothing, A21); this stub can, and already does at
+// every Stop. So after a Bash call whose command is a `comm.mjs send`, it runs the same `wake --root`, with every
+// rule of wake intact. It touches no mail: delivery is still the turn boundary's. Any other command costs one stdin
+// read. Never fails the tool call. A90.
+if (process.argv[2] === "post-tool") {
+	try {
+		const p = JSON.parse(readFileSync(0, "utf8") || "{}")
+		const cmd = String((p.tool_input && p.tool_input.command) || "")
+		const wake = join(dirname(bus), "wake.mjs")
+		if (/comm\.mjs["']?\s+send\b/.test(cmd) && existsSync(wake))
+			spawnSync(process.execPath, [wake, "--root", projectRoot], { timeout: 10000, stdio: "ignore" })
+	} catch { /* a doorbell must never break a tool call */ }
+	process.exit(0)
+}
+
 // STOP. Delivery is unchanged in substance - same bus, same arguments - but the payload
 // is now read here rather than inherited, because the registry needs a SECOND WITNESS.
 //

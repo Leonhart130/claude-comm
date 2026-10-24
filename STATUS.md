@@ -1,30 +1,26 @@
-# STATUS — claude-comm, 2026-10-24 (sessions 4–24)
+# STATUS — claude-comm, 2026-10-24 (sessions 4–24, late)
 
 Design and gates are in `README.md`; **this file is only what is OPEN.** Keep it short — when it grows,
 fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-10-24, late evening, after 26 days off. `2026-10-24.1` is in all ten trees and boot reads "bus current" in each.
-**`work` is AWAKE** - out of `FIELDS.json`'s dormant list on the owner's word: its leader idles between its experts'
-bells and answers them, and he said to talk to it directly. atlas's, deneb's, rigel's and cobalt's leaders: not running.)*
+*(2026-10-24, near midnight, after 26 days off. `2026-10-24.2` is in all ten trees. **WORK IS THE MAIN FIELD NOW** - the
+owner: atlas inactive and not relaunched for days, "c'est Work qui prend le relais … ce sera principalement
+avec lui". He gave a standing green light: "je te laisse gérer … T'as mon feu vert pour tout.")*
 
-1. **Three letters wait for their bell** (rung once tonight: work's leader mid-turn, atlas's and deneb's not running):
-   `node bin/exchange-bell.mjs --peer <channel> --ref <file>`, each its channel's newest `out/` file dated 10-24. deneb
-   has a NEW channel (it had none and wrote into `field/in/`); its answer carries the terminal its leader runs in.
-2. **What tonight's fixes still owe the field** ("not verified" in their FINDINGS entries): a REAL leader rung by
-   `close.mjs` (A87's is a fake; work's next `done` + close measures it), and deneb's next `launch.mjs` line - its 10-23
-   launch printed "no caller window" and split WORK's tab.
-3. **`turn-corpus` is still red - 10 inputs absorbed by a turn that read ringable** (`#compacted-at-rest`, 23 before
-   tonight's starter): 8 look like the corpus's own FIFO pairing (unverified), 1 is a `!` command whose input row lands
-   late (no transcript shows it; try the runtime's `sessions/<pid>.json` status), 1 unexamined. Settle the 8 FIRST: an
-   instrument that miscounts blinds the other two.
-4. **A31 blamed the suite again for a live session's own registry rewrite** (#15's first name, F below): work's leader
-   ran `/clear` during tonight's boot gate (`source: clear`); the re-run with the field quiet was 88/88. Fix it before the
-   next prove-red, which runs A31 dozens of times.
-5. **Review #19 - still waiting for the owner's word** (`BRIEF-adversarial-19.md`). When he gives it, add tonight's
-   commits `59aa2a0..01e54a5` to the target - bench, placement refusal, compaction clause, new turn-starter, close's ring,
-   unstarted guard. Attack the recent fix.
+1. **Read work's answers first** (its channel): the two real-session measurements tonight's fixes owe - an expert's
+   close seen whole then gone ~2 s later (`#close-after-the-turn`), and a `send` to a resting agent waking it at once
+   (`#ring-after-send`). Both are faked in their arms; work is the measurement. Its usage question is there too.
+2. **Work's ideas 1 and 2 - usage readings for experts, `comm stop <agent>`** - both need a MID-TURN channel, and the
+   `PostToolUse` hook installed tonight is one (`additionalContext`). Read `FINDINGS.md#midturn-channel` FIRST (measured
+   09-20), then design. Not built.
+3. **`turn-corpus` still red - 10 inputs absorbed by a turn read ringable** (`#compacted-at-rest`): 8 look like the
+   corpus's own FIFO pairing (unverified), 1 a late `!` row, 1 unexamined. Settle the 8 first.
+4. **A31 blames the suite for a live session's own registry rewrite** (#15's first name, F below; 10-24: a `/clear`).
+5. **Review #19 - LAUNCHED 10-24 ~23:45 on the owner's green light** (`BRIEF-adversarial-19.md`, rewritten: tonight's
+   two releases first). Dispose of `review/REVIEW-19.md` point by point, mutations included, as for #18.
+6. **Letters waiting for a bell**: deneb's (its own new channel) and atlas's - both leaders not running.
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a
 codename here; the mapping is in no repo. The boot report prints the REAL directory names: **never copy a `field:` row
