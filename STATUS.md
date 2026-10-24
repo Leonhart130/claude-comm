@@ -5,7 +5,7 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-10-25 ~01:30, end of a session that started 10-24 after 26 days off. `2026-10-25.1` is in all ten trees. **WORK IS
+*(2026-10-25 ~01:30, end of a session that started 10-24 after 26 days off. `2026-10-25.2` is in all ten trees. **WORK IS
 THE MAIN FIELD** - the owner: atlas inactive and not relaunched for days, "c'est Work qui prend le relais". Standing
 green light: "je te laisse gérer … T'as mon feu vert pour tout." Review #19 ran and is DISPOSED (`FINDINGS.md#review19`).)*
 
