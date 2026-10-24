@@ -15,10 +15,10 @@ green light: "je te laisse gérer … T'as mon feu vert pour tout." Review #19 r
 2. **Work's ideas 1-2 - usage readings for experts, `comm stop <agent>`** - both want a MID-TURN channel; the
    `PostToolUse` hook installed 10-24 is one (`additionalContext`). Read `FINDINGS.md#midturn-channel` FIRST. Not built.
 3. 🔴 **The bus is at 57 936 of 58 000 B (A22).** The next change to `comm.mjs`/`who.mjs` moves narrative to FINDINGS first.
-4. **Review #19 §5 - `leak-check` refuses almost any binary (rule 5)**: the fix changes what rules mean in a binary -
-   the owner's call; ask him with the measured rate (18 of 20 random 100 KB files).
+4. ✅ **Review #19 §5 decided by the owner 10-25** ("ignore the short words"): in a binary, rules under 4 letters are not
+   applied (rule 5 only): 20/20 false refusals -> 0/20. And A31 no longer blames the suite for a live session's own rewrite.
 5. **Named, unarmed**: the `briefs` row's unreadable-root branch, and its reply-older-than-brief branch (only the
-   presence arms ran in `--prove-red`); A31 still blames the suite for a live session's own registry rewrite (F below).
+   presence arms ran in `--prove-red`).
 6. **Letters waiting for a bell**: deneb's (its own new channel) and atlas's - both leaders not running.
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a
@@ -48,7 +48,7 @@ half-typed message 09-27. He says it is not serious, keep writing. Named, not fi
 **E - ✅ `who` prints each session's turn since 10-24** (`#who-shows-the-turn`, A91): working, IDLE n min, a dialog, the runtime's word.
 
 **F - carried, in priority order:** #15's names (`#review15`: the prove-red registry control blames itself for a live
-session's own `compact` rewrite - and A31 for a `/clear`, 10-24, ▶ NEXT 4; the prettier header and `readJson` outside the print) · `REVIEW-12b.md`'s seven points (`FINDINGS.md#review12b`, each already measured) ·
+session's own `compact` rewrite (A31's twin of it FIXED 10-25, `#review19`; boot's control still has it); the prettier header and `readJson` outside the print) · `REVIEW-12b.md`'s seven points (`FINDINGS.md#review12b`, each already measured) ·
 `boot.mjs --hook` records with NO ownership test (`boot.mjs:489`; needs a declared test seam first - its own
 `--prove-red` fires are foreign by construction) · two amendments demanded by acks: `stranded-untold` (atlas's
 `extension` waits ON PURPOSE, their decision - `FINDINGS.md#peer-state`) ·

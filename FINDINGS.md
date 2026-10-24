@@ -2951,11 +2951,23 @@ command at all: it rings when a message file younger than 5 s is in an inbox. A 
 whatever form it was typed in. `withHooks` recognises our command by its exact form (`.claude/comm-hook.mjs" <verb>`):
 the substring `comm-hook` also matched a person's `my-telecomm-hook.sh` and deleted it at every re-install.
 
-### 🟡 §5 — leak-check on binaries: rule 5 refuses almost any binary — NAMED, the owner's call
+### 🟡 §5 — leak-check on binaries: rule 5 refuses almost any binary — DECIDED by the owner 10-25, built
 
 20 random 100 KB files: 18 refused by rule 5 (two letters). latin1 makes 0x80-0xFF printable, so the ≥ 4 filter
 filters nothing. And a word glued to a letter-valued CRC byte passes. The remedy changes what the rules mean in a
-binary, rule by rule, and that choice is the owner's. Not changed tonight.
+binary, rule by rule, and that choice is the owner's. **Asked 10-25 with three options, he chose "ignore the short words":**
+in a binary (a NUL, no UTF-16 BOM), a rule of fewer than 4 letters is not applied. Of his 15 rules, that is rule 5 alone
+(3 letters by `lettersOf`; it carries a character class). Measured on the same 20 random 100 KB files: 20 refused before,
+**0 after**. Text keeps every rule. A85 adds a short rule: in an image it passes, in text it is refused, and 100 KB of
+noise commits. Mutated 2/2. The cost, named: a private word of 2-3 letters inside a binary passes. The second half of §5
+(a word glued to a letter-valued byte, the letter bound failing) stays: in a binary, letter bounds mean little.
+
+### 🟢 And #review15's first name, after three measured instances: A31 no longer blames the suite for a live session's own rewrite
+
+On 10-24 (twice) and on 10-25, a field leader's `/clear` during the gate rewrote its own registry entry, and A31 read
+"THE SUITE MOVED IT". A changed entry is now the world's when its new transcript is REAL: it exists under a Claude Code
+projects dir, outside the fixtures, for a pid that lives. Two cases join the attribution's synthetic control, and
+mutating either half reddens A31: an own rewrite is excused, and a rewrite to a transcript that does not exist is still blamed.
 
 ### 🟢 §6 — turn-corpus: 9 of the 10 were its own FIFO pairing
 

@@ -83,10 +83,19 @@ function textOf(buf) {
 		.flatMap(runs).join("\n")
 }
 
+// THE OWNER'S CALL, 2026-10-25 (review #19 §5): in a BINARY, a rule whose word is shorter than 4 letters is not applied.
+// Measured: 18 of 20 random 100 KB files refused by one two-letter rule - two given letters sit somewhere in almost any
+// binary, so committing an image or a PDF was a false alarm nearly every time. Offered three choices, he took "Ignorer les
+// mots courts". The cost, named: a private word of 2-3 letters INSIDE a binary passes. Text, UTF-16 with a BOM included,
+// keeps every rule. A rule's length is its letters outside lookarounds and character classes - an approximation, so a
+// rule with alternatives counts all of them. Numbers are kept: a skipped rule becomes one that never matches.
+const NEVER = /(?!)/
+const lettersOf = (re) => re.source.replace(/\(\?<?[=!][^)]*\)/g, "").replace(/\[[^\]]*\]/g, "").replace(/\\./g, "").replace(/[^a-z]/gi, "").length
 /** Hits in a buffer. A binary's are one per RULE, with no line: its runs are decoded several ways, so a line would name
  * nothing, and one word would count once per decoding. */
 function hitsOf(buf, rules) {
-	const h = scan(textOf(buf), rules)
+	const bom = (buf[0] === 0xff && buf[1] === 0xfe) || (buf[0] === 0xfe && buf[1] === 0xff)
+	const h = scan(textOf(buf), buf.includes(0) && !bom ? rules.map((re) => lettersOf(re) >= 4 ? re : NEVER) : rules)
 	if (!buf.includes(0)) return h.map((x) => ({ ...x, at: `:${x.line}` }))
 	return [...new Set(h.map((x) => x.rule))].map((rule) => ({ rule, at: " (binary, its printable runs)" }))
 }

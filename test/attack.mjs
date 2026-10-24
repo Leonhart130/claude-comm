@@ -115,7 +115,7 @@ const snapshotReal = () => {
 }
 /** What moved between two snapshots, split by who could have moved it. */
 const registryDiff = (before, after, ours) => {
-	const changed = [], vanished = [], leaked = [], foreign = [], departed = []
+	const changed = [], vanished = [], leaked = [], foreign = [], departed = [], rewritten = []
 	for (const [f, v] of before) {
 		// An entry that went away while its process DIED is attrition, not damage: no suite
 		// here can kill a live session, and on a busy machine an owner restarts windows while
@@ -126,13 +126,21 @@ const registryDiff = (before, after, ours) => {
 			const pid = Number(String(f).replace(/\.json$/, ""))
 			;(Number.isFinite(pid) && existsSync(`/proc/${pid}`) ? vanished : departed).push(f)
 		}
-		else if (after.get(f).hash !== v.hash) changed.push(f)
+		else if (after.get(f).hash !== v.hash) {
+			// A live session's OWN rewrite - a /clear, a compaction, its Stop hook's refresh - names a REAL transcript of its
+			// own: one that exists under a Claude Code projects dir, outside this suite's fixtures, for a pid that lives.
+			// Measured three times in two days, each a field leader's /clear during the gate (#review15's first name). Any
+			// other change of an entry is still this suite's doing.
+			const t = after.get(f).transcript, pid = Number(String(f).replace(/\.json$/, ""))
+			const own = !!t && !t.startsWith(ours) && /\/\.claude\/projects\//.test(t) && existsSync(t) && Number.isFinite(pid) && existsSync(`/proc/${pid}`)
+			;(own ? rewritten : changed).push(f)
+		}
 	}
 	for (const [f, v] of after) {
 		if (before.has(f)) continue
 		;(v.transcript && v.transcript.startsWith(ours) ? leaked : foreign).push(f)
 	}
-	return { changed, vanished, leaked, foreign, departed }
+	return { changed, vanished, leaked, foreign, departed, rewritten }
 }
 const realBefore = snapshotReal()
 // G5: an aborted suite is the run whose effect on the world is LEAST known, and a check()
@@ -3520,12 +3528,16 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	// measurement here. Four one-variable cases against one control.
 	const E = (t) => ({ hash: "aaaaaaaaaaaa", transcript: t })
 	const base = new Map([["1.json", E("/home/u/.claude/1.jsonl")]])
+	const realT = join(mkdtempSync(join(tmpdir(), "comm-attack-a31-")), ".claude", "projects", "p", "s.jsonl")
+	mkdirSync(dirname(realT), { recursive: true }); writeFileSync(realT, "")
 	const cases = {
 		"nothing moved": registryDiff(base, new Map(base), root),
 		"an existing entry overwritten": registryDiff(base, new Map([["1.json", { hash: "bbbbbbbbbbbb", transcript: "/x" }]]), root),
 		"an existing entry deleted": registryDiff(base, new Map(), root),
 		"a new entry with a FIXTURE transcript": registryDiff(base, new Map([...base, ["9.json", E(join(root, "t.jsonl"))]]), root),
 		"a new entry from another session": registryDiff(base, new Map([...base, ["9.json", E("/home/u/.claude/9.jsonl")]]), root),
+		"a live session rewriting its own entry": registryDiff(base, new Map([["1.json", { hash: "cccccccccccc", transcript: realT }]]), root),
+		"an entry rewritten to a transcript that does not exist": registryDiff(base, new Map([["1.json", { hash: "cccccccccccc", transcript: realT + ".gone" }]]), root),
 	}
 	const blames = (d) => d.changed.length + d.vanished.length + d.leaked.length > 0
 	const attribution =
@@ -3534,7 +3546,9 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		blames(cases["an existing entry deleted"]) &&
 		blames(cases["a new entry with a FIXTURE transcript"]) &&
 		!blames(cases["a new entry from another session"]) &&
-		cases["a new entry from another session"].foreign.length === 1
+		cases["a new entry from another session"].foreign.length === 1 &&
+		!blames(cases["a live session rewriting its own entry"]) && cases["a live session rewriting its own entry"].rewritten.length === 1 &&
+		blames(cases["an entry rewritten to a transcript that does not exist"])
 
 	const d = registryDiff(realBefore, realAfter, root)
 	const mine = d.changed.length + d.vanished.length + d.leaked.length
@@ -3546,8 +3560,9 @@ process.stdout.write(JSON.stringify({ ops, res }))
 			: `THE SUITE MOVED IT — changed ${JSON.stringify(d.changed)}, vanished ${JSON.stringify(d.vanished)}, ` +
 			  `appeared with a fixture transcript ${JSON.stringify(d.leaked)}`) +
 		(d.foreign.length ? ` · ${d.foreign.length} session(s) started on this machine during the run (${d.foreign.join(", ")}) — the world moving, not this suite` : "") +
+		(d.rewritten.length ? ` · ${d.rewritten.length} live session(s) rewrote their own entry during the run (${d.rewritten.join(", ")}) — the world moving` : "") +
 		` · attribution armed on synthetic snapshots (overwrite/delete/fixture-transcript all blame the suite, ` +
-		`another session's entry does not)=${attribution}`)
+		`another session's entry does not, nor a live session's own rewrite to its real transcript - one to a missing transcript does)=${attribution}`)
 }
 
 // A44 — a --ref names the BASE it resolved against, at the REFUSAL and at the SUCCESS.
@@ -5821,7 +5836,8 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 	// The word is BUILT, never written: this file is itself scanned (a fixture copies the tracked tree), and a literal
 	// here made the clean control red - measured, the first prove-red of this arm.
 	const W = ["zq", "probe", "word"].join("")
-	const list85 = join(r85, "private-words"); writeFileSync(list85, `# test\n${W}\n`)
+	// rule 2 is SHORT, as one of the owner's is: a binary does not apply it (his call, 10-25), text does
+	const list85 = join(r85, "private-words"); writeFileSync(list85, `# test\n${W}\n(?<![a-z])qx(?![a-z])\n`)
 	const repo85 = join(r85, "repo"), bare85 = join(r85, "bare.git"), other85 = join(r85, "other")
 	mkdirSync(repo85)
 	const env85 = { ...process.env, CLAUDE_COMM_PRIVATE_WORDS: list85, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" }
@@ -5898,6 +5914,12 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 	writeFileSync(join(repo85, "v.txt"), Buffer.from(`note ${W}\n`, "utf16le")); g85("add", "v.txt")
 	const utf16NoBom = rec(g85("commit", "-qm", "a utf-16 note, no BOM")); g85("reset", "-q", "--hard", "HEAD")
 	writeFileSync(join(repo85, "q.png"), png("someone")); g85("add", "q.png"); const cleanBin = rec(g85("commit", "-qm", "a clean image"))
+	// review #19 §5, the owner's call: the SHORT rule's word inside a binary passes; in a text file it is refused; and a
+	// 100 KB binary of (reproducible) noise - 18 of 20 refused before - commits. The long word in a PNG (pngText) still refuses.
+	writeFileSync(join(repo85, "s.png"), png("a qx b")); g85("add", "s.png"); const shortInBin = rec(g85("commit", "-qm", "a short word in an image"))
+	writeFileSync(join(repo85, "s.md"), "a qx b\n"); g85("add", "s.md"); const shortInText = rec(g85("commit", "-qm", "a short word in text")); g85("reset", "-q", "--hard", "HEAD")
+	let seed = 85; const noise = Buffer.alloc(100_000, 0).map(() => (seed = (seed * 1103515245 + 12345) % 2147483648) >> 23 & 255)
+	noise[0] = 0; writeFileSync(join(repo85, "noise.bin"), noise); g85("add", "noise.bin"); const noiseBin = rec(g85("commit", "-qm", "noise"))
 	// Review #18 §4: `git replace` - rev-list and cat-file read the stand-in, the push sends the ORIGINAL. A dirty commit,
 	// its clean twin as replacement, the dirty one pushed by id. Control: the twin itself pushes.
 	writeFileSync(join(repo85, "r.md"), `${W}\n`); g85("add", "r.md"); g85("commit", "-q", "--no-verify", "-m", "dirty")
@@ -5948,6 +5970,7 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 		refused(pushBlobTag) && refused(pushRawBlob) && refused(pushRawTree) && refused(pushNested) && refused(pushMsg) && refused(pushName) &&
 		refused(typeChange) && refused(gitlink) && refused(hooksPathCommit) && invalid.status === 4 && refused(utf16) && typedArg.status === 2 &&
 		refused(nulText) && refused(pngText) && refused(utf16NoBom) && cleanBin.status === 0 &&
+		shortInBin.status === 0 && refused(shortInText) && noiseBin.status === 0 &&
 		refused(pushReplaced) && !replacedPublished && pushTwin.status === 0 &&
 		hcFresh.status === 0 && hcNoX.status === 1 && weakRan && afterWeak.status === 1 && /private word/.test(afterWeak.stderr || "")
 	check("A85 a private word is stopped in every object a push sends, at every hook, and never printed; no list is NOT ARMED",
@@ -5960,6 +5983,7 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 		`pushed past the local hooks: a message=${refused(pushMsg)} a file NAME=${refused(pushName)}; type change=${refused(typeChange)} gitlink=${refused(gitlink)} ` +
 		`core.hooksPath=${refused(hooksPathCommit)} UTF-16 text=${refused(utf16)} the word as an argument -> exit ${typedArg.status} (want 2) invalid rule -> exit ${invalid.status} (want 4); ` +
 		`binary (#18 §1): NUL text=${refused(nulText)} PNG tEXt=${refused(pngText)} UTF-16 no BOM=${refused(utf16NoBom)} a clean binary -> ${cleanBin.status} (want 0); ` +
+		`short rule (#19 §5): in a binary -> ${shortInBin.status} (want 0), in text refused=${refused(shortInText)}, 100 KB of noise -> ${noiseBin.status} (want 0); ` +
 		`git replace (#18 §4): the original pushed=${!refused(pushReplaced)} published=${replacedPublished}, its twin -> ${pushTwin.status} (want 0); ` +
 		`hooks (#18 §2): fresh -> ${hcFresh.status} (want 0), pre-push not executable -> ${hcNoX.status} (want 1); ` +
 		`a WEAKER scanner's mark (#18 §3): it ran clean=${weakRan}, this scanner after it -> ${afterWeak.status} (want 1); ` +
