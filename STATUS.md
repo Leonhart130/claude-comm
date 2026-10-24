@@ -5,21 +5,30 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-10-25 ~01:30, end of a session that started 10-24 after 26 days off. `2026-10-25.2` is in all ten trees. **WORK IS
-THE MAIN FIELD** - the owner: atlas inactive and not relaunched for days, "c'est Work qui prend le relais". Standing
-green light: "je te laisse gérer … T'as mon feu vert pour tout." Review #19 ran and is DISPOSED (`FINDINGS.md#review19`).)*
+*(2026-10-25 ~02:00, end of a session started 10-24 after 26 days off; the owner `/clear`s it, a DECLARED restart:
+`restart.mjs prepare` was run - FIRST run `node bin/handoff.mjs verify`. `2026-10-25.2` is in all ten trees. **WORK IS
+THE MAIN FIELD** - atlas inactive, not relaunched for days; "c'est Work qui prend le relais". Standing green light:
+"je te laisse gérer … T'as mon feu vert pour tout." Review #19 is DISPOSED (`FINDINGS.md#review19`).)*
 
-1. **Read work's channel first** - two real-session measurements are owed there: an expert's close SEEN whole then gone
-   ~2 s later, and a `send` to a resting agent waking it unasked. Measured for real tonight on this repo's own reviewer:
-   its `send` rang the leader 213 ms later (`post-tool`), its after-turn close went 2.3 s after its turn ended.
-2. **Work's ideas 1-2 - usage readings for experts, `comm stop <agent>`** - both want a MID-TURN channel; the
-   `PostToolUse` hook installed 10-24 is one (`additionalContext`). Read `FINDINGS.md#midturn-channel` FIRST. Not built.
+1. **Read work's channel first** (`exchange/work-leader/in/`, newest): two real-session measurements are owed - an
+   expert's close SEEN whole then gone ~2 s later (`.comm/close/<agent>.json` `turn_ended`), and a `send` to a resting
+   agent waking it unasked. Already measured on this repo's own reviewer 10-24: its `send` rang the leader 213 ms later
+   (`post-tool`), its after-turn close went 2.3 s after its turn. Also unmeasured: that an agent's first start on `.2`
+   got the CHANGELOG news (`#docs-from-code`) - read one work expert's transcript start, read-only.
+2. **Work's idea 1 - usage readings for experts**: design answered by work 10-24 (`…23h18-l-usage…`): the leader reads
+   `claude.ai/settings/usage` ~hourly, a line in a file, stop at 93 % week / 98 % session; the gap is the reading's
+   AGE. Plan: a file the `PostToolUse` hook shows each expert with its age, once per change. Read
+   `FINDINGS.md#midturn-channel` FIRST; write work the shape before building. Then idea 2 (`comm stop <agent>`, the
+   same channel) and `launch.mjs --resume <session>` (work, 10-24).
 3. 🔴 **The bus is at 57 936 of 58 000 B (A22).** The next change to `comm.mjs`/`who.mjs` moves narrative to FINDINGS first.
-4. ✅ **Review #19 §5 decided by the owner 10-25** ("ignore the short words"): in a binary, rules under 4 letters are not
-   applied (rule 5 only): 20/20 false refusals -> 0/20. And A31 no longer blames the suite for a live session's own rewrite.
-5. **Named, unarmed**: the `briefs` row's unreadable-root branch, and its reply-older-than-brief branch (only the
-   presence arms ran in `--prove-red`).
-6. **Letters waiting for a bell**: deneb's (its own new channel) and atlas's - both leaders not running.
+4. **Arm the arm count** (`LESSONS.md` §7): a block replacement deleted A90 on 10-25 and the suite would have stayed
+   green at 90. The boot `gate` row keeps the last green count and reddens when it drops without an amendment. Needs
+   its own `--prove-red` arm (~40-50 min under `systemd-run`).
+5. **Named, unarmed**: the `briefs` row's unreadable-root branch and its reply-older-than-brief branch (only the
+   presence arms ran in `--prove-red`); boot's own registry control still blames itself for a live session's rewrite
+   (A31's twin, fixed 10-25 - F below).
+6. **Letters waiting for a bell**: deneb's (its own new channel `exchange/<deneb>-leader/`) and atlas's - both leaders
+   not running; ring with `node bin/exchange-bell.mjs --peer <channel> --ref <file>` when they run.
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a
 codename here; the mapping is in no repo. The boot report prints the REAL directory names: **never copy a `field:` row
@@ -31,7 +40,7 @@ gets its codename and its rule BEFORE its name is written (deneb, rule 15), and 
 fenêtres ?"*). Every kitty arm runs in ONE minimized bench (`bench()`, `test/attack.mjs`; measured 0 panes in a visible
 tab). A new kitty arm uses `bench()`/`benchRun()`/`besideMe()`, never a bare `kitten @ launch`.
 
-**A0 - ✅ review #18 disposed 09-28** (`#review18`). **`boot --prove-red` took ~49 min 4 wide under load** (the memory
+**A0 - ✅ reviews #18 (09-28) and #19 (10-25) disposed** (`#review18`, `#review19`). **`boot --prove-red` took ~49 min 4 wide under load** (the memory
 said ~12): budget for it.
 
 **B - the registry half of #13 §1, MEASURED 09-27 by A31 going red on my own end-to-end probe**: a hand-fire from
@@ -39,8 +48,8 @@ inside a session in the project rewrites that session's registry entry. Design i
 fixed" - gate `record()` AND `refresh()` on the witness. Touches `Stop`, the hottest path: own change, own arm,
 `selftest` both ways.
 
-**C - tests faster, still reliable (owner, 09-27): `test/mutate.mjs` is built and in use** (10-24: 4 batches, 13 mutants,
-3-4 wide, ~95 s each, baselines green). Next: `attack` itself faster, `--only <arm>` for iteration; the full suite stays the gate.
+**C - tests faster, still reliable (owner, 09-27): `test/mutate.mjs` is built and in use** (10-24/25: 11 batches, 45 mutants,
+each reddening its own condition; one batch VOID - its baseline found a real defect, `#docs-from-code`). Next: `attack` itself faster, `--only <arm>` for iteration; the full suite stays the gate.
 
 **D - `#bell-into-typing`**: the bell reads the AGENT's turn, never the PERSON's input line - it cut the owner's
 half-typed message 09-27. He says it is not serious, keep writing. Named, not fixed.
@@ -57,7 +66,7 @@ session's own `compact` rewrite (A31's twin of it FIXED 10-25, `#review19`; boot
 (`#midturn-channel`), obedience to a POINTER is the open half - build `--kind blocked` only on atlas's field count.
 
 **Carried:** A2 marker · the installer overwrites a `SKILL.md` it did not generate · S6 · atlas's `rings.jsonl`
-(A62, A65) · #9 A3 · C7 · `who`'s 3rd/4th states · the restart trigger (ledger UNKNOWN) · C3. **Later, owner's
+(A62, A65) · #9 A3 · C7 · the restart trigger (ledger UNKNOWN) · C3. **Later, owner's
 order:** adoption (orion measured 09-19) → Rust port → value, with atlas's leader.
 
 ## Where it stands
@@ -71,13 +80,13 @@ order:** adoption (orion measured 09-19) → Rust port → value, with atlas's l
 | boot | `node bin/boot.mjs` — every gating row armed; `--fast` is injected at session start, contract in `CLAUDE.md` |
 | **ledger** | `node bin/ledger.mjs` — the reboot instrument, here AND in the field (`--root <tree>`); arms run inside `attack` as A34. Each start stores `pending`, the peer's covariate — **never inbox depth**: session #41 had an empty mailbox and the largest real queue of its last five boots. **Counts live in boot's output, never here** |
 | **sensor** | `node bin/context.mjs` — pid → transcript through `bin/session-registry.mjs` (the `SessionStart` hook writes it, keyed on pid + start time + boot id); **refuses on a miss**. `FINDINGS.md#clear-blind` |
-| reviews | #1–#12b **dispositioned** (#12b's seven points carried — `FINDINGS.md#review12b`); **#13, #14 and #15 disposed 2026-09-27** — `FINDINGS.md#review13`, `#review14`, `#review15`, released as `2026-09-27.1`, `.2`, `.5`. #5's amendment stands in `CLAUDE.md`: *a gate that CAN redden is not yet one that reddens for the property in its own title* — **#12b was its seventh instance, inside an arm the previous disposition had just written**; **#13 its eighth, in the arm #12b's disposition wrote** |
+| reviews | #1–#12b **dispositioned** (#12b's seven points carried — `FINDINGS.md#review12b`); **#13, #14 and #15 disposed 2026-09-27** — `FINDINGS.md#review13`, `#review14`, `#review15`, released as `2026-09-27.1`, `.2`, `.5`. #5's amendment stands in `CLAUDE.md`: *a gate that CAN redden is not yet one that reddens for the property in its own title* — **#12b was its seventh instance, inside an arm the previous disposition had just written**; **#13 its eighth, in the arm #12b's disposition wrote**; #16-#18 disposed 09-27/28; **#19 disposed 10-25**: its 🔴 was in the previous session's newest fix again, and 6 of 7 of its mutants had survived that session's arms |
 
 ## ⏭️ OPEN
 1. **🔴 Latency is a mailbox, not an interrupt.** Re-derive with `node test/latency.mjs <log>`; never
    transcribe the table. 26 deliveries: leader→expert median **1462 s**, expert→leader **586 s** — mail
-   lands at the recipient's *turn boundary*, so **an agent alive but idle never receives it** and `who`
-   saying "running" does not mean reachable. Never call this bus real-time. A16; `HISTORY.md`.
+   lands at the recipient's *turn boundary*. Since 10-24 an IDLE recipient is rung at once by the sender's
+   `PostToolUse` (213 ms, measured live, A90); a BUSY one still waits for its turn end. Never call it real-time. A16.
 
 2. **`--reply-to <id>` (threading).** Field-requested, then field-deprioritised: the substance lives in the
    file.
@@ -88,13 +97,9 @@ order:** adoption (orion measured 09-19) → Rust port → value, with atlas's l
 4. 🟢 **`bin/claim.mjs`, in production** (A38): advisory only; a claim in one project is invisible to another
    (`FINDINGS.md#claim-file`). Their verdict, the scope: *a claim makes sharing visible; the first answer is not to share.*
 
-5. **🟡 `who` reports TWO states and there are FOUR.** A leader lost **2 h 30** reading `running` for four
-   sessions sitting at their prompt. ✅ `context.mjs --sessions` prints `quiet <age>` — a MEASUREMENT, never
-   "at prompt". 🟢 Third: a session that has taken **no turn has no transcript at all**
-   (`FINDINGS.md#no-turn-yet`) — and `launch.mjs --prompt` now stops manufacturing them. 🟢 Fourth, measured
-   by the field 09-11: **CPU time separates *working* from *idle*** and `/proc` already carries it; one
-   sample each, so no threshold from it. 🔴 All of it belongs in `comm who` and cannot go there — A21 forbids
-   the import ⇒ an A21 amendment **and a split — both done 09-11; the states are BUILT 10-24 in `who` (A91): working / IDLE n min / WAITING / the runtime's word.**
+5. ✅ `who`'s states, BUILT 10-24 (A91, `#who-shows-the-turn`): working / IDLE n min / WAITING / the runtime's word, from
+   the runtime's own record - the 2 h 30 a leader lost reading `running` for four sessions at their prompt is closed.
+   Still true: a session that has taken no turn has no transcript (`#no-turn-yet`).
 
 6. 🟢 **A reply names what it answers** (`Answers:` on line 1; `exchange/README.md`, `#answered-mtime`). ⚠️ The row
    dates letters by FILENAME (C3, carried).

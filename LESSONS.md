@@ -284,3 +284,45 @@ refusé. ⚠️ **Et quand une garde participe à une MESURE, sa sortie doit pou
 Les trois sont armés désormais, chacun sur ce que la sortie CONTIENT et non sur le fait qu elle refuse : A49
 exige la chaîne suggérée, le bras du claim exige `you are asking as`. **Ce qui n est pas armé, et je le nomme :
 rien ne m oblige à me poser la question pour la PROCHAINE garde.** C est une forme, pas une garde.
+
+## §7 — J'ai effacé mon propre bras en remplaçant un bloc, et la suite serait restée verte.
+
+**Le 2026-10-25, vers 00h30.** Pour réécrire A89, j'ai remplacé tout le texte entre son en-tête et celui d'A58. Mais deux
+heures plus tôt, j'avais inséré A90 **devant A58, donc entre les deux**. A90 a disparu avec A89. Je ne l'ai vu que parce
+qu'une modification suivante cherchait une ancre dans A90 et ne l'a pas trouvée. Sans elle, la suite passait de 91
+contrôles à 90, **toute verte**, et la sonnerie après `send` n'était plus gardée par rien.
+
+### Le mécanisme
+
+**Les ancres étaient les miennes, posées par mes propres insertions.** « Insérer devant A58 » répété quatre fois a empilé
+A87, A88, A89 et A90 devant la même ancre. Remplacer « de A89 à A58 » a donc emporté tout ce qui avait été empilé après
+A89. Le contrôle que je faisais, l'assertion d'unicité de l'ancre, ne voit pas ce que contient le bloc.
+
+### Ce que ça a coûté
+
+Rien, de justesse : la propriété serait partie sans bras dans la version suivante. ⚠️ C'est la forme B à l'envers. Le
+bras ne rougit pas pour la mauvaise propriété : **il n'existe plus, et l'absence d'un bras ne rougit rien.**
+
+### La même soirée, des formes déjà cataloguées (pour le compte)
+
+- **Forme A, deux fois** : de vrais noms de projets écrits dans `FINDINGS.md` puis dans `STATUS.md`. **Le crochet
+  pre-commit les a arrêtés les deux fois**, et rien n'est sorti : la garde fait son travail. Et « an import is an
+  execution » enfreint deux fois : `node -e '…' <module>` met le module en `argv[1]` et lance son `main()` (`wake` a
+  refusé : pas de bus). Le relecteur a fait la même erreur la même nuit.
+- **Forme F** : j'ai écrit à work que son cas de `--ref` « devrait » déclencher la suggestion, sans l'avoir mesuré.
+  C'était faux. Je l'ai mesuré et corrigé une heure plus tard.
+- **Forme J, deux fois** : une sonde comptait 0 fenêtre pendant que la suite tournait (motif aveugle). Une autre ne
+  découpait pas sa liste (zsh ne découpe pas `$var`). Les deux ont été prises par un résultat impossible : 0 alors que
+  la suite tournait, et « tout manque ».
+- **Forme G, évitée** : « `.comm/stop/` sert à `restart.mjs` », vérifié avant de l'expédier. C'était faux.
+
+### La règle
+
+**Après un remplacement de bloc dans `test/attack.mjs`, compter les bras** (`check("A<n>` présents, chacun une fois),
+avant et après, et exiger le même ensemble plus ce que j'ajoute. Fait à la main le 10-25 : c'est ce qui a confirmé la
+restauration d'A90.
+
+### 🔴 Le contrôle
+
+**Pas encore armé, et je le nomme.** Une garde possible : la ligne `gate` du boot mémorise le nombre de contrôles de la
+dernière suite verte, et rougit quand il baisse sans un amendement. Elle est notée dans `STATUS.md` ▶ NEXT.
