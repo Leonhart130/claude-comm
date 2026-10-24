@@ -2857,6 +2857,23 @@ which matches no `send`; A75 catches that class too), a stub that rings after ev
 
 ⚠️ Not measured: the cost in a real session of one more hook per Bash call (a node start, ~50 ms, expected).
 
+## `#who-shows-the-turn` — `who` said "running" for an expert waiting 53 min on a bell nobody rang (2026-10-24)
+
+**atlas's leader, 09-25** (a brief at the repo root, unanswered for a month): `web` delivered, rang `done` and handed
+back. Its leader forgot the next bell, and for 53 min `comm who` read `● web running (pid 48812)`, inbox empty, exactly
+what a working expert looks like. The answer already existed: `liveAgents` collected `turnOf()`'s verdict (the
+runtime's own `sessions/<pid>.json`) for every session since `.3` (`#native-path`), and nothing rendered it.
+
+⇒ For a session alone on its inbox, `who` appends that verdict: `· working`, `· IDLE <n> min` (since the status
+changed), `· WAITING on a dialog`, the runtime's own word for a status this bus does not know (measured the same evening
+on work's leader: `shell`, a session waiting on its background shell), or `· turn ?` with no record. Several sessions on
+one inbox get none, since no single verdict is true there. Bytes first (A22): two narrative blocks in `comm.mjs` whose
+story already lives here (`#stale-ref`, `#A12`/`#A17`) became pointers, 1 281 B out against 591 B in. A91, with one
+stand-in and one variable per case, plus the two-session control. Mutated 3/3. On a real work expert: `· IDLE 43 min`.
+
+Not built: the brief's second ask, a leader's turn end that warns about an idle expert with an empty inbox. A
+line printed at every turn end is a line nobody reads; `who` now answers whoever asks.
+
 ## `#unstarted-session` — the bell answered Claude Code's trust dialog "No, exit" (2026-10-24)
 
 **deneb's leader, 2026-10-11:** `install.mjs --add-agent` made two folders Claude Code had never opened, `launch.mjs`

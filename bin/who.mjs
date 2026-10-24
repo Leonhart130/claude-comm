@@ -89,7 +89,7 @@ export function turnOf(pid, env) {
 	// `waiting` = a dialog is open (a permission prompt by default; read in the 2.1.283 binary, review #15 §8): a person
 	// must answer it, and a ring would type into it (#bell-into-typing) - so `send` prints no ring for it.
 	if (rec.status === "waiting") return { state: null, waiting: true, why: `it is WAITING on ${rec.waitingFor || "a dialog"} - a person must answer it` }
-	if (rec.status !== "busy" && rec.status !== "idle") return { state: null, why: `its runtime says '${rec.status}'` }
+	if (rec.status !== "busy" && rec.status !== "idle") return { state: null, status: String(rec.status), why: `its runtime says '${rec.status}'` }
 	return { state: rec.status, at: Number(rec.statusUpdatedAt) || null }
 }
 
@@ -117,6 +117,11 @@ export function renderWho(root, cfg, me, rest, { liveAgents: live_, pending }) {
 		// "is this session old enough to predate the hooks, i.e. deaf?", which
 		// otherwise has to be dug out of `ps`. Local time, dated when not today.
 		const started = l?.[0]?.since ? ` since ${l[0].since}` : ""
+		// THE TURN, not just "running" (atlas, 09-25: an expert waited 53 min for a bell nobody rang, shown `running`
+		// with an empty inbox). turnOf's verdict, rendered for ONE session only - several share an inbox, warned below.
+		const t = l?.length === 1 ? l[0].turn : null
+		const turn = !t ? "" : t.state === "busy" ? " · working" : t.state === "idle" ? ` · IDLE${t.at ? ` ${Math.max(0, Math.round((Date.now() - t.at) / 60000))} min` : ""}`
+			: t.waiting ? " · WAITING on a dialog" : t.status ? ` · ${t.status} (its runtime's word)` : " · turn ?"
 		const off = live.offBus?.[id]
 		// Name the declared value only when they AGREE. Reading `off[0]` alone
 		// reports N sessions under a value most of them do not have.
@@ -124,7 +129,7 @@ export function renderWho(root, cfg, me, rest, { liveAgents: live_, pending }) {
 		const names = off ? [...new Set(off.map((s) => s.declared))] : []
 		const many = l && l.length > 1 ? `  ⚠ ${l.length} SESSIONS SHARE THIS INBOX`
 			: !l && off ? `  ⚠ ${off.length} session(s) here declared OFF-BUS (CLAUDE_COMM_AGENT=${names.length === 1 ? names[0] : names.join(", ")})` : ""
-		console.log(`  ${l ? "●" : "○"} ${id.padEnd(18)} ${(l ? `running (pid ${l.map((x) => x.pid).join(",")})${started}` : "not running").padEnd(40)}${n ? `${n} pending` : ""}${many}`)
+		console.log(`  ${l ? "●" : "○"} ${id.padEnd(18)} ${(l ? `running (pid ${l.map((x) => x.pid).join(",")})${started}${turn}` : "not running").padEnd(40)}${n ? `${n} pending` : ""}${many}`)
 	}
 	// `who` answers WHO RECEIVES MAIL; a leader about to write a shared file is
 	// asking WHO HOLDS THIS DIRECTORY. A correctly-declared `none` reviewer is

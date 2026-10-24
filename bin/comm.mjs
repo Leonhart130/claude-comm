@@ -84,21 +84,9 @@ function loadConfig(root) {
 }
 
 /**
- * A session may DECLARE which agent it is; otherwise identity comes from the
- * directory, resolved against the config's PATHS, never its keys.
- *
- *   · a known agent  → that is who you are, whatever directory you are in
- *   · anything else  → NOT ON THE BUS: receive nothing, drain nothing
- *   · unset          → fall back to the directory (every existing install)
- *
- * Chosen so the unsafe case is the LOUD one. Not a security boundary; it stops
- * accidents, which is what actually happens in this topology.
- *
- * Matching ids instead of paths made `id === directory name` a load-bearing
- * invariant nothing enforced — four surfaces then gave four confident wrong
- * answers (FINDINGS.md#A12). Declaring exists because "one agent = one
- * directory" is wrong for a hub, which is exactly where you parallelise, and
- * five sessions silently shared one inbox (FINDINGS.md#A17).
+ * A session may DECLARE which agent it is; otherwise identity comes from the directory,
+ * resolved against the config's PATHS, never its keys (FINDINGS.md#A12, #A17):
+ *   · a known agent → that is who you are · anything else → NOT ON THE BUS · unset → the directory
  */
 const declaredAgent = () => {
 	const d = String(process.env.CLAUDE_COMM_AGENT ?? "").trim()
@@ -271,19 +259,8 @@ function lastSentTs(root, from, to) {
 }
 
 /**
- * A pointer at a file you did not write FOR THIS MESSAGE. Asked for by the ~/Dev/work
- * leader on 2026-09-06, from a defect he committed himself: the note carried the
- * substance, `--ref` pointed at a file holding YESTERDAY's verdict, and the bus
- * transported it without a word. The recipient would have opened something it had
- * already read and hunted for what was meant.
- *
- * A WARNING, never a refusal: "re-read what I already sent you" is legitimate, and
- * refusing it would push senders to --force, which turns off the file-exists rule too.
- * Computed PER RECIPIENT, so re-pointing one file at a second agent says nothing.
- *
- * 🔴 His negative control is THE arm (test/attack.mjs A45): a ref that was just
- * modified must produce NO warning. Without that, this is a limiter that fires for
- * everyone and passes every test it is given.
+ * A pointer at a file you did not write FOR THIS MESSAGE: a WARNING, never a refusal, computed
+ * PER RECIPIENT. A ref modified for this message must say nothing (A45). FINDINGS.md#stale-ref
  */
 function staleRef(root, from, to, refPath) {
 	const last = lastSentTs(root, from, to)

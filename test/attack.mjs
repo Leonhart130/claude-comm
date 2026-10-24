@@ -5518,6 +5518,52 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 		`from a leader session -> leader pids ${JSON.stringify(leaderPids(fromLeader))} (want only the OTHER session ${leaderSess.pid}, never the ringer's own)`)
 }
 
+// A91 — `who` SAYS WHETHER A SESSION IS WORKING OR WAITING, and for how long. atlas, 09-25: an expert waited 53 min
+// for a bell nobody rang while `who` read `● web running`, inbox empty - exactly what a working expert looks like.
+// One stand-in in `app`, one variable per case - the record its runtime keeps: busy, idle two minutes, a dialog, a
+// status this bus does not know (named in the runtime's own word), none. Positive control, the other variable: two
+// sessions on the one inbox, where no single verdict is true, so none may be printed.
+{
+	const r91 = mkdtempSync(join(tmpdir(), "comm-attack-whoturn-"))
+	mkdirSync(join(r91, "app"), { recursive: true })
+	mkdirSync(join(r91, ".comm"), { recursive: true })
+	writeFileSync(join(r91, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app" } }))
+	execFileSync("node", [join(PKG, "install.mjs"), r91], { stdio: "pipe" })
+	const bus91 = join(r91, ".comm", "bin", "comm.mjs"), fake91 = join(r91, "claude"), home = join(r91, "home")
+	writeFileSync(fake91, '#!/bin/sh\nsleep "$1"\n', { mode: 0o755 })
+	const standIn = () => { const env = { ...process.env, HOME: home }; delete env.CLAUDE_COMM_AGENT; delete env.CLAUDE_CONFIG_DIR
+		return spawn(fake91, ["40"], { cwd: join(r91, "app"), detached: true, stdio: "ignore", env }) }
+	const tickOf = (pid) => { const d = Date.now() + 4000; while (Date.now() < d) { try { const st = readFileSync(`/proc/${pid}/stat`, "utf8"); return st.slice(st.lastIndexOf(") ") + 2).split(" ")[19] } catch {} } return "" }
+	const sess = join(home, ".claude", "sessions")
+	const rec = (p, status, extra = {}) => { mkdirSync(sess, { recursive: true }); const f = join(sess, `${p.pid}.json`)
+		if (!status) rmSync(f, { force: true }); else writeFileSync(f, JSON.stringify({ pid: p.pid, procStart: p.tick, status, statusUpdatedAt: Date.now() - 120_000, ...extra })) }
+	const appLine = () => ((spawnSync("node", [bus91, "who"], { cwd: r91, encoding: "utf8" }).stdout || "").split("\n").find((l) => /^\s+[●○] app\b/.test(l)) || "")
+	const kids = [], got = {}
+	try {
+		const a = standIn(); kids.push(a)
+		const A = { pid: a.pid, tick: tickOf(a.pid) }
+		rec(A, "busy"); got.busy = appLine()
+		rec(A, "idle"); got.idle = appLine()
+		rec(A, "waiting", { waitingFor: "permission prompt" }); got.waiting = appLine()
+		rec(A, "shell"); got.shell = appLine()
+		rec(A, null); got.none = appLine()
+		rec(A, "idle")
+		const b = standIn(); kids.push(b)
+		rec({ pid: b.pid, tick: tickOf(b.pid) }, "busy"); got.two = appLine()
+	} finally {
+		for (const k of kids) try { process.kill(-k.pid) } catch {}
+		try { rmSync(r91, { recursive: true, force: true }) } catch {}
+	}
+	const ok = {
+		busy: /· working/.test(got.busy), idle: /· IDLE 2 min/.test(got.idle), waiting: /· WAITING on a dialog/.test(got.waiting),
+		shell: /· shell \(its runtime's word\)/.test(got.shell), none: /· turn \?/.test(got.none), two: /running \(pid \d+,\d+\)/.test(got.two) && !/·/.test(got.two),
+	}
+	check("A91 who says whether a session is working or waiting, and for how long",
+		Object.values(ok).every(Boolean),
+		Object.entries(ok).map(([k, v]) => `${k}=${v}${v ? "" : ` ("${(got[k] || "").trim()}")`}`).join("; ") +
+		" (busy, idle 2 min, a dialog, the runtime's own word, no record; positive control: two sessions on one inbox print no verdict)")
+}
+
 // A83 — `send`'s verdict over SEVERAL sessions, a relocated config dir, and a dialog (review #15 §5, §8,
 // `FINDINGS.md#review15`). Six mutants of `.3` survived A79 because it never had two sessions on one inbox, never a
 // `CLAUDE_CONFIG_DIR`, never a status outside busy/idle. Two stand-ins in `app`, each with its OWN HOME; one variable per
