@@ -39,6 +39,17 @@
           }
         ]
       }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if command -v node >/dev/null 2>&1; then node \"$CLAUDE_PROJECT_DIR/.claude/comm-hook.mjs\" post-tool; fi"
+          }
+        ]
+      }
     ]
   }
 }

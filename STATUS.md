@@ -1,25 +1,24 @@
-# STATUS — claude-comm, 2026-10-24 (sessions 4–24, late)
+# STATUS — claude-comm, 2026-10-25 (sessions 4–24)
 
 Design and gates are in `README.md`; **this file is only what is OPEN.** Keep it short — when it grows,
 fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-10-24, near midnight, after 26 days off. `2026-10-24.2` is in all ten trees. **WORK IS THE MAIN FIELD NOW** - the
-owner: atlas inactive and not relaunched for days, "c'est Work qui prend le relais … ce sera principalement
-avec lui". He gave a standing green light: "je te laisse gérer … T'as mon feu vert pour tout.")*
+*(2026-10-25 ~01:30, end of a session that started 10-24 after 26 days off. `2026-10-25.1` is in all ten trees. **WORK IS
+THE MAIN FIELD** - the owner: atlas inactive and not relaunched for days, "c'est Work qui prend le relais". Standing
+green light: "je te laisse gérer … T'as mon feu vert pour tout." Review #19 ran and is DISPOSED (`FINDINGS.md#review19`).)*
 
-1. **Read work's answers first** (its channel): the two real-session measurements tonight's fixes owe - an expert's
-   close seen whole then gone ~2 s later (`#close-after-the-turn`), and a `send` to a resting agent waking it at once
-   (`#ring-after-send`). Both are faked in their arms; work is the measurement. Its usage question is there too.
-2. **Work's ideas 1 and 2 - usage readings for experts, `comm stop <agent>`** - both need a MID-TURN channel, and the
-   `PostToolUse` hook installed tonight is one (`additionalContext`). Read `FINDINGS.md#midturn-channel` FIRST (measured
-   09-20), then design. Not built.
-3. **`turn-corpus` still red - 10 inputs absorbed by a turn read ringable** (`#compacted-at-rest`): 8 look like the
-   corpus's own FIFO pairing (unverified), 1 a late `!` row, 1 unexamined. Settle the 8 first.
-4. **A31 blames the suite for a live session's own registry rewrite** (#15's first name, F below; 10-24: a `/clear`).
-5. **Review #19 - LAUNCHED 10-24 ~23:45 on the owner's green light** (`BRIEF-adversarial-19.md`, rewritten: tonight's
-   two releases first). Dispose of `review/REVIEW-19.md` point by point, mutations included, as for #18.
+1. **Read work's channel first** - two real-session measurements are owed there: an expert's close SEEN whole then gone
+   ~2 s later, and a `send` to a resting agent waking it unasked. Measured for real tonight on this repo's own reviewer:
+   its `send` rang the leader 213 ms later (`post-tool`), its after-turn close went 2.3 s after its turn ended.
+2. **Work's ideas 1-2 - usage readings for experts, `comm stop <agent>`** - both want a MID-TURN channel; the
+   `PostToolUse` hook installed 10-24 is one (`additionalContext`). Read `FINDINGS.md#midturn-channel` FIRST. Not built.
+3. 🔴 **The bus is at 57 936 of 58 000 B (A22).** The next change to `comm.mjs`/`who.mjs` moves narrative to FINDINGS first.
+4. **Review #19 §5 - `leak-check` refuses almost any binary (rule 5)**: the fix changes what rules mean in a binary -
+   the owner's call; ask him with the measured rate (18 of 20 random 100 KB files).
+5. **Named, unarmed**: the `briefs` row's unreadable-root branch, and its reply-older-than-brief branch (only the
+   presence arms ran in `--prove-red`); A31 still blames the suite for a live session's own registry rewrite (F below).
 6. **Letters waiting for a bell**: deneb's (its own new channel) and atlas's - both leaders not running.
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a
@@ -35,8 +34,6 @@ tab). A new kitty arm uses `bench()`/`benchRun()`/`besideMe()`, never a bare `ki
 **A0 - ✅ review #18 disposed 09-28** (`#review18`). **`boot --prove-red` took ~49 min 4 wide under load** (the memory
 said ~12): budget for it.
 
-🔴 **The bus is at 57 816 of 58 000 B (A22).** The next change to `comm.mjs`/`who.mjs` moves narrative to FINDINGS FIRST.
-
 **B - the registry half of #13 §1, MEASURED 09-27 by A31 going red on my own end-to-end probe**: a hand-fire from
 inside a session in the project rewrites that session's registry entry. Design in `FINDINGS.md#review13` "Named, not
 fixed" - gate `record()` AND `refresh()` on the witness. Touches `Stop`, the hottest path: own change, own arm,
@@ -48,8 +45,7 @@ fixed" - gate `record()` AND `refresh()` on the witness. Touches `Stop`, the hot
 **D - `#bell-into-typing`**: the bell reads the AGENT's turn, never the PERSON's input line - it cut the owner's
 half-typed message 09-27. He says it is not serious, keep writing. Named, not fixed.
 
-**E - `who` still prints only `running`** (open item 5): `turnOf()` now lives in `who.mjs` and `send` uses it - `who`
-could print the same verdict, after the byte cut above.
+**E - ✅ `who` prints each session's turn since 10-24** (`#who-shows-the-turn`, A91): working, IDLE n min, a dialog, the runtime's word.
 
 **F - carried, in priority order:** #15's names (`#review15`: the prove-red registry control blames itself for a live
 session's own `compact` rewrite - and A31 for a `/clear`, 10-24, ▶ NEXT 4; the prettier header and `readJson` outside the print) · `REVIEW-12b.md`'s seven points (`FINDINGS.md#review12b`, each already measured) ·
@@ -98,7 +94,7 @@ order:** adoption (orion measured 09-19) → Rust port → value, with atlas's l
    (`FINDINGS.md#no-turn-yet`) — and `launch.mjs --prompt` now stops manufacturing them. 🟢 Fourth, measured
    by the field 09-11: **CPU time separates *working* from *idle*** and `/proc` already carries it; one
    sample each, so no threshold from it. 🔴 All of it belongs in `comm who` and cannot go there — A21 forbids
-   the import ⇒ an A21 amendment **and a split — both done 09-11; the states themselves are not built.**
+   the import ⇒ an A21 amendment **and a split — both done 09-11; the states are BUILT 10-24 in `who` (A91): working / IDLE n min / WAITING / the runtime's word.**
 
 6. 🟢 **A reply names what it answers** (`Answers:` on line 1; `exchange/README.md`, `#answered-mtime`). ⚠️ The row
    dates letters by FILENAME (C3, carried).
