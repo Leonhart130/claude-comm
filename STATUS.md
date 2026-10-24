@@ -10,16 +10,14 @@ fold the settled parts into the README.
 THE MAIN FIELD** - atlas inactive, not relaunched for days; "c'est Work qui prend le relais". Standing green light:
 "je te laisse gérer … T'as mon feu vert pour tout." Review #19 is DISPOSED (`FINDINGS.md#review19`).)*
 
-1. **Read work's channel first** (`exchange/work-leader/in/`, newest): two real-session measurements are owed - an
-   expert's close SEEN whole then gone ~2 s later (`.comm/close/<agent>.json` `turn_ended`), and a `send` to a resting
-   agent waking it unasked. Already measured on this repo's own reviewer 10-24: its `send` rang the leader 213 ms later
-   (`post-tool`), its after-turn close went 2.3 s after its turn. Also unmeasured: that an agent's first start on `.2`
-   got the CHANGELOG news (`#docs-from-code`) - read one work expert's transcript start, read-only.
-2. **Work's idea 1 - usage readings for experts**: design answered by work 10-24 (`…23h18-l-usage…`): the leader reads
-   `claude.ai/settings/usage` ~hourly, a line in a file, stop at 93 % week / 98 % session; the gap is the reading's
-   AGE. Plan: a file the `PostToolUse` hook shows each expert with its age, once per change. Read
-   `FINDINGS.md#midturn-channel` FIRST; write work the shape before building. Then idea 2 (`comm stop <agent>`, the
-   same channel) and `launch.mjs --resume <session>` (work, 10-24).
+1. **Read work's channel first** (`exchange/work-leader/in/`): it owes two real measurements - an expert's close seen
+   whole then gone ~2 s later (`turn_ended` in `.comm/close/<agent>.json`), a `send` waking a resting agent unasked.
+   (Our own reviewer, 10-24: rung 213 ms after its send; closed 2.3 s after its turn.) Unmeasured too: that an agent's
+   first start on `.2` got the CHANGELOG news - read one work expert's transcript start, read-only.
+2. **Work's idea 1, usage for experts** (work's answer, `…23h18-l-usage…`): read ~hourly from `claude.ai/settings/usage`
+   into a file; stop at 93 % week / 98 % session; the gap is the reading's AGE. Plan: the `PostToolUse` hook shows it with
+   its age, once per change. `#midturn-channel` FIRST; send work the shape before building. Then `comm stop <agent>`
+   (same channel) and `launch.mjs --resume <session>`.
 3. 🔴 **The bus is at 57 936 of 58 000 B (A22).** The next change to `comm.mjs`/`who.mjs` moves narrative to FINDINGS first.
 4. **Arm the arm count** (`LESSONS.md` §7): a block replacement deleted A90 on 10-25 and the suite would have stayed
    green at 90. The boot `gate` row keeps the last green count and reddens when it drops without an amendment. Needs
