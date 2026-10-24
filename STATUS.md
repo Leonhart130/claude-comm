@@ -19,12 +19,10 @@ THE MAIN FIELD** - atlas inactive, not relaunched for days; "c'est Work qui pren
    its age, once per change. `#midturn-channel` FIRST; send work the shape before building. Then `comm stop <agent>`
    (same channel) and `launch.mjs --resume <session>`.
 3. 🔴 **The bus is at 57 936 of 58 000 B (A22).** The next change to `comm.mjs`/`who.mjs` moves narrative to FINDINGS first.
-4. **Arm the arm count** (`LESSONS.md` §7): a block replacement deleted A90 on 10-25 and the suite would have stayed
-   green at 90. The boot `gate` row keeps the last green count and reddens when it drops without an amendment. Needs
-   its own `--prove-red` arm (~40-50 min under `systemd-run`).
-5. **Named, unarmed**: the `briefs` row's unreadable-root branch and its reply-older-than-brief branch (only the
-   presence arms ran in `--prove-red`); boot's own registry control still blames itself for a live session's rewrite
-   (A31's twin, fixed 10-25 - F below).
+4. **Arm the arm count** (`LESSONS.md` §7: a block replacement deleted A90, the suite green at 90): the `gate` row keeps
+   the last green count and reddens on a drop. Its own `--prove-red` arm (~40-50 min).
+5. **Named, unarmed**: the `briefs` row's unreadable-root and reply-older-than-brief branches; boot's registry control
+   still blames itself for a live session's rewrite (A31's twin, fixed 10-25).
 6. 🔴 **AMEND `stranded-untold`, demanded by the close 10-25**: acked 15x (atlas), 4x (rigel), 4x (cobalt), each for an old
    letter to an agent not running in a field I do not run. Measure a NEW strand: key the ack on the letter's id, so a
    letter once named stays named and only a newly stranded one warns. Gated change, its own arm, `--amended`.
