@@ -233,11 +233,19 @@ export function rowVerdict(r) {
 	// An API error or a usage limit ends the turn with a synthetic reply and no turn_duration.
 	if (r.type === "assistant") return r.isApiErrorMessage || r.message?.model === "<synthetic>" ? "idle" : "busy"
 	if (r.type !== "user") return null
+	// A compaction's SUMMARY is a `user` row nobody typed, and it is written at rest as often as mid-turn: 30 of the
+	// 35 on this machine (2026-10-24) were "Compacted while idle" and each read busy here, so no bell rang them for
+	// hours (work 10-11 and 10-24, deneb 10-11). It decides nothing; the row before it does - the closed turn,
+	// or the turn the compaction cut into. FINDINGS.md#compacted-at-rest
+	if (r.isCompactSummary) return null
 	const c = r.message?.content, t = textOf(c)
 	if (/\[Request interrupted by user/.test(t) && (hasToolResult(c) || /^\s*\[Request interrupted/.test(t))) return "idle"
 	// Meta rows are written at rest (a permission granted, a rename) EXCEPT these, each followed by
-	// a model turn every time it was seen: a Stop hook block (257) and two usage-limit resumes (9).
-	if (r.isMeta) return /^\s*(Stop hook feedback:|You can continue now|Your claude\.ai usage limit has reset)/.test(t) ? "busy" : null
+	// a model turn every time it was seen: a Stop hook block (257) and two usage-limit resumes (9);
+	// and since the runtime's own cross-session messages, "Another Claude session sent a message" -
+	// 303 of 303, 2026-10-24. Unread, it was 13 of the 23 inputs turn-corpus found absorbed by a turn
+	// this reader called ringable. FINDINGS.md#compacted-at-rest
+	if (r.isMeta) return /^\s*(Stop hook feedback:|You can continue now|Your claude\.ai usage limit has reset|Another Claude session sent a message)/.test(t) ? "busy" : null
 	// A slash command runs no model turn. A `!` shell command DOES: every one measured.
 	if (!hasToolResult(c) && /^\s*(<command-name>|<command-message>|<local-command-)/.test(t)) return null
 	return "busy"

@@ -4423,11 +4423,15 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 		["closed, then a ! shell command", [...closed, U("<bash-input>ls</bash-input>"), U("<bash-stdout>a</bash-stdout><bash-stderr></bash-stderr>")], "busy"],
 		["closed, then a usage-limit resume", [...closed, U("You can continue now. Continue the task you were working on", { isMeta: true })], "busy"],
 		["closed, then a doorbell typed at rest", [...closed, U("[claude-comm] doorbell. This line is from the BUS")], "busy"],
+		["closed, then another session's message", [...closed, U("Another Claude session sent a message:\n<agent-message from=\"a1\">", { isMeta: true })], "busy"],
 		["closed, then a subagent's rows", [...closed, { ...A("tool_use"), isSidechain: true }, { ...TR(), isSidechain: true }], "idle"],
 		["ended on an API error", [U("do it"), SYN("API Error: 529 Overloaded", { isApiErrorMessage: true })], "idle"],
 		["ended with a synthetic reply", [U("do it"), SYN("No response requested.")], "idle"],
 		["interrupted during a tool", [U("do it"), A("tool_use"), TR("[Request interrupted by user for tool use]")], "idle"],
 		["interrupted while thinking", [U("do it"), { type: "user", timestamp: at, message: { role: "user", content: [{ type: "text", text: "[Request interrupted by user]" }] } }], "idle"],
+		// the two compaction shapes, as the 35 on this machine wrote them (FINDINGS.md#compacted-at-rest)
+		["closed, then compacted while idle", [...closed, X("pr-link"), S("compact_boundary"), U("This session is being continued from a previous conversation that ran out of context.", { isCompactSummary: true }), X("attachment"), { ...S("informational"), content: "Compacted while idle, before the prompt cache expired" }], "idle"],
+		["compacted mid-turn, the turn going on", [U("do it"), A("tool_use"), TR(), S("compact_boundary"), U("This session is being continued from a previous conversation that ran out of context.", { isCompactSummary: true }), X("attachment")], "busy"],
 	]
 	const got = CASES.map(([name, rows, want]) => ({ name, want, got: wake.turnState(rows).state }))
 	const wrong = got.filter((c) => c.got !== c.want)

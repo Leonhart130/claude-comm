@@ -2732,6 +2732,44 @@ the property its mutation removed.
   right (two at rest, one working). That queued doorbells drop to zero in the field waits for a recount of a day
   of transcripts.
 
+## `#compacted-at-rest` — a session compacted while idle read "mid-turn", and nobody could ring it (2026-10-24)
+
+**Reported three times by two fields** — work 10-11 and 10-24 (one expert each), deneb 10-11 (both its experts): `wake` answered `mid-turn, not rung (last transcript row: a prompt, 9270s ago)` to a session sitting
+at an empty prompt under *"Compacted while idle, before the prompt cache expired"*. Mail waited hours; each leader
+typed into the window by hand after reading the screen. Work's leader named the cause from the code: the compaction's
+summary is a `user` row (`isCompactSummary: true`), and `rowVerdict` reads an unclassified user row as busy.
+
+**Measured on every compaction on this machine** (35, in 23 transcripts; truth = the next decisive row - an assistant
+row means the turn went on, a typed prompt or nothing means it was at rest):
+
+| compaction | n | shipped | with the summary deciding nothing |
+| --- | --- | --- | --- |
+| at rest, "Compacted while idle" written | 30 | **busy, 30/30** | idle, 30/30 |
+| mid-turn (the turn went on) | 4 | busy | busy, 4/4 - the row BEFORE it decides |
+| a manual `/compact` in a 1-s test session with no `turn_duration` at all | 1 | busy | busy - unrelated to the summary, unexplained |
+
+⇒ `if (r.isCompactSummary) return null`. The witness itself (work's expert, its transcript cut at line 2094): shipped `busy - a prompt`,
+fixed `idle - the turn closed`. A62 carries both shapes; the mutant that removes the clause reddens the idle one, the
+mutant that answers `idle` for it reddens the mid-turn one.
+
+### Found on the way: `turn-corpus` was red with no code change (`#A20` - the world moved)
+
+Re-run for this fix, `test/turn-corpus.mjs` (CLI 2.1.281 … 2.1.310 now; 2.1.229 … 2.1.270 on 09-13) reported **23
+typed inputs absorbed by a running turn while the reader said ringable** - with the code before this fix too, so not
+caused by it. The fix itself moved resting prompts read busy **34 → 9** and queued-mid-turn read ringable stayed **0**.
+
+- **13 of the 23: a turn-starter the reader did not know.** The runtime's cross-session messages arrive as a META
+  user row *"Another Claude session sent a message:"*, and a model turn follows it **303 times of 303** on this
+  machine - the same evidence `Stop hook feedback:` has (257). Added to the meta starters; the corpus control hides it
+  too, so the control still separates the readers. **23 → 10.**
+- **8 of the 10 look like the corpus's own pairing, NOT the reader** - unverified. In each the input was taken at once
+  (dequeue, then that meta row), so "idle" was true at its instant; the corpus pairs a `remove … absorbed` with the
+  OLDEST pending enqueue, and interleaved enqueue/dequeue rows can shift that pairing. Named, not measured.
+- **1: a `!` command whose input row lands late** (rigel, 09-28 23:44): `<bash-input>` is stamped 23:44:16 and
+  written AFTER an enqueue at 23:44:20, so for the command's 33 s nothing in the transcript showed it running. No
+  transcript reader can see that; the runtime's `sessions/<pid>.json` status might. Named, not fixed.
+- **1 unexamined** (rigel 10-02 14:01:51, a prompt carrying an upload).
+
 ## `#cache-lives-an-hour` — resuming an idle expert after an hour re-writes its whole context
 
 **Asked by the owner 2026-09-13, through atlas's leader:** *(paraphrased)* waking an agent an hour later at 600k tokens

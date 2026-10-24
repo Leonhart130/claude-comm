@@ -17,7 +17,7 @@
  * into work. A resting prompt read busy is reported and tolerated — it costs a later ring.
  *
  * THE CONTROL moves one variable: the same reader, the same corpus, with the two turn-starters
- * learned on 2026-09-13 hidden (a `!` shell command, a usage-limit resume). It must find
+ * learned since 2026-09-13 hidden (a `!` shell command, a usage-limit resume, another session's message). It must find
  * interrupting misreads, or this corpus cannot tell a good reader from the one before it, and
  * the verdict says so. Re-run when the CLI moves: its row vocabulary is not a contract.
  * FINDINGS.md#wake-mid-turn
@@ -35,7 +35,7 @@ const NOT_A_PROMPT = /^\s*(<command-name>|<command-message>|<local-command-|<bas
 const isPrompt = (r) => r.type === "user" && !r.isMeta && !r.isSidechain && !r.isCompactSummary && !isTR(r.message?.content) &&
 	/\S/.test(textOf(r.message?.content)) && !NOT_A_PROMPT.test(textOf(r.message?.content))
 const STARTER = (r) => r.type === "user" && (r.isMeta
-	? /^\s*(You can continue now|Your claude\.ai usage limit has reset)/.test(textOf(r.message?.content))
+	? /^\s*(You can continue now|Your claude\.ai usage limit has reset|Another Claude session sent a message)/.test(textOf(r.message?.content))
 	: /^\s*<bash-(input|stdout|stderr)>/.test(textOf(r.message?.content)))
 
 function measure(dir, hideStarters) {
