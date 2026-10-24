@@ -328,7 +328,9 @@ try {
 		if (label && seen !== label) {
 			const entry = readFileSync(join(inst.from, "CHANGELOG.md"), "utf8").split(/^## /m).find((e) => e.startsWith(label + " "))
 			if (entry) {
-				const body = entry.slice(entry.indexOf("\n") + 1).trim()
+				// the entry is written from the project root; an expert runs from its own folder (A74 caught the root spelling)
+				const bin = relative(agentRoot, join(projectRoot, ".comm", "bin")) || ".comm/bin"
+				const body = entry.slice(entry.indexOf("\n") + 1).trim().replace(/node \.comm\/bin\//g, `node ${bin}/`)
 				notices.push(`claude-comm is now ${label} in this project - what changed for you, said once per version:\n` +
 					(body.length > 2400 ? body.slice(0, 2400) + " …" : body) +
 					`\n  Every command, generated from the installed code: ${join(projectRoot, ".comm", "README.md")} - or any tool's --help.`)
