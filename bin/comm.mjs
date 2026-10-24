@@ -32,7 +32,7 @@ import {
 	readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync,
 	readdirSync, renameSync, statSync, lstatSync, readlinkSync,
 } from "node:fs"
-import { join, dirname, resolve, relative, sep, basename } from "node:path"
+import { join, dirname, resolve, relative, sep, basename, normalize, isAbsolute } from "node:path"
 // A21 permits a relative import of a BUS file and checks it transitively; see
 // bin/who.mjs's header and FINDINGS.md#bus-split.
 import { liveAgents as liveAgentsImpl, renderWho } from "./who.mjs"
@@ -190,9 +190,13 @@ function whereItActuallyIs(root, cfg, from, to, ref) {
 	const base = refBase(cfg, from, to)
 	const seen = new Set()
 	const hits = []
-	for (const [label, dir] of [["the project root", "."], [`your own directory ('${from}')`, cfg.agents[from] ?? "."]]) {
-		const rel = dir === "." ? bare : `${dir}/${bare}`
-		if (seen.has(rel) || !existsSync(join(root, rel))) continue
+	// The ref AS TYPED first, then its bare name, from the root and from the sender's own directory. Work's leader,
+	// 2026-10-24: `redaction/X.md` sent to `agence` existed from the root and was suggested nowhere - only bare names were.
+	const mine = cfg.agents[from] ?? "."
+	for (const [label, typed] of [["the project root", String(ref)], [`your own directory ('${from}')`, `${mine}/${ref}`],
+		["the project root", bare], [`your own directory ('${from}')`, `${mine}/${bare}`]]) {
+		const rel = normalize(typed)
+		if (seen.has(rel) || rel.startsWith("..") || isAbsolute(rel) || !existsSync(join(root, rel))) continue
 		seen.add(rel)
 		// Expressed FROM THE BASE, because that is the string the sender has to type.
 		const up = base.dir === "." ? "" : base.dir.split("/").map(() => "../").join("")

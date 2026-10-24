@@ -16,7 +16,7 @@
  * result, which is this project's signature failure mode.
  */
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync, statSync, lstatSync, symlinkSync, cpSync, utimesSync, chmodSync, renameSync, appendFileSync } from "node:fs"
-import { join, delimiter, resolve } from "node:path"
+import { join, delimiter, resolve, dirname, basename } from "node:path"
 import { execFileSync, spawnSync, spawn } from "node:child_process"
 import { createHash, randomUUID } from "node:crypto"
 import { pathToFileURL } from "node:url"
@@ -3627,9 +3627,20 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		const nowhere = c44(["send", "db", "--from", "leader", "--ref", "NO-SUCH-FILE.md", "--note", "x"])
 		const nowhereOut = `${nowhere.stdout || ""}${nowhere.stderr || ""}`
 		const quiet = nowhere.status !== 0 && !/found at/.test(nowhereOut)
+		// work's leader, 2026-10-24: a PATH typed from the root (`sub/DEEP.md`), not only a bare name
+		mkdirSync(join(r44, "sub"), { recursive: true }); writeFileSync(join(r44, "sub", "DEEP.md"), "deep\n")
+		const deep = c44(["send", "db", "--from", "leader", "--ref", "sub/DEEP.md", "--note", "x"])
+		const deepSuggests = deep.status !== 0 && /found at the project root: pass\s+--ref \.\.\/sub\/DEEP\.md/.test(`${deep.stdout || ""}${deep.stderr || ""}`)
+		// and never a path OUT of the project: a file beside the root, typed as ../X from it, is not suggested
+		const outside = join(dirname(r44), `OUTSIDE-${basename(r44)}.md`); writeFileSync(outside, "x\n")
+		const out = c44(["send", "db", "--from", "leader", "--ref", `../OUTSIDE-${basename(r44)}.md`, "--note", "x"])
+		rmSync(outside, { force: true })
+		const staysIn = out.status !== 0 && !/found at/.test(`${out.stdout || ""}${out.stderr || ""}`)
 		check("A49 a missed --ref names the string that would have worked",
-			suggests && quiet,
+			suggests && quiet && deepSuggests && staysIn,
 			`a file that exists at the root, referenced without the ../ -> suggestion printed=${suggests}; ` +
+			`a path typed from the root (sub/DEEP.md) -> ../sub/DEEP.md suggested=${deepSuggests}; ` +
+			`a file just OUTSIDE the project -> no suggestion=${staysIn}; ` +
 			`CONTROL, a file that exists nowhere -> no suggestion=${quiet} (a suggestion printed ` +
 			`unconditionally would point the next agent at a path that does not exist either)`)
 	}

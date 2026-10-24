@@ -1521,6 +1521,23 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 	}
 }
 
+// -- 5b'. briefs left at the root: is a peer waiting on me THERE? ------------
+// 2026-10-24: three briefs atlas's leader left at this repo's root (BRIEF-from-*.md, 09-18..09-26) sat a month with no
+// reply - the owner's own request among them - while every channel row above read green: they were not in exchange/.
+// A brief is answered when REPLY-to-<the same name>.md stands beside it, the name its writer asked for. A root that
+// cannot be listed is said, never read as "no brief" (LESSONS form E).
+{
+	let names = null, why = null
+	try { names = readdirSync(ROOT).filter((f) => /^BRIEF-from-.+\.md$/.test(f)) } catch (e) { why = e.code || e.message }
+	const reply = (f) => f.replace(/^BRIEF-from-/, "REPLY-to-")
+	const open = names ? names.filter((f) => !existsSync(join(ROOT, reply(f)))) : []
+	const at = (f) => { try { return statSync(join(ROOT, f)).mtimeMs } catch { return Date.now() } }
+	if (why) row("briefs", WARN, `the repo root could not be listed (${why}) - a brief left there CANNOT BE SEEN`)
+	else if (open.length) row("briefs", WARN, `UNANSWERED - ${open[0]} left at the root ${age(Date.now() - at(open[0]))} ago` +
+		(open.length > 1 ? ` (+${open.length - 1} more)` : "") + ` - its writer reads ${reply(open[0])}`, open.map((f) => `unanswered:${f}`))
+	else row("briefs", OK, names.length ? `${names.length} brief(s) at the root, each answered beside it` : "no brief left at the root")
+}
+
 // -- 5c. did the previous session close? ------------------------------------
 /**
  * The boot and the close are one loop, and this row is where they touch. A close writes
@@ -2241,6 +2258,17 @@ function proveRed() {
 	arm("tree: a commit never pushed", "tree", WARN,
 		() => { writeFileSync(scratch, "x\n"); g("add", "-A"); g("commit", "-qm", "unpushed") },
 		() => { g("reset", "-q", "--hard", baseSha); rmSync(scratch, { force: true }) })
+
+	// THE BRIEF ROW (10-24): one variable, a brief at the root with no reply beside it. BRIEF-*/REPLY-* are gitignored,
+	// so the copy starts with none; the positive control is the same brief WITH its reply, which must read answered.
+	const brief = join(pkg, "BRIEF-from-armed-peer.md"), briefReply = join(pkg, "REPLY-to-armed-peer.md")
+	arm("briefs: a brief left at the root has no reply", "briefs", WARN, () => writeFileSync(brief, "# x\n"), () => rmSync(brief, { force: true }))
+	if (selected("briefs: the same brief WITH its reply")) {
+		writeFileSync(brief, "# x\n"); writeFileSync(briefReply, "# y\n")
+		const lv = level(run(true), "briefs")
+		rmSync(brief, { force: true }); rmSync(briefReply, { force: true })
+		ran--; assert("briefs: the same brief WITH its reply", lv === OK, `level=${LV[lv]} (want ok)`)
+	}
 
 	const claudeMd = join(pkg, "CLAUDE.md")
 	arm("budget: tier 0 outgrows its cap", "budget", RED,
