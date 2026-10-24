@@ -225,6 +225,27 @@ if (blocks.length && !has("--force")) {
 	process.exit(3)
 }
 
+// ── THE TURN END THIS CLOSE TAKES AWAY, given back ───────────────────────────────────
+// Reported by work's leader 2026-10-24, and measured in its tree: two experts sent `done` and
+// closed themselves in the same turn, and neither rang the idle leader - no row in
+// .comm/wake/rings.jsonl - while the third, which stayed open, rang it 16 s after its send. The
+// doorbell is rung by the Stop hook at a turn END (install.mjs's stub), and a session whose window
+// closes never reaches one: every clean finish lost its ring. So this runs what that Stop hook
+// would have run, BEFORE the window goes - the same `wake --root`, with every rule of wake intact:
+// never this session, never into a running turn, the quiet period. After a refusal above it does
+// not run: the agent stays open and its own turn end rings. Its answer goes into the close record,
+// because nothing printed after the close can be read. A87.
+let rings = null
+if (root) {
+	const w = spawnSync(process.execPath, [fileURLToPath(new URL("wake.mjs", import.meta.url)), "--root", root, "--json",
+		...(has("--dry-run") ? ["--dry-run"] : [])], { cwd: root, encoding: "utf8", timeout: 10000 })
+	try { rings = JSON.parse(w.stdout).results } catch { rings = { failed: `wake exit ${w.status}${w.error ? ` (${w.error.code})` : ""}` } }
+	state.rings = rings
+	if (Array.isArray(rings)) for (const r of rings)
+		console.log(r.sent ? `close: rang ${r.agent} (pid ${r.pid}) before closing` : `close: ${r.agent}: ${r.dryRun ? "would be rung" : r.why}`)
+	else console.error(`close: ⚠ could not ring anyone before closing - ${rings.failed}; an idle recipient of this session's mail is not told`)
+}
+
 if (has("--dry-run")) {
 	console.log(JSON.stringify({ ...state, would_close: true }, null, 1))
 	process.exit(0)

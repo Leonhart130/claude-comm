@@ -4108,6 +4108,88 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 		`which is why the probe is detached${caller51 ? "" : " — THE ARM COULD NOT RUN: no kitty window for this suite"}`)
 }
 
+// A87 — AN AGENT THAT CLOSES ITSELF RINGS FIRST WHAT ITS OWN TURN END WOULD HAVE RUNG. Work's leader, 2026-10-24,
+// measured in its tree: two experts sent `done` and closed themselves in the same turn, and the idle leader was never
+// rung - the doorbell rides the Stop hook at a turn END, and a closed window never reaches one. The leader here is a
+// fake `claude` idle in a bench pane, its terminal in raw mode, writing down every byte typed into it: the arm reads
+// the bell ARRIVE, never an exit code. A matched pair, one variable: the expert first closes with nothing waiting for
+// anyone (nothing may be typed), then sends `done` and closes (the bell must reach the leader's window).
+{
+	const r87 = mkdtempSync(join(tmpdir(), "comm-attack-closering-"))
+	const opened87 = []
+	atExit(() => {
+		for (const [sock, id] of opened87)
+			try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
+		try { rmSync(r87, { recursive: true, force: true }) } catch {}
+	})
+	mkdirSync(join(r87, ".comm", "bin"), { recursive: true })
+	mkdirSync(join(r87, "db"), { recursive: true })
+	writeFileSync(join(r87, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", db: "db" } }))
+	for (const f of ["comm.mjs", "who.mjs", "launch.mjs", "wake.mjs", "session-registry.mjs", "close.mjs", "claim.mjs"])
+		cpSync(join(PKG, "bin", f), join(r87, ".comm", "bin", f))
+	const C87 = join(r87, ".comm", "bin", "close.mjs"), B87 = join(r87, ".comm", "bin", "comm.mjs")
+	writeFileSync(join(r87, "db", "DONE.md"), "done\n")
+	const fake87 = join(r87, "claude")
+	try { symlinkSync(process.execPath, fake87) } catch {}
+	const typed = join(r87, "typed.txt"), record = join(r87, ".comm", "close", "db.json")
+	const wk87 = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
+	const b87 = await bench()
+	const there = (id) => wk87.windows().some((w) => w.sock === b87.sock && w.id === id)
+	const pane = (cwd, agent, script) => {
+		const id = Number(spawnSync("kitten", ["@", "--to", `unix:${b87.sock}`, "launch", "--type=window", "--keep-focus", ...besideMe(b87),
+			`--cwd=${cwd}`, `--env=CLAUDE_COMM_AGENT=${agent}`, fake87, script], { encoding: "utf8", timeout: 10000 }).stdout)
+		if (Number.isInteger(id) && id > 0) opened87.push([b87.sock, id])
+		return Number.isInteger(id) && id > 0 ? id : null
+	}
+	// the expert waits for `go`, so its mark is on the window before it acts (A58's pattern), then runs `steps`
+	const expert = (name, steps) => {
+		const go = join(r87, `${name}.go`), script = join(r87, `${name}.cjs`)
+		writeFileSync(script, `const{spawnSync}=require("node:child_process"),fs=require("node:fs");` +
+			`const t=setInterval(()=>{if(!fs.existsSync(${JSON.stringify(go)}))return;clearInterval(t);` +
+			steps.map((a) => `spawnSync(process.execPath,${JSON.stringify(a)},{cwd:${JSON.stringify(join(r87, "db"))},stdio:"ignore"});`).join("") +
+			`setTimeout(()=>{},20000)},50)`)
+		const id = pane(join(r87, "db"), "db", script)
+		if (!id) return { id: null, gone: false }
+		spawnSync("kitten", ["@", "--to", `unix:${b87.sock}`, "set-user-vars", "--match", `id:${id}`, "CLAUDE_COMM_LAUNCHED=db"], { timeout: 5000 })
+		writeFileSync(go, "")
+		let gone = false
+		for (const until = Date.now() + 15000; Date.now() < until && !gone; nap(100)) gone = !there(id)
+		return { id, gone }
+	}
+	const readRecord = () => { try { return JSON.parse(readFileSync(record, "utf8")) } catch { return null } }
+
+	let leaderUp = false, quiet = null, quietRings = null, nothingTyped = false, loud = null, loudRings = null, arrived = false, sentDone = false
+	if (b87) {
+		const ls = join(r87, "leader.cjs")
+		writeFileSync(ls, `const fs=require("fs");fs.writeFileSync(${JSON.stringify(typed)},"");` +
+			`if(process.stdin.setRawMode)process.stdin.setRawMode(true);process.stdin.on("data",(d)=>fs.appendFileSync(${JSON.stringify(typed)},d))`)
+		const lid = pane(r87, "leader", ls)
+		for (const until = Date.now() + 8000; Date.now() < until && !leaderUp; nap(100)) leaderUp = !!lid && existsSync(typed)
+	}
+	if (leaderUp) {
+		// ① nothing waits for anyone: the close must ring nobody, and say so in its record
+		quiet = expert("quiet", [[C87]])
+		quietRings = readRecord()?.rings
+		nap(1500)
+		nothingTyped = readFileSync(typed, "utf8") === ""
+		// ② `done` to the leader, then the close in the same "turn" - the field's exact order
+		loud = expert("loud", [[B87, "send", "leader", "--kind", "done", "--ref", "DONE.md", "--note", "a87"], [C87]])
+		loudRings = readRecord()?.rings
+		// the leader's INBOX is the witness - log.jsonl is written at delivery, and this leader never delivers
+		try { sentDone = readdirSync(join(r87, ".comm", "inbox", "leader")).some((f) => f.endsWith(".json") &&
+			/"kind":\s*"done"/.test(readFileSync(join(r87, ".comm", "inbox", "leader", f), "utf8"))) } catch {}
+		for (const until = Date.now() + 8000; Date.now() < until && !arrived; nap(100)) arrived = /claude-comm/.test(readFileSync(typed, "utf8"))
+	}
+	const rangLeader = Array.isArray(loudRings) && loudRings.some((r) => r.agent === "leader" && r.sent === true)
+	check("A87 an agent that closes itself rings first what its own turn end would have rung",
+		leaderUp && quiet?.gone && Array.isArray(quietRings) && quietRings.length === 0 && nothingTyped &&
+			sentDone && loud?.gone && rangLeader && arrived,
+		`${b87 ? `an idle fake leader in the bench, raw terminal=${leaderUp}` : "THE ARM COULD NOT RUN: no kitty bench for this suite"}; ` +
+		`close with nothing waiting -> window gone=${!!quiet?.gone}, record rings=${JSON.stringify(quietRings)}, nothing typed into the leader=${nothingTyped}; ` +
+		`send done then close -> done waiting in the leader's inbox=${sentDone}, window gone=${!!loud?.gone}, record says leader rang=${rangLeader}, ` +
+		`the doorbell ARRIVED in the leader's terminal=${arrived}`)
+}
+
 // A58 — close REFUSES over a claim this agent holds, and over claims it cannot read.
 //
 // 🔴 Review #10 C1: this refusal had NEVER RUN. `claim list --json` answers an object, the loop
