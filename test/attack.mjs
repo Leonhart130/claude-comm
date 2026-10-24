@@ -160,6 +160,7 @@ atExit(() => {
 // is not a control. Review #9 C1.
 delete process.env.CLAUDE_COMM_AGENT
 process.env.CLAUDE_COMM_RUNTIME = mkdtempSync(join(tmpdir(), "comm-attack-runtime-"))
+atExit(() => { try { rmSync(process.env.CLAUDE_COMM_RUNTIME, { recursive: true, force: true }) } catch {} })   // review #19 §8
 
 execFileSync("node", [join(PKG, "install.mjs"), root], { stdio: "pipe" })
 const bus = join(root, ".comm", "bin", "comm.mjs")
@@ -3636,11 +3637,23 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		const out = c44(["send", "db", "--from", "leader", "--ref", `../OUTSIDE-${basename(r44)}.md`, "--note", "x"])
 		rmSync(outside, { force: true })
 		const staysIn = out.status !== 0 && !/found at/.test(`${out.stdout || ""}${out.stderr || ""}`)
+		// the title says "the string that WOULD HAVE WORKED": so retype it (review #19 §3, §7)
+		const typed = (`${deep.stdout || ""}${deep.stderr || ""}`.match(/found at the project root: pass\s+--ref (\S+)/) || [])[1]
+		const retyped = !!typed && c44(["send", "db", "--from", "leader", "--ref", typed, "--note", "x"]).status === 0
+		const rz = mkdtempSync(join(tmpdir(), "comm-attack-roster-"))
+		mkdirSync(join(rz, ".comm"), { recursive: true }); mkdirSync(join(rz, "zone"), { recursive: true }); mkdirSync(join(rz, "sub"), { recursive: true })
+		writeFileSync(join(rz, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", zone: "./zone/" } }))
+		writeFileSync(join(rz, "sub", "F.md"), "f\n")
+		const cz = (args) => spawnSync("node", [join(PKG, "bin", "comm.mjs"), ...args], { cwd: rz, encoding: "utf8" })
+		const zt = (`${cz(["send", "zone", "--from", "leader", "--ref", "sub/F.md", "--note", "x"]).stderr || ""}`.match(/pass\s+--ref (\S+)/) || [])[1]
+		const zoneRetyped = !!zt && cz(["send", "zone", "--from", "leader", "--ref", zt, "--note", "x"]).status === 0
+		rmSync(rz, { recursive: true, force: true })
 		check("A49 a missed --ref names the string that would have worked",
-			suggests && quiet && deepSuggests && staysIn,
+			suggests && quiet && deepSuggests && staysIn && retyped && zoneRetyped,
 			`a file that exists at the root, referenced without the ../ -> suggestion printed=${suggests}; ` +
 			`a path typed from the root (sub/DEEP.md) -> ../sub/DEEP.md suggested=${deepSuggests}; ` +
-			`a file just OUTSIDE the project -> no suggestion=${staysIn}; ` +
+			`a file just OUTSIDE the project -> no suggestion=${staysIn}; the suggestion RETYPED works=${retyped} (${typed}); ` +
+			`a roster written './zone/' -> its suggestion retyped works=${zoneRetyped} (${zt}); ` +
 			`CONTROL, a file that exists nowhere -> no suggestion=${quiet} (a suggestion printed ` +
 			`unconditionally would point the next agent at a path that does not exist either)`)
 	}
@@ -3938,7 +3951,9 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 	}
 	const beside77 = (a) => a.join(" ").includes("--match window_id:77 --next-to id:77")
 	const viaFg = recRun({ id: 77, pid: 999999, foreground_processes: [{ pid: me50 }], user_vars: {} })
-	const viaShell = recRun({ id: 77, pid: me50, foreground_processes: [], user_vars: {} })
+	// one hop, as here: the window's process is the session's PARENT (review #19 §3: the session's own pid was 0 hops)
+	const ppid50 = (() => { try { const st = readFileSync(`/proc/${me50}/stat`, "utf8"); return Number(st.slice(st.lastIndexOf(")") + 2).split(" ")[1]) } catch { return 0 } })()
+	const viaShell = recRun({ id: 77, pid: ppid50, foreground_processes: [], user_vars: {} })
 	const nowhere = recRun({ id: 77, pid: 999999, foreground_processes: [{ pid: 999999 }], user_vars: {} })
 	const nowherePrint = recRun({ id: 77, pid: 999999, foreground_processes: [{ pid: 999999 }], user_vars: {} }, ["--print"])
 	const fgBeside = viaFg.launches.length === 1 && beside77(viaFg.launches[0])
@@ -4236,6 +4251,7 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 	const wk88 = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
 	const b88 = await bench()
 	let up = false, pid = 0, sent = false, first = null, typedFirst = null, recordedFirst = null, second = null, arrived = false
+	let unreadable, unreadableRings = false, foreign
 	if (b88) {
 		const script = join(r88, "db.cjs")
 		writeFileSync(script, `const fs=require("fs");fs.writeFileSync(${JSON.stringify(pidFile)},String(process.pid));fs.writeFileSync(${JSON.stringify(typed)},"");` +
@@ -4259,96 +4275,142 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 		writeFileSync(join(r88, "cfg", "sessions", `${pid}.json`), "{}")
 		second = ring()
 		for (const until = Date.now() + 8000; Date.now() < until && !arrived; nap(100)) arrived = /claude-comm/.test(readFileSync(typed, "utf8"))
+		// ③ review #19 §3: a record that cannot be READ is not an absence - the decision, dry, rings as before
+		const unknownTurn = { state: "unknown", why: "a88", unregistered: true }, sess = join(r88, "cfg", "sessions")
+		chmodSync(sess, 0o000)
+		unreadable = wk88.runtimeRecord(pid)
+		const dry = mkdtempSync(join(tmpdir(), "comm-attack-dry-"))   // its own root: leg 2's ring must not hold the quiet period
+		unreadableRings = wk88.wakeAgent(dry, "db", pid, { dryRun: true, turn: unknownTurn, wins: wk88.windows() }).dryRun === true
+		rmSync(dry, { recursive: true, force: true })
+		chmodSync(sess, 0o755)
+		// ④ review #19 §8: a record another process left (its procStart is not this pid's start) is no record of this one
+		writeFileSync(join(sess, `${pid}.json`), JSON.stringify({ procStart: "1" }))
+		foreign = wk88.runtimeRecord(pid)
+		writeFileSync(join(sess, `${pid}.json`), "{}")
 	}
 	const refusedFirst = !!first && first.sent === false && /not started yet/.test(first.why || "")
 	check("A88 the bell is never typed into a session that has not started, and still reaches one that has",
 		up && sent && refusedFirst && recordedFirst === false && typedFirst === "" && !!second && second.sent === true && arrived &&
-			wk88.runtimeRecord(pid) === true,
+			wk88.runtimeRecord(pid) === true && unreadable === null && unreadableRings && foreign === false,
 		`${b88 ? `a fake expert idle in the bench, raw terminal, unregistered=${up}` : "THE ARM COULD NOT RUN: no kitty bench for this suite"}; mail waiting=${sent}; ` +
 		`NO runtime record -> refused as not started=${refusedFirst} (${first ? first.why : "no answer"}), quiet record written=${recordedFirst}, typed=${JSON.stringify(typedFirst)}; ` +
-		`WITH its runtime record -> rung=${second ? second.sent : null} (${second ? second.why || second.how : "no answer"}), the bell ARRIVED=${arrived}`)
+		`WITH its runtime record -> rung=${second ? second.sent : null} (${second ? second.why || second.how : "no answer"}), the bell ARRIVED=${arrived}; ` +
+		`an UNREADABLE record -> ${unreadable} (want null), and rings as before=${unreadableRings}; another process's record -> ${foreign} (want false)`)
 }
 
-// A89 — THE WINDOW CLOSES AFTER THE TURN THAT ASKED, NEVER DURING IT. The owner, 2026-09-26: "je veux le voir avoir
-// fini son report et 1-2secs après tu ferme sa fenêtre". The close used to run inside the turn writing the last
-// answer, so the window vanished mid-paragraph. Here a fake expert in the bench has a REAL registry entry (its own
-// CLAUDE_COMM_RUNTIME, never the machine's - A31) naming a transcript this arm writes by hand. A matched pair in time,
-// one variable, the turn: while the transcript says the turn runs, the armed close must leave the window alone; once
-// the arm writes the turn's end, the window must go - not before the grace, and not long after it.
+// A89 — THE WINDOW CLOSES AFTER THE TURN THAT ASKED, NEVER DURING IT - AND ANYTHING ELSE DISARMS IT. The owner,
+// 2026-09-26: "je veux le voir avoir fini son report et 1-2secs après tu ferme sa fenêtre". Review #19 §1: once armed,
+// nothing disarmed it - a prompt in the grace, an Esc, mail delivered by the last turn's Stop - and 6 of 7 mutants
+// survived the first version of this arm. One bench pane per scenario, all at once, each its own agent and record, each
+// with a REAL registry entry (its own CLAUDE_COMM_RUNTIME - A31) naming a transcript written here with a real turn end's
+// timing (end_turn, +130 ms stop_hook_summary, +5 ms turn_duration: review #19 §9, 2 711 of 2 711). One variable per
+// scenario, what follows the arming: the turn's end alone (gone after the grace), a prompt in the grace, an Esc, mail
+// delivered at the Stop, --cancel (each STAYS, the record saying why), no registry entry (gone after the grace alone).
 {
 	const r89 = mkdtempSync(join(tmpdir(), "comm-attack-afterturn-"))
-	const opened89 = []
+	const opened89 = [], SC = ["nominal", "grace", "esc", "mail", "cancel", "blind"]
 	atExit(() => {
 		for (const [sock, id] of opened89)
 			try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
 		try { rmSync(r89, { recursive: true, force: true }) } catch {}
 	})
 	mkdirSync(join(r89, ".comm", "bin"), { recursive: true })
-	mkdirSync(join(r89, "db"), { recursive: true })
-	writeFileSync(join(r89, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", db: "db" } }))
+	for (const k of SC) mkdirSync(join(r89, k), { recursive: true })
+	writeFileSync(join(r89, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", ...Object.fromEntries(SC.map((k) => [k, k])) } }))
 	for (const f of ["comm.mjs", "who.mjs", "launch.mjs", "wake.mjs", "session-registry.mjs", "close.mjs", "claim.mjs"])
 		cpSync(join(PKG, "bin", f), join(r89, ".comm", "bin", f))
-	const C89 = join(r89, ".comm", "bin", "close.mjs"), rt89 = join(r89, "runtime"), tx = join(r89, "transcript.jsonl")
+	const C89 = join(r89, ".comm", "bin", "close.mjs"), rt89 = join(r89, "runtime")
 	const fake89 = join(r89, "claude")
 	try { symlinkSync(process.execPath, fake89) } catch {}
 	const reg = await import(pathToFileURL(join(PKG, "bin", "session-registry.mjs")).href)
 	const wk89 = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
 	const b89 = await bench()
-	const at = () => new Date().toISOString()
-	const row = (r) => appendFileSync(tx, JSON.stringify({ timestamp: at(), ...r }) + "\n")
-	let up = false, pid = 0, armedOk = false, heldWhileBusy = false, gone = false, goneAfter = null, rec = null, id = null
+	const ts = () => new Date().toISOString()
+	const tx = (k) => join(r89, `${k}.jsonl`)
+	const row = (k, r) => appendFileSync(tx(k), JSON.stringify({ timestamp: ts(), ...r }) + "\n")
+	const U = (k, content, extra = {}) => row(k, { type: "user", message: { role: "user", content }, ...extra })
+	const A = (k, stop, text = "x") => row(k, { type: "assistant", message: { role: "assistant", model: "claude-opus-5", stop_reason: stop,
+		content: [stop === "tool_use" ? { type: "tool_use", id: "t1", name: "Bash", input: {} } : { type: "text", text }] } })
+	const endTurn = (k) => { A(k, "end_turn", "report"); nap(130); row(k, { type: "system", subtype: "stop_hook_summary" }); nap(5); row(k, { type: "system", subtype: "turn_duration" }) }
+	const there = (id) => wk89.windows().some((w) => w.sock === b89.sock && w.id === id)
+	const recOf = (k) => { try { return JSON.parse(readFileSync(join(r89, ".comm", "close", `${k}.json`), "utf8")) } catch { return null } }
+	const S89 = {}
 	if (b89) {
-		const pidFile = join(r89, "db.pid"), go = join(r89, "go"), out = join(r89, "out.json")
-		writeFileSync(join(r89, "db.cjs"), `const{spawnSync}=require("node:child_process"),fs=require("node:fs");` +
-			`fs.writeFileSync(${JSON.stringify(pidFile)},String(process.pid));` +
-			`const t=setInterval(()=>{if(!fs.existsSync(${JSON.stringify(go)}))return;clearInterval(t);` +
-			`const r=spawnSync(process.execPath,[${JSON.stringify(C89)}],{encoding:"utf8",cwd:${JSON.stringify(join(r89, "db"))}});` +
-			`fs.writeFileSync(${JSON.stringify(out)},JSON.stringify({s:r.status,o:r.stdout,e:r.stderr}))},50);setTimeout(()=>process.exit(0),60000)`)
-		id = Number(spawnSync("kitten", ["@", "--to", `unix:${b89.sock}`, "launch", "--type=window", "--keep-focus", ...besideMe(b89),
-			`--cwd=${join(r89, "db")}`, "--env=CLAUDE_COMM_AGENT=db", `--env=CLAUDE_COMM_RUNTIME=${rt89}`, fake89, join(r89, "db.cjs")], { encoding: "utf8", timeout: 10000 }).stdout)
-		if (Number.isInteger(id) && id > 0) opened89.push([b89.sock, id])
-		for (const until = Date.now() + 8000; Date.now() < until && !pid; nap(100)) try { pid = Number(readFileSync(pidFile, "utf8")) } catch {}
-		if (pid) {
-			// the session's registry entry, in this arm's own runtime dir, naming a turn in progress
-			mkdirSync(join(rt89, "claude-comm", "sessions"), { recursive: true })
-			writeFileSync(join(rt89, "claude-comm", "sessions", `${pid}.json`), JSON.stringify({ v: 1, pid, start: reg.startTimeOf(pid),
-				boot: reg.bootId(), transcript: tx, agent: "db", source: "startup", at: at() }))
-			row({ type: "user", message: { role: "user", content: "finish and close" } })
-			row({ type: "assistant", message: { role: "assistant", model: "claude-opus-5", stop_reason: "tool_use", content: [{ type: "tool_use", id: "t1", name: "Bash", input: {} }] } })
-			spawnSync("kitten", ["@", "--to", `unix:${b89.sock}`, "set-user-vars", "--match", `id:${id}`, "CLAUDE_COMM_LAUNCHED=db"], { timeout: 5000 })
-			up = wk89.readTurn(pid, () => ({ ok: true, transcript: tx })).state === "busy"
-			writeFileSync(go, "")
-			for (const until = Date.now() + 10000; Date.now() < until && !existsSync(out); nap(100)) {}
-			try { const o = JSON.parse(readFileSync(out, "utf8")); armedOk = o.s === 0 && /armed/.test(o.o) } catch {}
-			// ① the turn still runs: three times the grace later, the window must still be there
-			nap(6000)
-			heldWhileBusy = wk89.windows().some((w) => w.sock === b89.sock && w.id === id)
-			// ② the turn ends; the window must go, after the grace and not long after
-			row({ type: "user", message: { role: "user", content: [{ type: "tool_result", tool_use_id: "t1", content: "armed" }] } })
-			row({ type: "assistant", message: { role: "assistant", model: "claude-opus-5", stop_reason: "end_turn", content: [{ type: "text", text: "report" }] } })
-			row({ type: "system", subtype: "stop_hook_summary" })
-			row({ type: "system", subtype: "turn_duration" })
-			const ended = Date.now()
-			for (const until = ended + 12000; Date.now() < until && !gone; nap(100)) gone = !wk89.windows().some((w) => w.sock === b89.sock && w.id === id)
-			if (gone) goneAfter = Date.now() - ended
-			for (const until = Date.now() + 8000; Date.now() < until; nap(150)) { try { rec = JSON.parse(readFileSync(join(r89, ".comm", "close", "db.json"), "utf8")) } catch {} if (rec && rec.gone !== null && rec.gone !== undefined) break }
+		mkdirSync(join(rt89, "claude-comm", "sessions"), { recursive: true })
+		for (const k of SC) {
+			const pidFile = join(r89, `${k}.pid`), go = join(r89, `${k}.go`), cgo = join(r89, `${k}.cancel`), out = join(r89, `${k}.out`)
+			// every scenario arms; "nominal" arms twice (the second must not arm a second closer); "cancel" then cancels
+			writeFileSync(join(r89, `${k}.cjs`), `const{spawnSync}=require("node:child_process"),fs=require("node:fs");` +
+				`fs.writeFileSync(${JSON.stringify(pidFile)},String(process.pid));const o={};const C=(a)=>spawnSync(process.execPath,[${JSON.stringify(C89)},...a],{encoding:"utf8",cwd:${JSON.stringify(join(r89, k))}});` +
+				`const t=setInterval(()=>{if(!fs.existsSync(${JSON.stringify(go)}))return;clearInterval(t);const r=C([]);o.s=r.status;o.o=r.stdout;` +
+				(k === "nominal" ? `o.again=C([]).stdout;` : "") + `fs.writeFileSync(${JSON.stringify(out)},JSON.stringify(o));` +
+				(k === "cancel" ? `const u=setInterval(()=>{if(!fs.existsSync(${JSON.stringify(cgo)}))return;clearInterval(u);const c=C(["--cancel"]);fs.writeFileSync(${JSON.stringify(out)},JSON.stringify({...o,cs:c.status,co:c.stdout}))},50);` : "") +
+				`},50);setTimeout(()=>process.exit(0),60000)`)
+			const id = Number(spawnSync("kitten", ["@", "--to", `unix:${b89.sock}`, "launch", "--type=window", "--keep-focus", ...besideMe(b89),
+				`--cwd=${join(r89, k)}`, `--env=CLAUDE_COMM_AGENT=${k}`, `--env=CLAUDE_COMM_RUNTIME=${rt89}`, fake89, join(r89, `${k}.cjs`)], { encoding: "utf8", timeout: 10000 }).stdout)
+			if (Number.isInteger(id) && id > 0) opened89.push([b89.sock, id])
+			S89[k] = { id: Number.isInteger(id) && id > 0 ? id : null, pidFile, go, cgo, out, pid: 0 }
 		}
+		for (const until = Date.now() + 8000; Date.now() < until && SC.some((k) => !S89[k].pid); nap(100))
+			for (const k of SC) if (!S89[k].pid) try { S89[k].pid = Number(readFileSync(S89[k].pidFile, "utf8")) } catch {}
+		for (const k of SC) {
+			const { pid, id } = S89[k]
+			if (!pid || !id) continue
+			// "blind" has NO registry entry: its close can only be the grace alone
+			if (k !== "blind") writeFileSync(join(rt89, "claude-comm", "sessions", `${pid}.json`), JSON.stringify({ v: 1, pid, start: reg.startTimeOf(pid),
+				boot: reg.bootId(), transcript: tx(k), agent: k, source: "startup", at: ts() }))
+			U(k, "finish and close"); A(k, "tool_use")
+			spawnSync("kitten", ["@", "--to", `unix:${b89.sock}`, "set-user-vars", "--match", `id:${id}`, `CLAUDE_COMM_LAUNCHED=${k}`], { timeout: 5000 })
+			writeFileSync(S89[k].go, "")
+		}
+		for (const until = Date.now() + 10000; Date.now() < until && SC.some((k) => S89[k].pid && !existsSync(S89[k].out)); nap(100)) {}
+		for (const k of SC) try { S89[k].o = JSON.parse(readFileSync(S89[k].out, "utf8")) } catch {}
+		// ① the turn still runs: three times the grace later, every window but "blind" must still be there
+		nap(6000)
+		for (const k of SC) S89[k].heldWhileBusy = !!S89[k].id && there(S89[k].id)
+		// ② what follows the arming, one variable per scenario
+		U("cancel", [{ type: "tool_result", tool_use_id: "t1", content: "armed" }]); writeFileSync(S89.cancel.cgo, "")
+		for (const until = Date.now() + 8000; Date.now() < until && !(S89.cancel.o && "cs" in S89.cancel.o); nap(100)) try { S89.cancel.o = JSON.parse(readFileSync(S89.cancel.out, "utf8")) } catch {}
+		for (const k of ["nominal", "grace", "mail", "cancel"]) U(k, [{ type: "tool_result", tool_use_id: "t1", content: "armed" }])
+		U("esc", [{ type: "text", text: "[Request interrupted by user for tool use]" }])
+		A("mail", "end_turn", "report"); nap(130); row("mail", { type: "system", subtype: "stop_hook_summary" })
+		U("mail", "Stop hook feedback:\n[claude-comm] 1 message arrived for 'mail' while you were working", { isMeta: true })
+		A("mail", "end_turn", "ok, I will stay open"); nap(130); row("mail", { type: "system", subtype: "stop_hook_summary" }); row("mail", { type: "system", subtype: "turn_duration" })
+		endTurn("nominal"); S89.nominal.ended = Date.now()
+		endTurn("grace"); nap(700); U("grace", "attends, ne ferme pas"); A("grace", "end_turn", "ok")
+		endTurn("cancel")
+		for (const until = Date.now() + 9000; Date.now() < until; nap(100)) {
+			if (!S89.nominal.goneAt && S89.nominal.id && !there(S89.nominal.id)) S89.nominal.goneAt = Date.now()
+			if (S89.nominal.goneAt && Date.now() - S89.nominal.goneAt > 2500) break
+		}
+		for (const k of SC) { S89[k].stays = !!S89[k].id && there(S89[k].id); S89[k].rec = recOf(k) }
 	}
-	const timely = goneAfter !== null && goneAfter >= 1800 && goneAfter <= 7000
-	check("A89 the window closes after the turn that asked for it, never during it",
-		up && armedOk && heldWhileBusy && gone && timely && !!rec && rec.deferred === true && /turn that asked/.test(rec.turn_ended || "") && rec.gone === true,
-		`${b89 ? `a fake expert in the bench, its registry entry naming a turn IN PROGRESS=${up}` : "THE ARM COULD NOT RUN: no kitty bench for this suite"}; ` +
-		`close returned 0 having ARMED=${armedOk}; the turn still running 6 s later -> window still open=${heldWhileBusy}; ` +
-		`the turn's end written -> window gone=${gone} after ${goneAfter} ms (want 1800-7000: the grace, then the close)=${timely}; ` +
-		`record: deferred=${rec && rec.deferred}, turn_ended="${rec && rec.turn_ended}", gone=${rec && rec.gone}`)
+	const n = S89.nominal || {}, after = n.goneAt && n.ended ? n.goneAt - n.ended : null
+	const stayed = (k, re) => !!S89[k] && S89[k].heldWhileBusy && S89[k].stays && re.test((S89[k].rec && S89[k].rec.cancelled) || "")
+	const ok = {
+		armed: SC.every((k) => S89[k] && S89[k].o && S89[k].o.s === 0 && /armed/.test(S89[k].o.o || "")),
+		heldWhileBusy: ["nominal", "grace", "esc", "mail", "cancel"].every((k) => S89[k] && S89[k].heldWhileBusy),
+		nominalGoneAfterGrace: after !== null && after >= 1800 && after <= 7000 && /turn that asked/.test((n.rec && n.rec.turn_ended) || "") && n.rec.gone === true,
+		secondCloseNotArmed: /already armed/.test((n.o && n.o.again) || ""),
+		graceCancels: stayed("grace", /new turn|in the grace/), escCancels: stayed("esc", /interrupted/),
+		mailCancels: stayed("mail", /mail was delivered/), cancelCancels: stayed("cancel", /--cancel/) && !!S89.cancel.o && S89.cancel.o.cs === 0,
+		blindGoesOnTheGrace: !!S89.blind && !S89.blind.stays && /could not be read at the arming/.test((S89.blind.rec && S89.blind.rec.turn_ended) || ""),
+	}
+	check("A89 the window closes after the turn that asked for it, never during it - and anything else disarms it",
+		!!b89 && Object.values(ok).every(Boolean),
+		`${b89 ? "" : "THE ARM COULD NOT RUN: no kitty bench for this suite; "}` + Object.entries(ok).map(([k, v]) => `${k}=${v}`).join("; ") +
+		`; nominal gone ${after} ms after its turn's end (want 1800-7000); its second close said "${((n.o && n.o.again) || "").split("\n")[0].slice(0, 90)}"` +
+		SC.filter((k) => S89[k] && S89[k].rec).map((k) => `; ${k}: "${(S89[k].rec.cancelled || S89[k].rec.turn_ended || "-").slice(0, 70)}"`).join(""))
 }
 
 // A90 — A `send` RINGS AN IDLE RECIPIENT AT ONCE, NOT AT THE SENDER'S TURN END. Work's leader, 2026-10-24: a bell to
 // a resting expert sat until it rang by hand, because the doorbell rode only the sender's Stop hook - a leader that
 // sends and works on wakes nobody. The installed stub now rings after a Bash call that was a `comm.mjs send`. In a
 // fixture installed by the REAL installer, a fake started expert idle in the bench records every byte typed into it;
-// the leader's own stub is handed a PostToolUse payload. A matched pair, one variable, the command: `ls` (nothing may
-// be typed, nothing rung) and the `send` (the bell must arrive). The hook must be registered on Bash, or none of it runs.
+// the leader's own stub is handed a PostToolUse payload. A matched pair, ONE variable since review #19 §3-4 - the age of
+// the newest message: the same mail made a minute old, after a `comm.mjs inbox` that names the bus and sends nothing
+// (nothing typed, nothing rung), then a fresh send typed in the form the first version's regex missed (`node $C send`)
+// - the bell must arrive. Registered on Bash for PostToolUse AND PostToolUseFailure (a failing Bash fires only the second).
 {
 	const r90 = mkdtempSync(join(tmpdir(), "comm-attack-postsend-"))
 	const opened90 = []
@@ -4367,7 +4429,7 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 	let hooked = false
 	try {
 		const st = JSON.parse(readFileSync(join(r90, ".claude", readdirSync(join(r90, ".claude")).find((f) => /^settings.*\.json$/.test(f))), "utf8"))
-		hooked = (st.hooks.PostToolUse || []).some((g) => g.matcher === "Bash" && (g.hooks || []).some((h) => /comm-hook\.mjs" post-tool/.test(h.command)))
+		hooked = ["PostToolUse", "PostToolUseFailure"].every((ev) => (st.hooks[ev] || []).some((g) => g.matcher === "Bash" && (g.hooks || []).some((h) => /comm-hook\.mjs" post-tool/.test(h.command))))
 	} catch {}
 	const fake90 = join(r90, "claude")
 	try { symlinkSync(process.execPath, fake90) } catch {}
@@ -4384,25 +4446,26 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 		for (const until = Date.now() + 8000; Date.now() < until && !up; nap(100)) up = existsSync(pidFile) && existsSync(typed)
 	}
 	if (up) {
-		const cmd = "node .comm/bin/comm.mjs send db --ref BRIEF.md --note a90"
 		sent = spawnSync(process.execPath, [join(r90, ".comm", "bin", "comm.mjs"), "send", "db", "--ref", "BRIEF.md", "--note", "a90"], { cwd: r90, encoding: "utf8" }).status === 0
 		const post = (command) => spawnSync(process.execPath, [stub, "post-tool"], { cwd: r90, encoding: "utf8",
 			input: JSON.stringify({ hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command } }) }).status
-		// ① any other command: nothing rung, nothing typed
-		quietExit = post("ls -la")
+		// ① the same mail, a minute old, and a command that names the bus but sends nothing: nothing rung, nothing typed
+		for (const f of readdirSync(join(r90, ".comm", "inbox", "db"))) { const old = new Date(Date.now() - 60_000); utimesSync(join(r90, ".comm", "inbox", "db", f), old, old) }
+		quietExit = post("node .comm/bin/comm.mjs inbox")
 		nap(1200)
 		quietTyped = readFileSync(typed, "utf8")
 		quietRang = existsSync(join(r90, ".comm", "wake", "rings.jsonl"))
-		// ② the send: the bell arrives
-		loudExit = post(cmd)
+		// ② a fresh send, typed the way the first regex missed (review #19 §4: 58 real sends): the bell arrives
+		spawnSync(process.execPath, [join(r90, ".comm", "bin", "comm.mjs"), "send", "db", "--ref", "BRIEF.md", "--note", "a90 again"], { cwd: r90, encoding: "utf8" })
+		loudExit = post("C=.comm/bin/comm.mjs; node $C send db --ref BRIEF.md --note a90")
 		for (const until = Date.now() + 8000; Date.now() < until && !arrived; nap(100)) arrived = /claude-comm/.test(readFileSync(typed, "utf8"))
 	}
 	check("A90 a send rings an idle recipient at once, not at the sender's turn end",
 		hooked && up && sent && quietExit === 0 && quietTyped === "" && quietRang === false && loudExit === 0 && arrived,
-		`installed PostToolUse hook on Bash running the stub's post-tool=${hooked}; ` +
+		`installed PostToolUse AND PostToolUseFailure hooks on Bash running the stub's post-tool=${hooked}; ` +
 		`${b90 ? `a fake started expert idle in the bench=${up}` : "THE ARM COULD NOT RUN: no kitty bench for this suite"}; mail waiting=${sent}; ` +
-		`after 'ls' -> exit ${quietExit}, typed=${JSON.stringify(quietTyped)}, a ring recorded=${quietRang}; ` +
-		`after the send -> exit ${loudExit}, the bell ARRIVED=${arrived}`)
+		`mail a minute old, after 'comm.mjs inbox' -> exit ${quietExit}, typed=${JSON.stringify(quietTyped)}, a ring recorded=${quietRang}; ` +
+		`a fresh send typed as 'node $C send' -> exit ${loudExit}, the bell ARRIVED=${arrived}`)
 }
 
 // A58 — close REFUSES over a claim this agent holds, and over claims it cannot read.
@@ -4721,6 +4784,11 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 		["closed, then a usage-limit resume", [...closed, U("You can continue now. Continue the task you were working on", { isMeta: true })], "busy"],
 		["closed, then a doorbell typed at rest", [...closed, U("[claude-comm] doorbell. This line is from the BUS")], "busy"],
 		["closed, then another session's message", [...closed, U("Another Claude session sent a message:\n<agent-message from=\"a1\">", { isMeta: true })], "busy"],
+		// review #19 day, live: a tool's OUTPUT quoting the marker is not an interruption - the turn goes on
+		["a tool's output QUOTING the interruption marker, mid-turn", [U("do it"), A("tool_use"), TR("the review says: [Request interrupted by user for tool use], then the window closed")], "busy"],
+		["closed, then a skill a slash command launches", [...closed, U("<command-message>review</command-message>"), U("Base directory for this skill: /x/review", { isMeta: true })], "busy"],
+		["closed, then the runtime's idle notice", [...closed, U("[Cross-session idle notice] a1 has been idle", { isMeta: true })], "busy"],
+		["closed, then a scheduled task fires", [...closed, S("scheduled_task_fire")], "busy"],
 		["closed, then a subagent's rows", [...closed, { ...A("tool_use"), isSidechain: true }, { ...TR(), isSidechain: true }], "idle"],
 		["ended on an API error", [U("do it"), SYN("API Error: 529 Overloaded", { isApiErrorMessage: true })], "idle"],
 		["ended with a synthetic reply", [U("do it"), SYN("No response requested.")], "idle"],

@@ -56,7 +56,7 @@
  *    a `/clear` keeps the process, its model, its effort and its window, and the agent rebuilds
  *    from its files. It counts only when the registry names a NEW transcript for the pid.
  */
-import { readFileSync, writeFileSync, appendFileSync, renameSync, readdirSync, mkdirSync, existsSync, statSync, openSync, readSync, closeSync } from "node:fs"
+import { readFileSync, writeFileSync, appendFileSync, renameSync, readdirSync, mkdirSync, existsSync, statSync, openSync, readSync, closeSync, readlinkSync } from "node:fs"
 import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { spawnSync } from "node:child_process"
@@ -223,13 +223,21 @@ const textOf = (c) => typeof c === "string" ? c : !Array.isArray(c) ? "" : c.map
 	: x.type !== "tool_result" ? "" : typeof x.content === "string" ? x.content
 	: Array.isArray(x.content) ? x.content.map((y) => y.text || "").join("") : "").join("")
 const hasToolResult = (c) => Array.isArray(c) && c.some((x) => x.type === "tool_result")
+// AN INTERRUPTION IS A ROW THAT *IS* THE MARKER: a text row that begins with it, or a tool result whose WHOLE content it
+// is - never a tool's output that merely QUOTES it. 2026-10-24, live: the leader read review/REVIEW-19.md, which quotes
+// "[Request interrupted by user for tool use]", its tool result read "interrupted" - idle - in the middle of its turn,
+// and a Stop hook typed the bell into that turn. On this machine 8 of 8 tool results containing the marker are such
+// quotes, each followed by more of the same turn; no real interruption is written that way. FINDINGS.md#review19
+const isInterruption = (c, t) => /^\s*\[Request interrupted/.test(t) && !hasToolResult(c) ||
+	Array.isArray(c) && c.some((x) => x.type === "tool_result" && /^\s*\[Request interrupted by user[^\]]*\]\s*$/.test(textOf([x])))
 
 /** "idle", "busy", or null when the row decides nothing. */
 export function rowVerdict(r) {
 	if (!r || r.isSidechain) return null
 	// A closed turn. Every other system row - the Stop hook's summary, an away summary, a local
 	// command - decides nothing.
-	if (r.type === "system") return r.subtype === "turn_duration" ? "idle" : null
+	// ...and a scheduled task FIRES a turn (review #19 §2a: 32 s blind before its first reply was written).
+	if (r.type === "system") return r.subtype === "turn_duration" ? "idle" : r.subtype === "scheduled_task_fire" ? "busy" : null
 	// An API error or a usage limit ends the turn with a synthetic reply and no turn_duration.
 	if (r.type === "assistant") return r.isApiErrorMessage || r.message?.model === "<synthetic>" ? "idle" : "busy"
 	if (r.type !== "user") return null
@@ -239,13 +247,15 @@ export function rowVerdict(r) {
 	// or the turn the compaction cut into. FINDINGS.md#compacted-at-rest
 	if (r.isCompactSummary) return null
 	const c = r.message?.content, t = textOf(c)
-	if (/\[Request interrupted by user/.test(t) && (hasToolResult(c) || /^\s*\[Request interrupted/.test(t))) return "idle"
+	if (isInterruption(c, t)) return "idle"
 	// Meta rows are written at rest (a permission granted, a rename) EXCEPT these, each followed by
 	// a model turn every time it was seen: a Stop hook block (257) and two usage-limit resumes (9);
 	// and since the runtime's own cross-session messages, "Another Claude session sent a message" -
 	// 303 of 303, 2026-10-24. Unread, it was 13 of the 23 inputs turn-corpus found absorbed by a turn
 	// this reader called ringable. FINDINGS.md#compacted-at-rest
-	if (r.isMeta) return /^\s*(Stop hook feedback:|You can continue now|Your claude\.ai usage limit has reset|Another Claude session sent a message)/.test(t) ? "busy" : null
+	// Review #19 §2a, measured 10-24: a skill a slash command launches ("Base directory for this skill", 79 of 79) and the
+	// runtime's own idle notice (1 of 1) start a model turn too. A false busy costs a later ring; a false idle types into work.
+	if (r.isMeta) return /^\s*(Stop hook feedback:|You can continue now|Your claude\.ai usage limit has reset|Another Claude session sent a message|Base directory for this skill|\[Cross-session idle notice\])/.test(t) ? "busy" : null
 	// A slash command runs no model turn. A `!` shell command DOES: every one measured.
 	if (!hasToolResult(c) && /^\s*(<command-name>|<command-message>|<local-command-)/.test(t)) return null
 	return "busy"
@@ -297,7 +307,7 @@ function describe({ state, row }) {
 		: row.type === "assistant" ? (row.isApiErrorMessage || row.message?.model === "<synthetic>" ? "the turn ended on an error"
 			: row.message?.stop_reason !== "end_turn" ? "a tool call"
 			: state === "busy" ? "a Stop hook blocked and the model is answering it" : "a reply ended, its Stop hook still running")
-		: /\[Request interrupted/.test(t) ? "interrupted by the user"
+		: isInterruption(c, t) ? "interrupted by the user"
 		: hasToolResult(c) ? "a tool result"
 		: row.isMeta ? "a Stop hook block or a resumed turn"
 		: /^\s*<bash-/.test(t) ? "a ! shell command" : "a prompt"
@@ -447,9 +457,16 @@ export function runtimeRecord(pid) {
 	let env = []
 	try { env = readFileSync(`/proc/${pid}/environ`, "utf8").split("\0") } catch { return null }
 	const val = (k) => (env.find((e) => e.startsWith(`${k}=`)) || "").slice(k.length + 1)
-	const dir = val("CLAUDE_CONFIG_DIR") || (val("HOME") && join(val("HOME"), ".claude"))
+	let dir = val("CLAUDE_CONFIG_DIR") || (val("HOME") && join(val("HOME"), ".claude"))
 	if (!dir) return null
-	try { statSync(join(dir, "sessions", `${pid}.json`)); return true } catch (e) { return e.code === "ENOENT" ? false : null }
+	// a RELATIVE config dir is the SESSION's, resolved from its cwd - not from wake's (review #19 §8)
+	if (!dir.startsWith("/")) try { dir = join(readlinkSync(`/proc/${pid}/cwd`), dir) } catch { return null }
+	let rec
+	try { rec = JSON.parse(readFileSync(join(dir, "sessions", `${pid}.json`), "utf8")) } catch (e) { return e.code === "ENOENT" ? false : null }
+	// a record left by a DEAD session under a pid reused since is no record of this one (turnOf's own test, review #19 §8)
+	let tick = null
+	try { const st = readFileSync(`/proc/${pid}/stat`, "utf8"); tick = st.slice(st.lastIndexOf(") ") + 2).split(" ")[19] } catch {}
+	return !(rec && rec.procStart !== undefined && tick && String(rec.procStart) !== tick)
 }
 
 export function wakeAgent(root, agent, pid, { dryRun = false, wins, turn = null, cfg = null, lookup = null, sendText = null,

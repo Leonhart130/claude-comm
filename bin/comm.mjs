@@ -199,7 +199,7 @@ function whereItActuallyIs(root, cfg, from, to, ref) {
 		if (seen.has(rel) || rel.startsWith("..") || isAbsolute(rel) || !existsSync(join(root, rel))) continue
 		seen.add(rel)
 		// Expressed FROM THE BASE, because that is the string the sender has to type.
-		const up = base.dir === "." ? "" : base.dir.split("/").map(() => "../").join("")
+		const up = relative(resolve(root, base.dir), root).replace(/[^/]$/, "$&/")   // `review/`, `./review`: review #19 §7
 		hits.push(`  found at ${label}: pass  --ref ${up}${rel}\n`)
 	}
 	return hits.join("")

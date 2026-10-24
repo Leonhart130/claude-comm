@@ -6,6 +6,7 @@
  *   node .comm/bin/close.mjs --dry-run       resolve and check everything, close nothing
  *   node .comm/bin/close.mjs --force         close over waiting mail / held claims
  *   node .comm/bin/close.mjs --now           close at once, inside this turn (the old default)
+ *   node .comm/bin/close.mjs --cancel        disarm a close armed in this window: it stays open
  *
  * WHY THIS EXISTS. The owner, 2026-09-10: *"c'est super d'ouvrir une fenetre et lancer un
  * agent, mais ce serait aussi super de pouvoir fermer celle-ci lorsqu'il a fini, sinon dans
@@ -64,7 +65,7 @@
  * leaving nothing at all. `--dry-run` is what the arms use to gate the decision; the file
  * is what gates the effect.
  */
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs"
+import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync, openSync, readSync, closeSync } from "node:fs"
 import { join, dirname } from "node:path"
 import { spawnSync, spawn } from "node:child_process"
 import { fileURLToPath } from "node:url"
@@ -146,8 +147,33 @@ function mailWaiting(root, agent) {
 		return `mail is waiting: ${(box.stdout.match(/^inbox.*$/m) || [""])[0].trim()} — somebody expects this agent to act, and a window that closes on unread mail loses it until the agent is relaunched`
 	return null
 }
+// 🔴 REVIEW #19 §1: ONCE ARMED, NOTHING DISARMED IT. A new turn begun after the arming was WAITED OUT and the window went
+// after it; an Esc read as the turn's end; mail delivered by the last turn's own Stop hook left the inbox empty, so the
+// one cancellation never fired - and the record said "the turn that asked for the close ended" each time. Now the closer
+// reads only what the transcript GAINED since the arming (its size, taken by the close that armed it), and the turn that
+// asked may only finish: its tool result, its last answer, its Stop, a turn_duration. ANYTHING else CANCELS and says
+// what - a prompt, an Esc, a delivered message, a doorbell, a second turn, a /clear. The cost, a window that stays after
+// the agent read its mail, is one more `close.mjs`, and the agent knows to type it: its context says "armed".
+/** What the rows written since the arming say: { ended } once the asking turn closed, or { cancel: why }. */
+function sinceArming(rows, rowVerdict) {
+	let ended = false
+	for (const r of rows) {
+		if (!r || r.isSidechain) continue
+		if (r.type === "system" && r.subtype === "turn_duration") { if (ended) return { cancel: "a second turn ran after the one that asked" }; ended = true; continue }
+		if (r.type === "attachment" && r.attachment?.type === "queued_command") return { cancel: "somebody typed into the session while its last turn ran" }
+		const v = rowVerdict(r)
+		if (!v) continue
+		const c = r.message?.content, tool = Array.isArray(c) && c.some((x) => x.type === "tool_result")
+		// the asking turn's own remainder: the close's tool result, the final answer
+		if (!ended && v === "busy" && (r.type === "assistant" || (r.type === "user" && tool))) continue
+		if (v === "idle") return { cancel: "the turn was interrupted, or ended on an error - that is not a finished report" }
+		if (r.type === "user" && r.isMeta) return { cancel: "mail was delivered into the session after the close was asked (its Stop hook blocked), or a turn resumed" }
+		return { cancel: ended ? "a new turn began after the one that asked for the close" : "a new prompt reached the session before its turn ended" }
+	}
+	return { ended }
+}
 if (ARGV[0] === "--after-turn") {
-	const [, me, sock, id, statePath, root, agent] = ARGV
+	const [, me, sock, id, statePath, root, agent, transcript, offsetArg, forced] = ARGV
 	const wake = await import(new URL("wake.mjs", import.meta.url))
 	let lookup = null
 	try { ({ lookup } = await import(new URL("session-registry.mjs", import.meta.url))) } catch {}
@@ -156,27 +182,59 @@ if (ARGV[0] === "--after-turn") {
 		try { prev = JSON.parse(readFileSync(statePath, "utf8")) } catch { prev = { intent_unreadable: true } }
 		try { writeFileSync(statePath, JSON.stringify({ ...prev, ...o }, null, 1) + "\n") } catch {}
 	}
+	const stop = (o, code = 1) => { note({ ...o, closer_pid: null }); process.exit(code) }
+	note({ closer_pid: process.pid })
 	const armed = Date.now()
 	let how = null
-	for (;;) {
-		const t = wake.readTurn(Number(me), lookup)
-		if (t.state === "unknown") how = `its turn could not be read (${t.why}) - closed after the grace alone`
-		else if (t.state === "idle") how = "the turn that asked for the close ended"
-		if (how) {
-			nap(GRACE_MS)
-			// a turn begun in the grace - a doorbell, the person typing - is waited out like the first one
-			if (t.state === "idle" && wake.readTurn(Number(me), lookup).state !== "idle") { how = null; continue }
-			break
+	if (transcript === "-") {
+		// no registry entry at the arming: nothing to read, so the grace alone - and the record says so
+		nap(GRACE_MS)
+		how = `its turn could not be read at the arming (${offsetArg}) - closed after the grace alone`
+	} else {
+		// read forward from the arming offset; a row still being written is read on the next look
+		let pos = Number(offsetArg) || 0, rows = [], lastLook = 0
+		const pull = () => {
+			let fd
+			try {
+				const size = statSync(transcript).size
+				if (size <= pos) return
+				fd = openSync(transcript, "r")
+				const buf = Buffer.alloc(size - pos)
+				readSync(fd, buf, 0, buf.length, pos)
+				const text = buf.toString("utf8"), cut = text.lastIndexOf("\n")
+				if (cut < 0) return
+				for (const l of text.slice(0, cut).split("\n")) if (l) try { rows.push(JSON.parse(l)) } catch {}
+				pos += Buffer.byteLength(text.slice(0, cut + 1))
+			} catch {} finally { if (fd !== undefined) try { closeSync(fd) } catch {} }
 		}
-		if (Date.now() - armed > AFTER_TURN_MAX_MS) {
-			note({ abandoned_at: new Date().toISOString(), abandoned: `the turn did not end within ${AFTER_TURN_MAX_MS / 60_000} min - the window was left open, not closed on a working session` })
-			process.exit(1)
+		for (;;) {
+			pull()
+			const v = sinceArming(rows, wake.rowVerdict)
+			if (v.cancel) stop({ cancelled_at: new Date().toISOString(), cancelled: `${v.cancel} - the window stays` })
+			if (v.ended) {
+				nap(GRACE_MS)
+				pull()
+				const again = sinceArming(rows, wake.rowVerdict)
+				if (again.cancel) stop({ cancelled_at: new Date().toISOString(), cancelled: `${again.cancel} (in the grace) - the window stays` })
+				how = "the turn that asked for the close ended"
+				break
+			}
+			// a /clear moves the session to a NEW transcript: the person is working in it
+			if (lookup && Date.now() - lastLook > 2000) {
+				lastLook = Date.now()
+				const h = lookup(Number(me))
+				if (h.ok && h.transcript !== transcript) stop({ cancelled_at: new Date().toISOString(), cancelled: "the session moved to a new transcript (a /clear) after the close was asked - the window stays" })
+			}
+			try { process.kill(Number(me), 0) } catch { stop({ session_gone_at: new Date().toISOString() }) }
+			if (Date.now() - armed > AFTER_TURN_MAX_MS)
+				stop({ abandoned_at: new Date().toISOString(), abandoned: `the turn did not end within ${AFTER_TURN_MAX_MS / 60_000} min - the window was left open, not closed on a working session` })
+			nap(300)
 		}
-		nap(300)
 	}
-	const late = mailWaiting(root, agent)
-	if (late) { note({ cancelled_at: new Date().toISOString(), cancelled: `${late} — it came after the close was asked, so the window stays and the agent's next turn reads it` }); process.exit(1) }
-	note({ turn_ended: how, closing_at: new Date().toISOString(), waited_ms: Date.now() - armed })
+	// mail that came in the grace and was not delivered waits for THIS agent - unless the close was forced over it
+	const late = forced === "force" ? null : mailWaiting(root, agent)
+	if (late) stop({ cancelled_at: new Date().toISOString(), cancelled: `${late} — it is waiting at the moment of the close, so the window stays and the agent's next turn reads it` })
+	note({ turn_ended: how, closing_at: new Date().toISOString(), waited_ms: Date.now() - armed, closer_pid: null })
 	spawn(process.execPath, [fileURLToPath(import.meta.url), "--verify", sock, String(id), statePath], { detached: true, stdio: "ignore" }).unref()
 	const out = spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { encoding: "utf8", timeout: 5000 })
 	if (out.status !== 0) note({ close_failed: `kitten @ close-window exit ${out.status}: ${(out.stderr || "").trim()}` })
@@ -238,6 +296,31 @@ while (!existsSync(join(root, ".comm", "config.json"))) {
 	const up = dirname(root)
 	if (up === root) { root = null; break }
 	root = up
+}
+// The closer this record names, if one is ALIVE and is ours: a close.mjs --after-turn on this very record, by its cmdline.
+const recordPath = root ? join(root, ".comm", "close", `${launchedFor}.json`) : null
+const armedCloser = () => {
+	let rec = null
+	try { rec = JSON.parse(readFileSync(recordPath, "utf8")) } catch { return null }
+	const pid = rec && rec.closer_pid
+	let cmd = ""
+	try { cmd = readFileSync(`/proc/${pid}/cmdline`, "utf8") } catch { return null }
+	return pid && cmd.includes("--after-turn") && cmd.includes(recordPath) ? Number(pid) : null
+}
+if (has("--cancel")) {
+	const pid = recordPath && armedCloser()
+	if (!pid) die(`nothing is armed for '${launchedFor}' - no live closer in ${recordPath || "(no project found)"}`, 1)
+	try { process.kill(pid) } catch (e) { die(`the armed closer (pid ${pid}) could not be stopped: ${e.code || e.message}`, 4) }
+	try { writeFileSync(recordPath, JSON.stringify({ ...JSON.parse(readFileSync(recordPath, "utf8")), closer_pid: null,
+		cancelled_at: new Date().toISOString(), cancelled: "close.mjs --cancel - the window stays" }, null, 1) + "\n") } catch {}
+	console.log(`close: cancelled - window ${win.id} stays open (the closer, pid ${pid}, was stopped)`)
+	process.exit(0)
+}
+// ONE closer per window, checked BEFORE anything rewrites the record (the intent record below wiped the pid this looked
+// for, so a second close in the same turn armed a second closer and rang again: A89, its own first runs).
+if (!has("--now") && !has("--dry-run") && recordPath && armedCloser()) {
+	console.log(`close: already armed - window ${win.id} closes after this turn; \`close.mjs --cancel\` disarms it`)
+	process.exit(0)
 }
 const blocks = []
 if (root) {
@@ -317,11 +400,21 @@ if (root) {
 // THE DEFAULT IS AFTER THIS TURN (header of the deferred closer, above). It needs the record and the project to
 // work from; without them, or with --now, the close happens here, inside the turn, as it always did.
 if (statePath && root && !has("--now")) {
-	writeFileSync(statePath, JSON.stringify({ ...state, deferred: true, grace_ms: GRACE_MS, verified_at: null, gone: null }, null, 1) + "\n")
-	spawn(process.execPath, [fileURLToPath(import.meta.url), "--after-turn", String(me), win.sock, String(win.id), statePath, root, launchedFor],
-		{ detached: true, stdio: "ignore" }).unref()
+	// WHERE THE TRANSCRIPT STANDS NOW: the closer reads only what comes after (review #19 §1). No registry entry, no offset.
+	const { lookup } = await import(new URL("session-registry.mjs", import.meta.url))
+	const hit = lookup(me)
+	let tx = "-", off = hit.ok ? "" : hit.why
+	if (hit.ok) try { off = String(statSync(hit.transcript).size); tx = hit.transcript } catch (e) { off = `transcript unreadable: ${e.code}` }
+	const closer = spawn(process.execPath, [fileURLToPath(import.meta.url), "--after-turn", String(me), win.sock, String(win.id), statePath, root, launchedFor, tx, off, has("--force") ? "force" : "-"],
+		{ detached: true, stdio: "ignore" })
+	closer.unref()
+	// the closer's pid is written HERE, before this returns: a second close.mjs in the same turn read the record before
+	// the closer had written it, and armed a second one (A89, the first run of its own scenario)
+	writeFileSync(statePath, JSON.stringify({ ...state, deferred: true, grace_ms: GRACE_MS, armed_offset: tx === "-" ? null : Number(off),
+		closer_pid: closer.pid || null, verified_at: null, gone: null }, null, 1) + "\n")
 	console.log(`close: armed - window ${win.id} closes ${GRACE_MS / 1000} s after THIS turn ends, so your last answer stays on screen, whole.\n` +
-		`  Write your final report now, then end your turn. The outcome lands in ${statePath}.`)
+		`  Write your final report now, then end your turn. Anything that starts another turn cancels it (\`--cancel\` does too).\n` +
+		`  The outcome lands in ${statePath}.`)
 	process.exit(0)
 }
 if (statePath) {

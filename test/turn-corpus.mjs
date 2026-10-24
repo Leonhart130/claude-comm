@@ -39,7 +39,7 @@ const STARTER = (r) => r.type === "user" && (r.isMeta
 	: /^\s*<bash-(input|stdout|stderr)>/.test(textOf(r.message?.content)))
 
 function measure(dir, hideStarters) {
-	const m = { files: 0, versions: new Set(), t1: 0, t1busy: [], t2: 0, t2ring: [], t3: 0, t3typed: [], t3internal: [] }
+	const m = { files: 0, versions: new Set(), t1: 0, t1busy: [], t2: 0, t2ring: [], t3: 0, t3typed: [], t3internal: [], fifo: 0 }
 	let projects = []
 	try { projects = readdirSync(dir) } catch (e) { console.error(`turn-corpus: cannot read ${dir} (${e.code})`); process.exit(2) }
 	for (const d of projects) {
@@ -71,8 +71,11 @@ function measure(dir, hideStarters) {
 					if (s !== "busy") m.t2ring.push(`${where(r)} read ${s}`)
 				}
 				if (r.type === "queue-operation") {
-					if (r.operation === "enqueue") pending.push({ s: here(), at: where(r), internal: /^\s*<task-notification>/.test(String(r.content || "")) })
-					else for (const e of r.operation === "popAll" ? pending.splice(0) : pending.splice(0, 1)) {
+					if (r.operation === "enqueue") pending.push({ s: here(), at: where(r), content: String(r.content || ""), internal: /^\s*<task-notification>/.test(String(r.content || "")) })
+					// A remove CARRIES what it removes (1 226 of 1 226, review #19 §6): FIFO gave a later notification's
+					// absorption to the message before it - 9 of the 10 misreads. FIFO stays as the fallback, and is counted.
+					else for (const e of r.operation === "popAll" ? pending.splice(0)
+						: (() => { const k = r.content ? pending.findIndex((p) => p.content === String(r.content)) : -1; if (k < 0) m.fifo++; return pending.splice(k < 0 ? 0 : k, 1) })()) {
 						m.t3++
 						if (r.operation === "remove" && /absorbed/.test(String(r.reason || "")) && e.s !== "busy")
 							(e.internal ? m.t3internal : m.t3typed).push(`${e.at} read ${e.s}`)
@@ -97,7 +100,7 @@ if (real.t1busy.length) console.log(list(real.t1busy))
 console.log(`  queued mid-turn (queued_command)    ${String(real.t2).padStart(6)}   read ringable: ${real.t2ring.length}  — a ring there interrupts`)
 if (real.t2ring.length) console.log(list(real.t2ring))
 console.log(`  queue outcomes                      ${String(real.t3).padStart(6)}   absorbed while read ringable: ${real.t3typed.length} typed, ` +
-	`${real.t3internal.length} internal (<task-notification>, measured to start no turn)`)
+	`${real.t3internal.length} internal (<task-notification>, measured to start no turn); paired by FIFO, no content to match: ${real.fifo}`)
 if (real.t3typed.length) console.log(list(real.t3typed))
 
 const bad = real.t2ring.length + real.t3typed.length

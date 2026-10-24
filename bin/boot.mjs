@@ -1530,8 +1530,9 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 	let names = null, why = null
 	try { names = readdirSync(ROOT).filter((f) => /^BRIEF-from-.+\.md$/.test(f)) } catch (e) { why = e.code || e.message }
 	const reply = (f) => f.replace(/^BRIEF-from-/, "REPLY-to-")
-	const open = names ? names.filter((f) => !existsSync(join(ROOT, reply(f)))) : []
 	const at = (f) => { try { return statSync(join(ROOT, f)).mtimeMs } catch { return Date.now() } }
+	// answered = a reply AT LEAST AS NEW as the brief: a brief rewritten after its reply is open again (review #19 §8)
+	const open = names ? names.filter((f) => !existsSync(join(ROOT, reply(f))) || at(reply(f)) < at(f)).sort((x, y) => at(x) - at(y)) : []
 	if (why) row("briefs", WARN, `the repo root could not be listed (${why}) - a brief left there CANNOT BE SEEN`)
 	else if (open.length) row("briefs", WARN, `UNANSWERED - ${open[0]} left at the root ${age(Date.now() - at(open[0]))} ago` +
 		(open.length > 1 ? ` (+${open.length - 1} more)` : "") + ` - its writer reads ${reply(open[0])}`, open.map((f) => `unanswered:${f}`))

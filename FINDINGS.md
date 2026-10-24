@@ -2822,8 +2822,8 @@ That brief sat unanswered for four weeks at the repo root, a place no boot row r
 
 ⇒ **The default is now after the turn.** `close.mjs` makes every check and rings as before, then arms a detached
 `--after-turn` closer and returns (`armed`). The closer reads the session's own transcript with wake's reader until the
-turn that asked has ENDED, waits `GRACE_MS` (2 s) with the report on screen, re-reads (a turn begun in the grace is
-waited out too), re-checks the inbox (mail that came after the call cancels the close and says so), then closes and
+turn that asked has ENDED, waits `GRACE_MS` (2 s) with the report on screen, ~~re-reads (a turn begun in the grace is
+waited out too)~~ - **superseded 10-25 by `#review19` §1: any new turn now CANCELS** -, re-checks the inbox, then closes and
 hands the outcome to the same `--verify` probe. If the turn cannot be read (no registry entry), it closes after the
 grace alone and records that. If it does not end within 30 min, it gives up and the window stays: a working session
 is never closed. `--now` is the old immediate close.
@@ -2896,6 +2896,78 @@ exists. Mutated 2/2 (no guard; a guard that ignores the record).
 
 ⚠️ Not done: `launch.mjs` does not warn that a never-opened folder will stop at that dialog (the field's second idea).
 Trust lives in `~/.claude.json`, the runtime's private file and no contract. Named, not built.
+
+## `#review19` — review #19 on the two 10-24 releases: one 🔴, four 🟡, six mutants of seven surviving; disposed (2026-10-25)
+
+`review/REVIEW-19.md`, Opus xhigh, 2026-10-24 23:17 to 00:05, launched on the owner's green light. **The 🔴 was again
+inside the most recent fix** (`21f033d`, the after-turn close): the fourth review running where that holds. And the review
+day gave one more of the same family, measured LIVE on the leader: below, first.
+
+### 🔴 Found live while reading the review: a tool's output that QUOTES the interruption marker read "interrupted"
+
+At 22:06:10Z the reviewer's Stop hook rang the leader **in the middle of its turn**. The leader's last decisive row was a
+tool result: `sed` printing `REVIEW-19.md`, which quotes `[Request interrupted by user for tool use]`. `rowVerdict` called
+any tool result CONTAINING the marker an interruption, so idle, so ringable. On this machine 8 of 8 tool results that
+contain it are such quotes, each followed by more of the same turn; no real interruption is written that way (they are
+text rows that begin with it). ⇒ `isInterruption`: a text row that begins with the marker, or a tool result whose WHOLE
+content it is. Replayed on the leader's own transcript cut at each row: `idle - interrupted` became `busy - a tool result`.
+A62 gains the shape.
+
+### 🔴 §1 — an armed close never disarmed
+
+Replayed by the reviewer with a real turn's timing: an Esc, a prompt typed in the grace, and mail delivered by the last
+turn's Stop hook each let the window close 2 s later, the record saying *"the turn that asked for the close ended"*. And
+`CHANGELOG .2`'s *"mail that arrives after the call cancels the close"* was false for the common case: the Stop hook
+delivers that mail, so the inbox is empty at the check. ⇒ The closer now reads only the rows the transcript GAINED since
+the arming (its size, taken by the close that armed it). The asking turn may only finish (its tool results, its last
+answer, its Stop, a `turn_duration`). Anything else cancels and says what: a queued input, an interruption or error, a
+delivered message (a `Stop hook feedback` META), a new prompt, a second turn, a `/clear` (the registry naming a new
+transcript). The closer's pid is in the record, and `close.mjs --cancel` stops it. A second `close.mjs` does not arm a
+second closer (`already armed`), and `--force` is honoured by the closer (late mail no longer cancels a forced close).
+A89 now runs six scenarios at once, one pane and one agent each, with a real turn end's timing (§9 of the review:
+`end_turn`, +130 ms, +5 ms).
+
+### 🟡 §2 — turn-starters the reader did not know, and a close on an unreadable turn
+
+a. A skill launched by a slash command (`Base directory for this skill`, 79 of 79 followed by a model turn), the runtime's
+idle notice (1 of 1) and a scheduled task (`system/scheduled_task_fire`, 1 of 1) now read busy. With one sample each, the
+last two are taken on the safe side: a false busy costs a later ring, while a false idle types into work.
+b. Superseded by §1's design: the closer no longer re-reads the TURN, it reads the rows. A transcript with no registry
+entry at the arming still closes on the grace alone, and the record says so.
+
+### 🟡 §3 — the arms: six of seven mutants survived
+
+Each surviving shape now has an arm that sees it. A89's six scenarios (a prompt in the grace, an Esc, mail at the Stop,
+`--cancel`, no registry entry, a second close). A90's negative control is the same mail made a minute old after a
+`comm.mjs inbox`, and its positive control is a send typed `node $C send`. A88 adds an unreadable record (it rings as
+before) and another process's record (not this session's). A50 ④'s shell case is one real hop, not zero. A49 RETYPES
+the suggestion and requires it to work, from a roster written `./zone/` too.
+
+### 🟡 §4 — the ring after a send missed two real forms
+
+A Bash that exits non-zero fires `PostToolUseFailure`, not `PostToolUse` (measured, CLI 2.1.310): both are registered
+now. The regex on the command missed 58 real successful sends (`C=…/comm.mjs; node $C send`). ⇒ The stub reads no
+command at all: it rings when a message file younger than 5 s is in an inbox. A send that succeeded has just written one,
+whatever form it was typed in. `withHooks` recognises our command by its exact form (`.claude/comm-hook.mjs" <verb>`):
+the substring `comm-hook` also matched a person's `my-telecomm-hook.sh` and deleted it at every re-install.
+
+### 🟡 §5 — leak-check on binaries: rule 5 refuses almost any binary — NAMED, the owner's call
+
+20 random 100 KB files: 18 refused by rule 5 (two letters). latin1 makes 0x80-0xFF printable, so the ≥ 4 filter
+filters nothing. And a word glued to a letter-valued CRC byte passes. The remedy changes what the rules mean in a
+binary, rule by rule, and that choice is the owner's. Not changed tonight.
+
+### 🟢 §6 — turn-corpus: 9 of the 10 were its own FIFO pairing
+
+A remove carries what it removes (1 226 of 1 226): the corpus pairs by content now, with FIFO as a counted fallback. The
+leader's guess (8 of 10) was low by one: the "unexamined" case was pairing too.
+
+### 🟢 §7, §8 — named and fixed
+
+The suggestion's `../` is counted from the resolved base (`./review`, `review/`). `runtimeRecord` compares `procStart` and
+resolves a relative `CLAUDE_CONFIG_DIR` from the session's cwd. The `briefs` row requires a reply at least as new as its
+brief, and names the oldest first. The suite removes its own runtime dir.
+**Not done:** the `briefs` row's unreadable-root branch has no arm.
 
 ## `#cache-lives-an-hour` — resuming an idle expert after an hour re-writes its whole context
 
