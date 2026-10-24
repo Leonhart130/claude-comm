@@ -4332,6 +4332,68 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 		`record: deferred=${rec && rec.deferred}, turn_ended="${rec && rec.turn_ended}", gone=${rec && rec.gone}`)
 }
 
+// A90 — A `send` RINGS AN IDLE RECIPIENT AT ONCE, NOT AT THE SENDER'S TURN END. Work's leader, 2026-10-24: a bell to
+// a resting expert sat until it rang by hand, because the doorbell rode only the sender's Stop hook - a leader that
+// sends and works on wakes nobody. The installed stub now rings after a Bash call that was a `comm.mjs send`. In a
+// fixture installed by the REAL installer, a fake started expert idle in the bench records every byte typed into it;
+// the leader's own stub is handed a PostToolUse payload. A matched pair, one variable, the command: `ls` (nothing may
+// be typed, nothing rung) and the `send` (the bell must arrive). The hook must be registered on Bash, or none of it runs.
+{
+	const r90 = mkdtempSync(join(tmpdir(), "comm-attack-postsend-"))
+	const opened90 = []
+	atExit(() => {
+		for (const [sock, id] of opened90)
+			try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
+		try { rmSync(r90, { recursive: true, force: true }) } catch {}
+	})
+	mkdirSync(join(r90, ".comm"), { recursive: true })
+	mkdirSync(join(r90, "db"), { recursive: true })
+	mkdirSync(join(r90, "cfg", "sessions"), { recursive: true })
+	writeFileSync(join(r90, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", db: "db" } }))
+	execFileSync("node", [join(PKG, "install.mjs"), r90], { stdio: "pipe" })
+	writeFileSync(join(r90, "db", "BRIEF.md"), "go\n")
+	const stub = join(r90, ".claude", "comm-hook.mjs")
+	let hooked = false
+	try {
+		const st = JSON.parse(readFileSync(join(r90, ".claude", readdirSync(join(r90, ".claude")).find((f) => /^settings.*\.json$/.test(f))), "utf8"))
+		hooked = (st.hooks.PostToolUse || []).some((g) => g.matcher === "Bash" && (g.hooks || []).some((h) => /comm-hook\.mjs" post-tool/.test(h.command)))
+	} catch {}
+	const fake90 = join(r90, "claude")
+	try { symlinkSync(process.execPath, fake90) } catch {}
+	const typed = join(r90, "typed.txt"), pidFile = join(r90, "db.pid")
+	const b90 = await bench()
+	let up = false, sent = false, quietExit = null, quietTyped = null, quietRang = null, loudExit = null, arrived = false
+	if (b90) {
+		writeFileSync(join(r90, "db.cjs"), `const fs=require("fs");fs.writeFileSync(${JSON.stringify(pidFile)},String(process.pid));` +
+			`fs.writeFileSync(${JSON.stringify(join(r90, "cfg", "sessions"))}+"/"+process.pid+".json","{}");fs.writeFileSync(${JSON.stringify(typed)},"");` +
+			`if(process.stdin.setRawMode)process.stdin.setRawMode(true);process.stdin.on("data",(d)=>fs.appendFileSync(${JSON.stringify(typed)},d));setTimeout(()=>process.exit(0),60000)`)
+		const id = Number(spawnSync("kitten", ["@", "--to", `unix:${b90.sock}`, "launch", "--type=window", "--keep-focus", ...besideMe(b90),
+			`--cwd=${join(r90, "db")}`, "--env=CLAUDE_COMM_AGENT=db", `--env=CLAUDE_CONFIG_DIR=${join(r90, "cfg")}`, fake90, join(r90, "db.cjs")], { encoding: "utf8", timeout: 10000 }).stdout)
+		if (Number.isInteger(id) && id > 0) opened90.push([b90.sock, id])
+		for (const until = Date.now() + 8000; Date.now() < until && !up; nap(100)) up = existsSync(pidFile) && existsSync(typed)
+	}
+	if (up) {
+		const cmd = "node .comm/bin/comm.mjs send db --ref BRIEF.md --note a90"
+		sent = spawnSync(process.execPath, [join(r90, ".comm", "bin", "comm.mjs"), "send", "db", "--ref", "BRIEF.md", "--note", "a90"], { cwd: r90, encoding: "utf8" }).status === 0
+		const post = (command) => spawnSync(process.execPath, [stub, "post-tool"], { cwd: r90, encoding: "utf8",
+			input: JSON.stringify({ hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command } }) }).status
+		// ① any other command: nothing rung, nothing typed
+		quietExit = post("ls -la")
+		nap(1200)
+		quietTyped = readFileSync(typed, "utf8")
+		quietRang = existsSync(join(r90, ".comm", "wake", "rings.jsonl"))
+		// ② the send: the bell arrives
+		loudExit = post(cmd)
+		for (const until = Date.now() + 8000; Date.now() < until && !arrived; nap(100)) arrived = /claude-comm/.test(readFileSync(typed, "utf8"))
+	}
+	check("A90 a send rings an idle recipient at once, not at the sender's turn end",
+		hooked && up && sent && quietExit === 0 && quietTyped === "" && quietRang === false && loudExit === 0 && arrived,
+		`installed PostToolUse hook on Bash running the stub's post-tool=${hooked}; ` +
+		`${b90 ? `a fake started expert idle in the bench=${up}` : "THE ARM COULD NOT RUN: no kitty bench for this suite"}; mail waiting=${sent}; ` +
+		`after 'ls' -> exit ${quietExit}, typed=${JSON.stringify(quietTyped)}, a ring recorded=${quietRang}; ` +
+		`after the send -> exit ${loudExit}, the bell ARRIVED=${arrived}`)
+}
+
 // A58 — close REFUSES over a claim this agent holds, and over claims it cannot read.
 //
 // 🔴 Review #10 C1: this refusal had NEVER RUN. `claim list --json` answers an object, the loop

@@ -2836,6 +2836,27 @@ the immediate default arms nothing. A51 moved to `--now`, the path whose closer 
 ⚠️ Not verified: a REAL session's turn end (A89's transcript is hand-written in the shape wake reads, `#wake-mid-turn`).
 The claims are not re-checked at the close, only at the call.
 
+## `#ring-after-send` — a leader that sent and kept working woke nobody (2026-10-24)
+
+**Work's leader, the same evening:** its bell to an expert resting at its prompt (17:49:45Z) sat until it typed
+`wake.mjs` by hand. `send` had said so itself: *"IDLE … no turn is in progress, so none ends"*. The doorbell rode only
+the SENDER's Stop hook, so mail to an idle agent waited for the sender to finish its whole turn. Its proposal, that
+`send` ring the recipient itself, cannot be built where it asked: the bus spawns nothing (A21's import list has no
+`child_process`), which is why `send` prints the ring command instead.
+
+⇒ **The installed stub rings instead.** It is already outside the bus and already runs `wake --root` at every Stop.
+A `PostToolUse` hook on `Bash` now hands it each command, and after one that is a `comm.mjs send` it runs that same
+`wake`, with every rule intact (never its own session, never a running turn, the quiet period, never an unstarted
+session). It delivers nothing: the mail still lands at the recipient's turn boundary, so delivery itself is
+unchanged. Any other command costs one stdin read, and it never fails the tool call.
+
+A90, in a fixture installed by the real installer: a fake started expert idle in the bench, with mail waiting. After
+`ls` nothing is typed or rung; after the send the bell ARRIVES. Mutated 3/3: the template literal eating the regex's
+backslashes (my own first version, caught before any arm by reading the generated stub: it read `comm.mjs["']?s+send`,
+which matches no `send`; A75 catches that class too), a stub that rings after every command, and the hook unregistered.
+
+⚠️ Not measured: the cost in a real session of one more hook per Bash call (a node start, ~50 ms, expected).
+
 ## `#unstarted-session` — the bell answered Claude Code's trust dialog "No, exit" (2026-10-24)
 
 **deneb's leader, 2026-10-11:** `install.mjs --add-agent` made two folders Claude Code had never opened, `launch.mjs`
