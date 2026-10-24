@@ -4135,9 +4135,11 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 	const wk87 = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
 	const b87 = await bench()
 	const there = (id) => wk87.windows().some((w) => w.sock === b87.sock && w.id === id)
+	const cfg87 = join(r87, "cfg")
+	mkdirSync(join(cfg87, "sessions"), { recursive: true })
 	const pane = (cwd, agent, script) => {
 		const id = Number(spawnSync("kitten", ["@", "--to", `unix:${b87.sock}`, "launch", "--type=window", "--keep-focus", ...besideMe(b87),
-			`--cwd=${cwd}`, `--env=CLAUDE_COMM_AGENT=${agent}`, fake87, script], { encoding: "utf8", timeout: 10000 }).stdout)
+			`--cwd=${cwd}`, `--env=CLAUDE_COMM_AGENT=${agent}`, `--env=CLAUDE_CONFIG_DIR=${cfg87}`, fake87, script], { encoding: "utf8", timeout: 10000 }).stdout)
 		if (Number.isInteger(id) && id > 0) opened87.push([b87.sock, id])
 		return Number.isInteger(id) && id > 0 ? id : null
 	}
@@ -4161,7 +4163,9 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 	let leaderUp = false, quiet = null, quietRings = null, nothingTyped = false, loud = null, loudRings = null, arrived = false, sentDone = false
 	if (b87) {
 		const ls = join(r87, "leader.cjs")
-		writeFileSync(ls, `const fs=require("fs");fs.writeFileSync(${JSON.stringify(typed)},"");` +
+		// a STARTED session: it keeps a runtime record, or A88's guard would rightly refuse to type into it
+		writeFileSync(ls, `const fs=require("fs");fs.writeFileSync(${JSON.stringify(join(cfg87, "sessions"))}+"/"+process.pid+".json","{}");` +
+			`fs.writeFileSync(${JSON.stringify(typed)},"");` +
 			`if(process.stdin.setRawMode)process.stdin.setRawMode(true);process.stdin.on("data",(d)=>fs.appendFileSync(${JSON.stringify(typed)},d))`)
 		const lid = pane(r87, "leader", ls)
 		for (const until = Date.now() + 8000; Date.now() < until && !leaderUp; nap(100)) leaderUp = !!lid && existsSync(typed)
@@ -4188,6 +4192,65 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 		`close with nothing waiting -> window gone=${!!quiet?.gone}, record rings=${JSON.stringify(quietRings)}, nothing typed into the leader=${nothingTyped}; ` +
 		`send done then close -> done waiting in the leader's inbox=${sentDone}, window gone=${!!loud?.gone}, record says leader rang=${rangLeader}, ` +
 		`the doorbell ARRIVED in the leader's terminal=${arrived}`)
+}
+
+// A88 — THE BELL IS NEVER TYPED INTO A SESSION THAT HAS NOT STARTED. A field, 2026-10-11: two experts launched into
+// folders Claude Code had never opened sat at its trust dialog, default "❯ No, exit"; the leader's Stop hook rang them
+// (turn unknown, rung as before) and the Enter answered the dialog - both sessions exited. Measured 10-24 on a real
+// session there: no registry entry AND no runtime record (<config>/sessions/<pid>.json). A matched pair, one
+// variable: a fake expert idle in the bench with mail waiting, its terminal in raw mode recording every byte, rung
+// once WITHOUT a runtime record (nothing may be typed, and nothing recorded, or the quiet period would swallow the
+// next ring) and once WITH one (the bell must arrive - so the guard is not simply "never ring an unregistered pid").
+{
+	const r88 = mkdtempSync(join(tmpdir(), "comm-attack-unstarted-"))
+	const opened88 = []
+	atExit(() => {
+		for (const [sock, id] of opened88)
+			try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
+		try { rmSync(r88, { recursive: true, force: true }) } catch {}
+	})
+	mkdirSync(join(r88, ".comm", "bin"), { recursive: true })
+	mkdirSync(join(r88, "db"), { recursive: true })
+	mkdirSync(join(r88, "cfg", "sessions"), { recursive: true })
+	writeFileSync(join(r88, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", db: "db" } }))
+	for (const f of ["comm.mjs", "who.mjs", "wake.mjs", "session-registry.mjs"]) cpSync(join(PKG, "bin", f), join(r88, ".comm", "bin", f))
+	writeFileSync(join(r88, "db", "BRIEF.md"), "go\n")   // a ref resolves against the expert's spoke, whoever sends
+	const fake88 = join(r88, "claude")
+	try { symlinkSync(process.execPath, fake88) } catch {}
+	const typed = join(r88, "typed.txt"), pidFile = join(r88, "db.pid")
+	const wk88 = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
+	const b88 = await bench()
+	let up = false, pid = 0, sent = false, first = null, typedFirst = null, recordedFirst = null, second = null, arrived = false
+	if (b88) {
+		const script = join(r88, "db.cjs")
+		writeFileSync(script, `const fs=require("fs");fs.writeFileSync(${JSON.stringify(pidFile)},String(process.pid));fs.writeFileSync(${JSON.stringify(typed)},"");` +
+			`if(process.stdin.setRawMode)process.stdin.setRawMode(true);process.stdin.on("data",(d)=>fs.appendFileSync(${JSON.stringify(typed)},d))`)
+		const id = Number(spawnSync("kitten", ["@", "--to", `unix:${b88.sock}`, "launch", "--type=window", "--keep-focus", ...besideMe(b88),
+			`--cwd=${join(r88, "db")}`, "--env=CLAUDE_COMM_AGENT=db", `--env=CLAUDE_CONFIG_DIR=${join(r88, "cfg")}`, fake88, script], { encoding: "utf8", timeout: 10000 }).stdout)
+		if (Number.isInteger(id) && id > 0) opened88.push([b88.sock, id])
+		for (const until = Date.now() + 8000; Date.now() < until && !up; nap(100)) { try { pid = Number(readFileSync(pidFile, "utf8")) } catch {} up = pid > 0 && existsSync(typed) }
+	}
+	if (up) {
+		const env = { ...process.env, CLAUDE_COMM_AGENT: "leader" }
+		sent = spawnSync(process.execPath, [join(r88, ".comm", "bin", "comm.mjs"), "send", "db", "--ref", "BRIEF.md", "--note", "a88"], { cwd: r88, encoding: "utf8", env }).status === 0
+		const ring = () => { try { return JSON.parse(spawnSync(process.execPath, [join(r88, ".comm", "bin", "wake.mjs"), "--root", r88, "--json"], { cwd: r88, encoding: "utf8", env }).stdout).results.find((r) => r.agent === "db") } catch { return null } }
+		// ① no runtime record: not rung, said why, nothing recorded, nothing typed
+		first = ring()
+		recordedFirst = existsSync(join(r88, ".comm", "wake", "db.json"))
+		nap(1200)
+		typedFirst = readFileSync(typed, "utf8")
+		// ② the same session, now with its runtime record: rung, and the bell arrives
+		writeFileSync(join(r88, "cfg", "sessions", `${pid}.json`), "{}")
+		second = ring()
+		for (const until = Date.now() + 8000; Date.now() < until && !arrived; nap(100)) arrived = /claude-comm/.test(readFileSync(typed, "utf8"))
+	}
+	const refusedFirst = !!first && first.sent === false && /not started yet/.test(first.why || "")
+	check("A88 the bell is never typed into a session that has not started, and still reaches one that has",
+		up && sent && refusedFirst && recordedFirst === false && typedFirst === "" && !!second && second.sent === true && arrived &&
+			wk88.runtimeRecord(pid) === true,
+		`${b88 ? `a fake expert idle in the bench, raw terminal, unregistered=${up}` : "THE ARM COULD NOT RUN: no kitty bench for this suite"}; mail waiting=${sent}; ` +
+		`NO runtime record -> refused as not started=${refusedFirst} (${first ? first.why : "no answer"}), quiet record written=${recordedFirst}, typed=${JSON.stringify(typedFirst)}; ` +
+		`WITH its runtime record -> rung=${second ? second.sent : null} (${second ? second.why || second.how : "no answer"}), the bell ARRIVED=${arrived}`)
 }
 
 // A58 — close REFUSES over a claim this agent holds, and over claims it cannot read.

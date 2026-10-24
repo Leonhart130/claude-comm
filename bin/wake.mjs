@@ -314,7 +314,7 @@ function describe({ state, row }) {
 export function readTurn(pid, lookup) {
 	if (typeof lookup !== "function") return { state: "unknown", why: "no session registry beside wake.mjs" }
 	const hit = lookup(pid)
-	if (!hit.ok) return { state: "unknown", why: hit.why }
+	if (!hit.ok) return { state: "unknown", why: hit.why, unregistered: true }
 	let size
 	try { size = statSync(hit.transcript).size } catch (e) {
 		// FINDINGS.md#no-turn-yet: a session that has taken no turn has no transcript at all.
@@ -438,8 +438,22 @@ function clearFresh(pid, lookup, send, confirmMs) {
 	}
 }
 
+/**
+ * Does the RUNTIME keep a record of this session - <config>/sessions/<pid>.json, the file who.mjs's turnOf reads its
+ * status from (#native-path)? true / false, or null when it cannot say. false only on a POSITIVE absence (ENOENT).
+ * The lookup is turnOf's own; it is not imported because who.mjs is the bus and is out of bytes (A22).
+ */
+export function runtimeRecord(pid) {
+	let env = []
+	try { env = readFileSync(`/proc/${pid}/environ`, "utf8").split("\0") } catch { return null }
+	const val = (k) => (env.find((e) => e.startsWith(`${k}=`)) || "").slice(k.length + 1)
+	const dir = val("CLAUDE_CONFIG_DIR") || (val("HOME") && join(val("HOME"), ".claude"))
+	if (!dir) return null
+	try { statSync(join(dir, "sessions", `${pid}.json`)); return true } catch (e) { return e.code === "ENOENT" ? false : null }
+}
+
 export function wakeAgent(root, agent, pid, { dryRun = false, wins, turn = null, cfg = null, lookup = null, sendText = null,
-	allowClear = true, confirmMs = FRESH_CONFIRM_MS, fresh = {} } = {}) {
+	allowClear = true, confirmMs = FRESH_CONFIRM_MS, fresh = {}, started = runtimeRecord } = {}) {
 	const prev = lastWake(root, agent)
 	// THE QUIET PERIOD GUARDS A RING THAT HAS NOT WORKED YET - not every ring. A recipient that took a turn AFTER the
 	// last ring and is idle again has consumed it: a second message within 120 s was swallowed and nothing ever retried
@@ -449,6 +463,14 @@ export function wakeAgent(root, agent, pid, { dryRun = false, wins, turn = null,
 	// right outcome for the wrong reason, and the reason is what the sender reads. Nothing is recorded, so the next hook
 	// that fires looks again instead of waiting out QUIET_MS for a ring that never happened.
 	if (turn && turn.state === "busy") return { agent, pid, sent: false, busy: true, turn: "busy", why: `mid-turn, not rung (${turn.why})` }
+	// 🔴 NEVER TYPE INTO A SESSION THAT HAS NOT STARTED. A field, 2026-10-11: two experts launched into folders Claude
+	// Code had never opened sat at its trust dialog, whose default is "❯ No, exit"; the leader's Stop hook rang them -
+	// turn `unknown`, rung as before - and the Enter answered the dialog: both sessions exited, no transcript. Measured
+	// 10-24 on a real session in an untrusted folder: at that dialog it has NO registry entry (SessionStart has not run)
+	// AND no runtime record. Both witnesses, or this rings as before - a hookless session still has its runtime record.
+	// Nothing is lost by waiting: a session's start delivers its mail. Not recorded, so the next hook looks again. A88.
+	if (turn && turn.state === "unknown" && turn.unregistered && started(pid) === false)
+		return { agent, pid, sent: false, turn: "unknown", turnWhy: turn.why, why: "not started yet: no registry entry and no runtime record - a session at a startup dialog (trust, login) takes a typed Enter as its answer, and the trust dialog's default is 'No, exit'" }
 	// `ending` counts as answered too: a ring typed then is queued and replayed at the turn's close (turnState, 5/5).
 	// `unknown` does not - a transcript we could not read vouches for nothing.
 	const answered = prev && turn && (turn.state === "idle" || turn.state === "ending") && turn.call && turn.call.at > Date.parse(prev.at)

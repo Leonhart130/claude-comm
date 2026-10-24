@@ -2455,6 +2455,29 @@ reviewer running its own controls to collide with the leader's.
 mysterious — and the author being exempt from his own tool is `LESSONS.md` form **A**, for the second time.
 
 
+
+### 2026-10-24 — "the honest fallback" was the owner's tab, and this repo's own suite split it
+
+The owner: *"à chaque fois, ça divise la fenêtre qui est focus … fais en sorte que ça divise seulement la tienne"*.
+Two causes, both "the ACTIVE tab" again. A51 and A58 opened their panes with **no `--match` at all**. And
+`launch.mjs` used the caller only when it resolved as a window's FOREGROUND process, so an ancestor-resolved caller
+(the same window, one hop down) fell through to "kitty's default", which is the tab the owner is looking at. ⇒ Either
+resolution places the pane (`close.mjs` keeps refusing the ancestor answer: who may ACT is its question, not where).
+`--match window_id:` AND `--next-to id:` (kitty ignores `--next-to` outside the target tab). And **no caller window
+REFUSES**, in `--print` too, printing the `--os-window --minimized` launch to type. A50 ④ is a recording kitten with
+three trees (foreground, shell only, no window); ⑤ proves `--match` beats focus through a tab that is not active.
+Mutated 3/3, each reddening its own condition. ① had to show a window: with none, the new refusal fired first and ①
+read it as the id refusal, which is red for the wrong guard (form B), caught on the first run.
+
+**Then the owner, the same evening: *"t'as besoin d'ouvrir ces 50 fenêtres … visuellement c'est vraiment
+dérangeant."*** Measured by polling every socket through one suite: **11 windows, 9 split into the session's own
+window**. A mutation batch or a boot control multiplies that. All are needed (the only proof the launcher and the
+closer work in a real kitty), but none needs to be SEEN. So `bench()` opens ONE minimized OS window whose process is a
+fake `claude` running a job loop, and `benchRun()` runs a command from inside it: the launcher finds the bench as its
+caller exactly as it finds a leader. Re-measured: **12 windows, 0 in the session's tab**, 10 in the bench and 2 in
+A50's own minimized `--os-window`. ⚠️ NOT armed: a bench that leaked into the active tab is not run as a mutant,
+because the active tab is the owner's.
+
 ## `#doorbell-shares-the-human-s-line` — a wake landed inside a command the owner was typing
 
 **2026-09-11, reported by the `atlas` field leader, who explicitly declined to attribute it to me.** It is
@@ -2769,6 +2792,45 @@ caused by it. The fix itself moved resting prompts read busy **34 → 9** and qu
   written AFTER an enqueue at 23:44:20, so for the command's 33 s nothing in the transcript showed it running. No
   transcript reader can see that; the runtime's `sessions/<pid>.json` status might. Named, not fixed.
 - **1 unexamined** (rigel 10-02 14:01:51, a prompt carrying an upload).
+
+## `#self-close-rings` — an expert that closed itself took its own doorbell with it (2026-10-24)
+
+**Work's leader, measured in its tree:** two experts sent `done`, then ran `close.mjs` in the same turn, as the
+method says. The leader sat idle. **No row in `rings.jsonl` for either**, and it found one by the owner asking and the
+other at a scheduled wake. The positive control was the same day: a third expert sent `done` and stayed open, and its
+Stop hook rang the leader 16 s later. The doorbell rides the Stop hook at a turn END (`install.mjs`'s
+stub runs `wake --root`), and a session whose window closes never reaches one, so **every clean finish lost its ring.**
+
+⇒ `close.mjs` runs that same `wake --root` before the window goes, after the mail and claim refusals (a refused
+close rings nothing: the agent stays open and its turn end rings), with every rule of wake intact. Its answer goes into
+`.comm/close/<agent>.json` (`rings`), since nothing printed after the close can be read. `--dry-run` runs
+`wake --dry-run`. A87: an idle fake leader in the bench, raw terminal, records every byte. Closing with nothing waiting
+types nothing; `send done` then close makes the bell ARRIVE. Mutated 2/2 (no ring; a ring that only pretends).
+
+⚠️ Not verified: a REAL leader session receiving it (A87's leader is a fake `claude`; the field will tell).
+
+## `#unstarted-session` — the bell answered Claude Code's trust dialog "No, exit" (2026-10-24)
+
+**deneb's leader, 2026-10-11:** `install.mjs --add-agent` made two folders Claude Code had never opened, `launch.mjs`
+started an expert in each, and the leader ended its turn. Both windows showed *"Quick safety check: Is this a project
+you created or one you trust?"* with **"❯ No, exit" preselected** (trust on `~/Dev` does not reach a new subfolder).
+The leader's Stop hook rang them (`rings.jsonl`: `"turn":"unknown","rang":true`), the Enter answered the dialog, and
+both sessions exited with no transcript.
+
+**Measured 10-24 on a real `claude` in a fresh untrusted folder** (a minimized OS window, no turn taken): the dialog is
+on screen word for word; the session has **no registry entry** (SessionStart has not run) **and no runtime record**
+(`~/.claude/sessions/<pid>.json` absent). The positive control is a started session (this one), which has its record,
+`status` busy. Nothing was written to `~/.claude.json`.
+
+⇒ `wake` does not type when BOTH witnesses say "not started": a registry miss (`readTurn` marks it `unregistered`)
+AND a positive ENOENT on the runtime record (`runtimeRecord(pid)`, `turnOf`'s own lookup: who.mjs is out of bytes,
+A22). Anything less rings as before. A hookless session has its runtime record, and a record we cannot read is not an
+absence. It is not recorded as a ring, so the quiet period does not swallow the next one, and nothing is lost: a
+session's start delivers its mail. A88 is a matched pair on the record alone; the bell must ARRIVE once the record
+exists. Mutated 2/2 (no guard; a guard that ignores the record).
+
+⚠️ Not done: `launch.mjs` does not warn that a never-opened folder will stop at that dialog (the field's second idea).
+Trust lives in `~/.claude.json`, the runtime's private file and no contract. Named, not built.
 
 ## `#cache-lives-an-hour` — resuming an idle expert after an hour re-writes its whole context
 
