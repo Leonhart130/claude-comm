@@ -4423,6 +4423,153 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 		SC.filter((k) => S89[k] && S89[k].rec).map((k) => `; ${k}: "${(S89[k].rec.cancelled || S89[k].rec.turn_ended || "-").slice(0, 70)}"`).join(""))
 }
 
+// A95 — A SESSION RELAYS ITSELF: AFTER ITS TURN, `/clear` PROVED, THEN ITS FIRST PROMPT PROVED - AND NOTHING IS TYPED
+// WHEN A STEP CANNOT BE. The owner, 2026-10-25, through a field leader: "ce truc de se clear et se relancer a l'air très
+// important". One bench pane per scenario, each a fake Claude Code that DRAWS the input box measured live that day (a
+// rule, `❯` + NBSP + a dim placeholder, a rule), records every byte typed into it, and answers `/clear` + Enter as the
+// SessionStart hook does - a registry entry naming a NEW transcript - unless it is the one told not to. Each with a REAL
+// registry entry (its own CLAUDE_COMM_RUNTIME, A31) and a transcript written here with a real turn end's timing. One
+// variable per scenario. After the arming: nothing (relayed - `/clear`, the prompt, nothing else, and the prompt in the
+// NEW transcript: the positive control every "nothing typed" below leans on), text on the input line, a dialog instead
+// of the box, the guard's file gone by the moment of the relay, a `/clear` the session ignores (the prompt must NOT
+// follow), a prompt the session swallows (typed, never in the transcript: NOT relayed), a prompt in the grace. At the
+// arming: no first prompt (the refusal hands back the config line to type), no guard, and a session inside a session -
+// one WITH a registry entry of its own and in the window's foreground list, as a `claude -p` the session spawned would
+// be, so nothing but the ancestry test can refuse it. Each refused, nothing armed. FINDINGS.md#relay
+{
+	const r95 = mkdtempSync(join(tmpdir(), "comm-attack-relay-"))
+	const opened95 = [], ARMS = ["nominal", "typed", "dialog", "guard", "noclear", "untaken", "grace"], REFUSED = ["nosay", "noguard", "nested"], SC = [...ARMS, ...REFUSED]
+	atExit(() => {
+		for (const [sock, id] of opened95)
+			try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
+		try { rmSync(r95, { recursive: true, force: true }) } catch {}
+	})
+	const say = (k) => `resume ${k}: read HANDOFF.md, then the last brief`
+	mkdirSync(join(r95, ".comm", "bin"), { recursive: true })
+	for (const k of SC) { mkdirSync(join(r95, k), { recursive: true }); writeFileSync(join(r95, k, "HANDOFF.md"), "written\n") }
+	writeFileSync(join(r95, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", ...Object.fromEntries(SC.map((k) => [k, k])) },
+		relay: Object.fromEntries(SC.filter((k) => k !== "nosay").map((k) => [k, k === "noguard" ? say(k) : { say: say(k), guard: "test -f HANDOFF.md" }])) }))
+	for (const f of ["relay.mjs", "wake.mjs", "session-registry.mjs"]) cpSync(join(PKG, "bin", f), join(r95, ".comm", "bin", f))
+	const R95 = join(r95, ".comm", "bin", "relay.mjs"), rt95 = join(r95, "runtime"), regDir95 = join(rt95, "claude-comm", "sessions"), fake95 = join(r95, "claude")
+	try { symlinkSync(process.execPath, fake95) } catch {}
+	// the fake session's source is this function's: no escaping between two languages, and it reads its scenario from argv[2]
+	function relayFake() {
+		const fs = require("fs"), { spawnSync } = require("child_process")
+		const c = JSON.parse(fs.readFileSync(process.argv[2], "utf8"))
+		fs.writeFileSync(c.keys, ""); fs.writeFileSync(c.pidFile, String(process.pid))
+		const RULE = "\x1b[38:2:136:136:136m" + "─".repeat(60) + "\x1b[39m"
+		let line = c.typed || "", tx = c.tx
+		const draw = () => process.stdout.write("\x1b[2J\x1b[H" + (c.dialog
+			? " Quick safety check: Is this a project you created or one you trust?\r\n\r\n ❯ No, exit\r\n   Yes, I trust this folder\r\n\r\n Enter to confirm · Esc to cancel\r\n"
+			: "\r\n\r\n" + RULE + "\r\n\x1b[m❯ " + (line || "\x1b[22;2mTry \"fake\"\x1b[22m") + "\r\n" + RULE + "\r\n  ⏵⏵ fake session\r\n"))
+		draw()
+		if (process.stdin.setRawMode) process.stdin.setRawMode(true)
+		process.stdin.on("data", (d) => {
+			fs.appendFileSync(c.keys, d)
+			for (const ch of d.toString()) {
+				if (ch !== "\r") { line += ch; draw(); continue }
+				const sub = line
+				line = ""
+				if (sub === "/clear") { if (c.clears) { tx = c.tx2; fs.copyFileSync(c.next, `${c.regDir}/${process.pid}.json`) } }
+				else if (!c.swallows) fs.appendFileSync(tx, JSON.stringify({ type: "user", timestamp: new Date().toISOString(), message: { role: "user", content: sub } }) + "\n")
+				draw()
+			}
+		})
+		const t = setInterval(() => {
+			if (!fs.existsSync(c.go)) return
+			clearInterval(t)
+			const r = spawnSync(c.argv[0], c.argv.slice(1), { encoding: "utf8", cwd: c.cwd })
+			fs.writeFileSync(c.out, JSON.stringify({ s: r.status, o: r.stdout, e: r.stderr }))
+		}, 50)
+		setTimeout(() => process.exit(0), 90000)
+	}
+	writeFileSync(join(r95, "fake.cjs"), `(${relayFake.toString()})()\n`)
+	// the session inside the session: registered under its own pid as SessionStart would, then relay.mjs in-process
+	function nestedSession() {
+		const fs = require("fs"), { pathToFileURL } = require("url")
+		const c = JSON.parse(fs.readFileSync(process.argv[2], "utf8"))
+		const st = fs.readFileSync("/proc/self/stat", "utf8"), start = Number(st.slice(st.lastIndexOf(")") + 2).split(" ")[19])
+		fs.writeFileSync(c.txNested, "")
+		fs.writeFileSync(`${c.regDir}/${process.pid}.json`, JSON.stringify({ v: 1, pid: process.pid, start, boot: c.boot, transcript: c.txNested, agent: "nested", source: "startup", at: new Date().toISOString() }))
+		process.argv.splice(2)
+		import(pathToFileURL(c.relay).href)
+	}
+	writeFileSync(join(r95, "nested.cjs"), `(${nestedSession.toString()})()\n`)
+	const reg = await import(pathToFileURL(join(PKG, "bin", "session-registry.mjs")).href)
+	const b95 = await bench()
+	const ts = () => new Date().toISOString()
+	const tx = (k) => join(r95, `${k}.jsonl`), tx2 = (k) => join(r95, `${k}.after-clear.jsonl`)
+	const row = (k, r) => appendFileSync(tx(k), JSON.stringify({ timestamp: ts(), ...r }) + "\n")
+	const U = (k, content, extra = {}) => row(k, { type: "user", message: { role: "user", content }, ...extra })
+	const A = (k, stop, text = "x") => row(k, { type: "assistant", message: { role: "assistant", model: "claude-opus-5", stop_reason: stop,
+		content: [stop === "tool_use" ? { type: "tool_use", id: "t1", name: "Bash", input: {} } : { type: "text", text }] } })
+	const endTurn = (k) => { A(k, "end_turn", "handed over"); nap(130); row(k, { type: "system", subtype: "stop_hook_summary" }); nap(5); row(k, { type: "system", subtype: "turn_duration" }) }
+	const recOf = (k) => { try { return JSON.parse(readFileSync(join(r95, ".comm", "relay", `${k}.json`), "utf8")) } catch { return null } }
+	const keysOf = (k) => { try { return readFileSync(join(r95, `${k}.keys`), "utf8") } catch { return null } }
+	const S95 = {}
+	if (b95) {
+		mkdirSync(regDir95, { recursive: true })
+		for (const k of SC) {
+			const c = { keys: join(r95, `${k}.keys`), pidFile: join(r95, `${k}.pid`), go: join(r95, `${k}.go`), out: join(r95, `${k}.out`), cwd: join(r95, k),
+				tx: tx(k), tx2: tx2(k), next: join(r95, `${k}.next.json`), regDir: regDir95, clears: k !== "noclear", swallows: k === "untaken",
+				typed: k === "typed" ? "hello" : "", dialog: k === "dialog", boot: reg.bootId(), relay: R95, txNested: join(r95, "nested-inner.jsonl"),
+				// "nested": relay.mjs run by ANOTHER `claude` under this one - node under that name, so it is a session of its own
+				argv: k === "nested" ? [fake95, join(r95, "nested.cjs"), join(r95, `${k}.json`)] : [process.execPath, R95] }
+			writeFileSync(join(r95, `${k}.json`), JSON.stringify(c))
+			const id = Number(spawnSync("kitten", ["@", "--to", `unix:${b95.sock}`, "launch", "--type=window", "--keep-focus", ...besideMe(b95),
+				`--cwd=${join(r95, k)}`, `--env=CLAUDE_COMM_RUNTIME=${rt95}`, fake95, join(r95, "fake.cjs"), join(r95, `${k}.json`)], { encoding: "utf8", timeout: 10000 }).stdout)
+			if (Number.isInteger(id) && id > 0) opened95.push([b95.sock, id])
+			S95[k] = { id: Number.isInteger(id) && id > 0 ? id : null, c, pid: 0 }
+		}
+		for (const until = Date.now() + 8000; Date.now() < until && SC.some((k) => !S95[k].pid); nap(100))
+			for (const k of SC) if (!S95[k].pid) try { S95[k].pid = Number(readFileSync(S95[k].c.pidFile, "utf8")) } catch {}
+		for (const k of SC) {
+			const { pid, id, c } = S95[k]
+			if (!pid || !id) continue
+			const entry = (transcript, source) => JSON.stringify({ v: 1, pid, start: reg.startTimeOf(pid), boot: reg.bootId(), transcript, agent: k, source, at: ts() })
+			writeFileSync(join(regDir95, `${pid}.json`), entry(tx(k), "startup"))
+			writeFileSync(c.next, entry(tx2(k), "clear"))
+			U(k, "write your handoff, then relay"); A(k, "tool_use")
+			writeFileSync(c.go, "")
+		}
+		for (const until = Date.now() + 15000; Date.now() < until && SC.some((k) => S95[k].pid && !existsSync(S95[k].c.out)); nap(100)) {}
+		for (const k of SC) try { S95[k].o = JSON.parse(readFileSync(S95[k].c.out, "utf8")) } catch {}
+		// the guard's file goes AFTER a passing arming: only the check at the moment of the relay can see it
+		rmSync(join(r95, "guard", "HANDOFF.md"), { force: true })
+		for (const k of ARMS) U(k, [{ type: "tool_result", tool_use_id: "t1", content: "relay: armed" }])
+		for (const k of ARMS) if (k !== "grace") { endTurn(k); if (k === "nominal") S95.nominal.ended = Date.now() }
+		endTurn("grace"); nap(700); U("grace", "attends, ne vide pas"); A("grace", "end_turn", "ok")
+		const settled = (k) => { const r = recOf(k); return r && r.relayed !== null && !r.relay_pid }
+		for (const until = Date.now() + 25000; Date.now() < until && ARMS.some((k) => S95[k].pid && !settled(k)); nap(200)) {}
+		for (const k of SC) { S95[k].rec = recOf(k); S95[k].keys = keysOf(k) }
+	}
+	const rec = (k) => (S95[k] && S95[k].rec) || {}, keys = (k) => S95[k] && S95[k].keys, out = (k) => (S95[k] && S95[k].o) || {}
+	const why = (k) => `${rec(k).refused || ""}${rec(k).cancelled || ""}`
+	const untouched = (k, re) => rec(k).relayed === false && keys(k) === "" && re.test(why(k))
+	let after = ""
+	try { after = readFileSync(tx2("nominal"), "utf8") } catch {}
+	const ok = {
+		armed: ARMS.every((k) => out(k).s === 0 && /relay: armed/.test(out(k).o || "")),
+		relayed: rec("nominal").relayed === true && keys("nominal") === `/clear\r${say("nominal")}\r` && after.includes(JSON.stringify(say("nominal"))),
+		// never inside the turn: the first keystroke comes after its end AND the grace
+		afterTheTurn: !!S95.nominal && !!rec("nominal").clear && Date.parse(rec("nominal").clear.at) - S95.nominal.ended >= 1800,
+		typedRefused: untouched("typed", /text is on the input line/),
+		dialogRefused: untouched("dialog", /no input box/),
+		guardRefused: untouched("guard", /guard failed/),
+		noclearStops: rec("noclear").relayed === false && keys("noclear") === "/clear\r" && /not confirmed/.test(why("noclear")),
+		untakenNotRelayed: rec("untaken").relayed === false && keys("untaken") === `/clear\r${say("untaken")}\r` && /no user row carrying it/.test(why("untaken")),
+		graceCancels: untouched("grace", /in the grace|new turn/),
+		nosayRefused: out("nosay").s === 2 && /no first prompt/.test(out("nosay").e || "") && /"relay": \{"nosay": /.test(out("nosay").e || "") && !S95.nosay.rec,
+		noguardRefused: out("noguard").s === 2 && /no guard/.test(out("noguard").e || "") && !S95.noguard.rec,
+		nestedRefused: out("nested").s === 2 && /inside another claude session/.test(out("nested").e || "") && !S95.nested.rec,
+	}
+	check("A95 a session relays itself after its turn - /clear proved, its prompt proved - and types nothing a step cannot prove",
+		!!b95 && Object.values(ok).every(Boolean),
+		`${b95 ? "" : "THE ARM COULD NOT RUN: no kitty bench for this suite; "}` + Object.entries(ok).map(([k, v]) => `${k}=${v}`).join("; ") +
+		ARMS.map((k) => `; ${k}: keys ${JSON.stringify((keys(k) || "").slice(0, 60))} "${(why(k) || (rec(k).relayed ? "relayed" : "-")).slice(0, 70)}"`).join("") +
+		REFUSED.map((k) => `; ${k}: exit ${out(k).s} "${(out(k).e || "").split("\n")[0].slice(0, 60)}"`).join(""))
+}
+
 // A90 — A `send` RINGS AN IDLE RECIPIENT AT ONCE, NOT AT THE SENDER'S TURN END. Work's leader, 2026-10-24: a bell to
 // a resting expert sat until it rang by hand, because the doorbell rode only the sender's Stop hook - a leader that
 // sends and works on wakes nobody. The installed stub now rings after a Bash call that was a `comm.mjs send`. In a

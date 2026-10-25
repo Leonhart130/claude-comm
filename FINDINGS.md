@@ -3684,6 +3684,46 @@ of 7 killed** by their own arm. **Not verified:** a real agent acting on the lin
 `selftest` was not run, since delivery (Stop, SessionStart) is untouched; only Bash calls are checked, because the
 hook's matcher is `Bash`.
 
+## `#relay` — a session hands over to a fresh copy of itself, with nobody at the keyboard (2026-10-25)
+
+**Asked by the owner through rigel's leader** (letters `…auto-relais.md` 18h41 and `…auto-relais-experts.md` 20h0x,
+`exchange/field/in/`): the field hands its leader over at ~150 k tokens (a Stop hook), and each handover needed him to
+type `/clear` then "hey leader expert". In his words: *"ce truc de se clear et se relancer a l'air très important […] Et il
+faut également que ça marche bien pour les experts."* To me, the same evening: *"c'est très important pour son travail
+[…] j'aimerais que tu traites ça en priorité."* The shape was already settled in `DESIGN-autonomy.md` (09-04: `/clear`
+typed into the window, not a relaunch), and most parts were already measured. **Measured tonight, before building,
+on Claude Code 2.1.310, a real session in a minimized window (Haiku 5.5):**
+
+| question | measured |
+| --- | --- |
+| Can the screen tell an empty prompt from a half-typed one? | **yes, but not as plain text.** Empty, the box line is `❯` + NBSP + a placeholder (`Try "how does <filepath> work?"`) drawn DIM (`\e[22;2m`), or nothing at all after a turn or a clear. Typed text is drawn plain: `❯ hello`. `kitten @ get-text` without `--ansi` cannot tell the two apart |
+| What does a dialog look like? | the trust dialog draws `❯ No, exit` with **no rule above it**: no input box. The `/` menu, open while `/clear` is typed, reads as text on the line |
+| `/clear` typed with `send-text`, then `\r` | runs the command; a new transcript (`46ee197e` → `b85a531c`), the command's rows at its head |
+| The first prompt typed after it | a plain `user` row with exactly that text, in the NEW transcript; the model stayed Haiku 5.5 |
+| End to end, `relay.mjs` armed by the session itself, from its own Bash tool | **relayed**: turn end + 2 s, `/clear` proved by the registry 301 ms later, the prompt taken 252 ms after it, the fresh session answered. Twice: the window's process being claude (`zsh -ic` exec'd it), then a hand-started shape (zsh 1681827 → claude 1682271), which is the owner's leader windows. (301 and 252 are poll steps: 100 ms and 250 ms) |
+| `hello` typed into the box while the arming turn ran | **refused**, nothing typed: `somebody's text is on the input line: "hello"` - and `hello` was still there, whole |
+| Does the ledger count it? | **yes**: the probe's ledger reads `reboot 2 [clear:2]` - each relay is a reboot-arm start, with nothing else to do |
+
+**The design**, `bin/relay.mjs` (its header carries the reasons): armed by the agent in its own turn, after its
+handoff; one or more GUARDS that exit 0 only when the handoff is written (**no guard, no relay**); the first prompt per
+agent in `.comm/config.json` `relay`; a detached watcher that waits for THAT turn's end + 2 s (close.mjs's wait, moved to
+`wake.awaitTurnEnd` so the two share one reading of it), re-runs the guards, reads the screen (`wake.promptAtRest`),
+reads the turn, types `/clear` and proves it (`wake.clearFresh`, rule 7's), waits for the box at rest again, types the
+prompt and proves it. **Nothing is retried**: a step it cannot prove stops it where it is, in `.comm/relay/<agent>.json`.
+**A95** arms it: one bench pane per scenario, a fake session drawing the measured box and recording every byte typed.
+
+**What it does NOT cover, said rather than implied:**
+- **The race between the screen check and the keystroke.** A person who starts typing in the ~1 ms between them is
+  typed over. Narrowed, not closed.
+- **Effort** was not re-measured tonight; 09-13 measured it surviving a `/clear` (`low`), and the process is the same.
+- **Another Claude Code version's screen.** Every unknown shape reads as NOT at rest, so a changed box stops relays
+  (it says so in the record) rather than typing into somebody's words. That is the direction it fails in, chosen.
+- **A relay cancelled by mail** (delivered at the Stop) is not re-armed: the agent's next turn end is where it, or the
+  project's hook, arms it again. The record says so.
+- **Memory.** `/clear` returns no RSS (09-04); a relay frees context, not the process. The relaunch stays the rare path.
+- **The field's Stop hook** (rigel's, at 150 k) must let the handover turn end: it does, it never blocks when
+  `stop_hook_active` (read, not run).
+
 ## `#settings-inheritance` — an expert runs its leader's `settings.local.json`, not its `settings.json` (2026-09-27)
 
 **Reported by atlas's leader** (field letter 09-27): a `Stop` hook he put in his root's `settings.local.json` ran

@@ -5,27 +5,23 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-10-25 06:10 CET by `date` - the clocks fell back at 03:00 - end of the session after the declared restart (handoff verified
-31/31). **WORK IS THE MAIN FIELD.** The owner: "j'te laisse gérer tout ça ce soir"; and **"tu peux utiliser tout l'usage
-jusque 100%, c'est fait pour être consommé"** - never self-throttle near the cap. `2026-10-25.5` is in all ten trees.)*
+*(2026-10-25 20h34 CET by `date`. **WORK IS THE MAIN FIELD.** The owner: "j'te laisse gérer tout ça ce soir"; **"tu peux
+utiliser tout l'usage jusque 100%"** - never self-throttle near the cap. Tonight he made the self-relay THE priority.)*
 
-1. **Read work's channel first.** It owes only measurement 1: an expert's close seen whole then gone (`turn_ended` in
-   `.comm/close/<agent>.json`, at `agence`'s close). Measured 10-25 05h03: a `send` wakes a resting expert at the sender's
-   turn end, and a resting leader is rung in 9 s. An EXPERT's first start on a new version is still unmeasured. Its 06h05 letter:
-   thresholds WRITTEN (no statusLine, the owner's word first). LESSONS §8: my letters' times were guessed, 15-36 min fast.
-2. **Usage is BUILT and installed** (`2026-10-25.5`, `#usage-statusline`, A93/A94, 7/7 mutants). The measurement is the
-   FIRST REAL CROSSING in work, once it writes its `usage` thresholds - and whether the agent acts on the line (D2).
-   Work adds `"statusLine": true` only with the owner's word; meanwhile this repo's statusLine feeds the machine file.
-   Then `comm stop <agent>` and `launch.mjs --resume <session>`, outside the bus.
-3. **The bus has room: 50 754 of 58 000 B** (`#bus-notes`). New tools go OUTSIDE it - the bus only delivers mail.
-4. **Named, unarmed**: boot's registry control still blames itself for a live session's rewrite (A31's twin, fixed 10-25).
-5. **Arm LESSONS §8**: the `channel:` row compares my outgoing letters' written time with the file's (>10 min warns).
-6. **Letters waiting for a bell**: deneb's (its own channel `exchange/<deneb>-leader/`) and atlas's - both leaders not
-   running at 02:20; ring with `node bin/exchange-bell.mjs --peer <channel> --ref <file>` when they run.
+1. **The first REAL relay in a field.** rigel's leader adds `"relay"` to its config and ends its 150 k Stop hook's message
+   with `relay.mjs` (letter `…21h-…-livre.md`); its experts are its task T8. Read `.comm/relay/<agent>.json` there:
+   relayed, the clear's ms, the prompt's ms, and whether the fresh session booted. Unarmed in relay.mjs (no arm reaches
+   them): the turn re-read just before `/clear`, and the window re-check at the relay. The screen/keystroke race is named.
+2. **Work owes nothing**: measurement 1 arrived 09h08 (`turn_ended` there). Usage's first real crossing waits on work's
+   thresholds; its `statusLine` waits on the owner's word. An EXPERT's first start on a new version is still unmeasured.
+3. **rigel's four memory ideas** (its 15h09 letter; my 20h06 reply disposes them): `claim --machine`, `launch --memory`,
+   memory in `who` (outside who.mjs - the bus is 50 754 of 58 000 B), "closed" vs "crashed" from `.comm/close/`.
+4. **Arm LESSONS §8**: the `channel:` row compares my outgoing letters' written time with the file's (>10 min warns).
+5. **Letters waiting for a bell**: deneb's (`exchange/<deneb>-leader/`) and atlas's - ring with
+   `node bin/exchange-bell.mjs --peer <channel> --ref <file>` when their leaders run.
 
-**Done 10-25 night** (commits `0779386`..`0e1dbaf`): `#stranded-named` · the gate's `arms-gone` (LESSONS §7) · the briefs
-row armed · F2's wait and its zombie (`alive()` read an unreaped child as running) · 7/7 mutants killed · `.3` (comments)
-`.4` (the shortest `--ref` suggestion) and `.5` (usage) released everywhere · `prove-red` 74/74 before the zombie fix.
+**Done 10-25** (night `0779386`..`0e1dbaf`: `.3`-`.5`, `#stranded-named`, F2's zombie; evening: `2026-10-25.6`) - `relay.mjs`,
+the owner's priority through rigel: measured live twice, refuses on a half-typed line; A95 + 9/9 mutants, each its own condition.
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a
 codename here; the mapping is in no repo. The boot report prints the REAL directory names: **never copy a `field:` row
@@ -69,7 +65,7 @@ order:** adoption (orion measured 09-19) → Rust port → value, with atlas's l
 
 | | state |
 | --- | --- |
-| toolkit | `bin/comm.mjs` · `session-registry.mjs` · `ledger.mjs` · `restart-signal.mjs` · `claim.mjs` · `wake.mjs` · `exchange-bell.mjs` · `context.mjs` · `handoff.mjs` · `restart.mjs` · `launch.mjs` · `close.mjs` · `boot.mjs` · `install.mjs` · `test/` — no dependencies |
+| toolkit | `bin/comm.mjs` · `session-registry.mjs` · `ledger.mjs` · `restart-signal.mjs` · `claim.mjs` · `wake.mjs` · `exchange-bell.mjs` · `context.mjs` · `handoff.mjs` · `restart.mjs` · `launch.mjs` · `close.mjs` · `relay.mjs` · `boot.mjs` · `install.mjs` · `test/` — no dependencies |
 | repo | `origin` = `Leonhart130/claude-comm`. **The push is the leader's call**, delegated 2026-09-05, along with installing into field trees — do not ask again |
 | **vega** | in real daily use — 26 real deliveries, both directions |
 | gates | `attack` (deterministic, every case armed) · `ledger --prove-red`, now run INSIDE it · `selftest` (real sessions, not gated by boot) · `context` and `boot` controls. **Counts live in boot's output, never here** |
@@ -106,8 +102,9 @@ order:** adoption (orion measured 09-19) → Rust port → value, with atlas's l
 8. **🟡 The autonomy mandate — self-launching experts, a self-rebooting leader.** Given 2026-09-04; settled
    parts in [`DESIGN-autonomy.md`](DESIGN-autonomy.md), **do not re-derive them here.** The finding that
    shapes it: the consumer's defects are **BOOT defects, not crowding defects**. 🟢 **2026-09-11 the leader
-   launched, briefed and was reviewed by its own expert** — first full exercise. 🔴 **Open: a REAL restart
-   arming the arm, and the trigger — ▶ NEXT 7.**
+   launched, briefed and was reviewed by its own expert** — first full exercise. 🟢 **10-25: the self-relay is
+   BUILT** (`bin/relay.mjs`, `#relay`, A95): after its handoff a session `/clear`s and restarts ITSELF, each step proved,
+   and every relay is a reboot-arm start. The trigger stays the agent's, or its project's hook (rigel's, at 150 k).
 
 **Carried forward, still open** *(cut from ▶ NEXT 2026-09-08, not retracted)*:
 - **ESLint is uncovered.** A43 stops a configured *prettier* rewriting our generated files; ESLint is the

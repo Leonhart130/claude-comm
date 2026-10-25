@@ -642,7 +642,7 @@ const GITIGNORE_BLOCK = "# claude-comm live state (regenerate with install.mjs)\
 // drifted - wake.mjs documented none of its user flags, `who --all` and `comm log` were nowhere. So this section is
 // BUILT, at every install, from each tool's own usage lines (what its --help prints) and from `comm help`, read from
 // the very files written beside it: it cannot describe a version other than the one installed. A92 gates both ends.
-const CLI_TOOLS = ["launch", "close", "wake", "claim", "restart", "handoff", "ledger", "usage"]
+const CLI_TOOLS = ["launch", "close", "relay", "wake", "claim", "restart", "handoff", "ledger", "usage"]
 const usageLines = (src) => src.split("\n").filter((l) => /^ \*\s{2,}node \S*bin\/[\w-]+\.mjs/.test(l))
 	.map((l) => l.replace(/^ \*\s+/, "").replace(/^node (\.comm\/)?bin\//, "node .comm/bin/"))
 function REFERENCE(here) {
@@ -1011,7 +1011,7 @@ function write(path, content, results) {
 // restarts happen HERE - 53 cold starts in one field tree against 5 declared reboots - and
 // the ledger verdict stays UNKNOWN until declared restarts exist to count. A tool only the
 // maintainer can run cannot fill an arm the field is the source of.
-const BUS_FILES = ["comm.mjs", "session-registry.mjs", "ledger.mjs", "wake.mjs", "restart-signal.mjs", "claim.mjs", "launch.mjs", "close.mjs", "handoff.mjs", "restart.mjs", "who.mjs", "usage.mjs"]
+const BUS_FILES = ["comm.mjs", "session-registry.mjs", "ledger.mjs", "wake.mjs", "restart-signal.mjs", "claim.mjs", "launch.mjs", "close.mjs", "handoff.mjs", "restart.mjs", "who.mjs", "usage.mjs", "relay.mjs"]
 const CHANGELOG = join(HERE, "CHANGELOG.md")
 function busPrint() {
 	const h = createHash("sha256")

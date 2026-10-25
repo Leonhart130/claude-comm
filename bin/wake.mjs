@@ -433,8 +433,8 @@ export function freshReport(cfg, agents, turnOf, fresh = {}) {
 
 const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
 
-/** Type `/clear` and PROVE it: a new transcript for this pid in the registry, or nothing is claimed. */
-function clearFresh(pid, lookup, send, confirmMs) {
+/** Type `/clear` and PROVE it: a new transcript for this pid in the registry, or nothing is claimed. relay.mjs's too. */
+export function clearFresh(pid, lookup, send, confirmMs) {
 	const before = typeof lookup === "function" ? lookup(pid) : { ok: false, why: "no session registry beside wake.mjs" }
 	if (!before.ok) return { cleared: false, typed: false, why: `not restarted fresh: the registry cannot name its transcript (${before.why}), so a clear could not be proved and none was typed` }
 	const a = send("/clear")
@@ -448,6 +448,108 @@ function clearFresh(pid, lookup, send, confirmMs) {
 		if (Date.now() - t0 >= confirmMs) return { cleared: false, typed: true, why: `clear not confirmed: the registry still names the same transcript ${confirmMs} ms later` }
 		sleepSync(100)
 	}
+}
+
+// ── AFTER THE TURN THAT ASKED: close.mjs's wait, and relay.mjs's ───────────────────────────────────────
+// Moved here from close.mjs 2026-10-25 so the two deferred actions share ONE reading of "that turn has ended" (A89, A95).
+// 🔴 REVIEW #19 §1: ONCE ARMED, NOTHING DISARMED IT. A new turn begun after the arming was WAITED OUT and the window went
+// after it; an Esc read as the turn's end; mail delivered by the last turn's own Stop hook left the inbox empty, so the
+// one cancellation never fired - and the record said "the turn that asked for the close ended" each time. So the wait
+// reads only what the transcript GAINED since the arming (its size, taken by the call that armed it), and the turn that
+// asked may only finish: its tool result, its last answer, its Stop, a turn_duration. ANYTHING else CANCELS and says
+// what - a prompt, an Esc, a delivered message, a doorbell, a second turn, a /clear.
+/** What the rows written since the arming say: { ended } once the asking turn closed, or { cancel: why }. */
+export function sinceArming(rows, verdict = rowVerdict) {
+	let ended = false
+	for (const r of rows) {
+		if (!r || r.isSidechain) continue
+		if (r.type === "system" && r.subtype === "turn_duration") { if (ended) return { cancel: "a second turn ran after the one that asked" }; ended = true; continue }
+		if (r.type === "attachment" && r.attachment?.type === "queued_command") return { cancel: "somebody typed into the session while its last turn ran" }
+		const v = verdict(r)
+		if (!v) continue
+		const c = r.message?.content, tool = Array.isArray(c) && c.some((x) => x.type === "tool_result")
+		// the asking turn's own remainder: the arming call's tool result, the final answer
+		if (!ended && v === "busy" && (r.type === "assistant" || (r.type === "user" && tool))) continue
+		if (v === "idle") return { cancel: "the turn was interrupted, or ended on an error - that is not a finished report" }
+		if (r.type === "user" && r.isMeta) return { cancel: "mail was delivered into the session after the action was asked (its Stop hook blocked), or a turn resumed" }
+		return { cancel: ended ? "a new turn began after the one that asked" : "a new prompt reached the session before its turn ended" }
+	}
+	return { ended }
+}
+
+/**
+ * Block until the turn that armed a deferred action has ENDED and `graceMs` passed with nothing after it. Reads
+ * `transcript` forward from `offset`, a row still being written is read on the next look. Returns { ended, waitedMs },
+ * or why not: { cancel } (with `moved` for a /clear), { gone } (the session exited), { abandoned } (past `maxMs`).
+ */
+export function awaitTurnEnd({ pid, transcript, offset = 0, lookup = null, graceMs = 2000, maxMs = 30 * 60_000, what = "action" }) {
+	const rows = [], armed = Date.now()
+	let pos = offset, lastLook = 0
+	const pull = () => {
+		let fd
+		try {
+			const size = statSync(transcript).size
+			if (size <= pos) return
+			fd = openSync(transcript, "r")
+			const buf = Buffer.alloc(size - pos)
+			readSync(fd, buf, 0, buf.length, pos)
+			const text = buf.toString("utf8"), cut = text.lastIndexOf("\n")
+			if (cut < 0) return
+			for (const l of text.slice(0, cut).split("\n")) if (l) try { rows.push(JSON.parse(l)) } catch {}
+			pos += Buffer.byteLength(text.slice(0, cut + 1))
+		} catch {} finally { if (fd !== undefined) try { closeSync(fd) } catch {} }
+	}
+	const said = (why) => why.replace("the action was", `the ${what} was`)
+	for (;;) {
+		pull()
+		const v = sinceArming(rows)
+		if (v.cancel) return { cancel: said(v.cancel) }
+		if (v.ended) {
+			sleepSync(graceMs)
+			pull()
+			const again = sinceArming(rows)
+			if (again.cancel) return { cancel: `${said(again.cancel)} (in the grace)` }
+			return { ended: true, waitedMs: Date.now() - armed }
+		}
+		// a /clear moves the session to a NEW transcript: the person is working in it
+		if (typeof lookup === "function" && Date.now() - lastLook > 2000) {
+			lastLook = Date.now()
+			const h = lookup(pid)
+			if (h.ok && h.transcript !== transcript) return { cancel: `the session moved to a new transcript (a /clear) after the ${what} was asked`, moved: true }
+		}
+		try { process.kill(pid, 0) } catch { return { gone: true } }
+		if (Date.now() - armed > maxMs) return { abandoned: true }
+		sleepSync(300)
+	}
+}
+
+// ── IS THE PROMPT AT REST AND EMPTY? Read off the screen, because nothing else knows ─────────────────────
+// The transcript says whether a TURN runs; only the screen says whether a PERSON has typed. Measured 2026-09-13: `hello`
+// half-typed, then `/clear` + Enter, was submitted as the prompt "hello/clear". Measured 2026-10-25 on Claude Code 2.1.310
+// with `kitten @ get-text --ansi` (FINDINGS.md#relay): the input is a box - a rule of `─`, a line `❯` + NBSP, a rule - near
+// the bottom. Empty, the line after `❯ ` is nothing, or a placeholder drawn DIM (`\e[22;2m`, "Try …"); typed text is drawn
+// plain. A dialog (trust, a permission) draws no such box. Every unknown shape reads as NOT at rest: a wrong "busy" costs
+// one relay, a wrong "at rest" types into somebody's words.
+const SGR = /\x1b\[[0-9;:]*m/g
+const plain = (l) => l.replace(SGR, "")
+const isRule = (l) => /^─{10,}\s*$/.test(plain(l).trim())
+/** { ok: true } when the screen shows Claude Code's input box at the bottom, empty; else { ok: false, why }. */
+export function promptAtRest(screen) {
+	const lines = String(screen || "").split("\n")
+	while (lines.length && !plain(lines[lines.length - 1]).trim()) lines.pop()
+	let top = -1
+	for (let i = lines.length - 1; i > 0; i--) if (/^❯[  ]/.test(plain(lines[i])) || plain(lines[i]) === "❯") { if (isRule(lines[i - 1])) { top = i; break } }
+	if (top < 0) return { ok: false, why: "no input box on screen (a dialog, a menu, or not Claude Code's prompt)" }
+	let bottom = -1
+	for (let j = top + 1; j < lines.length; j++) if (isRule(lines[j])) { bottom = j; break }
+	if (bottom < 0) return { ok: false, why: "the input box has no lower edge on screen" }
+	if (lines.length - 1 - bottom > 6) return { ok: false, why: `the input box is not at the bottom of the screen (${lines.length - 1 - bottom} lines below it): something is drawn under it` }
+	for (let j = top + 1; j < bottom; j++) if (plain(lines[j]).trim()) return { ok: false, why: "the input holds more than one line of text" }
+	const rest = lines[top].replace(/^(\x1b\[[0-9;:]*m)*❯[  ]?/, "")
+	if (!plain(rest).trim()) return { ok: true }
+	// a placeholder: the text after the mark starts DIM (SGR parameter 2), and is the only text there
+	if (/^\x1b\[(?:[0-9:]*;)*2(?:;[0-9:]*)*m/.test(rest)) return { ok: true, placeholder: plain(rest).trim().slice(0, 60) }
+	return { ok: false, why: `somebody's text is on the input line: "${plain(rest).trim().slice(0, 40)}"` }
 }
 
 /**

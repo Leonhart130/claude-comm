@@ -23,6 +23,22 @@ already have.
 
 
 
+
+## 2026-10-25.6 — bus print `02dcb53b81c2` — 2026-10-25
+
+- **A session can hand over to a fresh copy of itself, with nobody at the keyboard.** Write your handoff, then:
+  `node .comm/bin/relay.mjs --guard "<a command that exits 0 only when your handoff is written>"`. Two seconds after
+  THIS turn ends, your window gets `/clear`, then your first prompt, each step proved (a new transcript in the registry,
+  then a user row carrying the prompt). Same process, so the same model and effort; mail waiting stays in your inbox.
+- **The first prompt is per agent**, once, in `.comm/config.json`:
+  `"relay": {"leader": "hey leader expert", "web": {"say": "Resume: read REPORT.md, then your last brief", "guard": "test -f REPORT.md"}}`
+  (`--say` overrides it). **No guard, no relay**: what survives a `/clear` is only what was written down.
+- **It never types into somebody's words.** It reads the screen first: text on the input line, a dialog, or a prompt not
+  at rest, and it types nothing. Anything that starts another turn before then (a message, mail, Esc) cancels it.
+  Nothing is retried. Every step and its outcome lands in `.comm/relay/<agent>.json`; `--cancel` disarms, `--dry-run`
+  checks everything and arms nothing.
+- It has no trigger of its own: WHEN to hand over is yours, or your project's hook's.
+
 ## 2026-10-25.5 — bus print `9ec0f08f92c9` — 2026-10-25
 
 - **Your project can set usage thresholds, and you are told when one is reached.** In `.comm/config.json`:

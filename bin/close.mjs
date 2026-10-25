@@ -65,7 +65,7 @@
  * leaving nothing at all. `--dry-run` is what the arms use to gate the decision; the file
  * is what gates the effect.
  */
-import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync, openSync, readSync, closeSync } from "node:fs"
+import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from "node:fs"
 import { join, dirname } from "node:path"
 import { spawnSync, spawn } from "node:child_process"
 import { fileURLToPath } from "node:url"
@@ -155,31 +155,6 @@ function mailWaiting(root, agent) {
 		return `mail is waiting: ${(box.stdout.match(/^inbox.*$/m) || [""])[0].trim()} — somebody expects this agent to act, and a window that closes on unread mail loses it until the agent is relaunched`
 	return null
 }
-// 🔴 REVIEW #19 §1: ONCE ARMED, NOTHING DISARMED IT. A new turn begun after the arming was WAITED OUT and the window went
-// after it; an Esc read as the turn's end; mail delivered by the last turn's own Stop hook left the inbox empty, so the
-// one cancellation never fired - and the record said "the turn that asked for the close ended" each time. Now the closer
-// reads only what the transcript GAINED since the arming (its size, taken by the close that armed it), and the turn that
-// asked may only finish: its tool result, its last answer, its Stop, a turn_duration. ANYTHING else CANCELS and says
-// what - a prompt, an Esc, a delivered message, a doorbell, a second turn, a /clear. The cost, a window that stays after
-// the agent read its mail, is one more `close.mjs`, and the agent knows to type it: its context says "armed".
-/** What the rows written since the arming say: { ended } once the asking turn closed, or { cancel: why }. */
-function sinceArming(rows, rowVerdict) {
-	let ended = false
-	for (const r of rows) {
-		if (!r || r.isSidechain) continue
-		if (r.type === "system" && r.subtype === "turn_duration") { if (ended) return { cancel: "a second turn ran after the one that asked" }; ended = true; continue }
-		if (r.type === "attachment" && r.attachment?.type === "queued_command") return { cancel: "somebody typed into the session while its last turn ran" }
-		const v = rowVerdict(r)
-		if (!v) continue
-		const c = r.message?.content, tool = Array.isArray(c) && c.some((x) => x.type === "tool_result")
-		// the asking turn's own remainder: the close's tool result, the final answer
-		if (!ended && v === "busy" && (r.type === "assistant" || (r.type === "user" && tool))) continue
-		if (v === "idle") return { cancel: "the turn was interrupted, or ended on an error - that is not a finished report" }
-		if (r.type === "user" && r.isMeta) return { cancel: "mail was delivered into the session after the close was asked (its Stop hook blocked), or a turn resumed" }
-		return { cancel: ended ? "a new turn began after the one that asked for the close" : "a new prompt reached the session before its turn ended" }
-	}
-	return { ended }
-}
 if (ARGV[0] === "--after-turn") {
 	const [, me, sock, id, statePath, root, agent, transcript, offsetArg, forced] = ARGV
 	const wake = await import(new URL("wake.mjs", import.meta.url))
@@ -199,45 +174,12 @@ if (ARGV[0] === "--after-turn") {
 		nap(GRACE_MS)
 		how = `its turn could not be read at the arming (${offsetArg}) - closed after the grace alone`
 	} else {
-		// read forward from the arming offset; a row still being written is read on the next look
-		let pos = Number(offsetArg) || 0, rows = [], lastLook = 0
-		const pull = () => {
-			let fd
-			try {
-				const size = statSync(transcript).size
-				if (size <= pos) return
-				fd = openSync(transcript, "r")
-				const buf = Buffer.alloc(size - pos)
-				readSync(fd, buf, 0, buf.length, pos)
-				const text = buf.toString("utf8"), cut = text.lastIndexOf("\n")
-				if (cut < 0) return
-				for (const l of text.slice(0, cut).split("\n")) if (l) try { rows.push(JSON.parse(l)) } catch {}
-				pos += Buffer.byteLength(text.slice(0, cut + 1))
-			} catch {} finally { if (fd !== undefined) try { closeSync(fd) } catch {} }
-		}
-		for (;;) {
-			pull()
-			const v = sinceArming(rows, wake.rowVerdict)
-			if (v.cancel) stop({ cancelled_at: new Date().toISOString(), cancelled: `${v.cancel} - the window stays` })
-			if (v.ended) {
-				nap(GRACE_MS)
-				pull()
-				const again = sinceArming(rows, wake.rowVerdict)
-				if (again.cancel) stop({ cancelled_at: new Date().toISOString(), cancelled: `${again.cancel} (in the grace) - the window stays` })
-				how = "the turn that asked for the close ended"
-				break
-			}
-			// a /clear moves the session to a NEW transcript: the person is working in it
-			if (lookup && Date.now() - lastLook > 2000) {
-				lastLook = Date.now()
-				const h = lookup(Number(me))
-				if (h.ok && h.transcript !== transcript) stop({ cancelled_at: new Date().toISOString(), cancelled: "the session moved to a new transcript (a /clear) after the close was asked - the window stays" })
-			}
-			try { process.kill(Number(me), 0) } catch { stop({ session_gone_at: new Date().toISOString() }) }
-			if (Date.now() - armed > AFTER_TURN_MAX_MS)
-				stop({ abandoned_at: new Date().toISOString(), abandoned: `the turn did not end within ${AFTER_TURN_MAX_MS / 60_000} min - the window was left open, not closed on a working session` })
-			nap(300)
-		}
+		// read forward from the arming offset: the wait and every cancellation are wake's, shared with relay.mjs (A89, A95)
+		const w = wake.awaitTurnEnd({ pid: Number(me), transcript, offset: Number(offsetArg) || 0, lookup, graceMs: GRACE_MS, maxMs: AFTER_TURN_MAX_MS, what: "close" })
+		if (w.cancel) stop({ cancelled_at: new Date().toISOString(), cancelled: `${w.cancel} - the window stays` })
+		if (w.gone) stop({ session_gone_at: new Date().toISOString() })
+		if (w.abandoned) stop({ abandoned_at: new Date().toISOString(), abandoned: `the turn did not end within ${AFTER_TURN_MAX_MS / 60_000} min - the window was left open, not closed on a working session` })
+		how = "the turn that asked for the close ended"
 	}
 	// mail that came in the grace and was not delivered waits for THIS agent - unless the close was forced over it
 	const late = forced === "force" ? null : mailWaiting(root, agent)
