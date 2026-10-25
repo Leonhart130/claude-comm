@@ -4498,9 +4498,9 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 // told a new version's changelog entry at its first start on it, and only once. Positive controls on (1) and (3).
 {
 	// kitty's own (launch, close, wake); wake's, which close passes on; close's own detached closer and probe; comm
-	// whoami's (claim); restart-signal's (restart); git's (handoff)
+	// whoami's (claim); restart-signal's (restart); git's (handoff); comm send's (usage, a crossing's message)
 	const FOREIGN = { launch: ["--keep-focus", "--match", "--next-to", "--to"], close: ["--match", "--to", "--root", "--json", "--after-turn", "--verify"],
-		wake: ["--match", "--to"], claim: ["--agent-root"], restart: ["--by"], handoff: ["--porcelain", "--short", "--stdin"], ledger: [] }
+		wake: ["--match", "--to"], claim: ["--agent-root"], restart: ["--by"], handoff: ["--porcelain", "--short", "--stdin"], ledger: [], usage: ["--ref", "--kind", "--note"] }
 	const undocumented = (src, foreign) => { const head = src.slice(0, src.indexOf("*/"))
 		return [...new Set([...src.matchAll(/["'](--[a-z][a-z0-9-]+)["']/g)].map((m) => m[1]))].filter((f) => f !== "--help" && !head.includes(f) && !foreign.includes(f)) }
 	const gaps = {}
@@ -4559,9 +4559,83 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 			quiet && recorderRecords && !notInReadme.length && !!entry && told && once,
 		`(1) options neither in their tool's header nor declared foreign: ${Object.keys(gaps).length ? JSON.stringify(gaps) : "none"}; positive control, one more parsed flag is named=${ctlCaught}; ` +
 		`(2) comm flags missing from their help line: ${commGaps.join(", ") || "none"}; ` +
-		`(3) --help exits 0 with its usage: ${helpRuns.filter((h) => !h.ok).map((h) => h.t).join(",") || "all 7"}, comm --help=${commHelp.status === 0}, comm help outside any project=${helpAnywhere.status === 0}; nothing done (no kitten call, mail still waiting, no wake/close record)=${quiet}; positive control, the recorder records a real wake=${recorderRecords}; ` +
+		`(3) --help exits 0 with its usage: ${helpRuns.filter((h) => !h.ok).map((h) => h.t).join(",") || `all ${helpRuns.length}`}, comm --help=${commHelp.status === 0}, comm help outside any project=${helpAnywhere.status === 0}; nothing done (no kitten call, mail still waiting, no wake/close record)=${quiet}; positive control, the recorder records a real wake=${recorderRecords}; ` +
 		`(4) lines missing from the generated README: ${notInReadme.length ? notInReadme.slice(0, 3).join(" | ") : "none"}; ` +
 		`(5) ${label}'s entry at the first start=${told}, not again at the second=${once}`)
+}
+
+// A93 — THE USAGE READING (FINDINGS.md#usage-statusline): the statusLine writes it ON CHANGE and the bar shows it; an agent
+// at its project's threshold is told ONCE per window, its leader by a bus message pointing at the record. Every case runs
+// the GENERATED stub, the path a real session runs. ONE variable per case: the reading, the window, the config.
+// Positive controls: below the threshold nothing is said; the same reading in a NEW window speaks again - so the silence
+// of a project with no `usage`, and of the second telling, is the guard and not a dead hook.
+{
+	const r93 = mkdtempSync(join(tmpdir(), "comm-attack-usage-"))
+	atExit(() => { try { rmSync(r93, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(r93, ".comm"), { recursive: true }); mkdirSync(join(r93, "ex"), { recursive: true })
+	const cfg93 = (usage) => writeFileSync(join(r93, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", ex: "ex" }, ...(usage ? { usage } : {}) }))
+	cfg93({ week: 93, session: 85, agents: { leader: { week: 98, session: 98 } } })
+	execFileSync("node", [join(PKG, "install.mjs"), r93], { stdio: "pipe" })
+	const env93 = { ...process.env, CLAUDE_COMM_RUNTIME: join(r93, "rt") }
+	delete env93.CLAUDE_COMM_AGENT
+	const uFile = join(r93, "rt", "claude-comm", "usage.json")
+	const uAt = () => { try { return JSON.parse(readFileSync(uFile, "utf8")).at } catch { return null } }
+	const bar = (rl) => (spawnSync(process.execPath, [join(r93, "ex", ".claude", "comm-hook.mjs"), "statusline"], { cwd: join(r93, "ex"), encoding: "utf8", env: env93,
+		input: JSON.stringify({ session_id: "a93", ...(rl ? { rate_limits: rl } : {}) }) }).stdout || "")
+	const rl = (fh, sd, wk) => ({ five_hour: { used_percentage: fh, resets_at: 1900000000 }, seven_day: { used_percentage: sd, resets_at: wk } })
+	const post = (agent) => { const dir = agent === "leader" ? r93 : join(r93, agent)
+		const out = spawnSync(process.execPath, [join(dir, ".claude", "comm-hook.mjs"), "post-tool"], { cwd: dir, encoding: "utf8", env: env93, input: JSON.stringify({ hook_event_name: "PostToolUse" }) }).stdout || ""
+		try { return JSON.parse(out).hookSpecificOutput.additionalContext || "" } catch { return out.trim() ? `UNPARSED: ${out.slice(0, 60)}` : "" } }
+	const toLeader = () => { try { return readdirSync(join(r93, ".comm", "inbox", "leader")).filter((f) => f.endsWith(".json")).map((f) => JSON.parse(readFileSync(join(r93, ".comm", "inbox", "leader", f), "utf8"))) } catch { return [] } }
+
+	const shown = bar(rl(50, 92, 1900500000))
+	const below = post("ex")                                   // control: 92 < 93
+	const at1 = uAt(); bar(rl(50, 92, 1900500000)); const unchangedKept = uAt() === at1
+	const noLimits = bar(null), afterNone = uAt()
+	bar(rl(51, 94.4, 1900500000)); const changedWrote = uAt() !== at1
+	const first = post("ex"), mail1 = toLeader()
+	const second = post("ex"), mail2 = toLeader()
+	const lead = post("leader")                                // its own threshold, 98
+	bar(rl(51, 94.4, 1901100000)); const newWindow = post("ex")  // the same value, the next week
+	cfg93(null); bar(rl(51, 94.4, 1901700000)); const noConfig = post("ex")
+	const m = mail1[0] || {}
+	check("A93 the usage reading is written on change, and an agent at its threshold is told once per window, its leader too",
+		shown === "5h 50 % · 7d 92 %" && below === "" && unchangedKept && noLimits === "" && afterNone === at1 && changedWrote &&
+			/week \(7-day window\) is at 94 % - the threshold set for 'ex' is 93 %/.test(first) && /has been told/.test(first) &&
+			mail1.length === 1 && m.from === "ex" && m.kind === "fyi" && m.refPath === ".comm/usage/ex.md" && existsSync(join(r93, ".comm", "usage", "ex.md")) &&
+			second === "" && mail2.length === 1 && lead === "" && /is at 94 %/.test(newWindow) && noConfig === "",
+		`bar "${shown}" (want "5h 50 % · 7d 92 %"); CONTROL below the threshold -> ${below ? `SAID: ${below.slice(0, 50)}` : "silent"}; ` +
+		`the same reading again -> file kept=${unchangedKept}; no rate_limits -> bar "${noLimits}", file kept=${afterNone === at1}; a new value -> rewritten=${changedWrote}; ` +
+		`94.4 % vs 93 % -> ${first ? `told ("${first.slice(14, 100)}…")` : "SILENT"}, the leader's inbox ${mail1.length} message (from ${m.from}, ${m.kind}, ${m.refPath}); ` +
+		`again -> ${second ? "TOLD AGAIN" : "silent"}, inbox ${mail2.length}; the leader at its own 98 % -> ${lead ? "TOLD" : "silent"}; ` +
+		`POSITIVE CONTROL the next window -> ${newWindow ? "told" : "SILENT"}; no "usage" in the config -> ${noConfig ? "TOLD" : "silent"}`)
+}
+
+// A94 — THE STATUSLINE IS INSTALLED ONLY WHERE THE PROJECT OPTED IN, and never over a person's own (work's rule, 10-25: the
+// owner's Claude Code config changes only by his word). The user level is sandboxed (CLAUDE_CONFIG_DIR) so the operator's
+// real settings never decide this arm. One variable per install: the flag, a foreign statusLine, a user-level one.
+{
+	const r94 = mkdtempSync(join(tmpdir(), "comm-attack-sl-"))
+	atExit(() => { try { rmSync(r94, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(r94, "p", ".comm"), { recursive: true }); mkdirSync(join(r94, "p", "ex", ".claude"), { recursive: true }); mkdirSync(join(r94, "home"), { recursive: true })
+	const P = join(r94, "p")
+	const cfg94 = (usage) => writeFileSync(join(P, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", ex: "ex" }, ...(usage ? { usage } : {}) }))
+	const inst = () => spawnSync(process.execPath, [join(PKG, "install.mjs"), P], { encoding: "utf8", env: { ...process.env, CLAUDE_CONFIG_DIR: join(r94, "home") } }).status
+	const slOf = (dir) => { try { return JSON.parse(readFileSync(join(dir, ".claude", "settings.json"), "utf8")).statusLine || null } catch { return null } }
+	const ours = (sl) => !!sl && /comm-hook\.mjs"? statusline/.test(sl.command || "")
+	cfg94(null); const e0 = inst(); const byDefault = slOf(P)
+	cfg94({ week: 93, statusLine: true })
+	writeFileSync(join(P, "ex", ".claude", "settings.json"), JSON.stringify({ statusLine: { type: "command", command: "my-own-bar.sh" } }))
+	const e1 = inst(); const optedIn = slOf(P), foreign = slOf(join(P, "ex"))
+	writeFileSync(join(r94, "home", "settings.json"), JSON.stringify({ statusLine: { type: "command", command: "users-bar.sh" } }))
+	inst(); const underUser = slOf(P)
+	rmSync(join(r94, "home", "settings.json")); inst(); const back = slOf(P)
+	cfg94({ week: 93, statusLine: false }); inst(); const optedOut = slOf(P)
+	check("A94 the usage statusLine is installed only where the project opted in, and never over a person's own",
+		e0 === 0 && byDefault === null && e1 === 0 && ours(optedIn) && foreign && foreign.command === "my-own-bar.sh" && underUser === null && ours(back) && optedOut === null,
+		`no "usage" -> ${byDefault ? "ADDED" : "none"} (exit ${e0}); "statusLine": true -> ${ours(optedIn) ? "ours" : JSON.stringify(optedIn)} (exit ${e1}); ` +
+		`a person's own in ex/ -> ${foreign && foreign.command === "my-own-bar.sh" ? "kept" : JSON.stringify(foreign)}; one at user level -> ours ${underUser ? "LEFT" : "removed"}; ` +
+		`POSITIVE CONTROL it gone again -> ${ours(back) ? "ours" : "none"}; "statusLine": false -> ${optedOut ? "LEFT" : "removed"}`)
 }
 
 // A58 — close REFUSES over a claim this agent holds, and over claims it cannot read.

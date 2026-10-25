@@ -22,6 +22,20 @@ already have.
 
 
 
+
+## 2026-10-25.5 — bus print `9ec0f08f92c9` — 2026-10-25
+
+- **Your project can set usage thresholds, and you are told when one is reached.** In `.comm/config.json`:
+  `"usage": {"week": 93, "session": 85, "agents": {"leader": {"week": 98}}}` (percent of the 7-day and the 5-hour
+  window; `agents` overrides one agent). After a Bash call, an agent at its threshold gets one line in its context, once
+  per window: the value, how old the reading is, and when it resets. Its leader gets a bus message pointing at
+  `.comm/usage/<agent>.md`.
+- **The reading comes from Claude Code itself.** A session's status bar receives the account's usage, and a statusLine
+  writes it to one file for the whole machine. A project gets that statusLine **only** if its config says
+  `"usage": {"statusLine": true}`, and never over a statusLine of your own. Without one, the readings come from any
+  other session on the machine that has it, and the line always says their age.
+- `node .comm/bin/usage.mjs` prints the last reading and its age.
+
 ## 2026-10-25.4 — bus print `baa56b6c3844` — 2026-10-25
 
 - **When `comm send` refuses a `--ref` and suggests the one that works, it now suggests the shortest.** A file typed from

@@ -3672,6 +3672,18 @@ threshold crossing per window, with the age. **Not verified:** freshness while e
 API responses); the field's absence just after a reset (schema, not observed); a statusLine in a `launch.mjs` window or
 in an expert; any account that is not a subscriber.
 
+**Built the same morning, on work's three answers** (`2026-10-25.5`, `bin/usage.mjs`). Thresholds per project with
+per-agent exceptions: `"usage": {"week": 93, "session": 85, "agents": {"leader": {"week": 98}}}`. At a crossing, the
+agent is told once per window (an exclusive create, so two Bash calls ending together tell once), and the agent itself
+sends its leader a bus message pointing at `.comm/usage/<agent>.md`. The statusLine is installed **only** with
+`"statusLine": true`, and never over a person's own, here or at user level: work's rule, *the owner's Claude Code
+config changes only by his word*. The statusLine command gets `CLAUDE_PROJECT_DIR` and runs in the project folder
+(measured), so it goes through the stub like the hooks. **Armed:** A93 (the reading written on change; told once; the
+leader told; a per-agent threshold; a new window speaks again; no config is silent) and A94 (the opt-in). **Mutated, 7
+of 7 killed** by their own arm. **Not verified:** a real agent acting on the line (D2's open half, `#midturn-channel`);
+`selftest` was not run, since delivery (Stop, SessionStart) is untouched; only Bash calls are checked, because the
+hook's matcher is `Bash`.
+
 ## `#settings-inheritance` — an expert runs its leader's `settings.local.json`, not its `settings.json` (2026-09-27)
 
 **Reported by atlas's leader** (field letter 09-27): a `Stop` hook he put in his root's `settings.local.json` ran

@@ -110,8 +110,23 @@ const forward = (input, notices = []) => spawnSync(process.execPath,
 // every Stop. So after a Bash call whose command is a \`comm.mjs send\`, it runs the same \`wake --root\`, with every
 // rule of wake intact. It touches no mail: delivery is still the turn boundary's. Any other command costs one stdin
 // read. Never fails the tool call. A90.
+// THE STATUS BAR (\`FINDINGS.md#usage-statusline\`): a statusLine installed where the project opted in hands its usage
+// here; usage.mjs writes it for the whole machine on a change and returns the line the bar shows.
+if (process.argv[2] === "statusline") {
+	try { process.stdout.write((await import(pathToFileURL(join(dirname(bus), "usage.mjs")).href)).statusline(readFileSync(0, "utf8"))) } catch {}
+	process.exit(0)
+}
 if (process.argv[2] === "post-tool") {
-	try { readFileSync(0) } catch {}   // the payload is drained, never read: Claude Code writes it, and a closed pipe is its error
+	let raw = ""
+	try { raw = readFileSync(0, "utf8") } catch {}   // drained, and read only for its event name: a closed pipe is Claude Code's error
+	// USAGE FIRST: an agent at its project's threshold is told once per window, and its leader gets a message - which the
+	// ring below then rings. A project with no \`usage\` in its config pays one read of it. \`FINDINGS.md#usage-statusline\`
+	let usage = ""
+	try {
+		const um = join(dirname(bus), "usage.mjs")
+		if (existsSync(um) && readFileSync(join(projectRoot, ".comm", "config.json"), "utf8").includes('"usage"'))
+			usage = (await import(pathToFileURL(um).href)).check({ projectRoot, agentRoot, bus }) || ""
+	} catch { /* usage is advice: it must never break a tool call */ }
 	try {
 		// NOT THE COMMAND'S TEXT: a message that has just LANDED. Review #19 §4 counted 58 real sends a regex on the
 		// command missed (\`C=.../comm.mjs; node $C send\`) - a send that succeeded has written its file, whatever it was
@@ -125,6 +140,11 @@ if (process.argv[2] === "post-tool") {
 		if (fresh && existsSync(wake))
 			spawnSync(process.execPath, [wake, "--root", projectRoot], { timeout: 10000, stdio: "ignore" })
 	} catch { /* a doorbell must never break a tool call */ }
+	if (usage) {
+		let ev = "PostToolUse"
+		try { ev = JSON.parse(raw).hook_event_name || ev } catch {}
+		process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: ev, additionalContext: usage } }))
+	}
 	process.exit(0)
 }
 
@@ -622,7 +642,7 @@ const GITIGNORE_BLOCK = "# claude-comm live state (regenerate with install.mjs)\
 // drifted - wake.mjs documented none of its user flags, `who --all` and `comm log` were nowhere. So this section is
 // BUILT, at every install, from each tool's own usage lines (what its --help prints) and from `comm help`, read from
 // the very files written beside it: it cannot describe a version other than the one installed. A92 gates both ends.
-const CLI_TOOLS = ["launch", "close", "wake", "claim", "restart", "handoff", "ledger"]
+const CLI_TOOLS = ["launch", "close", "wake", "claim", "restart", "handoff", "ledger", "usage"]
 const usageLines = (src) => src.split("\n").filter((l) => /^ \*\s{2,}node \S*bin\/[\w-]+\.mjs/.test(l))
 	.map((l) => l.replace(/^ \*\s+/, "").replace(/^node (\.comm\/)?bin\//, "node .comm/bin/"))
 function REFERENCE(here) {
@@ -922,6 +942,22 @@ function withHooks(settings) {
 	return s
 }
 
+/**
+ * THE USAGE STATUSLINE (`FINDINGS.md#usage-statusline`), ONLY where the project opted in: `"usage": {"statusLine": true}`
+ * in .comm/config.json. Work's own rule (10-25): the owner's Claude Code config changes only by his word - so nothing
+ * here adds one by default. A statusLine that is not ours, in this file or at user level (which a project one would
+ * hide), is never replaced; opting out removes ours.
+ */
+const STATUS_COMMAND = `if command -v node >/dev/null 2>&1; then node "$CLAUDE_PROJECT_DIR/.claude/comm-hook.mjs" statusline; fi`
+const oursStatus = (sl) => /\.claude\/comm-hook\.mjs"? statusline\b/.test(String((sl && sl.command) || ""))
+function withStatusLine(settings, want, userHasOwn) {
+	const s = { ...settings }
+	if (s.statusLine && !oursStatus(s.statusLine)) return s
+	if (want && !userHasOwn) s.statusLine = { type: "command", command: STATUS_COMMAND }
+	else delete s.statusLine
+	return s
+}
+
 function write(path, content, results) {
 	const cur = existsSync(path) ? readFileSync(path, "utf8") : null
 	if (cur === content) { results.ok.push(path); return }
@@ -975,7 +1011,7 @@ function write(path, content, results) {
 // restarts happen HERE - 53 cold starts in one field tree against 5 declared reboots - and
 // the ledger verdict stays UNKNOWN until declared restarts exist to count. A tool only the
 // maintainer can run cannot fill an arm the field is the source of.
-const BUS_FILES = ["comm.mjs", "session-registry.mjs", "ledger.mjs", "wake.mjs", "restart-signal.mjs", "claim.mjs", "launch.mjs", "close.mjs", "handoff.mjs", "restart.mjs", "who.mjs"]
+const BUS_FILES = ["comm.mjs", "session-registry.mjs", "ledger.mjs", "wake.mjs", "restart-signal.mjs", "claim.mjs", "launch.mjs", "close.mjs", "handoff.mjs", "restart.mjs", "who.mjs", "usage.mjs"]
 const CHANGELOG = join(HERE, "CHANGELOG.md")
 function busPrint() {
 	const h = createHash("sha256")
@@ -1064,6 +1100,9 @@ if (!existsSync(cfgPath)) {
 }
 const cfg = readJson(cfgPath)
 const results = { wrote: [], ok: [], drift: [], failed: [], missing: [] }
+// A person's own statusLine at user level, which a project-level one would hide (CLAUDE_CONFIG_DIR is the runtime's own seam).
+const USER_STATUSLINE = (() => { try { const u = JSON.parse(readFileSync(join(process.env.CLAUDE_CONFIG_DIR || join(process.env.HOME || "", ".claude"), "settings.json"), "utf8"))
+	return !!(u && u.statusLine && !oursStatus(u.statusLine)) } catch { return false } })()
 
 if (ADD.length) {
 	// `--check` is a read-only pre-flight and this writes: refusing is better than picking
@@ -1295,7 +1334,7 @@ for (const [id, relPath] of Object.entries(cfg.agents)) {
 	// reported as installed either.
 	const sPath = join(agentRoot, ".claude", "settings.json")
 	try {
-		const merged = withHooks(readJson(sPath, {}))
+		const merged = withStatusLine(withHooks(readJson(sPath, {})), !!(cfg.usage && cfg.usage.statusLine === true), USER_STATUSLINE)
 		write(sPath, JSON.stringify(merged, null, 2) + "\n", results)
 	} catch (e) {
 		console.error(`  ✗ ${id}: ${e.message}`)
