@@ -123,7 +123,9 @@ function prepare() {
 	process.stdout.write(
 		`✓ armed: the next start of '${agent}' will score as a REBOOT, not a cold start\n` +
 		`  ${(p.stdout || "").trim().split("\n")[0]}\n\n` +
-		`  The last step is yours, and this tool will not take it: launch.mjs refuses an agent\n` +
+		`  To restart in THIS window with nobody at the keyboard (2026-10-25.6, FINDINGS.md#relay):\n\n` +
+		`      node ${join(HERE, "relay.mjs")} --guard "node ${join(HERE, "handoff.mjs")} verify"\n\n` +
+		`  Otherwise the last step is yours, and this tool will not take it: launch.mjs refuses an agent\n` +
 		`  that is already alive (A17), and you are it. Exit, then:\n\n` +
 		`      node ${join(HERE, "launch.mjs")} ${agent} --model <model> --effort <level> --prompt "<first turn>"\n\n` +
 		`  (the tier is yours to choose and has no default - launch.mjs refuses without it)\n\n` +

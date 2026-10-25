@@ -24,6 +24,16 @@ already have.
 
 
 
+
+## 2026-10-25.7 — bus print `ad6706f0e0d8` — 2026-10-25
+
+- **Your skill now says how to restart yourself.** Its section "Restarting yourself" used to say *"It does not
+  relaunch you"*. It now leads with `relay.mjs` (2026-10-25.6, below): a fresh session in your own window, with
+  nobody at the keyboard. `restart.mjs prepare` prints the same line.
+- **To carry what you read across a relay**: `restart.mjs prepare --obligations <notes.md> --read <file>...` first, then
+  `relay.mjs --guard "node .comm/bin/handoff.mjs verify"`. That guard exits 0 while every pinned file is unchanged, and
+  1 once one has changed: the relay refuses a handoff that no longer describes your disk.
+
 ## 2026-10-25.6 — bus print `02dcb53b81c2` — 2026-10-25
 
 - **A session can hand over to a fresh copy of itself, with nobody at the keyboard.** Write your handoff, then:

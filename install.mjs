@@ -1290,11 +1290,18 @@ function SKILL(ids, agentRoot) {
 		"Stuck on a decision that is not yours: `--kind blocked`, same form, and wait for the ruling.",
 		`Your task done, the report sent, and you were launched for it: close your window (\`node ${B}/close.mjs\`, below).`, "")
 	L.push(
-		"## Restarting yourself without losing what you read", "",
-		`\`node ${B}/restart.mjs prepare --obligations <notes.md> --read <a file you read>... --guard "<a check command>"\``,
-		"pins what you read and arms the restart. It does not relaunch you: the launcher refuses a live agent. " +
-		(isLeader ? "Exit; the owner relaunches you." : `${shared ? "An expert tells" : "Tell"} your leader first (\`${C} send ${leader} --ref <notes.md> --kind fyi\`), then exit: it relaunches you.`),
-		`The next session runs \`node ${B}/handoff.mjs verify\` FIRST: UNCHANGED files stand as read, CHANGED ones are read again.`, "",
+		"## Restarting yourself: a fresh session in this window, with nobody at the keyboard", "",
+		"Write your handoff first, then:",
+		`\`node ${B}/relay.mjs --guard "<a command that exits 0 only when your handoff is written>"\``,
+		"2 s after THIS turn ends it reads your screen (the input empty, no dialog open), types `/clear` and proves it, then",
+		"types your first prompt and proves it. Same process, so the same model and effort; mail waiting stays in your inbox.",
+		`The first prompt is set once, in \`.comm/config.json\`: \`"relay": {"${id}": "<the sentence your fresh session starts from>"}\``,
+		"(`--say` overrides it). No guard: refused - what survives a `/clear` is only what was written down. Anything that",
+		`starts another turn first cancels it. Every step lands in \`.comm/relay/${id}.json\`; \`--dry-run\` checks it all and arms nothing.`,
+		"When to restart is yours, or your project's hook's: the relay has no trigger of its own.", "",
+		`To carry what you READ across it: \`node ${B}/restart.mjs prepare --obligations <notes.md> --read <a file you read>...\``,
+		`first, then relay with \`--guard "node ${B}/handoff.mjs verify"\`. The next session runs \`node ${B}/handoff.mjs verify\``,
+		"FIRST: UNCHANGED files stand as read, CHANGED ones are read again.", "",
 		"## Closing your own window", "",
 		`After the report is written and the bell rung: \`node ${B}/close.mjs\`. It refuses a window nobody launched, and one with`,
 		"mail waiting or a claim held (`--force` overrides and records it). Otherwise it answers `close: armed`: your window",
