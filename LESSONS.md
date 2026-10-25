@@ -324,5 +324,9 @@ restauration d'A90.
 
 ### 🔴 Le contrôle
 
-**Pas encore armé, et je le nomme.** Une garde possible : la ligne `gate` du boot mémorise le nombre de contrôles de la
-dernière suite verte, et rougit quand il baisse sans un amendement. Elle est notée dans `STATUS.md` ▶ NEXT.
+**Armé le 2026-10-25** (`bin/boot.mjs`, ligne `gate`). Le boot garde les **identifiants** des bras de la dernière suite
+verte, pas leur nombre : un bras effacé et un bras ajouté gardent le même nombre. Un identifiant qui manque fait passer
+la ligne en `⚠ arms-gone:A<n>`, et ce vert n'est pas enregistré tant qu'une clôture n'a pas nommé le retrait
+(`--ack gate=`). Bras : `boot --prove-red`, *« gate: an arm gone from a green suite warns until a close names it »*.
+A91 y est renommé hors des identifiants, et la suite reste verte. Les contrôles positifs : la suite intacte est verte,
+la clôture qui nomme le retrait rend la suivante verte, et un bras rajouté ne prévient jamais.

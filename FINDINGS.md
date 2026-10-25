@@ -3349,6 +3349,31 @@ mine, none reached them), but it was not asked.
   `drift:<files>`, `bus-stale:<files>`, `unanswered:<letter>`, `note-lapsed:<agent>`, `claim:<resource=state>`; a
   long list becomes a hash of the list, never of the words.
 
+## `#stranded-named` — a stranded letter warns until a close names it, then only a new one gates (2026-10-25)
+
+**Demanded by the close, on the count.** `stranded-untold:<agent>` (review #11 R4, above) was acked **16x** in atlas,
+**5x** in rigel, **5x** in cobalt - each time for ONE old letter (37 d, 19 d, 21 d), in a field whose leader is not
+running and that I do not run. The row was right the first time: the sender was told the opposite, and nothing else
+says so. From the second boot on it re-announced a fact already reported, and the only answer was the same ack.
+
+**What it measures now.** A close records every untold letter it waves past, in `.boot-state.json`:
+`namedLetters["field:<x>"]["<agent>/<id>"] = {at, head, why}`. From then on the row prints that letter as
+`◦ … a close NAMED that letter (<date>: "<why>"); only a newly stranded letter gates`, at ok. A letter no close has
+named gates, and its cause is **its own id** (`stranded-untold:<agent>/<id>`), so three strands are three causes, never
+one count of three. The next close drops a letter that is no longer stranded. A row whose bus did not answer, or a
+dormant field, leaves its record alone. An unreadable state file names nothing, so every letter warns again.
+
+**Armed** (`boot --prove-red`, *"field: a named stranded letter stops gating, a new one gates"*): letter 1 warns on
+its id; one close; the next boot shows it named, at ok. **Letter 2, in the same inbox for the same agent and never
+named, still warns, on its id alone.** That is the positive control: a demotion keyed on the agent or the row would
+silence it. A planted record for a letter that is gone is dropped by the same close.
+
+**Unchanged:** this repo's own `mail` row (its strands are mine to act on) and a letter whose sender was told
+(`to_state: not-running`), still `◦`. **Migration:** the old per-agent codes are discharged at the next close with
+`--amended field:<x>@stranded-untold:<agent>`; the three letters warn once more under their ids, and that close names
+them. **Not verified:** S6 (`#review11b`) still stands. A recipient relaunched without draining and stopped again
+keeps its letter named, with no sign that it was alive in between.
+
 ## `#native-path` — Claude Code's own cross-session messaging, measured against this bus (2026-09-18)
 
 Asked by atlas's leader (letter n°3 §3, *"si la voie native couvre une partie du transport"*). Measured on MY

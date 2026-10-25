@@ -124,8 +124,9 @@ const rows = []
 // `causes`: the codes a row DECLARES for what made it non-green, where it computed them.
 // The close counts acknowledgements per code (`FINDINGS.md#armer`, 2nd finding); a row that
 // declares none is counted on the hash of the operator's reason, as before.
-const row = (label, level, text, causes = null) => {
-	rows.push({ label, level, text, ...(level !== OK && causes && causes.length ? { causes } : {}) })
+// `extra`: data the CLOSE needs from a row and the reader does not - `letters` on a `field:` row.
+const row = (label, level, text, causes = null, extra = null) => {
+	rows.push({ label, level, text, ...(level !== OK && causes && causes.length ? { causes } : {}), ...(extra || {}) })
 	if (level > worst) worst = level
 }
 
@@ -1033,6 +1034,14 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 			dormant = d
 		} catch (e) { dormantBad = (e && e.message) || String(e) }
 	}
+	// 🔴 AMENDED 2026-10-25, on the count and not on an opinion (`FINDINGS.md#stranded-named`): `stranded-untold` was
+	// acked 16x, 5x and 5x, each time for the SAME old letter in a field I do not run - the row re-announced a fact it
+	// had already reported. So a close records each letter it waved past (`namedLetters`, by `<agent>/<id>`), that
+	// letter is printed `◦ named` from then on, and only a letter no close has named gates - keyed on ITS id, so three
+	// strands are three causes, never one count. A state file that cannot be read names nothing: every letter warns
+	// again, the loud direction (form E).
+	let named = {}
+	try { named = JSON.parse(readFileSync(join(ROOT, ".boot-state.json"), "utf8")).namedLetters || {} } catch {}
 	// Every file the field hooks actually EXECUTE, not just the bus. `comm.mjs` was the
 	// only one compared until the two instruments started travelling beside it
 	// (2026-09-04); a copy that can go stale and is compared by nothing is a drift class
@@ -1113,7 +1122,7 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 					// before 2026-09-18) and mail sent to a live recipient count as unannounced.
 					let told = false
 					try { told = JSON.parse(readFileSync(join(ibx, a, f), "utf8")).to_state === "not-running" } catch {}
-					if (!told) unannounced.set(a, (unannounced.get(a) || 0) + 1)
+					if (!told) unannounced.set(a, [...(unannounced.get(a) || []), `${a}/${f.slice(0, -5)}`])
 					const mt = statSync(join(ibx, a, f)).mtimeMs
 					if (!oldest || mt < oldest) oldest = mt
 				}
@@ -1262,7 +1271,15 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 			} catch {}
 		}
 		const awake = !!asleep && (liveNames.length > 0 || !!wokeAt)
-		const unannouncedStranded = asleep ? [] : strandedNames.filter((n) => (unannounced.get(n) || 0) > 0).map((n) => `${unannounced.get(n)} for ${n}`)
+		// The untold letters of agents that are NOT running, split by whether a close has named them (`named`, above).
+		const fieldNamed = named[`field:${name}`] || {}
+		const untoldLetters = strandedNames.flatMap((n) => unannounced.get(n) || [])
+		const newUntold = asleep ? [] : untoldLetters.filter((id) => !fieldNamed[id])
+		const namedUntold = untoldLetters.filter((id) => fieldNamed[id])
+		const firstNamed = namedUntold.length ? fieldNamed[namedUntold[0]] : null
+		const perAgent = new Map()
+		for (const id of newUntold) { const a = id.slice(0, id.indexOf("/")); perAgent.set(a, (perAgent.get(a) || 0) + 1) }
+		const unannouncedStranded = [...perAgent].map(([n, k]) => `${k} for ${n}`)
 		const bits = [
 			// An unparsed non-zero exit must not borrow the confident wording of a parsed one:
 			// it means the installer refused for a reason this row has not read.
@@ -1274,7 +1291,8 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 				: `bus current (${installed.length} files)`,
 			!pending ? "0 pending"
 				: unaddressable.length ? `⚠ ${unaddressable.join(", ")} has mail and IS ON NO ROSTER - nothing will ever deliver it: the bus does not know the name (oldest ${age(Date.now() - oldest)})`
-				: stranded.length && unannouncedStranded.length ? `⚠ ${stranded.join(", ")} has mail and is NOT RUNNING, and ${unannouncedStranded.join(", ")} was sent while it ran or before sends were stamped - nobody was told it would wait for a relaunch (oldest ${age(Date.now() - oldest)})`
+				: stranded.length && unannouncedStranded.length ? `⚠ ${stranded.join(", ")} has mail and is NOT RUNNING, and ${unannouncedStranded.join(", ")} was sent while it ran or before sends were stamped - nobody was told it would wait for a relaunch (oldest ${age(Date.now() - oldest)})${namedUntold.length ? ` - ${namedUntold.length} more already named at a close` : ""}`
+				: stranded.length && namedUntold.length && !asleep ? `◦ ${stranded.join(", ")} has mail and is not running - its sender was not told, and a close NAMED ${namedUntold.length === 1 ? "that letter" : `those ${namedUntold.length} letters`} (${String(firstNamed.at || "").slice(0, 10)}: "${String(firstNamed.why || "").slice(0, 80)}"); only a newly stranded letter gates (oldest ${age(Date.now() - oldest)})`
 				: stranded.length ? `◦ ${stranded.join(", ")} has mail and is not running - its sender was told so at send; it lands at the relaunch (oldest ${age(Date.now() - oldest)})`
 				: busAnswered ? `${pending} pending, in flight to a running agent (oldest ${age(Date.now() - oldest)})`
 				: `${pending} pending (oldest ${age(Date.now() - oldest)}) - the bus could not be asked who is running`,
@@ -1314,12 +1332,12 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 		const causes = [drift && `drift:${drifted.length ? about(drifted) : "refused"}`,
 			busStale === true && `bus-stale:${installed.length ? about(staleFiles) : "empty"}`, busStale === null && "bus-uncompared",
 			pending > 0 && unaddressable.length > 0 && `unaddressable:${about(unaddressable)}`, pending > 0 && !busAnswered && "bus-unasked",
-			unannouncedStranded.length > 0 && `stranded-untold:${about(strandedNames.filter((n) => (unannounced.get(n) || 0) > 0))}`,
+			unannouncedStranded.length > 0 && `stranded-untold:${about(newUntold)}`,
 			shared.length > 0 && `shared-inbox:${about(shared)}`,
 			claimsBad && `claim:${claimDirBad ? "unreadable" : about(claims.filter((c) => c.state !== "held").map((c) => `${c.resource}=${c.state}`))}`,
 			notesBad && "note-unreadable", dormantBad && "fields-unreadable", awake && "dormant-awake"].filter(Boolean)
 		row(`field:${name}`, drift || busStale !== false ? RED : mailStuck || claimsBad || shared.length > 0 || notesBad || dormantBad || awake ? WARN : OK,
-			bits.join(" - "), causes)
+			bits.join(" - "), causes, { letters: busAnswered && !asleep ? untoldLetters : null })
 	}
 }
 
@@ -1670,9 +1688,25 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 				`undrained BY DESIGN, and a loop waiting for it to empty then never ends. ` +
 				`FINDINGS.md#suite-abort-reads-clean`, ["hung"])
 		} else if (g.status === 0 && pass > 0) {
+			// 🔴 AN ARM THAT NO LONGER EXISTS REDDENS NOTHING (LESSONS.md §7, 2026-10-25): a block replacement in
+			// attack.mjs took A90 with it and the suite went from 91 to 90, all green. attack.mjs cannot see it - a
+			// deleted arm leaves its declared AND its reported set - and review #10 A1 said why: a ratchet needs state
+			// and a discharge. Both live here. The last green's arm ids are kept; one missing now warns, and this green
+			// is NOT recorded until a close names the removal (`--ack gate=`), which records it. Ids, not a count: a
+			// deleted arm and a new one keep the count. A state with no ids yet falls back on the count.
+			const arms = [...new Set([...out.matchAll(/^[^\S\n]+✓\s+(A\d+)\b/gm)].map((m) => m[1]))].sort((a, b) => a.slice(1) - b.slice(1))
+			const gone = prev && Array.isArray(prev.arms) ? prev.arms.filter((a) => !arms.includes(a)) : []
+			const fewer = prev && !Array.isArray(prev.arms) && prev.pass > pass ? prev.pass - pass : 0
 			// A green recorded over inputs that could not be read would be a cached green
 			// covering less than the row claims, consulted by every --fast boot afterwards.
 			if (fpBlind.length) row("gate", WARN, `attack ${pass}/${pass} in ${secs}s - but the fingerprint is BLIND to ${fpBlind.join(", ")}; this green is NOT being recorded`, [`blind:${fpBlind.join(",")}`])
+			else if (gone.length || fewer) {
+				const what = gone.length ? `${gone.join(", ")} ${gone.length === 1 ? "is" : "are"} GONE - the last green (${prev.head}) ran ${gone.length === 1 ? "it" : "them"}` : `${fewer} arm(s) FEWER than the last green (${prev.pass}, ${prev.head})`
+				row("gate", WARN, `attack ${pass}/${pass} in ${secs}s - but ${what}, and an arm that no longer exists reddens nothing (LESSONS.md §7). ` +
+					`Restore it, or name the removal at a close (--ack gate=), which records this green`,
+					[`arms-gone:${gone.length ? (gone.join(",").length > 60 ? `${gone.length}#${causeSig(gone.join(","))}` : gone.join(",")) : `${prev.pass}->${pass}`}`],
+					{ accept: { print, head: git("rev-parse", "--short", "HEAD"), pass, arms } })
+			}
 			else row("gate", OK, `attack ${pass}/${pass} in ${secs}s`)
 			// MERGE. Review #3 R2: this wrote the object wholesale and erased `sources`,
 			// `lastSource` and `lastSourceAt` - the record that exists to answer whether
@@ -1681,7 +1715,7 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 			// documented use, and the file is gitignored so there was no recovery.
 			// MERGED INTO THE BYTES ON DISK, not into `prev` - `prev` was read before the gate
 			// ran and is up to 26 s old by now (review #7 F2, above).
-			if (!fpBlind.length) updateState((d) => ({ ...d, print, at: new Date().toISOString(), head: git("rev-parse", "--short", "HEAD"), pass }))
+			if (!fpBlind.length && !gone.length && !fewer) updateState((d) => ({ ...d, print, at: new Date().toISOString(), head: git("rev-parse", "--short", "HEAD"), pass, arms }))
 		} else {
 			// The single inference this tool may draw - and it never suppresses a run.
 			const unchanged = prev && prev.print === print
@@ -1843,6 +1877,24 @@ if (CLOSE) {
 					else c[label] = Object.values(rowCauses).reduce((a, v) => a + v.n, 0)
 				} else delete c[label]
 			}
+			// THE LETTERS THIS CLOSE NAMED (`FINDINGS.md#stranded-named`): a `field:` row lists every untold letter it
+			// sees, named or not. One acked here is recorded with the ack; one already named keeps its first naming; one
+			// no longer stranded is dropped. A row whose bus did not answer lists `null` and its record is left alone.
+			const namedAll = JSON.parse(JSON.stringify(d.namedLetters || {}))
+			for (const r of rows) {
+				if (!Array.isArray(r.letters)) continue
+				const prev = namedAll[r.label] || {}, next = {}
+				for (const id of r.letters) {
+					if (prev[id]) next[id] = prev[id]
+					else if (r.level !== OK && ACKS.has(r.label)) next[id] = { at, head, why: ACKS.get(r.label) }
+				}
+				if (Object.keys(next).length) namedAll[r.label] = next
+				else delete namedAll[r.label]
+			}
+			d.namedLetters = namedAll
+			// An arm removal NAMED here becomes the baseline (`gate`, LESSONS.md §7): the green the gate row held back.
+			const gr = rows.find((r) => r.label === "gate" && r.accept)
+			if (gr && gr.level !== OK && ACKS.has("gate")) Object.assign(d, gr.accept, { at })
 			written = c
 			writtenCauses = causes
 			d.ackCounts = c
@@ -3487,6 +3539,74 @@ function proveRed() {
 				`.boot-state.json replaced by a directory -> exit ${blocked.status}, ` +
 				`${/NOT CLOSED/.test(blocked.stdout) ? "refused and said why" : `WRONG: ${(blocked.stdout || "").slice(-70).trim()}`}; ` +
 				`positive control, the file restored -> exit ${control.status} ${/✓ CLOSED/.test(control.stdout) ? "CLOSED" : "STILL REFUSING - the fixture did not come back"}`)
+		}
+
+		// ── a stranded letter a close has NAMED stops gating; a new one still gates ──────────
+		//
+		// `FINDINGS.md#stranded-named`, amended 2026-10-25 on 16x/5x/5x acks of the same old letters. ONE close
+		// names letter 1; the next boot must print it `◦ named` at ok. THE POSITIVE CONTROL is letter 2, never
+		// named, in the same inbox for the same agent: it must still warn, under ITS OWN id - a demotion keyed on
+		// the agent (or on the row) would silence it, and that is the failure this arm forbids. A planted record for
+		// a letter that is gone must be dropped by the same close.
+		{
+			const ib = join(proj, ".comm", "inbox", "app")
+			mkdirSync(ib, { recursive: true })
+			const L1 = "2026-10-25T00-00-01-000Z-aaaaa1", L2 = "2026-10-25T00-00-02-000Z-aaaaa2"
+			const put = (id) => writeFileSync(join(ib, `${id}.json`), JSON.stringify({ id, from: "leader", to: "app", kind: "fyi", ref: "x.md", ts: "2026-10-25T00:00:00.000Z", to_state: "running" }))
+			{ const st0 = stateOf(); st0.namedLetters = { "field:proj": { "app/gone-letter": { at: "2026-10-01T00:00:00.000Z", head: "x", why: "planted" } } }; writeFileSync(join(pkg, ".boot-state.json"), JSON.stringify(st0, null, 2) + "\n") }
+			put(L1)
+			const first = rowOf(run(true), "field:proj")
+			const acks3 = run(false).rows.filter((r) => r.label && r.label !== "close")
+				.flatMap((r) => ["--ack", `${r.label}=fixture: deliberately ${r.label}`])
+			touchStatus()
+			const closed = closeRun2(acks3)
+			const rec = (stateOf().namedLetters || {})["field:proj"] || {}
+			const named1 = rowOf(run(true), "field:proj")
+			put(L2)
+			const fresh = rowOf(run(true), "field:proj")
+			rmSync(join(ib, `${L1}.json`), { force: true }); rmSync(join(ib, `${L2}.json`), { force: true })
+			{ const st0 = stateOf(); delete st0.namedLetters; writeFileSync(join(pkg, ".boot-state.json"), JSON.stringify(st0, null, 2) + "\n") }
+			const wantFirst = first.level === WARN && (first.causes || []).includes(`stranded-untold:app/${L1}`)
+			const wantRec = closed.status === 0 && !!rec[`app/${L1}`] && rec[`app/${L1}`].why === "fixture: deliberately field:proj" && !rec["app/gone-letter"]
+			const wantNamed = named1.level === OK && /a close NAMED that letter/.test(named1.text)
+			const wantFresh = fresh.level === WARN && JSON.stringify(fresh.causes || []) === JSON.stringify([`stranded-untold:app/${L2}`]) && /1 more already named/.test(fresh.text)
+			assert("field: a named stranded letter stops gating, a new one gates",
+				wantFirst && wantRec && wantNamed && wantFresh,
+				`letter 1 unnamed -> ${LV[first.level]} ${JSON.stringify(first.causes || [])} (want warn on its id); ` +
+				`close -> exit ${closed.status}, recorded=${!!rec[`app/${L1}`]}, the gone letter dropped=${!rec["app/gone-letter"]}; ` +
+				`next boot -> ${LV[named1.level]} ${wantNamed ? "named" : `SAID: ${named1.text.slice(0, 80)}`} (want ok, named); ` +
+				`**letter 2, never named -> ${LV[fresh.level]} ${JSON.stringify(fresh.causes || [])}** (the positive control: want warn on letter 2 alone)` +
+				(closed.status ? ` CLOSE REFUSED: ${(closed.stdout || "").split("\n").filter((l) => /NOT CLOSED|^\s{6}\S/.test(l)).join(" | ").slice(0, 300)}` : ""))
+		}
+
+		// ── an arm gone from a GREEN suite warns, until a close names its removal ────────────
+		//
+		// LESSONS.md §7: a block replacement deleted A90 and the suite stayed green at 90 - attack.mjs's own
+		// declared-must-report scan cannot see it, the arm leaves both sets. ONE VARIABLE: A91's label, renamed
+		// out of the `A<n>` id space, so the suite runs the same checks, green. The positive controls: the same
+		// suite before the rename is ok, the close that names the removal makes the next run ok, and an arm ADDED
+		// back never warns - a ratchet that fired on additions would be noise.
+		{
+			const ap = join(pkg, "test", "attack.mjs")
+			const src = readFileSync(ap, "utf8")
+			const r0 = rowOf(run(false), "gate")
+			writeFileSync(ap, src.replace('check("A91 ', 'check("Z91 '))
+			const dropped = run(false)
+			const r1 = rowOf(dropped, "gate")
+			touchStatus()
+			const closed = closeRun2(dropped.rows.filter((r) => r.label && r.label !== "close")
+				.flatMap((r) => ["--ack", `${r.label}=fixture: deliberately ${r.label}`]))
+			const r2 = rowOf(run(false), "gate")
+			writeFileSync(ap, src)
+			const r3 = rowOf(run(false), "gate")
+			assert("gate: an arm gone from a green suite warns until a close names it",
+				r0.level === OK && src.includes('check("A91 ') &&
+				r1.level === WARN && JSON.stringify(r1.causes || []) === JSON.stringify(["arms-gone:A91"]) && /A91 is GONE/.test(r1.text) &&
+				closed.status === 0 && r2.level === OK && r3.level === OK,
+				`the suite as is -> ${LV[r0.level]} (control); A91 renamed out -> ${LV[r1.level]} ${JSON.stringify(r1.causes || [])} ` +
+				`${/A91 is GONE/.test(r1.text) ? "names it" : `SAID: ${r1.text.slice(0, 90)}`} (want warn on arms-gone:A91); ` +
+				`a close naming it -> exit ${closed.status}, the next run -> ${LV[r2.level]} (want ok: the removal is the baseline); ` +
+				`A91 restored -> ${LV[r3.level]} (want ok: an addition never warns)`)
 		}
 
 		// ── F3: mail for an agent NO ROSTER accounts for ─────────────────────────────────
