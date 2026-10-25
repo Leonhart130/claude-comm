@@ -3740,6 +3740,12 @@ root's `boot --hook` does not run in `review/`; one start record for the 09-27 r
 `settings.json` if it must not reach experts. *One run, `SessionStart` only, version 2.1.283; not tested without a
 git repo, nor with a parent that is not the repo root.* Also an item for the skill audit (STATUS ▶ NEXT A3).
 
+**2026-10-25, the child's OWN `settings.local.json` measured too** (Claude Code 2.1.310, a scratch git repo, one probe
+per file, a session in `child/`, one turn): at SessionStart AND at Stop it ran **the child's `settings.json`, the child's
+`settings.local.json` and the parent's `settings.local.json`** - all with `CLAUDE_PROJECT_DIR` = `…/child` - and not the
+parent's `settings.json`. So an expert's own local hook fires, and its leader's fires beside it: a leader's local hook
+that must not act in an expert has to test where it runs (rigel's 150 k hook does: a file under `$CLAUDE_PROJECT_DIR`).
+
 ## `#idle-send` — `send` promised a turn end to a session that had no turn (2026-09-27)
 
 **atlas's field letter** (`exchange/field/in/atlas-leader-2026-09-27-cloche-vers-une-session-au-repos.md`), then
