@@ -5,29 +5,29 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-10-25 ~02:00, end of a session started 10-24 after 26 days off; the owner `/clear`s it, a DECLARED restart:
-`restart.mjs prepare` was run - FIRST run `node bin/handoff.mjs verify`. `2026-10-25.2` is in all ten trees. **WORK IS
-THE MAIN FIELD** - atlas inactive, not relaunched for days; "c'est Work qui prend le relais". Standing green light:
-"je te laisse gérer … T'as mon feu vert pour tout." Review #19 is DISPOSED (`FINDINGS.md#review19`).)*
+*(2026-10-25 ~03:30 CET - the clocks fell back at 03:00 - end of the session after the declared restart (handoff verified
+31/31). **WORK IS THE MAIN FIELD.** The owner: "j'te laisse gérer tout ça ce soir"; and **"tu peux utiliser tout l'usage
+jusque 100%, c'est fait pour être consommé"** - never self-throttle near the cap. `2026-10-25.3` is in all ten trees.)*
 
-1. **Read work's channel first** (`exchange/work-leader/in/`): it owes two real measurements - an expert's close seen
-   whole then gone ~2 s later (`turn_ended` in `.comm/close/<agent>.json`), a `send` waking a resting agent unasked.
-   (Our own reviewer, 10-24: rung 213 ms after its send; closed 2.3 s after its turn.) Unmeasured too: that an agent's
-   first start on `.2` got the CHANGELOG news - read one work expert's transcript start, read-only.
-2. **Work's idea 1, usage for experts** (work's answer, `…23h18-l-usage…`): read ~hourly from `claude.ai/settings/usage`
-   into a file; stop at 93 % week / 98 % session; the gap is the reading's AGE. Plan: the `PostToolUse` hook shows it with
-   its age, once per change. `#midturn-channel` FIRST; send work the shape before building. Then `comm stop <agent>`
-   (same channel) and `launch.mjs --resume <session>`.
-3. 🔴 **The bus is at 57 936 of 58 000 B (A22).** The next change to `comm.mjs`/`who.mjs` moves narrative to FINDINGS first.
-4. **Arm the arm count** (`LESSONS.md` §7: a block replacement deleted A90, the suite green at 90): the `gate` row keeps
-   the last green count and reddens on a drop. Its own `--prove-red` arm (~40-50 min).
-5. **Named, unarmed**: the `briefs` row's unreadable-root and reply-older-than-brief branches; boot's registry control
-   still blames itself for a live session's rewrite (A31's twin, fixed 10-25).
-6. 🔴 **AMEND `stranded-untold`, demanded by the close 10-25**: acked 15x (atlas), 4x (rigel), 4x (cobalt), each for an old
-   letter to an agent not running in a field I do not run. Measure a NEW strand: key the ack on the letter's id, so a
-   letter once named stays named and only a newly stranded one warns. Gated change, its own arm, `--amended`.
-7. **Letters waiting for a bell**: deneb's (its own new channel `exchange/<deneb>-leader/`) and atlas's - both leaders
-   not running; ring with `node bin/exchange-bell.mjs --peer <channel> --ref <file>` when they run.
+1. **Read work's channel first.** It owes the answer to `out/2026-10-25-2-l-usage-se-lit-toute-seule.md` (three
+   questions: thresholds per project or per agent; ring its leader at a crossing; its hand-filled file dropped as a
+   source) and two measurements: an expert's close seen whole then gone (`turn_ended` in `.comm/close/<agent>.json`), a
+   `send` waking a resting agent unasked. Measured 10-25: work's leader's `/clear` at 23:22Z got the `.2` note; an
+   EXPERT's first start on a new version is still unmeasured.
+2. **Then build work's idea 1** (`FINDINGS.md#usage-statusline`: the statusLine gets `rate_limits` live). `bin/usage.mjs`
+   in BUS_FILES, outside A22: its statusLine mode writes `$XDG_RUNTIME_DIR/claude-comm/usage.json` ON CHANGE and prints
+   `5h n % · 7j n %`; the stub's Bash post-tool branch emits `additionalContext` once per threshold crossing per window
+   (`.comm/config.json` `usage:{week,session}`), with the age; the installer adds a statusLine only where none exists
+   (project or user). Then `comm stop <agent>` and `launch.mjs --resume <session>`, outside the bus too.
+   ⚠ **My probe statusLine is still in `.claude/settings.local.json`** (gitignored, tees to a dead scratchpad): remove it.
+3. **The bus has room again: 50 693 of 58 000 B** (`#bus-notes`). New tools go OUTSIDE it - the bus only delivers mail.
+4. **Named, unarmed**: boot's registry control still blames itself for a live session's rewrite (A31's twin, fixed 10-25).
+5. **Letters waiting for a bell**: deneb's (its own channel `exchange/<deneb>-leader/`) and atlas's - both leaders not
+   running at 02:20; ring with `node bin/exchange-bell.mjs --peer <channel> --ref <file>` when they run.
+
+**Done 10-25 night:** `stranded-untold` amended (`#stranded-named`: a close names each letter; only a new one gates) ·
+the gate keeps its arm ids and warns `arms-gone:A<n>` (LESSONS §7) · the briefs row's two branches armed · F2 waits the
+gate's ceiling (it timed out on a suite grown to 94 s) · MUTATION RESULT: see the line below, written after the batch.
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a
 codename here; the mapping is in no repo. The boot report prints the REAL directory names: **never copy a `field:` row
@@ -39,8 +39,8 @@ gets its codename and its rule BEFORE its name is written (deneb, rule 15), and 
 fenêtres ?"*). Every kitty arm runs in ONE minimized bench (`bench()`, `test/attack.mjs`; measured 0 panes in a visible
 tab). A new kitty arm uses `bench()`/`benchRun()`/`besideMe()`, never a bare `kitten @ launch`.
 
-**A0 - ✅ reviews #18 (09-28) and #19 (10-25) disposed** (`#review18`, `#review19`). **`boot --prove-red` took ~49 min 4 wide under load** (the memory
-said ~12): budget for it.
+**A0 - ✅ reviews #18 (09-28) and #19 (10-25) disposed** (`#review18`, `#review19`). **`boot --prove-red` took ~62 min ALONE
+on 10-25** (each fixture gate runs `attack`, 94 s now): budget for it, and make `attack` faster (C).
 
 **B - the registry half of #13 §1, MEASURED 09-27 by A31 going red on my own end-to-end probe**: a hand-fire from
 inside a session in the project rewrites that session's registry entry. Design in `FINDINGS.md#review13` "Named, not
@@ -57,9 +57,8 @@ half-typed message 09-27. He says it is not serious, keep writing. Named, not fi
 
 **F - carried, in priority order:** #15's names (`#review15`: the prove-red registry control blames itself for a live
 session's own `compact` rewrite (A31's twin of it FIXED 10-25, `#review19`; boot's control still has it); the prettier header and `readJson` outside the print) · `REVIEW-12b.md`'s seven points (`FINDINGS.md#review12b`, each already measured) ·
-`boot.mjs --hook` records with NO ownership test (`boot.mjs:489`; needs a declared test seam first - its own
-`--prove-red` fires are foreign by construction) · two amendments demanded by acks: `stranded-untold` (atlas's
-`extension` waits ON PURPOSE, their decision - `FINDINGS.md#peer-state`) ·
+`boot.mjs --hook` records with NO ownership test (the `has("--hook") && payload` branch; needs a declared test seam
+first - its own `--prove-red` fires are foreign by construction) ·
 #13 §7b/§7c (`handoff.mjs`'s D2 guard masked by `restart.mjs`'s; `INSIDE` unarmed) · the stub files
 `basename(transcript_path)` as the session, not the witnessed id · #14's names: a DETACHED replay of a live id is counted (by design, E1), `rootRecords` overwrites the witness's reason, a ledger killed at 5 s after its append · D2 mid-turn: timing now measured 4/4
 (`#midturn-channel`), obedience to a POINTER is the open half - build `--kind blocked` only on atlas's field count.

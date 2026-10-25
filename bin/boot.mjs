@@ -3317,6 +3317,9 @@ function proveRed() {
 		const closeRun2 = (extra = []) => spawnSync(process.execPath,
 			[SELFFILE, "--close", "--root", pkg, "--field", tmp, ...extra], { encoding: "utf8" })
 		const touchStatus = () => { const t = new Date(); utimesSync(join(pkg, "STATUS.md"), t, t) }
+		// A close is `✓ CLOSED`; its EXIT also carries every other row of a full boot (a fixture gate under load went RED
+		// and a close that had recorded exited 1, 10-25). So the arms test the close, and print the red rows they did not judge.
+		const redsOf = (r) => r.status ? `; red: ${(r.stdout || "").split("\n").filter((l) => /^\s+✗ \S/.test(l)).map((l) => l.trim().slice(0, 80)).join(" | ") || "none printed"}` : ""
 
 		// ── F2: a completed --close erased by another session's ordinary boot ────────────
 		//
@@ -3592,13 +3595,13 @@ function proveRed() {
 			rmSync(join(ib, `${L1}.json`), { force: true }); rmSync(join(ib, `${L2}.json`), { force: true })
 			{ const st0 = stateOf(); delete st0.namedLetters; writeFileSync(join(pkg, ".boot-state.json"), JSON.stringify(st0, null, 2) + "\n") }
 			const wantFirst = first.level === WARN && (first.causes || []).includes(`stranded-untold:app/${L1}`)
-			const wantRec = closed.status === 0 && !!rec[`app/${L1}`] && rec[`app/${L1}`].why === "fixture: deliberately field:proj" && !rec["app/gone-letter"]
+			const wantRec = /✓ CLOSED/.test(closed.stdout || "") && !!rec[`app/${L1}`] && rec[`app/${L1}`].why === "fixture: deliberately field:proj" && !rec["app/gone-letter"]
 			const wantNamed = named1.level === OK && /a close NAMED that letter/.test(named1.text)
 			const wantFresh = fresh.level === WARN && JSON.stringify(fresh.causes || []) === JSON.stringify([`stranded-untold:app/${L2}`]) && /1 more already named/.test(fresh.text)
 			assert("field: a named stranded letter stops gating, a new one gates",
 				wantFirst && wantRec && wantNamed && wantFresh,
 				`letter 1 unnamed -> ${LV[first.level]} ${JSON.stringify(first.causes || [])} (want warn on its id); ` +
-				`close -> exit ${closed.status}, recorded=${!!rec[`app/${L1}`]}, the gone letter dropped=${!rec["app/gone-letter"]}; ` +
+				`close -> ${/✓ CLOSED/.test(closed.stdout || "") ? "CLOSED" : "NOT CLOSED"} (exit ${closed.status}${redsOf(closed)}), recorded=${!!rec[`app/${L1}`]}, the gone letter dropped=${!rec["app/gone-letter"]}; ` +
 				`next boot -> ${LV[named1.level]} ${wantNamed ? "named" : `SAID: ${named1.text.slice(0, 80)}`} (want ok, named); ` +
 				`**letter 2, never named -> ${LV[fresh.level]} ${JSON.stringify(fresh.causes || [])}** (the positive control: want warn on letter 2 alone)` +
 				(closed.status ? ` CLOSE REFUSED: ${(closed.stdout || "").split("\n").filter((l) => /NOT CLOSED|^\s{6}\S/.test(l)).join(" | ").slice(0, 300)}` : ""))
@@ -3627,10 +3630,10 @@ function proveRed() {
 			assert("gate: an arm gone from a green suite warns until a close names it",
 				r0.level === OK && src.includes('check("A91 ') &&
 				r1.level === WARN && JSON.stringify(r1.causes || []) === JSON.stringify(["arms-gone:A91"]) && /A91 is GONE/.test(r1.text) &&
-				closed.status === 0 && r2.level === OK && r3.level === OK,
+				/✓ CLOSED/.test(closed.stdout || "") && r2.level === OK && r3.level === OK,
 				`the suite as is -> ${LV[r0.level]} (control); A91 renamed out -> ${LV[r1.level]} ${JSON.stringify(r1.causes || [])} ` +
 				`${/A91 is GONE/.test(r1.text) ? "names it" : `SAID: ${r1.text.slice(0, 90)}`} (want warn on arms-gone:A91); ` +
-				`a close naming it -> exit ${closed.status}, the next run -> ${LV[r2.level]} (want ok: the removal is the baseline); ` +
+				`a close naming it -> ${/✓ CLOSED/.test(closed.stdout || "") ? "CLOSED" : "NOT CLOSED"} (exit ${closed.status}${redsOf(closed)}), the next run -> ${LV[r2.level]} (want ok: the removal is the baseline); ` +
 				`A91 restored -> ${LV[r3.level]} (want ok: an addition never warns)`)
 		}
 
