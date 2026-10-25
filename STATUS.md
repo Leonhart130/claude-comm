@@ -5,21 +5,22 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-10-25 ~06:45 CET - the clocks fell back at 03:00 - end of the session after the declared restart (handoff verified
+*(2026-10-25 06:10 CET by `date` - the clocks fell back at 03:00 - end of the session after the declared restart (handoff verified
 31/31). **WORK IS THE MAIN FIELD.** The owner: "j'te laisse gérer tout ça ce soir"; and **"tu peux utiliser tout l'usage
 jusque 100%, c'est fait pour être consommé"** - never self-throttle near the cap. `2026-10-25.5` is in all ten trees.)*
 
 1. **Read work's channel first.** It owes only measurement 1: an expert's close seen whole then gone (`turn_ended` in
    `.comm/close/<agent>.json`, at `agence`'s close). Measured 10-25 05h03: a `send` wakes a resting expert at the sender's
-   turn end, and a resting leader is rung in 9 s. An EXPERT's first start on a new version is still unmeasured. My last
-   ring (06h40, `…-5-l-usage-est-installe.md`) hit its leader in `shell` state: landing unconfirmed.
+   turn end, and a resting leader is rung in 9 s. An EXPERT's first start on a new version is still unmeasured. Its 06h05 letter:
+   thresholds WRITTEN (no statusLine, the owner's word first). LESSONS §8: my letters' times were guessed, 15-36 min fast.
 2. **Usage is BUILT and installed** (`2026-10-25.5`, `#usage-statusline`, A93/A94, 7/7 mutants). The measurement is the
    FIRST REAL CROSSING in work, once it writes its `usage` thresholds - and whether the agent acts on the line (D2).
    Work adds `"statusLine": true` only with the owner's word; meanwhile this repo's statusLine feeds the machine file.
    Then `comm stop <agent>` and `launch.mjs --resume <session>`, outside the bus.
 3. **The bus has room: 50 754 of 58 000 B** (`#bus-notes`). New tools go OUTSIDE it - the bus only delivers mail.
 4. **Named, unarmed**: boot's registry control still blames itself for a live session's rewrite (A31's twin, fixed 10-25).
-5. **Letters waiting for a bell**: deneb's (its own channel `exchange/<deneb>-leader/`) and atlas's - both leaders not
+5. **Arm LESSONS §8**: the `channel:` row compares my outgoing letters' written time with the file's (>10 min warns).
+6. **Letters waiting for a bell**: deneb's (its own channel `exchange/<deneb>-leader/`) and atlas's - both leaders not
    running at 02:20; ring with `node bin/exchange-bell.mjs --peer <channel> --ref <file>` when they run.
 
 **Done 10-25 night** (commits `0779386`..`0e1dbaf`): `#stranded-named` · the gate's `arms-gone` (LESSONS §7) · the briefs

@@ -330,3 +330,23 @@ la ligne en `⚠ arms-gone:A<n>`, et ce vert n'est pas enregistré tant qu'une c
 (`--ack gate=`). Bras : `boot --prove-red`, *« gate: an arm gone from a green suite warns until a close names it »*.
 A91 y est renommé hors des identifiants, et la suite reste verte. Les contrôles positifs : la suite intacte est verte,
 la clôture qui nomme le retrait rend la suivante verte, et un bras rajouté ne prévient jamais.
+
+## §8 — J'ai écrit des heures sans lire l'horloge, toutes en avance, la nuit du changement d'heure.
+
+**Le 2026-10-25, entre 05h45 et 06h05.** Trois lettres à work portaient « vers 06h00 », « vers 06h05 » et « vers 06h40 ».
+L'une disait aussi que la `statusLine` tournait « depuis 06h30 ». D'après les fichiers eux-mêmes, elles sont parties à
+05h46, 05h50 et 06h04, et la `statusLine` tournait depuis 06h03:51. J'avais 15 à 36 minutes d'avance, toujours dans le
+même sens, parce que j'estimais l'heure d'après le travail accompli au lieu de lire `date`. Le recul de 03h00 a dû
+brouiller mon repère. **C'est work qui l'a vu** : son `date` lisait 06h04 quand il a ouvert la lettre « de 06h40 ». Il
+dit que c'est son défaut le plus fréquent.
+
+### Le mécanisme
+
+C'est la forme **C** sous sa plus petite taille. Une heure tapée est une mesure qui n'a pas été prise. Elle a l'air d'un
+fait, et personne ne la revérifie, sauf le lecteur qui a une horloge sous les yeux.
+
+### Le contrôle
+
+**Pas encore armé, et je le nomme** (`STATUS.md` ▶ NEXT). La garde possible : la ligne `channel:` du boot compare l'heure
+écrite dans l'en-tête de mes propres lettres sortantes (« le AAAA-MM-JJ vers HHhMM ») avec la date du fichier, et prévient
+au-delà de 10 minutes d'écart. En attendant, la règle : **une heure écrite vient de `date`, jamais de ma tête.**
