@@ -8,6 +8,10 @@ fold the settled parts into the README.
 *(2026-10-25 21h49 CET by `date`. **WORK IS THE MAIN FIELD.** The owner: "j'te laisse gérer tout ça ce soir"; **"tu peux
 utiliser tout l'usage jusque 100%"** - never self-throttle near the cap. Tonight he made the self-relay THE priority.)*
 
+0. **The two ⚠ at this boot were NAMED at the 10-25 close** (work's 21h49 letter asks nothing; rigel's dead claim is
+   its own) - and THAT is the gap the owner asked about: the boot shows a close's names for stranded letters, never for
+   `channel:` or claim rows, though `.boot-state.json` holds them (`lastClose.acked`, `ackCauses`). Build it, armed.
+   And a letter that expects no answer should not make a channel UNANSWERED (a reply would ping-pong with work's boot).
 1. **The first REAL relay in a field.** rigel's leader adds `"relay"` to its config and ends its 150 k Stop hook's message
    with `relay.mjs` (letter `…20h37-…-livre.md`); its experts are its task T8. Read `.comm/relay/<agent>.json` there:
    relayed, the clear's ms, the prompt's ms, whether the fresh session booted. Unarmed, uncovered: `FINDINGS.md#relay`.
