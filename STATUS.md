@@ -11,25 +11,22 @@ jusque 100%, c'est fait pour être consommé"** - never self-throttle near the c
 
 1. **Read work's channel first.** It owes the answer to `out/2026-10-25-2-l-usage-se-lit-toute-seule.md` (three
    questions: thresholds per project or per agent; ring its leader at a crossing; its hand-filled file dropped as a
-   source) and two measurements: an expert's close seen whole then gone (`turn_ended` in `.comm/close/<agent>.json`), a
-   `send` waking a resting agent unasked. Measured 10-25: work's leader's `/clear` at 23:22Z got the `.2` note; an
-   EXPERT's first start on a new version is still unmeasured.
+   source) and an expert's close seen whole then gone (`turn_ended` in `.comm/close/<agent>.json`, at `agence`'s close); a
+   `send` waking a resting agent - **MEASURED 05h03: yes, at the sender's turn end; a resting leader rung in 9 s**. Its
+   leader's `/clear` got the `.2` note; an EXPERT's first start on a new version is still unmeasured.
 2. **Then build work's idea 1** (`FINDINGS.md#usage-statusline`: the statusLine gets `rate_limits` live). `bin/usage.mjs`
    in BUS_FILES, outside A22: its statusLine mode writes `$XDG_RUNTIME_DIR/claude-comm/usage.json` ON CHANGE and prints
    `5h n % · 7j n %`; the stub's Bash post-tool branch emits `additionalContext` once per threshold crossing per window
    (`.comm/config.json` `usage:{week,session}`), with the age; the installer adds a statusLine only where none exists
    (project or user). Then `comm stop <agent>` and `launch.mjs --resume <session>`, outside the bus too.
-3. **The bus has room again: 50 693 of 58 000 B** (`#bus-notes`). New tools go OUTSIDE it - the bus only delivers mail.
+3. **The bus has room again: 50 754 of 58 000 B** (`#bus-notes`). New tools go OUTSIDE it - the bus only delivers mail.
 4. **Named, unarmed**: boot's registry control still blames itself for a live session's rewrite (A31's twin, fixed 10-25).
 5. **Letters waiting for a bell**: deneb's (its own channel `exchange/<deneb>-leader/`) and atlas's - both leaders not
    running at 02:20; ring with `node bin/exchange-bell.mjs --peer <channel> --ref <file>` when they run.
 
-**Done 10-25 night:** `stranded-untold` amended (`#stranded-named`: a close names each letter; only a new one gates) ·
-the gate keeps its arm ids and warns `arms-gone:A<n>` (LESSONS §7) · the briefs row's two branches armed · F2 waits the
-gate's ceiling (it timed out on a suite grown to 94 s) · **mutated, 7 of 7 killed** (scratch batch, 8 wide, 2 h: the
-stranded arm's baseline red was its close's EXIT, a red row elsewhere under load - the arms now test `✓ CLOSED`) ·
-`boot --prove-red` 74/74 at 82da9b4 · then F2's `alive()` fixed: a busy-wait cannot reap, so an exited boot stayed a
-ZOMBIE and every wait ran to its timeout (measured: wrote +94 s, "alive" at 330 s, state Z). A third control follows.
+**Done 10-25 night** (commits `0779386`..`0e1dbaf`): `#stranded-named` · the gate's `arms-gone` (LESSONS §7) · the briefs
+row armed · F2's wait and its zombie (`alive()` read an unreaped child as running) · 7/7 mutants killed · `.3` (comments)
+and `.4` (the shortest `--ref` suggestion, work's report) released everywhere · `prove-red` 74/74 before the zombie fix.
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a
 codename here; the mapping is in no repo. The boot report prints the REAL directory names: **never copy a `field:` row
