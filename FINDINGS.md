@@ -3349,6 +3349,31 @@ mine, none reached them), but it was not asked.
   `drift:<files>`, `bus-stale:<files>`, `unanswered:<letter>`, `note-lapsed:<agent>`, `claim:<resource=state>`; a
   long list becomes a hash of the list, never of the words.
 
+## `#bus-notes` — the stories cut from the bus's comments to make room under A22 (2026-10-25)
+
+**Why.** The bus (`comm.mjs` + `who.mjs`) stood at 57 936 of A22's 58 000 B, and 45 % of it was whole-line comments.
+Re-measuring the budget bought nothing: the reading model (Opus 5.5) counts `boot.mjs`'s first 2 000 lines at 2.43 B per
+token (132 145 B, 54 415 tokens, the Read tool's own count), against 2.42 for Opus 5. So the stories moved out and each
+rule stayed at its site with its anchor: **50 693 B (−7 243)**. Each file's CODE is byte-identical to `80e0e4c` once
+whole-line comments and blank lines are dropped (505 and 109 code lines). That check went ✗ on a one-character change.
+**Every original comment is verbatim in `git show 80e0e4c:bin/comm.mjs` and `…:bin/who.mjs`.** The stories that had no
+anchor of their own, quoted:
+
+- **`rosterAgent`** (review #11 R8): *"`inbox`/`dismiss` joined the caller's word onto .comm/inbox/, so `dismiss ../..
+  --force` moved package.json and tsconfig.json OUT OF A PROJECT ROOT into delivered/undefined.json, the second
+  overwriting the first. Process control already follows this rule; mail reading now does too."*
+- **`send`, the stale-ref warning computed before the queue write**: *"computed here, lastSentTs finds the message THIS
+  call just queued, compares the file against its own timestamp, and warns on every send forever — the limiter that
+  fires for everyone and passes every test, which is the exact failure the agent who asked for this named in his
+  request. Measured on the first run of the fix, not reasoned about."*
+- **`renderWho`, the two fixes for a shared inbox**: *"measured 2026-09-05: a turn ended in the leader's folder took the
+  leader's mail (1 -> 0), the same turn ended in the reviewer's folder left it (1 -> 1), and the reviewer could still
+  write to the leader with no variable at all."*
+- **`inbox`, per message by id** (atlas, 09-14): *"it cost them twice on 09-13; the ids it needed were printed nowhere,
+  so one was fished out of log.jsonl and was a day old."*
+- **`renderNudge`'s two first lines**: *"Found by finally exercising SessionStart with a real session: it announced mail
+  as having arrived 'while you were working' to a session that had just launched and had never worked."*
+
 ## `#stranded-named` — a stranded letter warns until a close names it, then only a new one gates (2026-10-25)
 
 **Demanded by the close, on the count.** `stranded-untold:<agent>` (review #11 R4, above) was acked **16x** in atlas,

@@ -20,6 +20,12 @@ already have.
 
 
 
+
+## 2026-10-25.3 — bus print `7701bee8f497` — 2026-10-25
+
+- **Nothing changes for you.** Only the bus's long comments were shortened, to make room for the next features; every
+  command behaves exactly as before.
+
 ## 2026-10-25.2 — bus print `ea0d5ca8c0be` — 2026-10-24
 
 - **The note you get at your first session after an update now spells its commands from YOUR folder** (`../.comm/bin/…`

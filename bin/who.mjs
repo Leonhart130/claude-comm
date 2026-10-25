@@ -2,13 +2,10 @@
 /**
  * claude-comm WHO — which sessions are alive, and what state each one is really in.
  *
- * Split out of comm.mjs 2026-09-11: A22 (size) and A21 (imports) contradicted each other at the
- * cap, and A21 now checks this file transitively. The seam is open item 5 — liveness reads the
- * MACHINE, not the mailbox, so it is the part that keeps wanting imports. `FINDINGS.md#bus-split`.
- *
- * 🔴 DEPENDENCIES FLOW ONE WAY: nothing is imported from `comm.mjs`, which passes `whoami`,
- * `findRoot`, `clock` and `pending` in. One implementation of "which claude process is which
- * agent" — a second one disagreed with the first twice in a day (review #5, F7 and G7).
+ * Split out of comm.mjs 2026-09-11 (A22 and A21 contradicted each other at the cap; A21 checks this file
+ * transitively): liveness reads the MACHINE, not the mailbox. `FINDINGS.md#bus-split`.
+ * 🔴 DEPENDENCIES FLOW ONE WAY: comm.mjs passes `whoami`, `findRoot`, `clock`, `pending` in - one
+ * implementation of "which process is which agent" (a second one disagreed twice in a day, review #5 F7, G7).
  */
 import { readdirSync, readFileSync, readlinkSync, statSync, existsSync } from "node:fs"
 import { join, resolve } from "node:path"
@@ -18,13 +15,9 @@ import { join, resolve } from "node:path"
 // what is ALIVE, and those differ exactly when it matters. FINDINGS.md#liveness
 export function liveAgents(root, cfg, { whoami, findRoot, clock }) {
 	const out = {}
-	// Off-bus sessions, keyed by the agent whose directory they occupy.
-	// Non-enumerable, so `live[agent]` and the shared-inbox scan over
-	// Object.entries(live) keep exactly their old meaning.
+	// Off-bus sessions by the agent directory they occupy; non-enumerable, so Object.entries(live) keeps its meaning.
 	const offBus = {}
-	// EVERY live session in the tree, on the bus or not: "off bus" is a property
-	// of the MAIL, not of the PRESENCE. A `none` session receives nothing, but it
-	// is alive and writing somewhere. FINDINGS.md#A23
+	// EVERY live session in the tree: "off bus" is a property of the MAIL, not of the PRESENCE. FINDINGS.md#A23
 	const tree = []
 	const finish = () => {
 		Object.defineProperty(out, "offBus", { value: offBus, enumerable: false })
@@ -52,10 +45,8 @@ export function liveAgents(root, cfg, { whoami, findRoot, clock }) {
 		// second, laxer definition of "in this project" that drifts from the first.
 		const home = findRoot(cwd)
 		if (home && resolve(home) === resolve(root)) tree.push({ pid: Number(pid), cwd, declared, agent: who })
-		// An off-bus session is not an agent, but it is not nothing either: report it
-		// as "not running" and an EXPORTED CLAUDE_COMM_AGENT takes the real agent off
-		// the bus while `who` says "not running" and `sent` says "lands when
-		// relaunched" — both false, mail queued forever. FINDINGS.md#A19
+		// An off-bus session is not nothing: an EXPORTED CLAUDE_COMM_AGENT takes the agent off the bus while
+		// `sent` says "lands when relaunched" - false, mail queued forever. FINDINGS.md#A19
 		if (!who) {
 			if (declared) {
 				const inDir = whoami(root, cfg, cwd, null)
@@ -96,11 +87,7 @@ export function turnOf(pid, env) {
 /** The `who` command, exactly as it rendered inside the bus. */
 export function renderWho(root, cfg, me, rest, { liveAgents: live_, pending }) {
 	const live = live_(root, cfg)
-	// `--json` exists so the WAKE does not have to scan /proc a second time.
-	// "Which claude process is which agent" already has one implementation, right
-	// here, and this project has now been bitten twice in one day by a second one
-	// disagreeing with it (F7, G7 of review #5). A program asking that question gets
-	// the same answer a person does, from the same call.
+	// `--json` so the WAKE asks this one implementation instead of scanning /proc again (review #5 F7, G7).
 	if (rest.includes("--json")) {
 		const out = { root, leader: cfg.leader, you: me || null, agents: {} }
 		for (const id of Object.keys(cfg.agents)) {
@@ -113,9 +100,7 @@ export function renderWho(root, cfg, me, rest, { liveAgents: live_, pending }) {
 	for (const id of Object.keys(cfg.agents)) {
 		const l = live[id]
 		const n = pending(root, id).msgs.length
-		// `since` was collected and never rendered. It is the field that answers
-		// "is this session old enough to predate the hooks, i.e. deaf?", which
-		// otherwise has to be dug out of `ps`. Local time, dated when not today.
+		// `since` answers "old enough to predate the hooks, i.e. deaf?". Local, dated when not today.
 		const started = l?.[0]?.since ? ` since ${l[0].since}` : ""
 		// THE TURN, not just "running" (atlas, 09-25: an expert waited 53 min for a bell nobody rang, shown `running`
 		// with an empty inbox). turnOf's verdict, rendered for ONE session only - several share an inbox, warned below.
@@ -131,12 +116,8 @@ export function renderWho(root, cfg, me, rest, { liveAgents: live_, pending }) {
 			: !l && off ? `  ⚠ ${off.length} session(s) here declared OFF-BUS (CLAUDE_COMM_AGENT=${names.length === 1 ? names[0] : names.join(", ")})` : ""
 		console.log(`  ${l ? "●" : "○"} ${id.padEnd(18)} ${(l ? `running (pid ${l.map((x) => x.pid).join(",")})${started}${turn}` : "not running").padEnd(40)}${n ? `${n} pending` : ""}${many}`)
 	}
-	// `who` answers WHO RECEIVES MAIL; a leader about to write a shared file is
-	// asking WHO HOLDS THIS DIRECTORY. A correctly-declared `none` reviewer is
-	// invisible to the first question and is the one holding the write lock.
-	// ⚠️ Walk live.tree, NOT the off-bus map: that map is keyed by AGENT
-	// DIRECTORY, so a session in `scripts/` — owned by no agent — stays
-	// invisible, which is exactly when the question is asked. FINDINGS.md#A23
+	// WHO RECEIVES MAIL is not WHO HOLDS THIS DIRECTORY: a `none` reviewer is invisible to the first and
+	// holds the write lock. Walk live.tree, NOT the off-bus map, keyed by agent directory. FINDINGS.md#A23
 	const others = (live.tree || []).filter((s) => !s.agent)
 	if (others.length) {
 		if (rest.includes("--all")) {
@@ -157,13 +138,8 @@ export function renderWho(root, cfg, me, rest, { liveAgents: live_, pending }) {
 		console.log(`\n  ⚠ ${shared.map(([id, v]) => `'${id}' has ${v.length} live sessions`).join("; ")}.`)
 		console.log(`    Mail is drained by whichever ends a turn FIRST — the others never see it,`)
 		console.log(`    and the sender is still told it was delivered.`)
-		// TWO FIXES, and the durable one is FIRST. Identity here comes from where a
-		// session stands, so a second agent with its own directory needs nothing typed
-		// at launch and keeps its own inbox — measured 2026-09-05: a turn ended in the
-		// leader's folder took the leader's mail (1 -> 0), the same turn ended in the
-		// reviewer's folder left it (1 -> 1), and the reviewer could still write to the
-		// leader with no variable at all. The env var stays because it is the only
-		// per-session channel when two sessions must share one directory.
+		// TWO FIXES, the durable one FIRST: its own directory needs nothing typed and keeps its own inbox
+		// (measured 09-05, FINDINGS.md#bus-notes); the env var is for two sessions sharing one directory.
 		const pad = Math.max(cfg.leader.length, 4)
 		console.log(`    Fix, and the first one needs nothing typed at launch:`)
 		console.log(`      give the second session its OWN directory and add it to .comm/config.json,`)
