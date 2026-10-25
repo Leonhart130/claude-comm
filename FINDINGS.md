@@ -3650,6 +3650,28 @@ only. It does not touch D2's open half - whether an agent acts on a POINTER - an
 - Not measured: other matchers, non-Bash tools, token cost per call, whether `PreToolUse` behaves the same, and any
   model other than haiku-4.5.
 
+## `#usage-statusline` — the account's usage reaches every session's statusLine, live (2026-10-25)
+
+**Asked by work** (its idea n° 1, letter `…23h18-l-usage…`): its experts stop at 93 % of the week or 98 % of the session,
+and read the value from a file its leader fills by hand from `claude.ai/settings/usage` about once an hour, so the
+value can be an hour old. **Measured before designing anything:**
+
+| question | measured | how |
+| --- | --- | --- |
+| Does Claude Code expose usage to a session? | **yes**: the `statusLine` command's stdin carries `rate_limits.five_hour` and `.seven_day`, each `{used_percentage, resets_at}` (epoch s), *"only present for subscribers"* | the documented schema inside the 2.1.310 binary, then a live probe |
+| Is it present for this account? | **yes**: 01:53, session 33 %, week 94 %, the week resetting at 05:00 | a probe statusLine in this repo's `.claude/settings.local.json` (gitignored), teeing stdin to the scratchpad |
+| Does it agree with the page? | **yes**: work's hand reading at 01:25 said 29 % / 94 % | work's own file |
+| Is it live? | **yes**: 115 refreshes in 10 min while working, 33/94 → 34/95 within them | the probe's log |
+| Does any field project already set a statusLine? | **no**, none in the ten trees nor at user level | `jq .statusLine` over every settings file |
+
+**What it means.** Nobody needs to read the page. The reading's age falls from about an hour to the last refresh of any
+session on the machine. Usage is the ACCOUNT's, so one machine-wide file serves every project. **The shape**, sent to
+work before building (`exchange/work-leader/out/2026-10-25-2-…`): an installed statusLine writes that file only on a
+change (115 writes in 10 min otherwise), and the stub's existing Bash `PostToolUse` branch tells the agent once per
+threshold crossing per window, with the age. **Not verified:** freshness while every session idles (the value comes from
+API responses); the field's absence just after a reset (schema, not observed); a statusLine in a `launch.mjs` window or
+in an expert; any account that is not a subscriber.
+
 ## `#settings-inheritance` — an expert runs its leader's `settings.local.json`, not its `settings.json` (2026-09-27)
 
 **Reported by atlas's leader** (field letter 09-27): a `Stop` hook he put in his root's `settings.local.json` ran
