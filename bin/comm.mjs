@@ -172,9 +172,9 @@ function whereItActuallyIs(root, cfg, from, to, ref) {
 		const rel = normalize(typed)
 		if (seen.has(rel) || rel.startsWith("..") || isAbsolute(rel) || !existsSync(join(root, rel))) continue
 		seen.add(rel)
-		// Expressed FROM THE BASE, because that is the string the sender has to type.
-		const up = relative(resolve(root, base.dir), root).replace(/[^/]$/, "$&/")   // `review/`, `./review`: review #19 §7
-		hits.push(`  found at ${label}: pass  --ref ${up}${rel}\n`)
+		// FROM THE BASE, the string the sender types (`./review`, review #19 §7), and the shortest: a file inside the
+		// spoke is named from it (work, 10-25: `../da/SPEC.md` resolved, `SPEC.md` is what anyone would type).
+		hits.push(`  found at ${label}: pass  --ref ${relative(resolve(root, base.dir), join(root, rel))}\n`)
 	}
 	return hits.join("")
 }

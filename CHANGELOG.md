@@ -21,6 +21,13 @@ already have.
 
 
 
+
+## 2026-10-25.4 — bus print `baa56b6c3844` — 2026-10-25
+
+- **When `comm send` refuses a `--ref` and suggests the one that works, it now suggests the shortest.** A file typed from
+  the root into the recipient's folder (`--ref da/SPEC.md`) is suggested as `--ref SPEC.md`, not `../da/SPEC.md` -
+  both resolve, the first is what anyone would type. (`.3` changed nothing you use: only the bus's comments.)
+
 ## 2026-10-25.3 — bus print `7701bee8f497` — 2026-10-25
 
 - **Nothing changes for you.** Only the bus's long comments were shortened, to make room for the next features; every

@@ -3655,6 +3655,10 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		// the title says "the string that WOULD HAVE WORKED": so retype it (review #19 §3, §7)
 		const typed = (`${deep.stdout || ""}${deep.stderr || ""}`.match(/found at the project root: pass\s+--ref (\S+)/) || [])[1]
 		const retyped = !!typed && c44(["send", "db", "--from", "leader", "--ref", typed, "--note", "x"]).status === 0
+		// work's leader, 10-25: a path typed from the root INTO the recipient's spoke - named from the spoke, the shortest
+		mkdirSync(join(r44, "db"), { recursive: true }); writeFileSync(join(r44, "db", "INSPOKE.md"), "in\n")
+		const ins = (`${(c44(["send", "db", "--from", "leader", "--ref", "db/INSPOKE.md", "--note", "x"]).stderr || "")}`.match(/pass\s+--ref (\S+)/) || [])[1]
+		const insShort = ins === "INSPOKE.md" && c44(["send", "db", "--from", "leader", "--ref", ins, "--note", "x"]).status === 0
 		const rz = mkdtempSync(join(tmpdir(), "comm-attack-roster-"))
 		mkdirSync(join(rz, ".comm"), { recursive: true }); mkdirSync(join(rz, "zone"), { recursive: true }); mkdirSync(join(rz, "sub"), { recursive: true })
 		writeFileSync(join(rz, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", zone: "./zone/" } }))
@@ -3664,11 +3668,12 @@ process.stdout.write(JSON.stringify({ ops, res }))
 		const zoneRetyped = !!zt && cz(["send", "zone", "--from", "leader", "--ref", zt, "--note", "x"]).status === 0
 		rmSync(rz, { recursive: true, force: true })
 		check("A49 a missed --ref names the string that would have worked",
-			suggests && quiet && deepSuggests && staysIn && retyped && zoneRetyped,
+			suggests && quiet && deepSuggests && staysIn && retyped && zoneRetyped && insShort,
 			`a file that exists at the root, referenced without the ../ -> suggestion printed=${suggests}; ` +
 			`a path typed from the root (sub/DEEP.md) -> ../sub/DEEP.md suggested=${deepSuggests}; ` +
 			`a file just OUTSIDE the project -> no suggestion=${staysIn}; the suggestion RETYPED works=${retyped} (${typed}); ` +
 			`a roster written './zone/' -> its suggestion retyped works=${zoneRetyped} (${zt}); ` +
+			`a path typed INTO the spoke (db/INSPOKE.md) -> the shortest, named from the spoke, retyped works=${insShort} (${ins}); ` +
 			`CONTROL, a file that exists nowhere -> no suggestion=${quiet} (a suggestion printed ` +
 			`unconditionally would point the next agent at a path that does not exist either)`)
 	}
