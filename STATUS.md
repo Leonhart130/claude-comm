@@ -9,7 +9,7 @@ fold the settled parts into the README.
 utiliser tout l'usage jusque 100%"** - never self-throttle near the cap. Tonight he made the self-relay THE priority.)*
 
 1. **The first REAL relay in a field.** rigel's leader adds `"relay"` to its config and ends its 150 k Stop hook's message
-   with `relay.mjs` (letter `…21h-…-livre.md`); its experts are its task T8. Read `.comm/relay/<agent>.json` there:
+   with `relay.mjs` (letter `…20h37-…-livre.md`); its experts are its task T8. Read `.comm/relay/<agent>.json` there:
    relayed, the clear's ms, the prompt's ms, and whether the fresh session booted. Unarmed in relay.mjs (no arm reaches
    them): the turn re-read just before `/clear`, and the window re-check at the relay. The screen/keystroke race is named.
 2. **Work owes nothing**: measurement 1 arrived 09h08 (`turn_ended` there). Usage's first real crossing waits on work's
