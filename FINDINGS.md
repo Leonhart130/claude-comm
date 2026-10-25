@@ -3713,6 +3713,8 @@ prompt and proves it. **Nothing is retried**: a step it cannot prove stops it wh
 **A95** arms it: one bench pane per scenario, a fake session drawing the measured box and recording every byte typed.
 
 **What it does NOT cover, said rather than implied:**
+- **Two checks no arm reaches** (A95's scenarios never get that far): the turn re-read just before `/clear`, and the
+  window re-checked at the relay. Each is a backstop behind a check that IS armed; a mutant of either would survive.
 - **The race between the screen check and the keystroke.** A person who starts typing in the ~1 ms between them is
   typed over. Narrowed, not closed.
 - **Effort** was not re-measured tonight; 09-13 measured it surviving a `/clear` (`low`), and the process is the same.

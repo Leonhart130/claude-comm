@@ -5,13 +5,12 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-10-25 20h34 CET by `date`. **WORK IS THE MAIN FIELD.** The owner: "j'te laisse gérer tout ça ce soir"; **"tu peux
+*(2026-10-25 21h49 CET by `date`. **WORK IS THE MAIN FIELD.** The owner: "j'te laisse gérer tout ça ce soir"; **"tu peux
 utiliser tout l'usage jusque 100%"** - never self-throttle near the cap. Tonight he made the self-relay THE priority.)*
 
 1. **The first REAL relay in a field.** rigel's leader adds `"relay"` to its config and ends its 150 k Stop hook's message
    with `relay.mjs` (letter `…20h37-…-livre.md`); its experts are its task T8. Read `.comm/relay/<agent>.json` there:
-   relayed, the clear's ms, the prompt's ms, and whether the fresh session booted. Unarmed in relay.mjs (no arm reaches
-   them): the turn re-read just before `/clear`, and the window re-check at the relay. The screen/keystroke race is named.
+   relayed, the clear's ms, the prompt's ms, whether the fresh session booted. Unarmed, uncovered: `FINDINGS.md#relay`.
 2. **Work owes nothing**: measurement 1 arrived 09h08 (`turn_ended` there). Usage's first real crossing waits on work's
    thresholds; its `statusLine` waits on the owner's word. An EXPERT's first start on a new version is still unmeasured.
 3. **rigel's four memory ideas** (its 15h09 letter; my 20h06 reply disposes them): `claim --machine`, `launch --memory`,
@@ -19,8 +18,10 @@ utiliser tout l'usage jusque 100%"** - never self-throttle near the cap. Tonight
 4. **Arm LESSONS §8**: the `channel:` row compares my outgoing letters' written time with the file's (>10 min warns).
 5. **Letters waiting for a bell**: deneb's (`exchange/<deneb>-leader/`) and atlas's - ring with
    `node bin/exchange-bell.mjs --peer <channel> --ref <file>` when their leaders run.
+6. **Unarmed: the generated SKILL names every tool.** A92 gates the README's reference only; `.6`'s skill still said
+   "It does not relaunch you" until `.7`, found by hand at the close.
 
-**Done 10-25** (night `0779386`..`0e1dbaf`: `.3`-`.5`, `#stranded-named`, F2's zombie; evening: `2026-10-25.6`) - `relay.mjs`,
+**Done 10-25** (night `0779386`..`0e1dbaf`: `.3`-`.5`, `#stranded-named`, F2's zombie; evening: `.6`, `.7` the skill) - `relay.mjs`,
 the owner's priority through rigel: measured live twice, refuses on a half-typed line; A95 + 9/9 mutants, each its own condition.
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a
