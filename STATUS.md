@@ -16,7 +16,7 @@ utiliser tout l'usage jusque 100%"** - never self-throttle near the cap. Tonight
 3. **rigel's four memory ideas** (its 15h09 letter; my 20h06 reply disposes them): `claim --machine`, `launch --memory`,
    memory in `who` (outside who.mjs - the bus is 50 754 of 58 000 B), "closed" vs "crashed" from `.comm/close/`.
 4. **Arm LESSONS §8**: the `channel:` row compares my outgoing letters' written time with the file's (>10 min warns).
-5. **Letters waiting for a bell**: deneb's (`exchange/<deneb>-leader/`) and atlas's - ring with
+5. **Letters waiting for a bell**: rigel's `…21h55-…` (its leader mid-turn twice), deneb's, atlas's - ring with
    `node bin/exchange-bell.mjs --peer <channel> --ref <file>` when their leaders run.
 6. **Unarmed: the generated SKILL names every tool.** A92 gates the README's reference only; `.6`'s skill still said
    "It does not relaunch you" until `.7`, found by hand at the close.
