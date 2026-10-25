@@ -55,8 +55,23 @@ const forward = (input, notices = []) => spawnSync(process.execPath,
 // every Stop. So after a Bash call whose command is a `comm.mjs send`, it runs the same `wake --root`, with every
 // rule of wake intact. It touches no mail: delivery is still the turn boundary's. Any other command costs one stdin
 // read. Never fails the tool call. A90.
+// THE STATUS BAR (`FINDINGS.md#usage-statusline`): a statusLine installed where the project opted in hands its usage
+// here; usage.mjs writes it for the whole machine on a change and returns the line the bar shows.
+if (process.argv[2] === "statusline") {
+	try { process.stdout.write((await import(pathToFileURL(join(dirname(bus), "usage.mjs")).href)).statusline(readFileSync(0, "utf8"))) } catch {}
+	process.exit(0)
+}
 if (process.argv[2] === "post-tool") {
-	try { readFileSync(0) } catch {}   // the payload is drained, never read: Claude Code writes it, and a closed pipe is its error
+	let raw = ""
+	try { raw = readFileSync(0, "utf8") } catch {}   // drained, and read only for its event name: a closed pipe is Claude Code's error
+	// USAGE FIRST: an agent at its project's threshold is told once per window, and its leader gets a message - which the
+	// ring below then rings. A project with no `usage` in its config pays one read of it. `FINDINGS.md#usage-statusline`
+	let usage = ""
+	try {
+		const um = join(dirname(bus), "usage.mjs")
+		if (existsSync(um) && readFileSync(join(projectRoot, ".comm", "config.json"), "utf8").includes('"usage"'))
+			usage = (await import(pathToFileURL(um).href)).check({ projectRoot, agentRoot, bus }) || ""
+	} catch { /* usage is advice: it must never break a tool call */ }
 	try {
 		// NOT THE COMMAND'S TEXT: a message that has just LANDED. Review #19 §4 counted 58 real sends a regex on the
 		// command missed (`C=.../comm.mjs; node $C send`) - a send that succeeded has written its file, whatever it was
@@ -70,6 +85,11 @@ if (process.argv[2] === "post-tool") {
 		if (fresh && existsSync(wake))
 			spawnSync(process.execPath, [wake, "--root", projectRoot], { timeout: 10000, stdio: "ignore" })
 	} catch { /* a doorbell must never break a tool call */ }
+	if (usage) {
+		let ev = "PostToolUse"
+		try { ev = JSON.parse(raw).hook_event_name || ev } catch {}
+		process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: ev, additionalContext: usage } }))
+	}
 	process.exit(0)
 }
 
