@@ -3340,7 +3340,10 @@ function proveRed() {
 			// loop, so the exit callback cannot run inside it and the loop would always spend its
 			// whole timeout - the first version of this arm sat for 93 s per run and called it
 			// waiting. The filesystem answers a blocked process; a callback does not.
-			const alive = () => existsSync(`/proc/${child.pid}`)
+			// 🔴 BUT NOT BY EXISTING: the same blocked loop cannot REAP the child, so an exited boot stays a zombie and
+			// its /proc entry stands - this waited out every timeout, and F2 passed only when the boot wrote inside it
+			// (measured 10-25: wrote at +94 s, "alive" at 330 s, state Z). A zombie is gone.
+			const alive = () => { try { return !/^Z/.test(readFileSync(`/proc/${child.pid}/stat`, "utf8").split(") ").pop()) } catch { return false } }
 			// Land inside the gate, which is the whole width of the window.
 			const t0 = Date.now(); while (Date.now() - t0 < 3000 && alive()) {}
 			const midAt = new Date().toISOString()

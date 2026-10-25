@@ -5,7 +5,7 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-10-25 ~03:30 CET - the clocks fell back at 03:00 - end of the session after the declared restart (handoff verified
+*(2026-10-25 ~05:50 CET - the clocks fell back at 03:00 - end of the session after the declared restart (handoff verified
 31/31). **WORK IS THE MAIN FIELD.** The owner: "j'te laisse gérer tout ça ce soir"; and **"tu peux utiliser tout l'usage
 jusque 100%, c'est fait pour être consommé"** - never self-throttle near the cap. `2026-10-25.3` is in all ten trees.)*
 
@@ -19,7 +19,6 @@ jusque 100%, c'est fait pour être consommé"** - never self-throttle near the c
    `5h n % · 7j n %`; the stub's Bash post-tool branch emits `additionalContext` once per threshold crossing per window
    (`.comm/config.json` `usage:{week,session}`), with the age; the installer adds a statusLine only where none exists
    (project or user). Then `comm stop <agent>` and `launch.mjs --resume <session>`, outside the bus too.
-   ⚠ **My probe statusLine is still in `.claude/settings.local.json`** (gitignored, tees to a dead scratchpad): remove it.
 3. **The bus has room again: 50 693 of 58 000 B** (`#bus-notes`). New tools go OUTSIDE it - the bus only delivers mail.
 4. **Named, unarmed**: boot's registry control still blames itself for a live session's rewrite (A31's twin, fixed 10-25).
 5. **Letters waiting for a bell**: deneb's (its own channel `exchange/<deneb>-leader/`) and atlas's - both leaders not
@@ -27,7 +26,10 @@ jusque 100%, c'est fait pour être consommé"** - never self-throttle near the c
 
 **Done 10-25 night:** `stranded-untold` amended (`#stranded-named`: a close names each letter; only a new one gates) ·
 the gate keeps its arm ids and warns `arms-gone:A<n>` (LESSONS §7) · the briefs row's two branches armed · F2 waits the
-gate's ceiling (it timed out on a suite grown to 94 s) · MUTATION RESULT: see the line below, written after the batch.
+gate's ceiling (it timed out on a suite grown to 94 s) · **mutated, 7 of 7 killed** (scratch batch, 8 wide, 2 h: the
+stranded arm's baseline red was its close's EXIT, a red row elsewhere under load - the arms now test `✓ CLOSED`) ·
+`boot --prove-red` 74/74 at 82da9b4 · then F2's `alive()` fixed: a busy-wait cannot reap, so an exited boot stayed a
+ZOMBIE and every wait ran to its timeout (measured: wrote +94 s, "alive" at 330 s, state Z). A third control follows.
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a
 codename here; the mapping is in no repo. The boot report prints the REAL directory names: **never copy a `field:` row
