@@ -119,6 +119,9 @@ for (let i = 0; i < ARGV.length; i++) {
 // and exit stays 1 only for RED.
 const OK = 0, UNKNOWN = 1, WARN = 2, RED = 3
 const MARK = ["✓", "?", "⚠", "✗"]
+// The gate's ceiling on `attack` (section 6), at module scope because a control that WAITS for a gate must wait at
+// least this long - F2's 90 s wait read a suite grown to 94 s as "nothing wrote" (2026-10-25).
+const GATE_CEILING_MS = 300_000
 let worst = OK
 const rows = []
 // `causes`: the codes a row DECLARES for what made it non-green, where it computed them.
@@ -1664,9 +1667,8 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 		// 🔴 A CEILING. Review #10 C6: the suite can HANG — a render exception leaves the
 		// inbox undrained by design, and a loop waiting for it to empty never ends. Without
 		// a timeout that hang is inherited by EVERY boot, and boot runs at every session
-		// start, so one bad commit would make the project unstartable. 300 s is ~7× the
-		// suite's measured 25-40 s; it is a ceiling, not a budget.
-		const GATE_CEILING_MS = 300_000
+		// start, so one bad commit would make the project unstartable. 300 s was ~7× the
+		// suite's 25-40 s; it is 3.2× its 94 s measured 2026-10-25. A ceiling, not a budget.
 		const g = spawnSync("node", [join(ROOT, "test", "attack.mjs")], { encoding: "utf8", timeout: GATE_CEILING_MS })
 		const out = `${g.stdout || ""}${g.stderr || ""}`
 		// A TIMEOUT IS NOT A FAILING SUITE and must not be reported as one: the arms that
@@ -2321,6 +2323,28 @@ function proveRed() {
 		const lv = level(run(true), "briefs")
 		rmSync(brief, { force: true }); rmSync(briefReply, { force: true })
 		ran--; assert("briefs: the same brief WITH its reply", lv === OK, `level=${LV[lv]} (want ok)`)
+	}
+	// The two branches named unarmed on 10-25. ONE VARIABLE each, against the answered brief just above as control.
+	// A reply OLDER than its brief: the brief was rewritten after its answer (review #19 §8), so it is open again.
+	if (selected("briefs: a brief rewritten after its reply")) {
+		writeFileSync(brief, "# x\n"); writeFileSync(briefReply, "# y\n")
+		const t = Date.now() / 1000 - 3600
+		utimesSync(briefReply, t, t)
+		const r = rowOf(run(true), "briefs")
+		rmSync(brief, { force: true }); rmSync(briefReply, { force: true })
+		ran--; assert("briefs: a brief rewritten after its reply", r.level === WARN && /UNANSWERED - BRIEF-from-armed-peer\.md/.test(r.text),
+			`the reply an hour older than its brief -> ${LV[r.level]} (want warn: open again)`)
+	}
+	// A root that cannot be LISTED - read bit off, traversal kept, so every file is still opened by name and the rest
+	// of the boot runs. A brief there cannot be seen, and the row must say so, never read it as "no brief" (form E).
+	if (selected("briefs: a root that cannot be listed")) {
+		writeFileSync(brief, "# x\n"); writeFileSync(briefReply, "# y\n")
+		let r = { level: -1, text: "" }
+		chmodSync(pkg, 0o311)
+		try { r = rowOf(run(true), "briefs") } finally { chmodSync(pkg, 0o755) }
+		rmSync(brief, { force: true }); rmSync(briefReply, { force: true })
+		ran--; assert("briefs: a root that cannot be listed", r.level === WARN && /could not be listed \(EACCES\)/.test(r.text),
+			`the root's read bit off -> ${LV[r.level]} ${r.text ? `"${r.text.slice(0, 70)}"` : "(no row: the boot did not run)"} (want warn, says it cannot see)`)
 	}
 
 	const claudeMd = join(pkg, "CLAUDE.md")
@@ -3320,14 +3344,15 @@ function proveRed() {
 			const before = stateOf()
 			writeFileSync(sp, JSON.stringify({ ...before, ackCounts: { "a-concurrent-close": 7 },
 				lastClose: { at: midAt, head: "cafe123", acked: ["a-concurrent-close"] } }, null, 2) + "\n")
-			const t1 = Date.now(); while (Date.now() - t1 < 90_000 && alive()) {}
+			const t1 = Date.now(); while (Date.now() - t1 < GATE_CEILING_MS + 30_000 && alive()) {}
+			const stillRunning = alive()
 			const after = stateOf()
 			const bootWroteAfter = after.at && Date.parse(after.at) >= Date.parse(midAt)
 			assert("state: a close written during the gate is not erased",
 				bootWroteAfter && after.ackCounts && after.ackCounts["a-concurrent-close"] === 7 &&
 				after.lastClose && after.lastClose.head === "cafe123",
 				`boot wrote at ${after.at} (after the concurrent write at ${midAt}: ${bootWroteAfter} - the positive control; ` +
-				`false would mean nothing wrote and "survived" proves nothing); ` +
+				`${stillRunning ? `false because the boot was STILL RUNNING after ${Math.round((Date.now() - t1) / 1000)} s` : `false would mean nothing wrote and "survived" proves nothing`}); ` +
 				`ackCounts=${JSON.stringify(after.ackCounts)} lastClose.head=${after.lastClose && after.lastClose.head} (want 7 / cafe123)`)
 		}
 

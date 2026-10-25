@@ -16,7 +16,7 @@ doorbell** — and a reboot obeys it too, since what survives a restart is what 
 | **L — before acting** | 🔴 **`LESSONS.md`'s FORM table** — my repeated errors, priced. Not the sections: the table | its forms are how the next one arrives |
 
 ```bash
-node bin/boot.mjs          # ~14 s · state + the adversarial gate (it prints the count; do not restate it here)
+node bin/boot.mjs          # ~100 s · state + the adversarial gate (attack alone 94 s, 10-25) (it prints the count; do not restate it here)
 node bin/boot.mjs --fast   # ~0.3 s · state only, when you are not touching the bus
 node bin/context.mjs       # how full this session is, resolved from /proc - exact, not guessed
 node bin/ledger.mjs        # did a restart cost us a defect? UNKNOWN until 10 starts per arm
