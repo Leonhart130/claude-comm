@@ -266,6 +266,13 @@ function main() {
 		if (bad.length) { console.error(`✗ leak-check: ${bad.join(", ")} missing, not executable, or not as --install-hooks writes them, in ${dir}`); process.exit(1) }
 		console.log(`✓ leak-check: the four hooks are current in ${dir}`); return
 	}
+	// No mode used to reach check() and print "FAILED (undefined): error" - a refusal that named nothing to type (10-26,
+	// mine, at a commit). It still exits 2 and checks nothing; it now says what to type. A97
+	const MODES = ["--tree", "--staged", "--message", "--commits", "--history", "--ref", "--all-cached"]
+	if (!MODES.includes(mode)) {
+		console.error(`✗ leak-check: ${mode ? `no mode ${mode}` : "no mode given"} - nothing was checked. One of: ${MODES.join(" ")}, or --install-hooks --hooks-dir --hooks-check (this file's header says what each reads)`)
+		process.exit(2)
+	}
 	const { armed, rules, why, invalid } = loadRules()
 	if (!armed) {
 		console.error(`✗ leak-check NOT ARMED: ${why}. Nothing was checked.`)

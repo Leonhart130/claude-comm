@@ -6234,4 +6234,19 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 		`no output printed the word=${!leaked}`)
 }
 
+// A97 — LEAK-CHECK WITH NO MODE SAYS WHAT TO TYPE. Run bare (mine, 10-26, at a commit) it printed "FAILED (undefined):
+// error": refused, right, and naming nothing to type (LESSONS form K). No mode and an unknown one: exit 2, nothing
+// checked - no list is given, so a run that reached the scan would say NOT ARMED (exit 3) - and the modes named.
+// Positive control: a real mode with no list still says NOT ARMED, so the refusal above is not every run's refusal.
+{
+	const lc97 = join(PKG, "bin", "leak-check.mjs"), env97 = { ...process.env }
+	env97.CLAUDE_COMM_PRIVATE_WORDS = join(tmpdir(), "comm-attack-no-such-list")
+	const run97 = (...a) => spawnSync(process.execPath, [lc97, ...a], { cwd: tmpdir(), env: env97, encoding: "utf8" })
+	const bare = run97(), odd = run97("--bogus"), real = run97("--staged")
+	const says = (r) => r.status === 2 && /--staged/.test(r.stderr) && /--tree/.test(r.stderr) && /nothing was checked/.test(r.stderr) && !/undefined/.test(r.stderr)
+	check("A97 leak-check with no mode, or an unknown one, refuses and names the modes to type",
+		says(bare) && says(odd) && /NOT ARMED/.test(real.stderr) && real.status === 3,
+		`bare -> exit ${bare.status} "${bare.stderr.trim().slice(0, 90)}"; --bogus -> exit ${odd.status}; control --staged, no list -> exit ${real.status} (want 3) NOT ARMED=${/NOT ARMED/.test(real.stderr)}`)
+}
+
 finish(null)
