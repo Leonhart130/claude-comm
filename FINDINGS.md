@@ -3723,6 +3723,21 @@ prompt and proves it. **Nothing is retried**: a step it cannot prove stops it wh
 - **A relay cancelled by mail** (delivered at the Stop) is not re-armed: the agent's next turn end is where it, or the
   project's hook, arms it again. The record says so.
 - **Memory.** `/clear` returns no RSS (09-04); a relay frees context, not the process. The relaunch stays the rare path.
+
+**10-26: the first field relays REFUSED at a box empty and at rest, because the session had a NAME.** rigel's leader,
+twice (08h48, 13h12, `.comm/relay/leader.json` there: `relayed: false`, "no input box on screen"); the window sat 4 h 24,
+and until a fix the owner typed `/clear` by hand at each handover. A session named by `claude -n` or `/rename` draws its
+name INTO the box's top edge: `──…── <name> ─`, the whole line in the rule's grey. `isRule` wanted only `─`, so the box
+had no top. **Measured here the same day** on a real `claude -n` session (2.1.310, a minimized window, no prompt sent):
+that exact line, `promptAtRest` → "no input box"; then `/clear` typed: **the name is still in the edge after it**, so
+the relay's second screen read (before its prompt) needs the same fix. The lower edge is untitled in both captures.
+**The fix**: the TOP edge alone also accepts `─{10,} <text> ─+`; both real captures then read at rest. **A96**, in A95's
+bench: a titled box relays (one variable against `nominal`), a titled box holding `hello` still refuses for THAT reason.
+Mutated: the edge untitled again reddens `titledRelayed` (and `titledTypedRefused`, which demands its own reason); a
+title that waves text through reddens `titledTypedRefused` alone; A95 green under both. **This is the "another
+version's screen" bullet above, arriving through a setting rather than a version**, and it failed in the direction
+chosen: nothing typed. Not measured: a name containing `─`, a name long enough to be cut, a theme other than the
+default (the fake draws the grey measured here).
 - **The field's Stop hook** (rigel's, at 150 k) must let the handover turn end: it does, it never blocks when
   `stop_hook_active` (read, not run).
 

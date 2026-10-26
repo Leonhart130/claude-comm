@@ -4438,7 +4438,7 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 // be, so nothing but the ancestry test can refuse it. Each refused, nothing armed. FINDINGS.md#relay
 {
 	const r95 = mkdtempSync(join(tmpdir(), "comm-attack-relay-"))
-	const opened95 = [], ARMS = ["nominal", "typed", "dialog", "guard", "noclear", "untaken", "grace"], REFUSED = ["nosay", "noguard", "nested"], SC = [...ARMS, ...REFUSED]
+	const opened95 = [], ARMS = ["nominal", "typed", "dialog", "guard", "noclear", "untaken", "grace", "titled", "titledTyped"], REFUSED = ["nosay", "noguard", "nested"], SC = [...ARMS, ...REFUSED]
 	atExit(() => {
 		for (const [sock, id] of opened95)
 			try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
@@ -4458,10 +4458,11 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 		const c = JSON.parse(fs.readFileSync(process.argv[2], "utf8"))
 		fs.writeFileSync(c.keys, ""); fs.writeFileSync(c.pidFile, String(process.pid))
 		const RULE = "\x1b[38:2:136:136:136m" + "─".repeat(60) + "\x1b[39m"
+		const TOP = c.title ? "\x1b[38:2:136:136:136m" + "─".repeat(44) + ` ${c.title} ─` + "\x1b[39m" : RULE
 		let line = c.typed || "", tx = c.tx
 		const draw = () => process.stdout.write("\x1b[2J\x1b[H" + (c.dialog
 			? " Quick safety check: Is this a project you created or one you trust?\r\n\r\n ❯ No, exit\r\n   Yes, I trust this folder\r\n\r\n Enter to confirm · Esc to cancel\r\n"
-			: "\r\n\r\n" + RULE + "\r\n\x1b[m❯ " + (line || "\x1b[22;2mTry \"fake\"\x1b[22m") + "\r\n" + RULE + "\r\n  ⏵⏵ fake session\r\n"))
+			: "\r\n\r\n" + TOP + "\r\n\x1b[m❯ " + (line || "\x1b[22;2mTry \"fake\"\x1b[22m") + "\r\n" + RULE + "\r\n  ⏵⏵ fake session\r\n"))
 		draw()
 		if (process.stdin.setRawMode) process.stdin.setRawMode(true)
 		process.stdin.on("data", (d) => {
@@ -4512,7 +4513,7 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 		for (const k of SC) {
 			const c = { keys: join(r95, `${k}.keys`), pidFile: join(r95, `${k}.pid`), go: join(r95, `${k}.go`), out: join(r95, `${k}.out`), cwd: join(r95, k),
 				tx: tx(k), tx2: tx2(k), next: join(r95, `${k}.next.json`), regDir: regDir95, clears: k !== "noclear", swallows: k === "untaken",
-				typed: k === "typed" ? "hello" : "", dialog: k === "dialog", boot: reg.bootId(), relay: R95, txNested: join(r95, "nested-inner.jsonl"),
+				typed: k === "typed" || k === "titledTyped" ? "hello" : "", dialog: k === "dialog", title: /^titled/.test(k) ? "leader expert" : "", boot: reg.bootId(), relay: R95, txNested: join(r95, "nested-inner.jsonl"),
 				// "nested": relay.mjs run by ANOTHER `claude` under this one - node under that name, so it is a session of its own
 				argv: k === "nested" ? [fake95, join(r95, "nested.cjs"), join(r95, `${k}.json`)] : [process.execPath, R95] }
 			writeFileSync(join(r95, `${k}.json`), JSON.stringify(c))
@@ -4568,6 +4569,23 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 		`${b95 ? "" : "THE ARM COULD NOT RUN: no kitty bench for this suite; "}` + Object.entries(ok).map(([k, v]) => `${k}=${v}`).join("; ") +
 		ARMS.map((k) => `; ${k}: keys ${JSON.stringify((keys(k) || "").slice(0, 60))} "${(why(k) || (rec(k).relayed ? "relayed" : "-")).slice(0, 70)}"`).join("") +
 		REFUSED.map((k) => `; ${k}: exit ${out(k).s} "${(out(k).e || "").split("\n")[0].slice(0, 60)}"`).join(""))
+	// A96 — A NAMED SESSION RELAYS TOO. A field's leader, 10-26, measured twice: a session the owner had named draws its
+	// name INTO the box's top edge (`──…── name ─`, 2.1.310, and still there after a /clear), the edge read as no rule,
+	// and the relay refused at a box empty and at rest - the owner typed /clear by hand at every handover. Measured here
+	// the same day on a real `claude -n` session in a minimized window, before and after /clear. Same bench, one variable
+	// against `nominal` (the title), and its pair against `typed`: a titled box holding text is still refused, so the
+	// title loosens the edge and nothing else. FINDINGS.md#relay
+	let after96 = ""
+	try { after96 = readFileSync(tx2("titled"), "utf8") } catch {}
+	const ok96 = {
+		titledRelayed: rec("titled").relayed === true && keys("titled") === `/clear\r${say("titled")}\r` && after96.includes(JSON.stringify(say("titled"))),
+		titledTypedRefused: untouched("titledTyped", /text is on the input line/),
+		control: ok.relayed && ok.typedRefused,
+	}
+	check("A96 a session whose name is drawn in its input box's top edge relays, and a titled box holding text still refuses",
+		!!b95 && Object.values(ok96).every(Boolean),
+		`${b95 ? "" : "THE ARM COULD NOT RUN: no kitty bench for this suite; "}` + Object.entries(ok96).map(([k, v]) => `${k}=${v}`).join("; ") +
+		["titled", "titledTyped"].map((k) => `; ${k}: keys ${JSON.stringify((keys(k) || "").slice(0, 60))} "${(why(k) || (rec(k).relayed ? "relayed" : "-")).slice(0, 70)}"`).join(""))
 }
 
 // A90 — A `send` RINGS AN IDLE RECIPIENT AT ONCE, NOT AT THE SENDER'S TURN END. Work's leader, 2026-10-24: a bell to

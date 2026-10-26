@@ -533,12 +533,16 @@ export function awaitTurnEnd({ pid, transcript, offset = 0, lookup = null, grace
 const SGR = /\x1b\[[0-9;:]*m/g
 const plain = (l) => l.replace(SGR, "")
 const isRule = (l) => /^─{10,}\s*$/.test(plain(l).trim())
+// A NAMED session (`claude -n`, `/rename`) draws its name INTO the top edge, `──…── name ─`, and keeps it across a /clear:
+// a field's relay refused twice on 10-26 at a box empty and at rest (FINDINGS.md#relay, 2.1.310). The lower edge was
+// measured untitled, so only the top accepts a title. A96
+const isTopRule = (l) => isRule(l) || /^─{10,} .*\S ─+$/.test(plain(l).trim())
 /** { ok: true } when the screen shows Claude Code's input box at the bottom, empty; else { ok: false, why }. */
 export function promptAtRest(screen) {
 	const lines = String(screen || "").split("\n")
 	while (lines.length && !plain(lines[lines.length - 1]).trim()) lines.pop()
 	let top = -1
-	for (let i = lines.length - 1; i > 0; i--) if (/^❯[  ]/.test(plain(lines[i])) || plain(lines[i]) === "❯") { if (isRule(lines[i - 1])) { top = i; break } }
+	for (let i = lines.length - 1; i > 0; i--) if (/^❯[  ]/.test(plain(lines[i])) || plain(lines[i]) === "❯") { if (isTopRule(lines[i - 1])) { top = i; break } }
 	if (top < 0) return { ok: false, why: "no input box on screen (a dialog, a menu, or not Claude Code's prompt)" }
 	let bottom = -1
 	for (let j = top + 1; j < lines.length; j++) if (isRule(lines[j])) { bottom = j; break }

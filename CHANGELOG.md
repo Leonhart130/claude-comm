@@ -25,6 +25,14 @@ already have.
 
 
 
+
+## 2026-10-26.1 — bus print `2bb029b3c62f` — 2026-10-26
+
+- **`relay.mjs` now works in a NAMED session.** A session named with `claude -n` or `/rename` draws its name in the top
+  edge of the input box, and the relay read that edge as "no input box on screen" and refused, with nothing typed. If
+  your `.comm/relay/<agent>.json` says `refused: … no input box …` while your box was empty, this was it: arm the relay
+  again, no other change on your side. A box holding text is still refused, named or not.
+
 ## 2026-10-25.7 — bus print `ad6706f0e0d8` — 2026-10-25
 
 - **Your skill now says how to restart yourself.** Its section "Restarting yourself" used to say *"It does not
