@@ -8,8 +8,8 @@ fold the settled parts into the README.
 *(2026-10-30 20h51 CET by `date`. **WORK IS THE MAIN FIELD**; the owner's word stands: *"tu peux utiliser tout l'usage
 jusque 100%"*. This session: the owner's ask through rigel (10-27) - own the bell's fix - SHIPPED as `2026-10-30.1`.)*
 
-0. **Read the field's answer first.** rigel's leader was rung at 18h58 with `exchange/field/out/…18h58-…-la-cloche-lit-l-ecran.md`
-   (it took the bell: `working`). It answers all four of its letters. Any reply lands in `field/in/`.
+0. **The field answered (10-30 20h52)**: `.1` installed, its local bell patch dropped, both dead
+   claims released. Nothing asked. Not yet seen there: a bell refused on a busy box, a lone Enter - it writes if one comes.
 1. **A relay cancelled for any reason but mail still tells nobody** (rigel 10-26 14h17: an expert idled at 192 k).
    The shape: the Stop of the turn that cancelled it says so to the agent. `Stop` is the hot path: own change, own arm,
    `selftest` both ways. `FINDINGS.md#relay`, last paragraph.
@@ -20,10 +20,12 @@ jusque 100%"*. This session: the owner's ask through rigel (10-27) - own the bel
    memory in `who` (outside who.mjs - the bus is ~50 754 of 58 000 B), "closed" vs "crashed" from `.comm/close/`.
 4. **Arm LESSONS §8**: the `channel:` row compares my outgoing letters' written time with the file's (>10 min warns).
 5. **Letters waiting for a bell**: deneb's and atlas's - `node bin/exchange-bell.mjs --peer <channel> --ref <file>` when
-   their leaders run (the bell now reads the screen first, rule 8).
+   their leaders run.
 6. **Unarmed: the generated SKILL names every tool.** A92 gates the README's reference only.
 7. **`boot --prove-red` is ~1 h** because `--only` cuts output, not work. 10-30 used a scratch harness that runs ONE
    block in its fixture (`FINDINGS.md#stranded-named`, last paragraph) - make that `--only` itself (C).
+8. **`channel:` prints "arrived 20h ago" for a letter 1 min old**: its age is the NAME's date at 00:00Z (`stampOfName`),
+   right for ordering, wrong as an arrival. Show the mtime there, or "dated <day>".
 
 **Done 10-30** (`b5859df` `.1`, `9b76066`): **wake's rule 8** - the bell reads the screen and never types into
 somebody's words (A98, 9 mutants; `#bell-into-typing` FIXED), the exchange bell too; `relay.mjs` refuses to arm on
