@@ -19,7 +19,7 @@
  * an idle session take a turn, and the turn's own Stop hook does the delivery that was
  * already gated.
  *
- * Seven rules, each of which is a way this could have been built wrong:
+ * Eight rules, each of which is a way this could have been built wrong:
  *
  * 1. **RESOLVE, THEN SEND. NEVER `send-text --match` ON A GUESS.** `kitten @ send-text
  *    --match` **exits 0 when it matches nothing**, so a wake aimed at a session that is
@@ -57,6 +57,12 @@
  *    NEVER A LEADER.** Resuming a 600 k context after its 1 h cache expired re-writes all of it;
  *    a `/clear` keeps the process, its model, its effort and its window, and the agent rebuilds
  *    from its files. It counts only when the registry names a NEW transcript for the pid.
+ *
+ * 8. **NEVER TYPE INTO SOMEBODY'S WORDS.** Rule 6 asks whether the AGENT works; in a window a person
+ *    talks in, an idle agent is exactly when they type to it. Only the screen knows: the input box must
+ *    be on it, at rest and empty (`promptAtRest`, the relay's own reader), or nothing is typed and
+ *    nothing recorded. A box holding only an earlier bell whose Enter was lost gets the Enter alone.
+ *    `FINDINGS.md#bell-into-typing`, A98.
  */
 import { readFileSync, writeFileSync, appendFileSync, renameSync, readdirSync, mkdirSync, existsSync, statSync, openSync, readSync, closeSync, readlinkSync } from "node:fs"
 import { join, dirname } from "node:path"
@@ -548,13 +554,26 @@ export function promptAtRest(screen) {
 	for (let j = top + 1; j < lines.length; j++) if (isRule(lines[j])) { bottom = j; break }
 	if (bottom < 0) return { ok: false, why: "the input box has no lower edge on screen" }
 	if (lines.length - 1 - bottom > 6) return { ok: false, why: `the input box is not at the bottom of the screen (${lines.length - 1 - bottom} lines below it): something is drawn under it` }
-	for (let j = top + 1; j < bottom; j++) if (plain(lines[j]).trim()) return { ok: false, why: "the input holds more than one line of text" }
 	const rest = lines[top].replace(/^(\x1b\[[0-9;:]*m)*❯[  ]?/, "")
+	// `typed` + `text`, every line of the box: wake must tell its OWN unsent bell from a person's words (rule 8)
+	const text = [rest, ...lines.slice(top + 1, bottom)].map((l) => plain(l).trim()).filter(Boolean).join(" ")
+	for (let j = top + 1; j < bottom; j++) if (plain(lines[j]).trim()) return { ok: false, typed: true, text, why: "the input holds more than one line of text" }
 	if (!plain(rest).trim()) return { ok: true }
 	// a placeholder: the text after the mark starts DIM (SGR parameter 2), and is the only text there
 	if (/^\x1b\[(?:[0-9:]*;)*2(?:;[0-9:]*)*m/.test(rest)) return { ok: true, placeholder: plain(rest).trim().slice(0, 60) }
-	return { ok: false, why: `somebody's text is on the input line: "${plain(rest).trim().slice(0, 40)}"` }
+	return { ok: false, typed: true, text, why: `somebody's text is on the input line: "${plain(rest).trim().slice(0, 40)}"` }
 }
+
+/** promptAtRest on the window's screen, read now. A screen that cannot be read is NOT at rest. */
+export function screenAtRest(win) {
+	const s = spawnSync("kitten", ["@", "--to", `unix:${win.sock}`, "get-text", "--ansi", "--match", `id:${win.id}`], { encoding: "utf8", timeout: 5000 })
+	if (s.status !== 0 || s.error) return { ok: false, why: `its screen could not be read (kitten @ get-text ${s.error ? s.error.code : `exit ${s.status}`})` }
+	return promptAtRest(s.stdout)
+}
+// A bell typed but never submitted (a field, 10-26: its text sat in the box, `comm sent` PENDING) is recognised whole,
+// wrapped or not; anything more in the box is somebody's words.
+const squash = (s) => String(s).replace(/\s+/g, "")
+const isOwnBell = (text) => typeof text === "string" && (squash(text) === squash(NUDGE) || squash(text) === squash(FRESH_NUDGE))
 
 /**
  * Does the RUNTIME keep a record of this session - <config>/sessions/<pid>.json, the file who.mjs's turnOf reads its
@@ -578,7 +597,7 @@ export function runtimeRecord(pid) {
 }
 
 export function wakeAgent(root, agent, pid, { dryRun = false, wins, turn = null, cfg = null, lookup = null, sendText = null,
-	allowClear = true, confirmMs = FRESH_CONFIRM_MS, fresh = {}, started = runtimeRecord } = {}) {
+	allowClear = true, confirmMs = FRESH_CONFIRM_MS, fresh = {}, started = runtimeRecord, screen = screenAtRest } = {}) {
 	const prev = lastWake(root, agent)
 	// THE QUIET PERIOD GUARDS A RING THAT HAS NOT WORKED YET - not every ring. A recipient that took a turn AFTER the
 	// last ring and is idle again has consumed it: a second message within 120 s was swallowed and nothing ever retried
@@ -610,16 +629,30 @@ export function wakeAgent(root, agent, pid, { dryRun = false, wins, turn = null,
 	// Rule 1. A refusal, never a hopeful --match.
 	if (!r.ok) return { agent, pid, sent: false, why: r.why, ...seen, ...said }
 	if (dryRun) return { agent, pid, sent: false, dryRun: true, window: r.win.id, socket: r.win.sock, how: r.how, wouldClear: decision.clear, ...seen, ...said }
+	// 🔴 RULE 8, NEVER TYPE INTO SOMEBODY'S WORDS (header). Read after the refusals above, so they cost no screen read.
+	// Not recorded, like rule 6: the next hook looks again, and a person who submits their own prompt has the mail handed
+	// over at that turn's Stop. The sender is never told WHAT is typed there - it is somebody else's unsent text.
+	const rest = screen(r.win)
+	const ownUnsent = !rest.ok && rest.typed === true && isOwnBell(rest.text)
+	if (!rest.ok && !ownUnsent) return { agent, pid, sent: false, notAtRest: true, ...seen, ...said,
+		why: `not rung, its input is not at rest: ${rest.typed ? "text is on its input line (a person typing, or a draft left there) - never typed into" : rest.why}` }
 	// ONE CLEAR PER RUN. A Stop hook kills this process after 10 s, and a confirmation may wait 4: a second
 	// clear could be typed and never proved or rung. The agent cleared first takes a turn, and ITS Stop hook
 	// runs wake again for the next one. Not rung meanwhile - ringing it now is the cold resume rule 7 avoids.
-	if (decision.clear && !allowClear) return { agent, pid, sent: false, deferred: true, why: `a fresh restart is due (${decision.why}) and this run already typed one - left for the next turn boundary, not rung cold`, ...seen, ...said }
+	if (decision.clear && !allowClear && !ownUnsent) return { agent, pid, sent: false, deferred: true, why: `a fresh restart is due (${decision.why}) and this run already typed one - left for the next turn boundary, not rung cold`, ...seen, ...said }
 	const send = sendText ? (text) => sendText(r.win, text)
 		: (text) => spawnSync("kitten", ["@", "--to", `unix:${r.win.sock}`, "send-text", "--match", `id:${r.win.id}`, text], { encoding: "utf8", timeout: 5000 })
 	const ring = { at: new Date().toISOString(), agent, pid, window: r.win.id, turn: turn ? turn.state : null, cleared: null }
 	const done = (rang, extra) => {
 		noteWake(root, agent, { at: ring.at, agent, pid, window: r.win.id })
 		noteRing(root, { ...ring, rang, ...extra })
+	}
+	// An earlier bell is the WHOLE box: its Enter was lost, so the Enter alone goes - never a /clear or a second bell on it.
+	if (ownUnsent) {
+		const e = send("\r")
+		if (e.status !== 0) return { agent, pid, sent: false, why: `send-text failed: ${(e.stderr || "").trim().slice(0, 80)}`, ...seen, ...said }
+		done(true, { text: "enter", resubmitted: true })
+		return { agent, pid, sent: true, resubmitted: true, window: r.win.id, socket: r.win.sock, how: r.how, ...seen, ...said }
 	}
 	let text = NUDGE, clearTyped = false
 	if (decision.clear) {
@@ -633,6 +666,15 @@ export function wakeAgent(root, agent, pid, { dryRun = false, wins, turn = null,
 				done(false, { after: again.state })
 				return { agent, pid, sent: false, cleared: false, clearTyped, clearWhy: c.why, ...seen, ...said,
 					why: `${c.why}, and the session now reads ${again.state} (${again.why}): the keystrokes started a turn, probably on a half-typed line, so no ring goes on top` }
+			}
+		}
+		// the clear took up to `confirmMs`: rule 8 is asked again before the bell, as the relay asks before its prompt
+		if (clearTyped) {
+			const now = screen(r.win)
+			if (!now.ok) {
+				done(false, { after: "not at rest" })
+				return { agent, pid, sent: false, notAtRest: true, cleared: ring.cleared, clearTyped, clearWhy: ring.clearWhy, ...seen, ...said,
+					why: `not rung after the clear, its input is not at rest: ${now.typed ? "text is on its input line" : now.why}` }
 			}
 		}
 	}
@@ -700,7 +742,7 @@ async function main() {
 				: r.turn === "ending" ? " · its reply had just ended" : ""
 			const fresh = r.cleared === true ? ` · ${r.clearWhy}` : r.cleared === false ? ` · ⚠ ${r.clearWhy}`
 				: r.wouldClear ? ` · would restart it fresh first (${r.freshWhy})` : r.freshWhy ? ` · no fresh restart: ${r.freshWhy}` : ""
-			console.log(r.sent ? `  ● woke ${r.agent} (pid ${r.pid}) in window ${r.window} — ${r.how}${note}${fresh}`
+			console.log(r.sent ? `  ● woke ${r.agent} (pid ${r.pid}) in window ${r.window} — ${r.how}${note}${fresh}${r.resubmitted ? " · Enter only: an earlier bell sat unsent in its box" : ""}`
 				: `  ○ ${r.agent}: ${r.dryRun ? `would wake in window ${r.window} (${r.how})${note}${fresh}` : r.why}`)
 		}
 		if (report.length) console.log("  fresh restart, for every agent in freshRestart (dry run — nothing typed):\n" +

@@ -3146,6 +3146,28 @@ read-only toward other projects' sessions. **The owner's answer, the same minute
 to him.** So the bell stays in use and the defect stays named - it is harmless while he is the one it interrupts and
 he sees it happen, and it is the same defect the day it truncates something that mattered.
 
+**FIXED 2026-10-30, `2026-10-30.1` - wake's rule 8, A98.** It came back through a field: rigel's leader counted four of
+the owner's messages cut on 10-26 evening, three to its leader - `wake` this time, the same blindness, and once into a
+SHELL after Claude Code was suspended (Ctrl+Z) in a window with no shell under it. That leader wrote a local patch
+(`screenAtRest` -> `promptAtRest`, the relay's own reader) and the owner had it handed to me to own
+(`exchange/field/in/…-2026-10-27-cloche-dans-la-saisie.md`). Taken, with three differences: (1) the sender
+is never told WHAT is in the box - the patch put the person's unsent words in the `why` every sender reads; (2) a box
+holding ONLY an earlier bell gets the Enter alone - the same field saw a bell typed and its Enter lost (10-26 14h17), and
+with the patch alone that box would refuse every later ring for good; anything more in it is somebody's words; (3) after
+a rule-7 `/clear` the screen is read again before the bell, as the relay reads it before its prompt. And the exchange
+bell - the one that cut him on 09-27 - reads it too. Not at rest: nothing typed, nothing recorded, the next hook looks
+again; a person who submits their own prompt has the mail handed over at that turn's Stop.
+**A98**, five bench sessions, one variable each against an empty box (the bell arrives): half-typed, no box, the unsent
+bell alone (`\r` and only that), that bell + words; the exchange bell into the half-typed box and into the empty one;
+the bell drawn on three HARD lines (Claude Code's wrap, which the bench's soft wrap never shows); an unreadable screen.
+Eight mutants, baseline green, each reddening its own condition: rule 8 off, own bell never / as a prefix, the `why`
+quoting the text, unreadable read as at rest, first line only, the exchange bell's check off (A98); the post-clear read
+off (A63's new leg). **A98's first run went red on the BENCH, not the code**: split beside the earlier arms' panes, a
+pane was a few rows high and the long box's top had scrolled off its screen - each A98 pane now has its own tab.
+**Still open:** the read-to-type gap (milliseconds); a dry run does not read the screen; Ctrl+Z in a shell-less window is
+avoided, not cured (`kill -CONT <pid>` brought it back there, nothing here detects it beyond "no input box"); what loses
+a bell's Enter is unmeasured.
+
 ## `#bell-mid-turn` — the exchange bell said it reused wake's rules, and never read the turn
 
 **2026-09-13, found re-reading `bin/exchange-bell.mjs` before ringing atlas's leader with the `.6` letter.**
@@ -3740,6 +3762,16 @@ chosen: nothing typed. Not measured: a name containing `─`, a name long enough
 default (the fake draws the grey measured here).
 - **The field's Stop hook** (rigel's, at 150 k) must let the handover turn end: it does, it never blocks when
   `stop_hook_active` (read, not run).
+
+**10-26: a relay armed with mail waiting is CANCELLED, every time, and only its record knew.** rigel's leader (13h39):
+armed early in a busy turn; two Stop hooks blocked once (its own, and the bus's handing over a bell that had arrived),
+the turn resumed, and step 2 cancelled the relay - correctly, and too late for anyone to act. **Since `2026-10-30.1` the
+arming refuses while the agent's inbox holds mail** (exit 5, a dry run too), saying how to clear it: read, `dismiss`, arm
+again as the turn's last act. A95's `mail` leg, one message in the inbox and nothing else apart from `nominal`; mutated
+(the check skipped), it reddens `mailRefused` alone. Mail that arrives AFTER the arming still cancels it. **Not built,
+named:** a relay cancelled for any other reason - somebody typed, or (their hypothesis, unverified here) a background
+sub-agent's completion notice delivered as input - still tells nobody but its record: their expert idled at 192 k until
+its leader typed `/clear` by hand (14h17). Telling the agent at that turn's Stop is the shape; it is the hot path.
 
 ## `#settings-inheritance` — an expert runs its leader's `settings.local.json`, not its `settings.json` (2026-09-27)
 

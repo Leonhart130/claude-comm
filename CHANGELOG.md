@@ -26,6 +26,17 @@ already have.
 
 
 
+
+## 2026-10-30.1 — bus print `fb91b29cbcf6` — 2026-10-30
+
+- **The doorbell no longer types into somebody's words.** Before it types, it reads the window: the input box must be on
+  screen, at rest and empty. Text in the box (somebody writing, or a draft left there), a dialog, a suspended session:
+  nothing is typed and nothing recorded - the next hook looks again, and your mail is handed over at your next turn's
+  end anyway. A box holding only an earlier doorbell whose Enter was lost gets the Enter alone.
+- **`relay.mjs` refuses to arm while mail waits for you** (exit 5): your Stop hook would hand it over, your turn would
+  resume, and that cancels a relay. Read it (`comm.mjs inbox` names each file), `comm.mjs dismiss` once read, then arm
+  again as your last act. Mail that arrives after the arming still cancels it, and `.comm/relay/<agent>.json` says so.
+
 ## 2026-10-26.1 — bus print `2bb029b3c62f` — 2026-10-26
 
 - **`relay.mjs` now works in a NAMED session.** A session named with `claude -n` or `/rename` draws its name in the top

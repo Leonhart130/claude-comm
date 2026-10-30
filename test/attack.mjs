@@ -3019,6 +3019,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 			who: () => ({ agents: { leader: { pids: [4242] } } }),
 			lookup: () => miss ? { ok: false, why: "pid 4242 is not in the session registry" } : { ok: true, transcript: tr },
 			send: (_win, t) => { typed.push(t); return { status: 0, stderr: "" } },
+			screen: () => ({ ok: true }),   // an empty box: rule 8 is A98's, not this arm's
 		})
 		return { ...r, typed, recorded: existsSync(join(ex, "peer", ".last-bell.json")) }
 	}
@@ -3857,6 +3858,10 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 		if (existsSync(out)) try { return JSON.parse(readFileSync(out, "utf8")) } catch {}
 	return { status: null, stdout: "", stderr: `bench: job ${n} had no answer in ${timeout} ms` }
 }
+// THE IDLE PROMPT A FAKE SESSION DRAWS, empty, as Claude Code draws it. Since wake's rule 8 (A98) a bell reads the screen
+// before it types: a fake that drew nothing reads "no input box", and every arm whose bell must ARRIVE would redden on
+// the screen instead of on the property it names.
+const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯ \\r\\n"+"─".repeat(60)+"\\r\\n");`
 
 // A50 — the launcher SPLITS the caller's tab, captures the window id, and marks the window.
 //
@@ -4213,7 +4218,7 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 	if (b87) {
 		const ls = join(r87, "leader.cjs")
 		// a STARTED session: it keeps a runtime record, or A88's guard would rightly refuse to type into it
-		writeFileSync(ls, `const fs=require("fs");fs.writeFileSync(${JSON.stringify(join(cfg87, "sessions"))}+"/"+process.pid+".json","{}");` +
+		writeFileSync(ls, `const fs=require("fs");fs.writeFileSync(${JSON.stringify(join(cfg87, "sessions"))}+"/"+process.pid+".json","{}");` + DRAW_IDLE_BOX +
 			`fs.writeFileSync(${JSON.stringify(typed)},"");` +
 			`if(process.stdin.setRawMode)process.stdin.setRawMode(true);process.stdin.on("data",(d)=>fs.appendFileSync(${JSON.stringify(typed)},d));` +
 			`setTimeout(()=>process.exit(0),60000)`)
@@ -4274,7 +4279,7 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 	let unreadable, unreadableRings = false, foreign
 	if (b88) {
 		const script = join(r88, "db.cjs")
-		writeFileSync(script, `const fs=require("fs");fs.writeFileSync(${JSON.stringify(pidFile)},String(process.pid));fs.writeFileSync(${JSON.stringify(typed)},"");` +
+		writeFileSync(script, `const fs=require("fs");fs.writeFileSync(${JSON.stringify(pidFile)},String(process.pid));fs.writeFileSync(${JSON.stringify(typed)},"");` + DRAW_IDLE_BOX +
 			`if(process.stdin.setRawMode)process.stdin.setRawMode(true);process.stdin.on("data",(d)=>fs.appendFileSync(${JSON.stringify(typed)},d));` +
 			`setTimeout(()=>process.exit(0),60000)`)
 		const id = Number(spawnSync("kitten", ["@", "--to", `unix:${b88.sock}`, "launch", "--type=window", "--keep-focus", ...besideMe(b88),
@@ -4435,10 +4440,11 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 // follow), a prompt the session swallows (typed, never in the transcript: NOT relayed), a prompt in the grace. At the
 // arming: no first prompt (the refusal hands back the config line to type), no guard, and a session inside a session -
 // one WITH a registry entry of its own and in the window's foreground list, as a `claude -p` the session spawned would
-// be, so nothing but the ancestry test can refuse it. Each refused, nothing armed. FINDINGS.md#relay
+// be, so nothing but the ancestry test can refuse it; and mail already waiting (its Stop hook would resume the turn and
+// cancel the relay - a field's, 10-26). Each refused, nothing armed. FINDINGS.md#relay
 {
 	const r95 = mkdtempSync(join(tmpdir(), "comm-attack-relay-"))
-	const opened95 = [], ARMS = ["nominal", "typed", "dialog", "guard", "noclear", "untaken", "grace", "titled", "titledTyped"], REFUSED = ["nosay", "noguard", "nested"], SC = [...ARMS, ...REFUSED]
+	const opened95 = [], ARMS = ["nominal", "typed", "dialog", "guard", "noclear", "untaken", "grace", "titled", "titledTyped"], REFUSED = ["nosay", "noguard", "nested", "mail"], SC = [...ARMS, ...REFUSED]
 	atExit(() => {
 		for (const [sock, id] of opened95)
 			try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
@@ -4450,6 +4456,9 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 	writeFileSync(join(r95, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", ...Object.fromEntries(SC.map((k) => [k, k])) },
 		relay: Object.fromEntries(SC.filter((k) => k !== "nosay").map((k) => [k, k === "noguard" ? say(k) : { say: say(k), guard: "test -f HANDOFF.md" }])) }))
 	for (const f of ["relay.mjs", "wake.mjs", "session-registry.mjs"]) cpSync(join(PKG, "bin", f), join(r95, ".comm", "bin", f))
+	// `mail`: one message waits in its inbox at the arming - the only thing it has that `nominal` has not
+	mkdirSync(join(r95, ".comm", "inbox", "mail"), { recursive: true })
+	writeFileSync(join(r95, ".comm", "inbox", "mail", "a95-mail.json"), JSON.stringify({ id: "a95-mail", from: "leader", to: "mail", ref: "HANDOFF.md", kind: "fyi" }))
 	const R95 = join(r95, ".comm", "bin", "relay.mjs"), rt95 = join(r95, "runtime"), regDir95 = join(rt95, "claude-comm", "sessions"), fake95 = join(r95, "claude")
 	try { symlinkSync(process.execPath, fake95) } catch {}
 	// the fake session's source is this function's: no escaping between two languages, and it reads its scenario from argv[2]
@@ -4517,7 +4526,9 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 				// "nested": relay.mjs run by ANOTHER `claude` under this one - node under that name, so it is a session of its own
 				argv: k === "nested" ? [fake95, join(r95, "nested.cjs"), join(r95, `${k}.json`)] : [process.execPath, R95] }
 			writeFileSync(join(r95, `${k}.json`), JSON.stringify(c))
-			const id = Number(spawnSync("kitten", ["@", "--to", `unix:${b95.sock}`, "launch", "--type=window", "--keep-focus", ...besideMe(b95),
+			// `mail` is refused before any screen is read: its own tab, so the panes that ARE read are not made smaller (A98)
+			const where = k === "mail" ? ["--type=tab", "--match", `window_id:${b95.id}`] : ["--type=window", ...besideMe(b95)]
+			const id = Number(spawnSync("kitten", ["@", "--to", `unix:${b95.sock}`, "launch", "--keep-focus", ...where,
 				`--cwd=${join(r95, k)}`, `--env=CLAUDE_COMM_RUNTIME=${rt95}`, fake95, join(r95, "fake.cjs"), join(r95, `${k}.json`)], { encoding: "utf8", timeout: 10000 }).stdout)
 			if (Number.isInteger(id) && id > 0) opened95.push([b95.sock, id])
 			S95[k] = { id: Number.isInteger(id) && id > 0 ? id : null, c, pid: 0 }
@@ -4563,6 +4574,8 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 		nosayRefused: out("nosay").s === 2 && /no first prompt/.test(out("nosay").e || "") && /"relay": \{"nosay": /.test(out("nosay").e || "") && !S95.nosay.rec,
 		noguardRefused: out("noguard").s === 2 && /no guard/.test(out("noguard").e || "") && !S95.noguard.rec,
 		nestedRefused: out("nested").s === 2 && /inside another claude session/.test(out("nested").e || "") && !S95.nested.rec,
+		// rigel's leader, 10-26: armed with mail waiting, the Stop hook resumed the turn and the relay was cancelled unseen
+		mailRefused: out("mail").s === 5 && /1 message\(s\) wait for 'mail'/.test(out("mail").e || "") && /dismiss/.test(out("mail").e || "") && !S95.mail.rec,
 	}
 	check("A95 a session relays itself after its turn - /clear proved, its prompt proved - and types nothing a step cannot prove",
 		!!b95 && Object.values(ok).every(Boolean),
@@ -4623,7 +4636,7 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 	let up = false, sent = false, quietExit = null, quietTyped = null, quietRang = null, loudExit = null, arrived = false
 	if (b90) {
 		writeFileSync(join(r90, "db.cjs"), `const fs=require("fs");fs.writeFileSync(${JSON.stringify(pidFile)},String(process.pid));` +
-			`fs.writeFileSync(${JSON.stringify(join(r90, "cfg", "sessions"))}+"/"+process.pid+".json","{}");fs.writeFileSync(${JSON.stringify(typed)},"");` +
+			`fs.writeFileSync(${JSON.stringify(join(r90, "cfg", "sessions"))}+"/"+process.pid+".json","{}");fs.writeFileSync(${JSON.stringify(typed)},"");` + DRAW_IDLE_BOX +
 			`if(process.stdin.setRawMode)process.stdin.setRawMode(true);process.stdin.on("data",(d)=>fs.appendFileSync(${JSON.stringify(typed)},d));setTimeout(()=>process.exit(0),60000)`)
 		const id = Number(spawnSync("kitten", ["@", "--to", `unix:${b90.sock}`, "launch", "--type=window", "--keep-focus", ...besideMe(b90),
 			`--cwd=${join(r90, "db")}`, "--env=CLAUDE_COMM_AGENT=db", `--env=CLAUDE_CONFIG_DIR=${join(r90, "cfg")}`, fake90, join(r90, "db.cjs")], { encoding: "utf8", timeout: 10000 }).stdout)
@@ -4653,6 +4666,131 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 		`a fresh send typed as 'node $C send' -> exit ${loudExit}, the bell ARRIVED=${arrived}`)
 }
 
+// A98 — THE BELL NEVER TYPES INTO SOMEBODY'S WORDS. The owner's message was cut by the exchange bell on 09-27
+// (`#bell-into-typing`), and four more times in a field on 10-26 by wake: the AGENT's turn was over, so it typed - into
+// what a PERSON was writing, and once into a shell after Claude Code was suspended. Wake's rule 8 reads the screen.
+// Real kitty panes in the bench, each a fake STARTED session that draws its input box one way and records every byte
+// typed into it; mail waits for each; ONE real `wake.mjs` run rings them all, as a hook would. One variable per pane,
+// against the empty box (the positive control: the bell arrives): text half-typed, no box at all, a box holding only an
+// earlier bell whose Enter was lost (Enter alone must go), and that bell with a person's words after it. Then the
+// exchange bell, real screen, into the half-typed pane and into the empty one. Every pane's screen is first read by
+// promptAtRest, so a bench that drew the wrong thing fails as unarmed instead of passing.
+{
+	const r98 = mkdtempSync(join(tmpdir(), "comm-attack-intowords-"))
+	const opened98 = []
+	atExit(() => {
+		for (const [sock, id] of opened98)
+			try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
+		try { rmSync(r98, { recursive: true, force: true }) } catch {}
+	})
+	const wk98 = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
+	const eb98 = await import(pathToFileURL(join(PKG, "bin", "exchange-bell.mjs")).href)
+	const PANES = { empty: "", typed: "bonjour je voul", nobox: null, own: wk98.NUDGE, ownplus: `${wk98.NUDGE} et puis` }
+	mkdirSync(join(r98, ".comm", "bin"), { recursive: true })
+	mkdirSync(join(r98, "cfg", "sessions"), { recursive: true })
+	for (const k of Object.keys(PANES)) { mkdirSync(join(r98, k), { recursive: true }); writeFileSync(join(r98, k, "BRIEF.md"), "go\n") }
+	writeFileSync(join(r98, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", ...Object.fromEntries(Object.keys(PANES).map((k) => [k, k])) } }))
+	for (const f of ["comm.mjs", "who.mjs", "wake.mjs", "session-registry.mjs"]) cpSync(join(PKG, "bin", f), join(r98, ".comm", "bin", f))
+	const fake98 = join(r98, "claude")
+	try { symlinkSync(process.execPath, fake98) } catch {}
+	function boxFake() {
+		const fs = require("fs")
+		const c = JSON.parse(fs.readFileSync(process.argv[2], "utf8"))
+		fs.writeFileSync(c.keys, "")
+		fs.writeFileSync(`${c.sessions}/${process.pid}.json`, "{}")   // a STARTED session (A88)
+		const RULE = "─".repeat(60)
+		process.stdout.write(c.line === null ? "\r\nzsh: suspended  claude\r\n% fg\r\n" : `\r\n${RULE}\r\n❯ ${c.line}\r\n${RULE}\r\n  ⏵⏵ fake session\r\n`)
+		if (process.stdin.setRawMode) process.stdin.setRawMode(true)
+		process.stdin.on("data", (d) => fs.appendFileSync(c.keys, d))
+		fs.writeFileSync(c.pidFile, String(process.pid))
+		setTimeout(() => process.exit(0), 60000)
+	}
+	writeFileSync(join(r98, "fake.cjs"), `(${boxFake.toString()})()\n`)
+	const keysOf = (k) => { try { return readFileSync(join(r98, `${k}.keys`), "utf8") } catch { return null } }
+	const b98 = await bench()
+	const P = {}
+	if (b98) {
+		for (const [k, line] of Object.entries(PANES)) {
+			writeFileSync(join(r98, `${k}.json`), JSON.stringify({ keys: join(r98, `${k}.keys`), pidFile: join(r98, `${k}.pid`), sessions: join(r98, "cfg", "sessions"), line }))
+			// each its own TAB in the bench's OS window: split beside the earlier arms' panes, a pane was a few rows high and
+			// the box's top had scrolled off its screen - the first run read "no input box" for the two long legs
+			const id = Number(spawnSync("kitten", ["@", "--to", `unix:${b98.sock}`, "launch", "--type=tab", "--keep-focus", "--match", `window_id:${b98.id}`,
+				`--cwd=${join(r98, k)}`, `--env=CLAUDE_COMM_AGENT=${k}`, `--env=CLAUDE_CONFIG_DIR=${join(r98, "cfg")}`, fake98, join(r98, "fake.cjs"), join(r98, `${k}.json`)],
+				{ encoding: "utf8", timeout: 10000 }).stdout)
+			if (Number.isInteger(id) && id > 0) opened98.push([b98.sock, id])
+			P[k] = { id: Number.isInteger(id) && id > 0 ? id : null, pid: 0 }
+		}
+		for (const until = Date.now() + 8000; Date.now() < until && Object.values(P).some((p) => !p.pid); nap(100))
+			for (const k of Object.keys(P)) if (!P[k].pid) try { P[k].pid = Number(readFileSync(join(r98, `${k}.pid`), "utf8")) } catch {}
+	}
+	const up = !!b98 && Object.values(P).every((p) => p.id && p.pid)
+	// THE BENCH IS ARMED only if each pane's screen reads as drawn
+	const verdict = {}
+	if (up) { nap(300); for (const k of Object.keys(P)) verdict[k] = wk98.screenAtRest({ sock: b98.sock, id: P[k].id }) }
+	const armed = up && verdict.empty.ok === true && verdict.typed.typed === true && verdict.nobox.ok === false && !verdict.nobox.typed &&
+		verdict.own.typed === true && verdict.ownplus.typed === true
+	let results = [], sentAll = false
+	const res = (k) => results.find((r) => r.agent === k) || null
+	if (up) {
+		const env = { ...process.env, CLAUDE_COMM_AGENT: "leader" }
+		sentAll = Object.keys(P).every((k) => spawnSync(process.execPath, [join(r98, ".comm", "bin", "comm.mjs"), "send", k, "--ref", "BRIEF.md", "--note", "a98"], { cwd: r98, encoding: "utf8", env }).status === 0)
+		try { results = JSON.parse(spawnSync(process.execPath, [join(r98, ".comm", "bin", "wake.mjs"), "--root", r98, "--json"], { cwd: r98, encoding: "utf8", env, timeout: 30000 }).stdout).results } catch {}
+		for (const until = Date.now() + 8000; Date.now() < until && !(/claude-comm/.test(keysOf("empty") || "") && keysOf("own") === "\r"); nap(100)) {}
+		nap(1200)   // what may NOT arrive is given the same time to arrive as what must
+	}
+	const quietOf = (k) => existsSync(join(r98, ".comm", "wake", `${k}.json`))
+	const refused = (k) => !!res(k) && res(k).sent === false && res(k).notAtRest === true && keysOf(k) === "" && !quietOf(k)
+	const controlOk = !!res("empty") && res("empty").sent === true && /claude-comm/.test(keysOf("empty") || "") && quietOf("empty")
+	const typedOk = refused("typed") && /input line/.test(res("typed").why) && !/bonjour/.test(JSON.stringify(res("typed")))
+	const noboxOk = refused("nobox") && /no input box/.test(res("nobox").why)
+	const ownOk = !!res("own") && res("own").sent === true && res("own").resubmitted === true && keysOf("own") === "\r"
+	const ownPlusOk = refused("ownplus")
+	// the exchange bell: its own channel per leg, the real screen, kitty and send-text; the turn reads idle
+	let ebTyped = null, ebEmpty = null
+	if (up) {
+		const idleTx = join(r98, "idle.jsonl"), at = new Date(Date.now() - 5000).toISOString()
+		writeFileSync(idleTx, [{ type: "user", timestamp: at, message: { role: "user", content: "x" } },
+			{ type: "assistant", timestamp: at, message: { role: "assistant", model: "claude-opus-5", stop_reason: "end_turn", content: [{ type: "text", text: "x" }] } },
+			{ type: "system", subtype: "stop_hook_summary", timestamp: at }, { type: "system", subtype: "turn_duration", timestamp: at }].map((r) => JSON.stringify(r)).join("\n") + "\n")
+		const ring = async (k) => {
+			const ex = join(r98, `ex-${k}`)
+			mkdirSync(join(ex, "peer", "out"), { recursive: true }); mkdirSync(join(ex, "peer", "in"), { recursive: true })
+			writeFileSync(join(ex, "peer", "out", "LETTER.md"), "# a letter\n")
+			const r = await eb98.bell(["--exchange", ex, "--peer", "peer", "--ref", join(ex, "peer", "out", "LETTER.md"), "--project", r98, "--agent", k],
+				{ who: () => ({ agents: { [k]: { pids: [P[k].pid] } } }), lookup: () => ({ ok: true, transcript: idleTx }) })
+			return { ...r, recorded: existsSync(join(ex, "peer", ".last-bell.json")) }
+		}
+		const before = keysOf("empty")
+		ebTyped = await ring("typed")
+		ebEmpty = await ring("empty")
+		for (const until = Date.now() + 8000; Date.now() < until && !/cross-project/.test(keysOf("empty").slice(before.length)); nap(100)) {}
+		nap(800)
+		ebEmpty.arrived = /cross-project/.test(keysOf("empty").slice(before.length))
+	}
+	const ebOk = !!ebTyped && ebTyped.code === 3 && /not at rest/.test(ebTyped.out) && !ebTyped.recorded && keysOf("typed") === "" &&
+		!!ebEmpty && ebEmpty.code === 0 && ebEmpty.recorded && ebEmpty.arrived
+	// Claude Code draws a long input as HARD lines, which a terminal's soft wrap (the bench's) never shows: the unsent bell
+	// spread over three lines is still recognised whole. And a screen that cannot be read is not at rest.
+	const RULE98 = "─".repeat(60), N = wk98.NUDGE, typedW = []
+	const wrapped = ["", RULE98, `❯ ${N.slice(0, 100)}`, `  ${N.slice(100, 200)}`, `  ${N.slice(200)}`, RULE98, "  ? for shortcuts"].join("\n")
+	const rootW = mkdtempSync(join(tmpdir(), "comm-attack-wrapped-"))
+	const wrappedR = wk98.wakeAgent(rootW, "w", 5151, { wins: [{ sock: "/tmp/kitty-attack", id: 7, shellPid: 1, fg: [5151] }], turn: { state: "idle", why: "a98" },
+		sendText: (_w, t) => { typedW.push(t); return { status: 0, stderr: "" } }, screen: () => wk98.promptAtRest(wrapped) })
+	rmSync(rootW, { recursive: true, force: true })
+	const wrappedOk = wrappedR.resubmitted === true && typedW.join("") === "\r"
+	const unreadable = wk98.screenAtRest({ sock: join(r98, "no-such.sock"), id: 1 })
+	const unreadableOk = unreadable.ok === false && /could not be read/.test(unreadable.why)
+	const said = (k) => res(k) ? `${res(k).sent ? (res(k).resubmitted ? "Enter only" : "rung") : `refused (${res(k).why})`}, typed ${JSON.stringify(keysOf(k)).slice(0, 40)}, quiet record=${quietOf(k)}` : "no answer"
+	check("A98 the bell never types into somebody's words - the screen is read first, by wake and by the exchange bell",
+		armed && sentAll && controlOk && typedOk && noboxOk && ownOk && ownPlusOk && ebOk && wrappedOk && unreadableOk,
+		`${b98 ? `five fake started sessions in the bench=${up}` : "THE ARM COULD NOT RUN: no kitty bench for this suite"}; ` +
+		`ARMED - each screen reads as drawn=${armed} (${Object.entries(verdict).map(([k, v]) => `${k}: ${v.ok ? "at rest" : v.typed ? "text" : v.why}`).join(", ")}); mail waiting for each=${sentAll}; ` +
+		`EMPTY box (control) -> ${said("empty")}; HALF-TYPED -> ${said("typed")}, the text kept from the sender=${!/bonjour/.test(JSON.stringify(res("typed") || {}))}; ` +
+		`NO box -> ${said("nobox")}; its OWN unsent bell -> ${said("own")}; that bell + a person's words -> ${said("ownplus")}; ` +
+		`exchange bell into the half-typed box -> exit ${ebTyped ? ebTyped.code : null}, recorded=${ebTyped ? ebTyped.recorded : null}; into the empty one -> exit ${ebEmpty ? ebEmpty.code : null}, ARRIVED=${ebEmpty ? ebEmpty.arrived : null}; ` +
+		`the unsent bell drawn on three hard lines -> typed ${JSON.stringify(typedW.join(""))} (${wrappedR.why || "resubmitted"}); an unreadable screen -> ${unreadable.ok ? "AT REST" : unreadable.why}`)
+}
+
 // A92 — EVERY COMMAND IS DOCUMENTED BY THE CODE ITSELF, AND --help DOES NOTHING ELSE. The owner, 2026-10-24: "tu
 // t'assures également que les experts et leaders, et enfin tous les utilisateurs du projet aient facilement accès à une
 // documentation constamment à jour". Measured that evening: the hand-written docs had drifted - wake.mjs documented none
@@ -4665,7 +4803,7 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 	// kitty's own (launch, close, wake); wake's, which close passes on; close's own detached closer and probe; comm
 	// whoami's (claim); restart-signal's (restart); git's (handoff); comm send's (usage, a crossing's message)
 	const FOREIGN = { launch: ["--keep-focus", "--match", "--next-to", "--to"], close: ["--match", "--to", "--root", "--json", "--after-turn", "--verify"],
-		wake: ["--match", "--to"], claim: ["--agent-root"], restart: ["--by"], handoff: ["--porcelain", "--short", "--stdin"], ledger: [], usage: ["--ref", "--kind", "--note"] }
+		wake: ["--match", "--to", "--ansi"], claim: ["--agent-root"], restart: ["--by"], handoff: ["--porcelain", "--short", "--stdin"], ledger: [], usage: ["--ref", "--kind", "--note"] }
 	const undocumented = (src, foreign) => { const head = src.slice(0, src.indexOf("*/"))
 		return [...new Set([...src.matchAll(/["'](--[a-z][a-z0-9-]+)["']/g)].map((m) => m[1]))].filter((f) => f !== "--help" && !head.includes(f) && !foreign.includes(f)) }
 	const gaps = {}
@@ -5241,7 +5379,7 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 	atExit(() => { try { rmSync(rootF, { recursive: true, force: true }) } catch {} })
 	const fg = [{ sock: "/tmp/kitty-attack", id: 7, shellPid: 1, fg: [5151] }]
 	const opted = (agent) => ({ leader: "leader", agents: { leader: ".", [agent]: `apps/${agent}` }, freshRestart: [agent, "leader"] })
-	const run = (agent, { cfg = opted(agent), changes = false, halfLine = false, miss = false, dryRun = false, allowClear = true } = {}) => {
+	const run = (agent, { cfg = opted(agent), changes = false, halfLine = false, miss = false, dryRun = false, allowClear = true, typesAfterClear = false } = {}) => {
 		const transcript = join(dirF, `${agent}.jsonl`)
 		writeFileSync(transcript, jsonl(closedF))
 		let current = transcript
@@ -5257,7 +5395,9 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 		const lookup = () => miss ? { ok: false, why: "pid 5151 is not in the session registry" } : { ok: true, transcript: current }
 		// `fresh.now` is the table's clock. Omitted on the first run, every call read "cache still warm" against the
 		// REAL clock and this arm went red typing NUDGE everywhere - red on the clock, not on the property it names.
-		const r = wake.wakeAgent(rootF, agent, 5151, { wins: fg, turn: T("idle", 90, BIG), cfg, lookup, sendText, confirmMs: 300, dryRun, allowClear, fresh: { now: NOW } })
+		// an empty box (rule 8 is A98's) - except for the person who starts typing while the clear is being proved
+		const screen = () => typesAfterClear && typed.includes("/clear") ? { ok: false, typed: true, text: "bonjour", why: "somebody's text" } : { ok: true }
+		const r = wake.wakeAgent(rootF, agent, 5151, { wins: fg, turn: T("idle", 90, BIG), cfg, lookup, sendText, confirmMs: 300, dryRun, allowClear, fresh: { now: NOW }, screen })
 		return { r, seq: typed.map((x) => x === wake.NUDGE ? "NUDGE" : x === wake.FRESH_NUDGE ? "FRESH" : x === "\r" ? "⏎" : x).join(" ") }
 	}
 	const confirmed = run("a1", { changes: true })
@@ -5268,6 +5408,7 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 	const miss = run("a5", { miss: true })
 	const dry = run("a6", { dryRun: true })
 	const deferred = run("a7", { allowClear: false })
+	const typesAfter = run("a8", { changes: true, typesAfterClear: true })
 	const effectOk = confirmed.seq === "/clear ⏎ FRESH ⏎" && confirmed.r.sent && confirmed.r.cleared === true &&
 		unconfirmed.seq === "/clear ⏎ NUDGE ⏎" && unconfirmed.r.sent && unconfirmed.r.cleared === false && /not confirmed/.test(unconfirmed.r.clearWhy) &&
 		halfLine.seq === "/clear ⏎" && !halfLine.r.sent && /half-typed/.test(halfLine.r.why) &&
@@ -5275,11 +5416,12 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 		leaderRun.seq === "NUDGE ⏎" && leaderRun.r.cleared === null &&
 		miss.seq === "NUDGE ⏎" && miss.r.cleared === false && /could not be proved/.test(miss.r.clearWhy) &&
 		dry.seq === "" && dry.r.wouldClear === true &&
-		deferred.seq === "" && deferred.r.deferred === true && !deferred.r.sent
+		deferred.seq === "" && deferred.r.deferred === true && !deferred.r.sent &&
+		typesAfter.seq === "/clear ⏎" && !typesAfter.r.sent && typesAfter.r.notAtRest === true && typesAfter.r.cleared === true
 
 	let hist = []
 	try { hist = readFileSync(wake.historyPath(rootF), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)) } catch {}
-	const survives = (lines) => lines.map((h) => h.agent).join(",") === "a1,a2,a3,a4,leader,a5"
+	const survives = (lines) => lines.map((h) => h.agent).join(",") === "a1,a2,a3,a4,leader,a5,a8"
 	const histOk = survives(hist) && hist[0].cleared === true && hist[0].text === "fresh" && hist[2].rang === false &&
 		hist.every((h) => Object.prototype.hasOwnProperty.call(h, "caller"))
 	const overwriteCaught = !survives(hist.slice(-1))
@@ -5289,7 +5431,8 @@ function benchRun(b, argv, { cwd, env = process.env, timeout = 60000 } = {}) {
 		`${TABLE.length - wrongT.length}/${TABLE.length} decisions right${wrongT.length ? ` — WRONG: ${wrongT.map(([n]) => n).join("; ")}` : ""}; ` +
 		`last real call read behind a 300 KB subagent row and a synthetic reply=${instOk} (${inst.state}, ${inst.call && inst.call.context}); ` +
 		`typed: confirmed "${confirmed.seq}", unconfirmed "${unconfirmed.seq}", half-typed line "${halfLine.seq}", not opted "${notOpted.seq}", ` +
-		`leader "${leaderRun.seq}", registry miss "${miss.seq}", dry-run "${dry.seq}" wouldClear=${dry.r.wouldClear}, second clear in a run "${deferred.seq}"; ` +
+		`leader "${leaderRun.seq}", registry miss "${miss.seq}", dry-run "${dry.seq}" wouldClear=${dry.r.wouldClear}, second clear in a run "${deferred.seq}", ` +
+		`somebody types while the clear is proved "${typesAfter.seq}" (${typesAfter.r.why}); ` +
 		`history ${hist.map((h) => h.agent).join(",") || "EMPTY"}, first ring intact=${histOk}; ` +
 		`POSITIVE CONTROLS fail the table: every bell ${everyBell.length}, never ${never.length}, leader-blind ${leaderBlind.length}; ` +
 		`an overwrite store loses the first ring=${overwriteCaught}`)

@@ -65,7 +65,7 @@ class Refusal extends Error {}
  * the code the CLI runs. Returns { code, out, err }: 0 rang or would ring · 3 not rung (not running, mid-turn,
  * quiet period) · 64 refused.
  */
-export async function bell(argv, { wins = null, lookup, send = null, who = null } = {}) {
+export async function bell(argv, { wins = null, lookup, send = null, who = null, screen = null } = {}) {
 	const has = (f) => argv.includes(f)
 	const die = (m) => { throw new Refusal(m) }
 	function opt(flag, dflt = null) {
@@ -185,6 +185,10 @@ export async function bell(argv, { wins = null, lookup, send = null, who = null 
 		}
 
 		if (has("--dry-run")) return { code: 0, out: `would ring ${agent} (pid ${target.pid}) in window ${target.r.win.id} on ${target.r.win.sock} — ${target.r.how}${turnNote}\n  ${TEXT}\n`, err: "" }
+		// WAKE'S RULE 8, NEVER INTO SOMEBODY'S WORDS. This bell is the one that cut the owner's half-written message to a peer
+		// leader (09-27): the turn was over, so it typed. The screen, read now; not recorded, so the next run looks again. A98
+		const rest = (screen || wake.screenAtRest)(target.r.win)
+		if (!rest.ok) return { code: 3, out: `○ ${agent} (pid ${target.pid}): not rung, its input is not at rest - ${rest.typed ? "text is on its input line (a person typing, or a draft left there)" : rest.why}. The file is written and waits: ${ref}\n`, err: "" }
 		const typeInto = send ? (t) => send(target.r.win, t) : (t) => spawnSync("kitten", ["@", "--to", `unix:${target.r.win.sock}`, "send-text", "--match", `id:${target.r.win.id}`, t],
 			{ encoding: "utf8", timeout: 5000 })
 		const a = typeInto(TEXT)

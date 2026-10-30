@@ -24,7 +24,8 @@
  * 1. AT THE ARMING, in the agent's own turn: who it is (the registry, never the cwd), its window (as its FOREGROUND
  *    process, never by ancestry - see close.mjs's header), the first prompt, and the GUARDS - commands that exit 0 only
  *    when the handoff is written. **No guard, no relay**: a /clear on faith is the loss this repo's first rule exists to
- *    prevent (*what survives a restart is what was written down*). Then a detached watcher, and the turn goes on.
+ *    prevent (*what survives a restart is what was written down*). And NO MAIL WAITING: the Stop hook would hand it over
+ *    and resume the turn, which cancels (step 2). Then a detached watcher, and the turn goes on.
  * 2. THE TURN THAT ASKED ENDS, then 2 s with nothing after it - close.mjs's wait, now wake's `awaitTurnEnd` (A89).
  *    Anything else first - a prompt, an Esc, mail delivered at the Stop - CANCELS, and the record says why.
  * 3. THE GUARDS AGAIN: the turn may have gone on writing after the arming.
@@ -46,7 +47,7 @@
  *   grown fat is relaunched (launch.mjs), which is the rare path.
  * - **No other session.** It acts on the window its caller is the foreground process of, and on nothing else.
  */
-import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync, readlinkSync } from "node:fs"
+import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync, readlinkSync, readdirSync } from "node:fs"
 import { join, dirname, resolve, basename } from "node:path"
 import { spawnSync, spawn } from "node:child_process"
 import { fileURLToPath } from "node:url"
@@ -226,6 +227,14 @@ if (/[\r\n]/.test(say)) die(`the first prompt must be ONE line: a newline typed 
 if (!guards.length) die(`no guard: pass --guard "<a command that exits 0 only when your handoff is written>" (repeatable), or add\n` +
 	`    "relay": {"${agent}": {"say": ${JSON.stringify(say)}, "guard": "<cmd>"}}  to ${cfgFile}.\n` +
 	`  A relay with nothing proving the handoff is a /clear on faith: what survives it is only what was written down.`)
+// MAIL ALREADY WAITING CANCELS IT, ALWAYS: this turn's Stop hook hands the mail over, the turn resumes, and a resumed turn
+// cancels the relay (step 2). A field's leader lost one so on 10-26, armed early in a busy turn; the record said
+// "cancelled" and nobody else knew. Refused here, while the agent can still act on it - a dry run included.
+let waiting = 0
+try { waiting = readdirSync(join(root, ".comm", "inbox", agent)).filter((f) => f.endsWith(".json")).length } catch {}
+if (waiting) die(`${waiting} message(s) wait for '${agent}' - this turn's Stop hook would hand them over, the turn would resume, and that ` +
+	`cancels a relay: nothing armed.\n  Read them (node .comm/bin/comm.mjs inbox names each file), dismiss them once read ` +
+	`(node .comm/bin/comm.mjs dismiss), then arm again as this turn's last act.`, 5)
 const failed = runGuards(guards, cwd)
 if (failed.length) die(`a guard failed, so the handoff is not proved - nothing armed:\n  · ${failed.join("\n  · ")}`, 3)
 
