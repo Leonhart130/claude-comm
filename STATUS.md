@@ -6,7 +6,7 @@ fold the settled parts into the README.
 ## ▶ NEXT
 
 *(2026-10-30 22h53 CET by `date`. **WORK IS THE MAIN FIELD**; the owner's word stands: *"tu peux utiliser tout l'usage
-jusque 100%"*. This session shipped the bell's fix (`.1`, the owner's ask), the relay told (`.2`), installed-mid-session (`.3`).)*
+jusque 100%"*.)*
 
 0. **The field answered (10-30 20h52)**: `.1` installed, its local bell patch dropped, both dead
    claims released. Nothing asked. Not yet seen there: a bell refused on a busy box, a lone Enter - it writes if one comes.
