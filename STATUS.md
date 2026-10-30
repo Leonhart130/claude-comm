@@ -11,7 +11,7 @@ jusque 100%"*. This session shipped the bell's fix (`.1`, the owner's ask) and t
 0. **The field answered (10-30 20h52)**: `.1` installed, its local bell patch dropped, both dead
    claims released. Nothing asked. Not yet seen there: a bell refused on a busy box, a lone Enter - it writes if one comes.
    **work**: its `agence` relay was cancelled 22h04 by work's own 150 k Stop hook; work fixed the hook and it relayed
-   22h09. My 22h07 letter (rung 22h10, in its transcript) came after - its answer lands in `work-leader/in/`.
+   22h09. It answered (22h10): same diagnosis, its hook now skips expert sessions; nothing asked. `.2` reaches it by notice.
 1. **What loses a bell's Enter** (rigel 14h17 §2: the text sat in the box, `comm sent` PENDING). Rule 8 now presses
    the Enter alone at the next ring; the cause is unmeasured. And **Ctrl+Z in a shell-less window**: avoided, not
    detected - `who` could say "no input box" per session (`screenAtRest`), outside the bus's bytes.
