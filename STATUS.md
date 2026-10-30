@@ -13,7 +13,7 @@ jusque 100%"*.)*
    **work** answered (22h10): its own 150 k Stop hook cancelled `agence`'s relay; fixed (it skips experts); nothing asked.
    **altair** (new field, 10-30 22h20; the owner asked me to equip it and take its request): `.3` is its request. It
    answered 23h13 (relay passes, nothing asked) and asked if a `--guard` replaces the config's: no, it adds - now said
-   and gated, `2026-10-31.1`. My answer (00h37, its channel in `exchange/`) is rung when it rests.
+   and gated, `2026-10-31.1`. My answer (00h37, its channel) waits: its leader was gone at 00h45 - ring it when it runs.
 1. **What loses a bell's Enter** (rigel 14h17 §2: the text sat in the box, `comm sent` PENDING). Rule 8 now presses
    the Enter alone at the next ring; the cause is unmeasured. And **Ctrl+Z in a shell-less window**: avoided, not
    detected - `who` could say "no input box" per session (`screenAtRest`), outside the bus's bytes.
