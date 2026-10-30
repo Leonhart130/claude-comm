@@ -3421,6 +3421,21 @@ silence it. A planted record for a letter that is gone is dropped by the same cl
 them. **Not verified:** S6 (`#review11b`) still stands. A recipient relaunched without draining and stopped again
 keeps its letter named, with no sign that it was alive in between.
 
+**EXTENDED 2026-10-30 to channels and dead claims** (NEXT 0 of the 10-25 close, the gap the owner asked about). That
+close acked `channel:work-leader` (work's letter 7: *"Rien ne t'est demandé"*) and `field:<rigel>` (a dead claim, its
+own), and the next boot printed both ⚠ again: the names lived in `lastClose.acked`, and no row read them. A reply to a
+letter that asks nothing would only ping-pong with the peer's own boot (its `boot.sh` §9 reads a newer letter of mine as
+waiting). Now a `channel:` row lists every unanswered letter it sees, and a close records the ones it waves past under
+the row (`namedLetters["channel:<peer>"]["<letter>"]`); a GONE claim is recorded as `claim:<resource>@<taken at>`. Named,
+each prints `◦ … NAMED at a close (<date>: "<why>")` at ok. **Keyed on the letter and on the claim ITSELF**: the next
+letter gates, and so does the same port taken again later and abandoned - rigel's `port:4391` of 10-30 10h52 is such a
+one, a different claim from the one acked on 10-25. Corrupt or unreadable claims still gate (F1). **Armed**
+(`boot --prove-red`, *"channel + claim: a letter or a dead claim a close named stops gating, a new one gates"*): one
+close names C1 and K1, both read ok after; C2 in the same channel and K2 on the same port, never named, warn on their
+own ids. Run alone in prove-red's fixture by a scratch harness (the whole control is ~1 h); six mutants, baseline
+green, each reddening it: the channel's naming ignored, or keyed on the peer; the claim keyed on its resource, its naming
+ignored, or never recorded; the channel's letters never passed to the close.
+
 ## `#native-path` — Claude Code's own cross-session messaging, measured against this bus (2026-09-18)
 
 Asked by atlas's leader (letter n°3 §3, *"si la voie native couvre une partie du transport"*). Measured on MY

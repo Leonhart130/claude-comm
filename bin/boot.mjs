@@ -1256,7 +1256,13 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 		const asleep = Object.prototype.hasOwnProperty.call(dormant, name) ? dormant[name] : null
 		// Only a GONE holder is the peer's own operation (review #12 F1): corrupt and unreadable are the TOOL failing
 		// to read its own records - a SCHEMA bump would turn work's two claims corrupt - and gate even when dormant.
-		const claimsBad = claimDirBad || claims.some((c) => c.state !== "held" && (!asleep || c.state !== "gone"))
+		// A GONE claim a close NAMED stops gating (`FINDINGS.md#stranded-named`, extended 2026-10-30: the close of 10-25
+		// acked a field's dead claim and every boot since re-announced it). Keyed on the claim ITSELF - its resource and the
+		// moment it was taken - so a new claim on the same port is a new cause. Corrupt and unreadable still gate (F1).
+		const claimId = (c) => `claim:${c.resource}@${(c.rec && c.rec.at) || "?"}`
+		const namedHere = named[`field:${name}`] || {}
+		const namedClaim = (c) => c.state === "gone" ? namedHere[claimId(c)] || null : null
+		const claimsBad = claimDirBad || claims.some((c) => c.state !== "held" && (!asleep || c.state !== "gone") && !namedClaim(c))
 		// AND THE TRIPWIRE the finding promised and nothing built (F1): a dormant field with a live session, or a start
 		// recorded after the decision, is awake - its hidden states are real again, and the owner must be asked.
 		let wokeAt = null
@@ -1313,7 +1319,8 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 			// on stderr as it was written — was announced at every session start as a crash
 			// (F14). `note` comes from claim.mjs's one renderer; there is no second wording here.
 			...claims.filter((c) => c.state !== "held" && c.note)
-				.map((c) => `${asleep && c.state === "gone" ? "◦" : "⚠"} CLAIM ${c.resource}: ${c.note}`),
+				.map((c) => `${(asleep && c.state === "gone") || namedClaim(c) ? "◦" : "⚠"} CLAIM ${c.resource}: ${c.note}` +
+					(namedClaim(c) ? ` - a close NAMED it (${String(namedClaim(c).at || "").slice(0, 10)}: "${String(namedClaim(c).why || "").slice(0, 80)}"); a new claim gates` : "")),
 			...(asleep ? [`◦ DORMANT (${asleep.by}${asleep.since ? `, ${asleep.since}` : ""}): ${String(asleep.why).slice(0, 160)} - only its tool's state gates`] : []),
 			...(awake ? [`⚠ BUT IT IS AWAKE: ${liveNames.length ? `${liveNames.join(", ")} running` : ""}${liveNames.length && wokeAt ? ", " : ""}${wokeAt ? `'${wokeAt.agent}' started ${new Date(wokeAt.at).toISOString().slice(0, 16)}Z, after the decision` : ""} - ask the owner, and edit FIELDS.json`] : []),
 			...(dormantBad ? [`⚠ FIELDS.json could not be read (${dormantBad.slice(0, 80)}) - no field is treated as dormant`] : []),
@@ -1337,10 +1344,10 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 			pending > 0 && unaddressable.length > 0 && `unaddressable:${about(unaddressable)}`, pending > 0 && !busAnswered && "bus-unasked",
 			unannouncedStranded.length > 0 && `stranded-untold:${about(newUntold)}`,
 			shared.length > 0 && `shared-inbox:${about(shared)}`,
-			claimsBad && `claim:${claimDirBad ? "unreadable" : about(claims.filter((c) => c.state !== "held").map((c) => `${c.resource}=${c.state}`))}`,
+			claimsBad && `claim:${claimDirBad ? "unreadable" : about(claims.filter((c) => c.state !== "held" && !namedClaim(c)).map((c) => `${c.resource}=${c.state}`))}`,
 			notesBad && "note-unreadable", dormantBad && "fields-unreadable", awake && "dormant-awake"].filter(Boolean)
 		row(`field:${name}`, drift || busStale !== false ? RED : mailStuck || claimsBad || shared.length > 0 || notesBad || dormantBad || awake ? WARN : OK,
-			bits.join(" - "), causes, { letters: busAnswered && !asleep ? untoldLetters : null })
+			bits.join(" - "), causes, { letters: busAnswered && !asleep ? [...untoldLetters, ...claims.filter((c) => c.state === "gone").map(claimId)] : null })
 	}
 }
 
@@ -1371,6 +1378,11 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 	if (rootErr === "ENOENT") row("channel", OK, `no exchange/ directory at ${root} - this project has no channels`)
 	else if (rootErr) row("channel", WARN, `exchange/ could not be read (${rootErr}) - this project's channels ` +
 		`CANNOT BE SEEN, which is not the same as having none`)
+	// A LETTER A CLOSE NAMED stops making its channel UNANSWERED (`FINDINGS.md#stranded-named`, extended 2026-10-30): a
+	// peer's "read, nothing asked" is acked at a close, and a reply to it would only ping-pong with the peer's own boot.
+	// Keyed on the letter's name, so the next letter gates. Unreadable state names nothing: every letter warns (form E).
+	let namedCh = {}
+	try { namedCh = JSON.parse(readFileSync(join(ROOT, ".boot-state.json"), "utf8")).namedLetters || {} } catch {}
 	for (const peer of peers) {
 		// A DIRECTORY THAT COULD NOT BE READ IS NOT AN EMPTY DIRECTORY. This returned
 		// {at:0} for both, and `continue` below then DELETED THE WHOLE ROW: review #8
@@ -1519,17 +1531,27 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 
 		// A reply this row could not read may be the very one that names the waiting letter, so
 		// an unreadable out/ is reported as NOT KNOWING, never as an answer.
+		const namedC = namedCh[`channel:${peer}`] || {}
+		const openNew = open.filter((o) => !namedC[o.name]), openNamed = open.filter((o) => namedC[o.name])
+		const first = openNamed.length ? namedC[openNamed[0].name] : null
+		const namedNote = first ? `${openNamed.length === 1 ? openNamed[0].name : `${openNamed.length} letters`} NAMED at a close ` +
+			`(${String(first.at || "").slice(0, 10)}: "${String(first.why || "").slice(0, 80)}")` : ""
+		// every unanswered letter, named or not: the close keeps a naming while its letter is listed, and drops it after
+		const letters = { letters: open.map((o) => o.name) }
 		if (blind || unread) {
 			row(`channel:${peer}`, WARN, "CANNOT SAY whether mail here is answered - " +
 				(blind || (unread < 0 ? "out/ could not be listed" : unread + " repl(y/ies) could not be read")), ["unreadable"])
-		} else if (open.length) {
+		} else if (openNew.length) {
 			row(`channel:${peer}`, WARN,
-				`UNANSWERED - ${open[0].name} arrived ${age(Date.now() - open[0].at)} ago` +
-				(open.length > 1 ? ` (+${open.length - 1} more unnamed by any reply)` : ""), [`unanswered:${open[0].name}`])
+				`UNANSWERED - ${openNew[0].name} arrived ${age(Date.now() - openNew[0].at)} ago` +
+				(openNew.length > 1 ? ` (+${openNew.length - 1} more unnamed by any reply)` : "") + (namedNote ? ` - ◦ ${namedNote}` : ""),
+				[`unanswered:${openNew[0].name}`], letters)
 		} else if (legacyWaiting) {
 			row(`channel:${peer}`, WARN, `UNANSWERED - ${legacyOpen[0].name} arrived ` +
 				`${age(Date.now() - legacyOpen[0].at)} ago${dated}` +
-				(legacyOpen.length > 1 ? ` (+${legacyOpen.length - 1} more on the old rule)` : ""), [`unanswered:${legacyOpen[0].name}`])
+				(legacyOpen.length > 1 ? ` (+${legacyOpen.length - 1} more on the old rule)` : ""), [`unanswered:${legacyOpen[0].name}`], letters)
+		} else if (openNamed.length) {
+			row(`channel:${peer}`, OK, `◦ unanswered, and ${namedNote} - only a new letter gates`, null, letters)
 		} else {
 			// NAMED BY DATE, not by mtime. The green branch printed `inb.name` - newest by
 			// mtime - so a restore made the row name the wrong letter while the verdict was
@@ -3608,6 +3630,53 @@ function proveRed() {
 				`next boot -> ${LV[named1.level]} ${wantNamed ? "named" : `SAID: ${named1.text.slice(0, 80)}`} (want ok, named); ` +
 				`**letter 2, never named -> ${LV[fresh.level]} ${JSON.stringify(fresh.causes || [])}** (the positive control: want warn on letter 2 alone)` +
 				(closed.status ? ` CLOSE REFUSED: ${(closed.stdout || "").split("\n").filter((l) => /NOT CLOSED|^\s{6}\S/.test(l)).join(" | ").slice(0, 300)}` : ""))
+		}
+
+		// ── a letter, or a dead claim, a close has NAMED stops gating; a new one still gates ──
+		//
+		// NEXT 0 of the 10-25 close, built 10-30: `#stranded-named` covered stranded mail only, so a close that acked a
+		// channel (a peer's "read, nothing asked") or a field's dead claim saw both announced again at every boot after.
+		// ONE close names letter C1 and claim K1; the next boot must show both at ok, named. THE POSITIVE CONTROLS, in the
+		// same channel and on the same resource: letter C2, and the port taken again later (K2) and gone, never named, must
+		// warn under their OWN ids - a naming keyed on the peer or on the resource would silence them.
+		{
+			const ch = join(pkg, "exchange", "peerx"), cd = join(proj, ".comm", "claims"), cf = join(cd, "port:4999.json")
+			mkdirSync(join(ch, "in"), { recursive: true }); mkdirSync(join(ch, "out"), { recursive: true }); mkdirSync(cd, { recursive: true })
+			const C1 = "2026-10-29-x-read-nothing-asked.md", C2 = "2026-10-30-x-a-question.md"
+			const K1 = "2026-10-29T10:00:00.000Z", K2 = "2026-10-30T10:00:00.000Z"
+			writeFileSync(join(ch, "out", "2026-10-28-x-a-reply-to-nothing.md"), "# no front matter\n")
+			writeFileSync(join(ch, "in", C1), "# read, nothing asked\n")
+			const dead = spawnSync(process.execPath, ["-e", ""]).pid   // exited: its holder is GONE
+			const claimAt = (at) => writeFileSync(cf, JSON.stringify({ v: 1, at, resource: "port:4999", by: "app", by_source: "bus", pid: dead, start: 1,
+				boot: readFileSync("/proc/sys/kernel/random/boot_id", "utf8").trim(), holder: "explicit", purpose: "fixture" }))
+			claimAt(K1)
+			const both = () => { const r = run(true); return [rowOf(r, "channel:peerx"), rowOf(r, "field:proj")] }
+			const [ch0, f0] = both()
+			touchStatus()
+			const closed = closeRun2(run(false).rows.filter((r) => r.label && r.label !== "close")
+				.flatMap((r) => ["--ack", `${r.label}=fixture: deliberately ${r.label}`]))
+			const recs = stateOf().namedLetters || {}
+			const [ch1, f1] = both()
+			writeFileSync(join(ch, "in", C2), "# a question\n")
+			claimAt(K2)
+			const [ch2, f2] = both()
+			rmSync(ch, { recursive: true, force: true }); rmSync(cf, { force: true })
+			{ const st0 = stateOf(); delete st0.namedLetters; writeFileSync(join(pkg, ".boot-state.json"), JSON.stringify(st0, null, 2) + "\n") }
+			const claimCauses = (r) => JSON.stringify((r.causes || []).filter((c) => /^claim:/.test(c)))
+			const want0 = ch0.level === WARN && JSON.stringify(ch0.causes || []) === JSON.stringify([`unanswered:${C1}`]) &&
+				f0.level === WARN && claimCauses(f0) === JSON.stringify(["claim:port:4999=gone"])
+			const wantRec = /✓ CLOSED/.test(closed.stdout || "") && !!(recs["channel:peerx"] || {})[C1] && !!(recs["field:proj"] || {})[`claim:port:4999@${K1}`]
+			const want1 = ch1.level === OK && /NAMED at a close/.test(ch1.text) && f1.level === OK && /a close NAMED it/.test(f1.text)
+			const want2 = ch2.level === WARN && JSON.stringify(ch2.causes || []) === JSON.stringify([`unanswered:${C2}`]) &&
+				f2.level === WARN && claimCauses(f2) === JSON.stringify(["claim:port:4999=gone"])
+			assert("channel + claim: a letter or a dead claim a close named stops gating, a new one gates",
+				want0 && wantRec && want1 && want2,
+				`unnamed -> channel ${LV[ch0.level]} ${JSON.stringify(ch0.causes || [])}, field ${LV[f0.level]} ${claimCauses(f0)} (want warn on each); ` +
+				`close -> ${/✓ CLOSED/.test(closed.stdout || "") ? "CLOSED" : "NOT CLOSED"} (exit ${closed.status}${redsOf(closed)}), recorded: letter=${!!(recs["channel:peerx"] || {})[C1]}, ` +
+				`claim=${!!(recs["field:proj"] || {})[`claim:port:4999@${K1}`]} (keys ${JSON.stringify(Object.keys(recs["field:proj"] || {}))}); ` +
+				`next boot -> channel ${LV[ch1.level]}, field ${LV[f1.level]} (want ok, each saying NAMED${want1 ? "" : `; SAID: ${ch1.text.slice(0, 70)} | ${f1.text.slice(-90)}`}); ` +
+				`**C2 and the port taken again (K2), never named -> channel ${LV[ch2.level]} ${JSON.stringify(ch2.causes || [])}, field ${LV[f2.level]} ${claimCauses(f2)}** ` +
+				`(the positive controls: want warn on each)`)
 		}
 
 		// ── an arm gone from a GREEN suite warns, until a close names its removal ────────────
