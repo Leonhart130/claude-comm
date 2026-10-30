@@ -4,6 +4,7 @@
  *
  *   node .comm/bin/relay.mjs --guard "<cmd>"                     after THIS turn: /clear, then the agent's first prompt
  *   node .comm/bin/relay.mjs --guard "<cmd>" --say "<prompt>"    the first prompt given here, not by .comm/config.json
+ *   node .comm/bin/relay.mjs --guard "<a>" --guard "<b>"         all of them AND the config's must pass: a flag adds
  *   node .comm/bin/relay.mjs --dry-run [--guard "<cmd>"]...      every check, the screen read now; nothing armed
  *   node .comm/bin/relay.mjs --cancel                            disarm a relay armed in this session
  *
@@ -231,7 +232,8 @@ if (!has("--dry-run") && liveWatcher()) {
 	process.exit(0)
 }
 
-// the first prompt and the guards: the flags, then the project's word for this agent
+// the first prompt and the guards: the flags, then the project's word for this agent. A --say replaces the config's; a
+// --guard only ADDS to its guards - a flag the agent types never removes the proof its project asks for (A95 flagguard)
 const conf = cfg.relay && cfg.relay[agent]
 const say = opt("--say", typeof conf === "string" ? conf : conf && typeof conf.say === "string" ? conf.say : null)
 const confGuards = conf && typeof conf === "object" ? [].concat(conf.guard || []).filter((g) => typeof g === "string") : []

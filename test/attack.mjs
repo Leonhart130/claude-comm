@@ -4443,10 +4443,12 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 // be, so nothing but the ancestry test can refuse it; and mail already waiting (its Stop hook would resume the turn and
 // cancel the relay - a field's, 10-26). Each refused, nothing armed. And armed then `--cancel`ed by the agent itself: the
 // record says it was told, so its own Stop hook says nothing back (A99). And no registry entry: the refusal says why when
-// the bus's stub is newer than the session (installed from inside it, 10-30), and not when it is older. FINDINGS.md#relay
+// the bus's stub is newer than the session (installed from inside it, 10-30), and not when it is older. And a --guard
+// flag ADDS to the config's guards: its own passes, the config's fails, refused - both ran (a field leader asked, 10-30).
+// FINDINGS.md#relay
 {
 	const r95 = mkdtempSync(join(tmpdir(), "comm-attack-relay-"))
-	const opened95 = [], ARMS = ["nominal", "typed", "dialog", "guard", "noclear", "untaken", "grace", "titled", "titledTyped"], REFUSED = ["nosay", "noguard", "nested", "mail", "selfcancel", "unregistered", "unregisteredOld"], SC = [...ARMS, ...REFUSED]
+	const opened95 = [], ARMS = ["nominal", "typed", "dialog", "guard", "noclear", "untaken", "grace", "titled", "titledTyped"], REFUSED = ["nosay", "noguard", "nested", "mail", "selfcancel", "unregistered", "unregisteredOld", "flagguard"], SC = [...ARMS, ...REFUSED]
 	atExit(() => {
 		for (const [sock, id] of opened95)
 			try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
@@ -4454,7 +4456,8 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 	})
 	const say = (k) => `resume ${k}: read HANDOFF.md, then the last brief`
 	mkdirSync(join(r95, ".comm", "bin"), { recursive: true })
-	for (const k of SC) { mkdirSync(join(r95, k), { recursive: true }); writeFileSync(join(r95, k, "HANDOFF.md"), "written\n") }
+	// `flagguard` alone has no HANDOFF.md: its config guard fails, and only that
+	for (const k of SC) { mkdirSync(join(r95, k), { recursive: true }); if (k !== "flagguard") writeFileSync(join(r95, k, "HANDOFF.md"), "written\n") }
 	// `unregisteredOld`: the bus's stub was there an hour before its session started (`unregistered` gets one after)
 	const stub95 = (k) => join(r95, k, ".claude", "comm-hook.mjs")
 	mkdirSync(dirname(stub95("unregisteredOld")), { recursive: true }); writeFileSync(stub95("unregisteredOld"), "// stub\n")
@@ -4533,10 +4536,12 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 				argv: k === "nested" ? [fake95, join(r95, "nested.cjs"), join(r95, `${k}.json`)]
 					// "selfcancel": armed, then `--cancel` once the watcher has exec'd (before that its cmdline is not yet its own)
 					: k === "selfcancel" ? ["sh", "-c", `"${process.execPath}" "${R95}" && sleep 1 && "${process.execPath}" "${R95}" --cancel`]
+					// "flagguard": a guard of its own that passes, and leaves a mark that it ran
+					: k === "flagguard" ? [process.execPath, R95, "--guard", "touch FLAG-RAN"]
 					: [process.execPath, R95] }
 			writeFileSync(join(r95, `${k}.json`), JSON.stringify(c))
 			// `mail` is refused before any screen is read: its own tab, so the panes that ARE read are not made smaller (A98)
-			const where = /^(mail|selfcancel|unregistered)/.test(k) ? ["--type=tab", "--match", `window_id:${b95.id}`] : ["--type=window", ...besideMe(b95)]
+			const where = /^(mail|selfcancel|unregistered|flagguard)/.test(k) ? ["--type=tab", "--match", `window_id:${b95.id}`] : ["--type=window", ...besideMe(b95)]
 			const id = Number(spawnSync("kitten", ["@", "--to", `unix:${b95.sock}`, "launch", "--keep-focus", ...where,
 				`--cwd=${join(r95, k)}`, `--env=CLAUDE_COMM_RUNTIME=${rt95}`, fake95, join(r95, "fake.cjs"), join(r95, `${k}.json`)], { encoding: "utf8", timeout: 10000 }).stdout)
 			if (Number.isInteger(id) && id > 0) opened95.push([b95.sock, id])
@@ -4596,6 +4601,9 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 			!/after it/.test(out("unregisteredOld").e || "") && !S95.unregisteredOld.rec,
 		selfCancelTold: out("selfcancel").s === 0 && /relay: cancelled/.test(out("selfcancel").o || "") && /--cancel/.test(why("selfcancel")) &&
 			!!rec("selfcancel").told_at && keys("selfcancel") === "",
+		// a flag that replaced the config's guards would arm here; one the config's replaced would leave no FLAG-RAN
+		flagAddsToConfig: out("flagguard").s === 3 && /guard failed/.test(out("flagguard").e || "") && /test -f HANDOFF\.md/.test(out("flagguard").e || "") &&
+			!/touch FLAG-RAN/.test(out("flagguard").e || "") && existsSync(join(r95, "flagguard", "FLAG-RAN")) && !S95.flagguard.rec,
 	}
 	check("A95 a session relays itself after its turn - /clear proved, its prompt proved - and types nothing a step cannot prove",
 		!!b95 && Object.values(ok).every(Boolean),

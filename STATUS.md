@@ -5,15 +5,15 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-10-30 22h53 CET by `date`. **WORK IS THE MAIN FIELD**; the owner's word stands: *"tu peux utiliser tout l'usage
+*(2026-10-31 00h41 CET by `date`. **WORK IS THE MAIN FIELD**; the owner's word stands: *"tu peux utiliser tout l'usage
 jusque 100%"*.)*
 
-0. **The field answered (10-30 20h52)**: `.1` installed, its local bell patch dropped, both dead
-   claims released. Nothing asked. Not yet seen there: a bell refused on a busy box, a lone Enter - it writes if one comes.
-   **work**: its `agence` relay was cancelled 22h04 by work's own 150 k Stop hook; work fixed the hook and it relayed
-   22h09. It answered (22h10): same diagnosis, its hook now skips expert sessions; nothing asked. `.2` reaches it by notice.
-   **altair** (new field, joined 22h20; the owner asked me to equip it and take its request): its relay refused in the
-   session that installed the bus - shipped as `.3`. My answer (22h32, its own channel in `exchange/`) is rung when it rests.
+0. **The field** (10-30 20h52): `.1` in, its bell patch dropped, nothing asked; it writes if it sees a bell refused on
+   a busy box or a lone Enter.
+   **work** answered (22h10): its own 150 k Stop hook cancelled `agence`'s relay; fixed (it skips experts); nothing asked.
+   **altair** (new field, 10-30 22h20; the owner asked me to equip it and take its request): `.3` is its request. It
+   answered 23h13 (relay passes, nothing asked) and asked if a `--guard` replaces the config's: no, it adds - now said
+   and gated, `2026-10-31.1`. My answer (00h37, its channel in `exchange/`) is rung when it rests.
 1. **What loses a bell's Enter** (rigel 14h17 §2: the text sat in the box, `comm sent` PENDING). Rule 8 now presses
    the Enter alone at the next ring; the cause is unmeasured. And **Ctrl+Z in a shell-less window**: avoided, not
    detected - `who` could say "no input box" per session (`screenAtRest`), outside the bus's bytes.
@@ -23,15 +23,18 @@ jusque 100%"*.)*
 4. **Letters waiting for a bell**: deneb's and atlas's - `node bin/exchange-bell.mjs --peer <channel> --ref <file>` when
    their leaders run.
 5. **Unarmed: the generated SKILL names every tool.** A92 gates the README's reference only.
-6. **`boot --prove-red` is ~1 h** because `--only` cuts output, not work. 10-30 used a scratch harness that runs ONE
+6. **`boot --prove-red` is 1-1.6 h** (66 then 98 min, 10-30) because `--only` cuts output, not work. 10-30 used a scratch harness that runs ONE
    block in its fixture (`FINDINGS.md#stranded-named`, last paragraph) - make that `--only` itself (C).
 7. **`channel:` prints "arrived 20h ago" for a letter 1 min old**: its age is the NAME's date at 00:00Z (`stampOfName`),
    right for ordering, wrong as an arrival. Show the mtime there, or "dated <day>".
+8. **`who` says `working` while only a background sub-agent runs** (altair 10-30 23h: turn ended, box at rest, "← 2
+   agents"; the runtime's `status` stays `busy`). My bell waiter keyed on IDLE waited 40 min. Show the turn's end from
+   the transcript (`wake.readTurn`) beside the runtime's word.
 
 **Done 10-30** (FINDINGS has each): `.1` the bell reads the screen first (A98, `#bell-into-typing` FIXED), relay
 refuses on waiting mail; `.2` a relay that did not happen is said at the next Stop (A99); `.3` installed mid-session is
-said (A100, A95); boot: a NAMED letter or dead claim stops gating, a cause is demanded only when waved (prove-red arms).
-Mutants: each reddened its own leg. In the ten trees; **altair** joined 22h20 (codename and leak rule 16 first).
+said (A100, A95); boot: a NAMED letter or dead claim stops gating, a cause is demanded only when waved (prove-red arms);
+10-31 `2026-10-31.1` a `--guard` adds (A95 `flagguard`). Mutants: each reddened its own leg. All in the ten trees.
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a
 codename here; the mapping is in no repo. The boot report prints the REAL directory names: **never copy a `field:` row
@@ -48,8 +51,7 @@ inside a session in the project rewrites that session's registry entry. Design i
 fixed" - gate `record()` AND `refresh()` on the witness. Touches `Stop`, the hottest path: own change, own arm,
 `selftest` both ways.
 
-**C - tests faster, still reliable (owner, 09-27): `test/mutate.mjs` is built and in use** (10-24/25: 11 batches, 45 mutants,
-each reddening its own condition; one batch VOID - its baseline found a real defect, `#docs-from-code`). Next: `attack` itself faster, `--only <arm>` for iteration; the full suite stays the gate.
+**C - tests faster, still reliable (owner, 09-27): `test/mutate.mjs` is built and in use.** Next: `attack` itself faster, `--only <arm>` for iteration; the full suite stays the gate.
 
 **F - carried, in priority order:** #15's names (`#review15`: the prove-red registry control blames itself for a live
 session's own `compact` rewrite (A31's twin of it FIXED 10-25, `#review19`; boot's control still has it); the prettier header and `readJson` outside the print) · `REVIEW-12b.md`'s seven points (`FINDINGS.md#review12b`, each already measured) ·
@@ -118,8 +120,6 @@ order:** adoption (orion measured 09-19) → Rust port → value, with atlas's l
 - **Test debt from review #4, none of it gated:** `FINDINGS.md#test-debt`.
 - **`#A20` from 2026-09-04 is still unexplained** (the 09-05 instance was fixed, `#update-signal`).
   **Run gates unfiltered.**
-- **The erosion counter WAS discharged** 2026-09-08 (`from: 9`, review #8 D3). 🟢 Its design flaw — one row,
-  several causes — was fixed 09-10; the stale "▶ NEXT 4" pointer here was cut 09-11, not retracted.
 
 ## ⚠️ What was NOT verified
 

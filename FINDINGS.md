@@ -3826,6 +3826,15 @@ upgrade rewrites the stub too, so the second message states the two times rather
 restart is the cure either way. **Not measured:** whether `claude -c` after `/exit` registers the session (`#clear-blind`
 lists `--continue` as unmeasured), so the advice is `/exit`, then `claude`.
 
+**10-31: a `--guard` flag ADDS to the config's guards, never replaces them.** altair's question (10-30 23h13), from its
+own try: `--dry-run --guard true` still ran the config's guard. That is the design since 10-25 (`[...all("--guard"),
+...confGuards]`): a flag the agent types must never remove the proof its project asks for - while `--say` DOES replace
+the config's prompt. The asymmetry was in neither the help nor a test, so a change "aligning" the two would have passed
+every gate. **Now** the help says it (on a `node` line, so the generated README carries it too) and A95 `flagguard`
+arms it: the config's guard fails (no HANDOFF.md), the flag's passes and leaves a file; refused, exit 3, naming the
+config's guard and not the flag's, the file there, no record. Mutants 2/2, each reddening that leg alone: flags replace
+the config's when given (it ARMED, exit 0); the config's replace the flags (no file). Release `2026-10-31.1`.
+
 ## `#settings-inheritance` — an expert runs its leader's `settings.local.json`, not its `settings.json` (2026-09-27)
 
 **Reported by atlas's leader** (field letter 09-27): a `Stop` hook he put in his root's `settings.local.json` ran

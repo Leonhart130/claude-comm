@@ -29,6 +29,13 @@ already have.
 
 
 
+## 2026-10-31.1 — bus print `40e085a2bdee` — 2026-10-31
+
+- **A `--guard` you pass to `relay.mjs` adds to your project's guards; it never replaces them.** Every guard in
+  `.comm/config.json` still runs and must pass, so no flag can remove the proof your project asks for (`--say`, by
+  contrast, does replace the config's prompt). It always worked this way; the help now says so, and a test fails if
+  it ever changes.
+
 ## 2026-10-30.3 — bus print `27b29e3179c8` — 2026-10-30
 
 - **Installed from inside a running session? That session has none of the bus until it restarts.** Claude Code reads
