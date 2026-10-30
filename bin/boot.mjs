@@ -1783,6 +1783,8 @@ let closeReport = ""
 let closeFailed = false
 if (CLOSE) {
 	const EROSION = 3
+	// What an ack of a row waves past: the causes it declares, or - declaring none - its level (review #11 R5a).
+	const causesOf = (r) => r.causes && r.causes.length ? r.causes : [["ok", "unknown", "warn", "red"][r.level] || "open"]
 	let st = {}
 	try { st = JSON.parse(readFileSync(join(ROOT, ".boot-state.json"), "utf8")) } catch {}
 
@@ -1880,7 +1882,7 @@ if (CLOSE) {
 				// Every cause the row declared was waved past by this ack, whatever it says. A row
 				// that declares none is keyed on ITSELF - its level - never on the operator's
 				// words (review #11 R5a: the hash fallback left every uncoded row evadable).
-				for (const sig of r.causes && r.causes.length ? r.causes : [["ok", "unknown", "warn", "red"][r.level] || "open"]) {
+				for (const sig of causesOf(r)) {
 					const prev = causes[r.label][sig] || { n: 0, why }
 					causes[r.label][sig] = { n: prev.n + 1, why }
 				}
@@ -1958,6 +1960,10 @@ if (CLOSE) {
 		// misuse `--amended` on a guard that needed no amendment, which corrupts the very
 		// evidence `CLAUDE.md` builds the amendment protocol on.
 		const waved = new Set(open.map((r) => r.label))
+		// ...AND PER CAUSE: a row waved for a NEW cause does not wave its old ones (10-30: a letter answered at 22h07, acked
+		// 3x before, was demanded at a close that acked only the next letter on the same channel). It is demanded again the
+		// next time IT is waved past, so real erosion is still caught.
+		const wavedCauses = new Set(open.filter((r) => ACKS.has(r.label)).flatMap((r) => causesOf(r).map((sig) => `${r.label}@${sig}`)))
 		// PER CAUSE. A row waved past three times for three DIFFERENT reasons is not eroding -
 		// it is a row doing its job on three different problems, and demanding an amendment
 		// there would push the operator to misuse `--amended` on a guard that needs none,
@@ -1965,9 +1971,11 @@ if (CLOSE) {
 		const eroding = []
 		for (const [label, byCause] of Object.entries(writtenCauses)) {
 			if (!waved.has(label)) continue
-			for (const [sig, v] of Object.entries(byCause)) if (v.n >= EROSION) eroding.push([label, sig, v])
+			for (const [sig, v] of Object.entries(byCause)) if (v.n >= EROSION && wavedCauses.has(`${label}@${sig}`)) eroding.push([label, sig, v])
 		}
-		const stale = Object.keys(written).filter((label) => !waved.has(label) && written[label] >= EROSION)
+		const stale = [...Object.keys(written).filter((label) => !waved.has(label) && written[label] >= EROSION),
+			...Object.entries(writtenCauses).filter(([label]) => waved.has(label)).flatMap(([label, byCause]) =>
+				Object.entries(byCause).filter(([sig, v]) => v.n >= EROSION && !wavedCauses.has(`${label}@${sig}`)).map(([sig]) => `${label}@${sig}`))]
 		if (eroding.length) {
 			lines.push("")
 			lines.push("  🔴 AMEND THE PROTOCOL - these CAUSES are being waved past, not acted on:")
@@ -1978,7 +1986,7 @@ if (CLOSE) {
 				lines.push(`      When you have: node bin/boot.mjs --close --amended ${label}@${sig}="what it measures now"`)
 			}
 		}
-		if (stale.length) lines.push(`  · ${stale.length} count(s) held as history for row(s) this close did not wave past (${stale.join(", ")}) - a row that is green, or gone, is not eroding`)
+		if (stale.length) lines.push(`  · ${stale.length} count(s) held as history for row(s) or cause(s) this close did not wave past (${stale.join(", ")}) - a row that is green, or a cause gone, is not eroding`)
 		lines.push("")
 		lines.push(`  ✓ CLOSED at ${head} - the next boot inherits a tree whose every row is green or named.`)
 		}
@@ -3490,13 +3498,14 @@ function proveRed() {
 				const ackWith = (treeWhy) => causeRows
 					.flatMap((label) => ["--ack", `${label}=${label === "tree" ? treeWhy : "fixture: deliberately " + label}`])
 				const reasonA = ackWith("cause A: work in flight")
-				for (let i = 0; i < 3; i++) { touchStatus(); closeRun2(reasonA) }
+				let thirdA = null
+				for (let i = 0; i < 3; i++) { touchStatus(); thirdA = closeRun2(reasonA) }
 				const causesA = (stateOf().ackCauses || {}).tree || {}
 				const sigA = Object.keys(causesA)[0]
 				// A SECOND, DIFFERENT CAUSE on the SAME row: the work committed, never pushed.
 				g("add", "-A"); g("commit", "-qm", "cause B: committed, not pushed")
 				touchStatus()
-				closeRun2(ackWith("cause B: something else entirely"))
+				const bOnly = closeRun2(ackWith("cause B: something else entirely"))
 				const both = (stateOf().ackCauses || {}).tree || {}
 				const sigB = Object.keys(both).find((k) => k !== sigA)
 				const separate = !!sigA && !!sigB && both[sigA].n === 3 && both[sigB].n === 1
@@ -3525,6 +3534,15 @@ function proveRed() {
 					`a row-keyed count fails); that close -> exit ${amended.status}` +
 					// Printed because the condition tests it: on 2026-09-19 every clause above read true and the arm was red.
 					(amended.status ? ` REFUSED: ${(amended.stdout || "").split("\n").filter((l) => /NOT CLOSED|^\s{6}\S/.test(l)).join(" | ").slice(0, 400)}` : ""))
+				// A CAUSE GONE IS NOT WAVED PAST, though its row is waved for another (10-30: an answered letter, acked 3x
+				// before, was demanded at a close that acked only a NEW letter on the same channel). The same two closes:
+				// the third A close, A present (the positive control: demanded), and the B-only close, A gone (silent).
+				const demandsA = (o) => !!o && (o.stdout || "").includes(`tree @${sigA} acknowledged`)
+				assert("close: a cause demands an amendment only at a close that waves IT past",
+					!!sigA && demandsA(thirdA) && !demandsA(bOnly) && /held as history[^\n]*tree@/.test((bOnly && bOnly.stdout) || ""),
+					`the 3rd close, cause ${sigA} present -> demanded=${demandsA(thirdA)} (want true: the control); the next close waves ` +
+					`tree for ${sigB} alone -> ${sigA} demanded=${demandsA(bOnly)} (want false), held as history=` +
+					`${/held as history[^\n]*tree@/.test((bOnly && bOnly.stdout) || "")} (want true)`)
 				g("reset", "-q", "--hard", baseSha); rmSync(join(pkg, "dirty-causes.txt"), { force: true })
 			}
 		}

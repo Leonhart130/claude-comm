@@ -13,7 +13,7 @@
  * the STUB's own location (import.meta.url), so nothing breaks if the project is
  * moved, cloned, or a hook is invoked from a subdirectory.
  */
-import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, renameSync, unlinkSync } from "node:fs"
+import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, renameSync, unlinkSync, readdirSync, readlinkSync } from "node:fs"
 import { join, dirname, resolve, sep, relative } from "node:path"
 import { fileURLToPath } from "node:url"
 import { randomBytes, createHash } from "node:crypto"
@@ -1323,6 +1323,7 @@ function SKILL(ids, agentRoot) {
 }
 
 // ── 2. per-agent stub + hooks ───────────────────────────────────────────────
+const firstHere = []   // [agent, folder] with no stub before this install: see the warning at the end
 for (const [id, relPath] of Object.entries(cfg.agents)) {
 	const agentRoot = resolve(ROOT, relPath)
 	// A roster entry with no directory used to `continue` with a stderr warning and
@@ -1333,6 +1334,7 @@ for (const [id, relPath] of Object.entries(cfg.agents)) {
 	// the exact failure this project exists to catch.
 	if (!existsSync(agentRoot)) { results.missing.push(`${id} → ${agentRoot}`); continue }
 
+	if (!existsSync(join(agentRoot, ".claude", "comm-hook.mjs"))) firstHere.push([id, agentRoot])
 	write(join(agentRoot, ".claude", "comm-hook.mjs"), STUB, results)
 	const folderIds = Object.keys(cfg.agents).filter((a) => resolve(ROOT, cfg.agents[a]) === agentRoot)
 	if (folderIds[0] === id) write(join(agentRoot, ".claude", "skills", "claude-comm", "SKILL.md"), SKILL(folderIds, agentRoot), results)
@@ -1530,5 +1532,26 @@ if (CHECK) {
 	console.log(`\n  settings.json + hook stubs take effect in each agent's NEXT session —`)
 	console.log(`  a running one has already loaded its settings.`)
 	console.log(`  .comm/bin/comm.mjs is NOT deferred: the stub re-executes it on every hook`)
-	console.log(`  fire, so a running agent picks up this bus at its next turn end.`)
+	console.log(`  fire, so a running agent that STARTED WITH the hooks picks up this bus at its next turn end.`)
+	// A FIRST INSTALL UNDER A RUNNING SESSION gives it nothing until it restarts: Claude Code reads hooks when a session
+	// starts, so no SessionStart (no registry entry: relay.mjs refuses there, close.mjs can only wait a grace) and no
+	// Stop (no mail handed over). A field leader installed from inside its own session on 10-30 and learned it from
+	// relay.mjs's refusal. A100.
+	const sessionsIn = (dir) => {
+		const out = []
+		let all = []
+		try { all = readdirSync("/proc").filter((p) => /^\d+$/.test(p)) } catch {}
+		for (const p of all) try {
+			const argv = readFileSync(`/proc/${p}/cmdline`, "utf8").split("\0")
+			if ((argv[0] || "").split("/").pop() !== "claude" || argv.includes("-p") || argv.includes("--print")) continue
+			if (readlinkSync(`/proc/${p}/cwd`) === dir) out.push(p)
+		} catch {}
+		return out
+	}
+	for (const [id, dir] of firstHere) {
+		const pids = sessionsIn(dir)
+		if (pids.length) console.log(`\n  ⚠ FIRST install for '${id}', and a session already runs there (pid ${pids.join(", ")}): it started with\n` +
+			`    none of the bus's hooks - no mail is handed to it and the registry does not know it, so relay.mjs\n` +
+			`    refuses there - until it restarts once: /exit, then claude in ${dir}`)
+	}
 }

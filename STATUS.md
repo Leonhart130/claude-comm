@@ -5,13 +5,15 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-10-30 22h22 CET by `date`. **WORK IS THE MAIN FIELD**; the owner's word stands: *"tu peux utiliser tout l'usage
-jusque 100%"*. This session shipped the bell's fix (`.1`, the owner's ask) and the relay told (`.2`).)*
+*(2026-10-30 22h53 CET by `date`. **WORK IS THE MAIN FIELD**; the owner's word stands: *"tu peux utiliser tout l'usage
+jusque 100%"*. This session shipped the bell's fix (`.1`, the owner's ask), the relay told (`.2`), installed-mid-session (`.3`).)*
 
 0. **The field answered (10-30 20h52)**: `.1` installed, its local bell patch dropped, both dead
    claims released. Nothing asked. Not yet seen there: a bell refused on a busy box, a lone Enter - it writes if one comes.
    **work**: its `agence` relay was cancelled 22h04 by work's own 150 k Stop hook; work fixed the hook and it relayed
    22h09. It answered (22h10): same diagnosis, its hook now skips expert sessions; nothing asked. `.2` reaches it by notice.
+   **altair** (new field, joined 22h20; the owner asked me to equip it and take its request): its relay refused in the
+   session that installed the bus - shipped as `.3`. My answer (22h32, its own channel in `exchange/`) is rung when it rests.
 1. **What loses a bell's Enter** (rigel 14h17 §2: the text sat in the box, `comm sent` PENDING). Rule 8 now presses
    the Enter alone at the next ring; the cause is unmeasured. And **Ctrl+Z in a shell-less window**: avoided, not
    detected - `who` could say "no input box" per session (`screenAtRest`), outside the bus's bytes.
@@ -26,12 +28,10 @@ jusque 100%"*. This session shipped the bell's fix (`.1`, the owner's ask) and t
 7. **`channel:` prints "arrived 20h ago" for a letter 1 min old**: its age is the NAME's date at 00:00Z (`stampOfName`),
    right for ordering, wrong as an arrival. Show the mtime there, or "dated <day>".
 
-**Done 10-30** (`b5859df` `.1`, `9b76066`): **wake's rule 8** - the bell reads the screen and never types into
-somebody's words (A98, 9 mutants; `#bell-into-typing` FIXED), the exchange bell too; `relay.mjs` refuses to arm on
-mail waiting (A95 `mail`); a letter or a dead claim a close NAMED stops gating (NEXT 0 of 10-25; prove-red arm, 6
-mutants). Full `boot --prove-red` green on these bytes (19h45-20h51, 66 min).
-**`.2`**: a relay that did not happen is said to the agent at its next Stop (A99, 8/8 mutants;
-`#relay`). Installed in the ten trees: **altair** joined the bus 10-30 22h20 (codename and leak rule 16 set first).
+**Done 10-30** (FINDINGS has each): `.1` the bell reads the screen first (A98, `#bell-into-typing` FIXED), relay
+refuses on waiting mail; `.2` a relay that did not happen is said at the next Stop (A99); `.3` installed mid-session is
+said (A100, A95); boot: a NAMED letter or dead claim stops gating, a cause is demanded only when waved (prove-red arms).
+Mutants: each reddened its own leg. In the ten trees; **altair** joined 22h20 (codename and leak rule 16 first).
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a
 codename here; the mapping is in no repo. The boot report prints the REAL directory names: **never copy a `field:` row

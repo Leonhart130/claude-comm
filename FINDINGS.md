@@ -1449,6 +1449,15 @@ this repo and it is a flaw in the mechanism that governs every other one.
   accumulate separately · acking the same cause three times prints the amend instruction · **an amendment
   discharges that cause and LEAVES THE OTHER STANDING** · an amendment for an unacked cause refuses.
 
+**2026-10-30: the count was per cause, the DEMAND was still per row.** `waved` held row labels, so every cause ever
+counted on a row the close acked was demanded - including one no longer present. Measured at my own close: work's
+letter 7, acked 3x before, was answered at 22h07, and the 22h29 close, acking only work's NEXT letter on the same
+channel, demanded an amendment for letter 7. **Now a cause is demanded only at a close that waves IT past**; one gone is
+held as history (`row@cause`), and demanded again the next time it is waved. Prove-red arm "a cause demands an amendment
+only at a close that waves IT past", in the two-cause fixture: the third A close (A present, demanded - the control) and
+the B-only close (A gone, silent). Run alone in that fixture by a scratch harness: the old row filter reddens it, and a
+history line that drops causes does too.
+
 ## `#review7-disposal` — disposing review #7, and the defect the disposal made before it shipped
 
 **2026-09-05.** Fourteen findings, all fixed and armed in `043a719`. What is written here is only what the
@@ -3802,6 +3811,20 @@ transcript, mail first, a read-only record, a FIFO); A95's `selfcancel` leg arms
 redden their own leg alone. **Not covered, named:** a relay that stops AFTER its `/clear` (steps 5-6 - the new
 transcript is not the one that armed); a watcher killed before it writes an end; a resumed turn shorter than the
 watcher's 300 ms poll (its Stop would come before the cancel is written - 2.5 s in the field case).
+
+**10-30: a session that installed the bus has none of it.** A new field's leader (codename altair) ran `comm.mjs init` and
+`install.mjs` from inside its own session, then `relay.mjs --dry-run`: exit 2, "pid … is not in the session registry".
+Claude Code reads its hooks when a session starts, so that session ran no SessionStart (no registry entry) and no Stop
+(no mail handed over) - while the installer's last line said the bus is live "at its next turn end", true only of an
+upgrade. It did not write the registry by hand (the entry is the proof the relay rests on), restarted, and its next
+session was registered. **Now** the installer, at a FIRST install of an agent with a `claude` session already running in
+its folder (`/proc`: argv0 `claude`, not `-p`, cwd the folder), says that session has none of the bus until it restarts
+once (A100: a fake session in one folder of two, a second install, a `claude -p` run); and `relay.mjs`, on a registry
+miss, compares the session's start (`/proc/<pid>/stat` + `btime`, equal to `ps` to the second) with the stub's mtime
+and, when the stub is newer, says so and how to fix it (A95 `unregistered`, and `unregisteredOld` as its control). An
+upgrade rewrites the stub too, so the second message states the two times rather than claim a first install; the
+restart is the cure either way. **Not measured:** whether `claude -c` after `/exit` registers the session (`#clear-blind`
+lists `--continue` as unmeasured), so the advice is `/exit`, then `claude`.
 
 ## `#settings-inheritance` — an expert runs its leader's `settings.local.json`, not its `settings.json` (2026-09-27)
 

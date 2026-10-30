@@ -28,6 +28,14 @@ already have.
 
 
 
+
+## 2026-10-30.3 — bus print `27b29e3179c8` — 2026-10-30
+
+- **Installed from inside a running session? That session has none of the bus until it restarts.** Claude Code reads
+  its hooks when a session starts: the one that ran the install gets no mail and no registry entry, so `relay.mjs`
+  refuses there. The installer now says so at a first install, naming the session; `relay.mjs`'s refusal now says why
+  when that is the case. Restart it once (`/exit`, then `claude` in the same folder) and everything works.
+
 ## 2026-10-30.2 — bus print `48223ccb5403` — 2026-10-30
 
 - **A relay that did not happen is now said to you.** If the relay you armed was cancelled (your turn resumed: another

@@ -4442,10 +4442,11 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 // one WITH a registry entry of its own and in the window's foreground list, as a `claude -p` the session spawned would
 // be, so nothing but the ancestry test can refuse it; and mail already waiting (its Stop hook would resume the turn and
 // cancel the relay - a field's, 10-26). Each refused, nothing armed. And armed then `--cancel`ed by the agent itself: the
-// record says it was told, so its own Stop hook says nothing back (A99). FINDINGS.md#relay
+// record says it was told, so its own Stop hook says nothing back (A99). And no registry entry: the refusal says why when
+// the bus's stub is newer than the session (installed from inside it, 10-30), and not when it is older. FINDINGS.md#relay
 {
 	const r95 = mkdtempSync(join(tmpdir(), "comm-attack-relay-"))
-	const opened95 = [], ARMS = ["nominal", "typed", "dialog", "guard", "noclear", "untaken", "grace", "titled", "titledTyped"], REFUSED = ["nosay", "noguard", "nested", "mail", "selfcancel"], SC = [...ARMS, ...REFUSED]
+	const opened95 = [], ARMS = ["nominal", "typed", "dialog", "guard", "noclear", "untaken", "grace", "titled", "titledTyped"], REFUSED = ["nosay", "noguard", "nested", "mail", "selfcancel", "unregistered", "unregisteredOld"], SC = [...ARMS, ...REFUSED]
 	atExit(() => {
 		for (const [sock, id] of opened95)
 			try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
@@ -4454,6 +4455,10 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 	const say = (k) => `resume ${k}: read HANDOFF.md, then the last brief`
 	mkdirSync(join(r95, ".comm", "bin"), { recursive: true })
 	for (const k of SC) { mkdirSync(join(r95, k), { recursive: true }); writeFileSync(join(r95, k, "HANDOFF.md"), "written\n") }
+	// `unregisteredOld`: the bus's stub was there an hour before its session started (`unregistered` gets one after)
+	const stub95 = (k) => join(r95, k, ".claude", "comm-hook.mjs")
+	mkdirSync(dirname(stub95("unregisteredOld")), { recursive: true }); writeFileSync(stub95("unregisteredOld"), "// stub\n")
+	{ const t = new Date(Date.now() - 3600_000); utimesSync(stub95("unregisteredOld"), t, t) }
 	writeFileSync(join(r95, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", ...Object.fromEntries(SC.map((k) => [k, k])) },
 		relay: Object.fromEntries(SC.filter((k) => k !== "nosay").map((k) => [k, k === "noguard" ? say(k) : { say: say(k), guard: "test -f HANDOFF.md" }])) }))
 	for (const f of ["relay.mjs", "wake.mjs", "session-registry.mjs"]) cpSync(join(PKG, "bin", f), join(r95, ".comm", "bin", f))
@@ -4531,7 +4536,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 					: [process.execPath, R95] }
 			writeFileSync(join(r95, `${k}.json`), JSON.stringify(c))
 			// `mail` is refused before any screen is read: its own tab, so the panes that ARE read are not made smaller (A98)
-			const where = k === "mail" || k === "selfcancel" ? ["--type=tab", "--match", `window_id:${b95.id}`] : ["--type=window", ...besideMe(b95)]
+			const where = /^(mail|selfcancel|unregistered)/.test(k) ? ["--type=tab", "--match", `window_id:${b95.id}`] : ["--type=window", ...besideMe(b95)]
 			const id = Number(spawnSync("kitten", ["@", "--to", `unix:${b95.sock}`, "launch", "--keep-focus", ...where,
 				`--cwd=${join(r95, k)}`, `--env=CLAUDE_COMM_RUNTIME=${rt95}`, fake95, join(r95, "fake.cjs"), join(r95, `${k}.json`)], { encoding: "utf8", timeout: 10000 }).stdout)
 			if (Number.isInteger(id) && id > 0) opened95.push([b95.sock, id])
@@ -4543,7 +4548,9 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 			const { pid, id, c } = S95[k]
 			if (!pid || !id) continue
 			const entry = (transcript, source) => JSON.stringify({ v: 1, pid, start: reg.startTimeOf(pid), boot: reg.bootId(), transcript, agent: k, source, at: ts() })
-			writeFileSync(join(regDir95, `${pid}.json`), entry(tx(k), "startup"))
+			// no registry entry for these two, as for a session that started before the bus's hooks existed
+			if (k === "unregistered") { mkdirSync(dirname(stub95(k)), { recursive: true }); writeFileSync(stub95(k), "// stub\n") }
+			if (!/^unregistered/.test(k)) writeFileSync(join(regDir95, `${pid}.json`), entry(tx(k), "startup"))
 			writeFileSync(c.next, entry(tx2(k), "clear"))
 			U(k, "write your handoff, then relay"); A(k, "tool_use")
 			writeFileSync(c.go, "")
@@ -4581,6 +4588,12 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		// rigel's leader, 10-26: armed with mail waiting, the Stop hook resumed the turn and the relay was cancelled unseen
 		mailRefused: out("mail").s === 5 && /1 message\(s\) wait for 'mail'/.test(out("mail").e || "") && /dismiss/.test(out("mail").e || "") && !S95.mail.rec,
 		// the agent cancelled it itself: the record says so AND that it was told, so its Stop hook stays silent (A99)
+		// a field leader, 10-30, installed the bus from inside its session and read only "not in the registry": the refusal
+		// says WHY when the stub is newer than the session, and the plain refusal stays plain when it is not
+		unregisteredSaysWhy: out("unregistered").s === 2 && /registry cannot name/.test(out("unregistered").e || "") &&
+			/written at [\d:]+, after it/.test(out("unregistered").e || "") && /\/exit, then claude/.test(out("unregistered").e || "") && !S95.unregistered.rec,
+		unregisteredOldPlain: out("unregisteredOld").s === 2 && /registry cannot name/.test(out("unregisteredOld").e || "") &&
+			!/after it/.test(out("unregisteredOld").e || "") && !S95.unregisteredOld.rec,
 		selfCancelTold: out("selfcancel").s === 0 && /relay: cancelled/.test(out("selfcancel").o || "") && /--cancel/.test(why("selfcancel")) &&
 			!!rec("selfcancel").told_at && keys("selfcancel") === "",
 	}
@@ -4684,6 +4697,47 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		Object.entries(ok99).map(([k, v]) => `${k}=${v}`).join("; ") + `; read-only record, 11 Stops -> ${loop} blocks (want 0); ` +
 		`the FIFO -> ${onFifo.hung || `exit ${onFifo.status}`}; told: "${told.reason.slice(0, 80)}…"`)
 }
+
+// A100 — A FIRST INSTALL UNDER A RUNNING SESSION SAYS THAT SESSION HAS NONE OF THE BUS. A field leader, 10-30, installed
+// the bus from inside its own session: Claude Code reads hooks when a session starts, so that one ran no SessionStart
+// (relay.mjs refused, "not in the session registry") and no Stop (no mail) - while the installer said the bus would be
+// live at its next turn end. A fake `claude` (node under that name) idles in ONE agent's folder; the variables: which
+// folder, a first install or a second, a session or a `claude -p` run.
+{
+	const r100 = mkdtempSync(join(tmpdir(), "comm-attack-firstinstall-"))
+	const kids = []
+	atExit(() => { for (const k of kids) try { k.kill() } catch {} try { rmSync(r100, { recursive: true, force: true }) } catch {} })
+	const fake100 = join(r100, "claude"), idle = join(r100, "idle.cjs")
+	try { symlinkSync(process.execPath, fake100) } catch {}
+	writeFileSync(idle, "setTimeout(() => {}, 60000)\n")
+	const project = (name) => {
+		const p = join(r100, name)
+		mkdirSync(join(p, "app"), { recursive: true })
+		mkdirSync(join(p, ".comm"), { recursive: true })
+		writeFileSync(join(p, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app" } }))
+		return p
+	}
+	// the script, then `-p` as ITS argument: node never reads it as its own flag, /proc shows it as claude's
+	const sessionIn = (cwd, ...extra) => { const k = spawn(fake100, [idle, ...extra], { cwd, stdio: "ignore" }); kids.push(k); return k }
+	const install = (p) => spawnSync(process.execPath, [join(PKG, "install.mjs"), p], { encoding: "utf8" }).stdout || ""
+	const pA = project("a"), sA = sessionIn(join(pA, "app"))
+	const pB = project("b")
+	sessionIn(join(pB, "app"), "-p")
+	nap(300)
+	const first = install(pA), second = install(pA), printRun = install(pB)
+	const warnFor = (out, id) => out.includes(`FIRST install for '${id}'`)
+	const ok100 = {
+		warnsApp: warnFor(first, "app") && first.includes(`pid ${sA.pid}`) && first.includes(join(pA, "app")),
+		silentLeader: !warnFor(first, "leader"),                     // first-installed too, nothing runs at the root: the control
+		secondSilent: !warnFor(second, "app"),
+		printRunSilent: !warnFor(printRun, "app") && !warnFor(printRun, "leader"),
+		qualified: /STARTED WITH the hooks/.test(first),
+	}
+	check("A100 a first install under a running session says that session has none of the bus until it restarts",
+		Object.values(ok100).every(Boolean),
+		Object.entries(ok100).map(([k, v]) => `${k}=${v}`).join("; ") + `; first: "${((first.split("\n").find((l) => /FIRST install/.test(l))) || "no warning").trim().slice(0, 110)}"`)
+}
+
 
 // A90 — A `send` RINGS AN IDLE RECIPIENT AT ONCE, NOT AT THE SENDER'S TURN END. Work's leader, 2026-10-24: a bell to
 // a resting expert sat until it rang by hand, because the doorbell rode only the sender's Stop hook - a leader that

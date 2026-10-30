@@ -181,7 +181,22 @@ let cmd = []
 try { cmd = readFileSync(`/proc/${me}/cmdline`, "utf8").split("\0") } catch {}
 if (cmd.includes("-p") || cmd.includes("--print")) die(`REFUSING: session ${me} is a 'claude -p' run - it has no prompt to type into`)
 const hit = lookup(me)
-if (!hit.ok) die(`the session registry cannot name this session's transcript (${hit.why}), so neither the end of this turn nor the /clear could be proved - nothing armed`)
+// WHY THE REGISTRY DOES NOT KNOW IT, when the disk can say: a session started before the bus's hooks were written never
+// ran their SessionStart (a field leader, 10-30, installed the bus from inside its own session and read only "not in
+// the registry"). The stub's mtime against the session's start, both measured; an upgrade rewrites the stub too, and
+// the same restart is the cure either way.
+function beforeHooks() {
+	try {
+		const st = readFileSync(`/proc/${me}/stat`, "utf8"), ticks = Number(st.slice(st.lastIndexOf(")") + 2).split(" ")[19])
+		const started = (Number(/^btime (\d+)/m.exec(readFileSync("/proc/stat", "utf8"))[1]) + ticks / 100) * 1000
+		const stub = statSync(join(readlinkSync(`/proc/${me}/cwd`), ".claude", "comm-hook.mjs")).mtimeMs
+		const hm = (t) => new Date(t).toTimeString().slice(0, 8)
+		return stub > started ? `\n  This session started at ${hm(started)}; the bus's hook stub here was written at ${hm(stub)}, after it. ` +
+			`Claude Code reads its hooks when a session starts, so this one has none of the bus's: no SessionStart (no registry ` +
+			`entry), no Stop (no mail handed over). Restart it once - /exit, then claude in the same folder - and the relay works.` : ""
+	} catch { return "" }
+}
+if (!hit.ok) die(`the session registry cannot name this session's transcript (${hit.why}), so neither the end of this turn nor the /clear could be proved - nothing armed${beforeHooks()}`)
 const agent = hit.agent
 if (!agent) die(`the registry entry for session ${me} names no agent - nothing armed`)
 let cwd = null
