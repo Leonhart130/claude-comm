@@ -5,33 +5,33 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-10-30 20h51 CET by `date`. **WORK IS THE MAIN FIELD**; the owner's word stands: *"tu peux utiliser tout l'usage
-jusque 100%"*. This session: the owner's ask through rigel (10-27) - own the bell's fix - SHIPPED as `2026-10-30.1`.)*
+*(2026-10-30 22h22 CET by `date`. **WORK IS THE MAIN FIELD**; the owner's word stands: *"tu peux utiliser tout l'usage
+jusque 100%"*. This session shipped the bell's fix (`.1`, the owner's ask) and the relay told (`.2`).)*
 
 0. **The field answered (10-30 20h52)**: `.1` installed, its local bell patch dropped, both dead
    claims released. Nothing asked. Not yet seen there: a bell refused on a busy box, a lone Enter - it writes if one comes.
-1. **A relay cancelled for any reason but mail still tells nobody** (rigel 10-26 14h17: an expert idled at 192 k).
-   The shape: the Stop of the turn that cancelled it says so to the agent. `Stop` is the hot path: own change, own arm,
-   `selftest` both ways. `FINDINGS.md#relay`, last paragraph.
-2. **What loses a bell's Enter** (rigel 14h17 §2: the text sat in the box, `comm sent` PENDING). Rule 8 now presses
+   **work**: its `agence` relay was cancelled 22h04 by work's own 150 k Stop hook; work fixed the hook and it relayed
+   22h09. My 22h07 letter (rung 22h10, in its transcript) came after - its answer lands in `work-leader/in/`.
+1. **What loses a bell's Enter** (rigel 14h17 §2: the text sat in the box, `comm sent` PENDING). Rule 8 now presses
    the Enter alone at the next ring; the cause is unmeasured. And **Ctrl+Z in a shell-less window**: avoided, not
    detected - `who` could say "no input box" per session (`screenAtRest`), outside the bus's bytes.
-3. **rigel's four memory ideas** (its 10-25 15h09 letter; my 20h06 reply disposes them): `claim --machine`, `launch --memory`,
-   memory in `who` (outside who.mjs - the bus is ~50 754 of 58 000 B), "closed" vs "crashed" from `.comm/close/`.
-4. **Arm LESSONS §8**: the `channel:` row compares my outgoing letters' written time with the file's (>10 min warns).
-5. **Letters waiting for a bell**: deneb's and atlas's - `node bin/exchange-bell.mjs --peer <channel> --ref <file>` when
+2. **rigel's four memory ideas** (its 10-25 15h09 letter; my 20h06 reply disposes them): `claim --machine`, `launch --memory`,
+   memory in `who` (outside who.mjs - the bus is at 91 %, A22), "closed" vs "crashed" from `.comm/close/`.
+3. **Arm LESSONS §8**: the `channel:` row compares my outgoing letters' written time with the file's (>10 min warns).
+4. **Letters waiting for a bell**: deneb's and atlas's - `node bin/exchange-bell.mjs --peer <channel> --ref <file>` when
    their leaders run.
-6. **Unarmed: the generated SKILL names every tool.** A92 gates the README's reference only.
-7. **`boot --prove-red` is ~1 h** because `--only` cuts output, not work. 10-30 used a scratch harness that runs ONE
+5. **Unarmed: the generated SKILL names every tool.** A92 gates the README's reference only.
+6. **`boot --prove-red` is ~1 h** because `--only` cuts output, not work. 10-30 used a scratch harness that runs ONE
    block in its fixture (`FINDINGS.md#stranded-named`, last paragraph) - make that `--only` itself (C).
-8. **`channel:` prints "arrived 20h ago" for a letter 1 min old**: its age is the NAME's date at 00:00Z (`stampOfName`),
+7. **`channel:` prints "arrived 20h ago" for a letter 1 min old**: its age is the NAME's date at 00:00Z (`stampOfName`),
    right for ordering, wrong as an arrival. Show the mtime there, or "dated <day>".
 
 **Done 10-30** (`b5859df` `.1`, `9b76066`): **wake's rule 8** - the bell reads the screen and never types into
 somebody's words (A98, 9 mutants; `#bell-into-typing` FIXED), the exchange bell too; `relay.mjs` refuses to arm on
 mail waiting (A95 `mail`); a letter or a dead claim a close NAMED stops gating (NEXT 0 of 10-25; prove-red arm, 6
 mutants). Full `boot --prove-red` green on these bytes (19h45-20h51, 66 min).
-Installed in the nine trees: rigel's DRIFT was its local bell patch + six experts' missing usage bar.
+**`.2`**: a relay that did not happen is said to the agent at its next Stop (A99, 8/8 mutants;
+`#relay`). Installed in the nine trees.
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a
 codename here; the mapping is in no repo. The boot report prints the REAL directory names: **never copy a `field:` row
@@ -42,9 +42,6 @@ gets its codename and its rule BEFORE its name is written (deneb, rule 15), and 
 🔴 **THE OWNER'S WINDOW RULE (09-19, 10-24): nothing a test opens lands in his view** (*"t'as besoin d'ouvrir ces 50
 fenêtres ?"*). Every kitty arm runs in ONE minimized bench (`bench()`, `test/attack.mjs`; measured 0 panes in a visible
 tab). A new kitty arm uses `bench()`/`benchRun()`/`besideMe()`, never a bare `kitten @ launch`.
-
-**A0 - ✅ reviews #18 (09-28) and #19 (10-25) disposed** (`#review18`, `#review19`). **`boot --prove-red` took ~62 min ALONE
-on 10-25** (each fixture gate runs `attack`, 94 s now): budget for it, and make `attack` faster (C).
 
 **B - the registry half of #13 §1, MEASURED 09-27 by A31 going red on my own end-to-end probe**: a hand-fire from
 inside a session in the project rewrites that session's registry entry. Design in `FINDINGS.md#review13` "Named, not

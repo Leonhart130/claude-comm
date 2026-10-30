@@ -4441,10 +4441,11 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 // arming: no first prompt (the refusal hands back the config line to type), no guard, and a session inside a session -
 // one WITH a registry entry of its own and in the window's foreground list, as a `claude -p` the session spawned would
 // be, so nothing but the ancestry test can refuse it; and mail already waiting (its Stop hook would resume the turn and
-// cancel the relay - a field's, 10-26). Each refused, nothing armed. FINDINGS.md#relay
+// cancel the relay - a field's, 10-26). Each refused, nothing armed. And armed then `--cancel`ed by the agent itself: the
+// record says it was told, so its own Stop hook says nothing back (A99). FINDINGS.md#relay
 {
 	const r95 = mkdtempSync(join(tmpdir(), "comm-attack-relay-"))
-	const opened95 = [], ARMS = ["nominal", "typed", "dialog", "guard", "noclear", "untaken", "grace", "titled", "titledTyped"], REFUSED = ["nosay", "noguard", "nested", "mail"], SC = [...ARMS, ...REFUSED]
+	const opened95 = [], ARMS = ["nominal", "typed", "dialog", "guard", "noclear", "untaken", "grace", "titled", "titledTyped"], REFUSED = ["nosay", "noguard", "nested", "mail", "selfcancel"], SC = [...ARMS, ...REFUSED]
 	atExit(() => {
 		for (const [sock, id] of opened95)
 			try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
@@ -4524,10 +4525,13 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 				tx: tx(k), tx2: tx2(k), next: join(r95, `${k}.next.json`), regDir: regDir95, clears: k !== "noclear", swallows: k === "untaken",
 				typed: k === "typed" || k === "titledTyped" ? "hello" : "", dialog: k === "dialog", title: /^titled/.test(k) ? "leader expert" : "", boot: reg.bootId(), relay: R95, txNested: join(r95, "nested-inner.jsonl"),
 				// "nested": relay.mjs run by ANOTHER `claude` under this one - node under that name, so it is a session of its own
-				argv: k === "nested" ? [fake95, join(r95, "nested.cjs"), join(r95, `${k}.json`)] : [process.execPath, R95] }
+				argv: k === "nested" ? [fake95, join(r95, "nested.cjs"), join(r95, `${k}.json`)]
+					// "selfcancel": armed, then `--cancel` once the watcher has exec'd (before that its cmdline is not yet its own)
+					: k === "selfcancel" ? ["sh", "-c", `"${process.execPath}" "${R95}" && sleep 1 && "${process.execPath}" "${R95}" --cancel`]
+					: [process.execPath, R95] }
 			writeFileSync(join(r95, `${k}.json`), JSON.stringify(c))
 			// `mail` is refused before any screen is read: its own tab, so the panes that ARE read are not made smaller (A98)
-			const where = k === "mail" ? ["--type=tab", "--match", `window_id:${b95.id}`] : ["--type=window", ...besideMe(b95)]
+			const where = k === "mail" || k === "selfcancel" ? ["--type=tab", "--match", `window_id:${b95.id}`] : ["--type=window", ...besideMe(b95)]
 			const id = Number(spawnSync("kitten", ["@", "--to", `unix:${b95.sock}`, "launch", "--keep-focus", ...where,
 				`--cwd=${join(r95, k)}`, `--env=CLAUDE_COMM_RUNTIME=${rt95}`, fake95, join(r95, "fake.cjs"), join(r95, `${k}.json`)], { encoding: "utf8", timeout: 10000 }).stdout)
 			if (Number.isInteger(id) && id > 0) opened95.push([b95.sock, id])
@@ -4576,6 +4580,9 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		nestedRefused: out("nested").s === 2 && /inside another claude session/.test(out("nested").e || "") && !S95.nested.rec,
 		// rigel's leader, 10-26: armed with mail waiting, the Stop hook resumed the turn and the relay was cancelled unseen
 		mailRefused: out("mail").s === 5 && /1 message\(s\) wait for 'mail'/.test(out("mail").e || "") && /dismiss/.test(out("mail").e || "") && !S95.mail.rec,
+		// the agent cancelled it itself: the record says so AND that it was told, so its Stop hook stays silent (A99)
+		selfCancelTold: out("selfcancel").s === 0 && /relay: cancelled/.test(out("selfcancel").o || "") && /--cancel/.test(why("selfcancel")) &&
+			!!rec("selfcancel").told_at && keys("selfcancel") === "",
 	}
 	check("A95 a session relays itself after its turn - /clear proved, its prompt proved - and types nothing a step cannot prove",
 		!!b95 && Object.values(ok).every(Boolean),
@@ -4599,6 +4606,83 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		!!b95 && Object.values(ok96).every(Boolean),
 		`${b95 ? "" : "THE ARM COULD NOT RUN: no kitty bench for this suite; "}` + Object.entries(ok96).map(([k, v]) => `${k}=${v}`).join("; ") +
 		["titled", "titledTyped"].map((k) => `; ${k}: keys ${JSON.stringify((keys(k) || "").slice(0, 60))} "${(why(k) || (rec(k).relayed ? "relayed" : "-")).slice(0, 70)}"`).join(""))
+}
+
+// A99 — A RELAY THAT DID NOT HAPPEN IS SAID TO THE AGENT, ONCE, AT A STOP OF THE SESSION THAT ARMED IT. Work's `agence`,
+// 10-30 22h04: armed at 300 k, the field's own 150 k Stop hook blocked that turn's end, the turn resumed, the relay
+// cancelled - and the agent told its leader "the relay follows its course" and sat idle; only the record knew. The real
+// hook, byte-identical; the variable is the relay record (once, the mail). `told` is the measured case (a continuation
+// Stop) and every other leg moves one thing against it. FINDINGS.md#relay
+{
+	const r99 = mkdtempSync(join(tmpdir(), "comm-attack-relaytold-"))
+	atExit(() => { try { rmSync(r99, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(r99, ".comm", "bin"), { recursive: true })
+	for (const a of ["leader", "db"]) mkdirSync(join(r99, ".comm", "inbox", a), { recursive: true })
+	mkdirSync(join(r99, ".comm", "relay"), { recursive: true })
+	mkdirSync(join(r99, "db"), { recursive: true })
+	writeFileSync(join(r99, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", db: "db" } }))
+	for (const f of ["comm.mjs", "who.mjs"]) cpSync(join(PKG, "bin", f), join(r99, ".comm", "bin", f))
+	const B99 = join(r99, ".comm", "bin", "comm.mjs"), REC = join(r99, ".comm", "relay", "leader.json"), T99 = join(r99, "session.jsonl")
+	const env99 = { ...process.env }
+	delete env99.CLAUDE_COMM_AGENT
+	const base = { agent: "leader", session: 4242, transcript: T99, armed_at: "2026-10-30T21:04:28.983Z", relay_pid: null, relayed: false,
+		cancelled: "mail was delivered into the session after the relay was asked (its Stop hook blocked), or a turn resumed - nothing was typed",
+		ended_at: "2026-10-30T21:04:31.729Z" }
+	const plant = (o) => { rmSync(REC, { force: true }); writeFileSync(REC, JSON.stringify(o, null, 1) + "\n") }
+	const recNow = () => { try { return JSON.parse(readFileSync(REC, "utf8")) } catch { return {} } }
+	const stop99 = (active = true, transcript = T99) => {
+		const r = spawnSync(process.execPath, [B99, "hook", "stop", "--agent-root", r99], { cwd: r99, env: env99, encoding: "utf8", timeout: 10000,
+			input: JSON.stringify({ hook_event_name: "Stop", stop_hook_active: active, transcript_path: transcript }) })
+		let j = null
+		try { j = JSON.parse(r.stdout) } catch {}
+		return { block: !!j && j.decision === "block", reason: (j && j.reason) || "", status: r.status, hung: r.error ? r.error.code : null }
+	}
+	plant(base); const told = stop99(true), toldRec = recNow(), again = stop99(true)
+	plant(base); const natural = stop99(false)
+	plant({ ...base, cancelled: undefined, refused: "a guard failed at the moment of the relay, so the handoff is not proved - nothing was typed" }); const refused = stop99(true)
+	plant(base); const other = stop99(true, join(r99, "other.jsonl")), otherRec = recNow()
+	plant({ ...base, relayed: true, cancelled: undefined }); const relayed = stop99(true)
+	plant({ ...base, relayed: null, cancelled: undefined, ended_at: undefined }); const armed = stop99(true)
+	plant({ ...base, cancelled: "relay.mjs --cancel - nothing was typed", told_at: base.ended_at }); const selfCancelled = stop99(true)
+	// a SessionStart in the same transcript (a compaction keeps it) must not spend the mark: it cannot block
+	plant(base)
+	const ss = spawnSync(process.execPath, [B99, "hook", "session-start", "--agent-root", r99], { cwd: r99, env: env99, encoding: "utf8", timeout: 10000,
+		input: JSON.stringify({ hook_event_name: "SessionStart", source: "compact", transcript_path: T99 }) })
+	const ssRec = recNow(), afterSs = stop99(true)
+	// mail first: its nudge blocks and the record stays untold; the Stop after it says the relay
+	plant(base)
+	writeFileSync(join(r99, "db", "REPORT.md"), "report\n")
+	const sent = spawnSync(process.execPath, [B99, "send", "leader", "--ref", "REPORT.md", "--kind", "done"], { cwd: join(r99, "db"), env: env99, encoding: "utf8" }).status === 0
+	const mailStop = stop99(false), mailRec = recNow(), afterMail = stop99(true)
+	// CANNOT LOOP, with its POSITIVE CONTROL: a mark that cannot land (the record read-only, and still untold after) -
+	// eleven Stops say nothing. `told` + `once` above are the same eleven with the mark landing: said exactly once.
+	plant(base); chmodSync(REC, 0o444)
+	let loop = 0
+	for (let k = 0; k < 11; k++) if (stop99(true).block) loop++
+	const stillUntold = !recNow().told_at
+	chmodSync(REC, 0o644)
+	// a FIFO where the record is: the hook must not hang on it (comm.mjs's REGULAR FILES ONLY rule)
+	rmSync(REC, { force: true })
+	const fifo = spawnSync("mkfifo", [REC]).status === 0, onFifo = stop99(true)
+	rmSync(REC, { force: true })
+	const ok99 = {
+		told: told.block && /YOUR RELAY DID NOT HAPPEN/.test(told.reason) && told.reason.includes(base.cancelled) && told.reason.includes(base.armed_at) && !!toldRec.told_at,
+		once: !again.block,
+		natural: natural.block,
+		refused: refused.block && /guard failed/.test(refused.reason),
+		otherSession: !other.block && !otherRec.told_at,
+		relayedSilent: !relayed.block,
+		armedSilent: !armed.block,
+		selfCancelSilent: !selfCancelled.block,
+		sessionStartSilent: ss.status === 0 && !/YOUR RELAY/.test(ss.stdout) && !ssRec.told_at && afterSs.block,
+		mailFirst: sent && mailStop.block && !/YOUR RELAY/.test(mailStop.reason) && !mailRec.told_at && afterMail.block && /YOUR RELAY DID NOT HAPPEN/.test(afterMail.reason),
+		cannotLoop: loop === 0 && stillUntold,
+		fifo: fifo && onFifo.hung === null && onFifo.status === 0 && !onFifo.block,
+	}
+	check("A99 a relay that did not happen is said to the agent once, at a Stop of the session that armed it",
+		Object.values(ok99).every(Boolean),
+		Object.entries(ok99).map(([k, v]) => `${k}=${v}`).join("; ") + `; read-only record, 11 Stops -> ${loop} blocks (want 0); ` +
+		`the FIFO -> ${onFifo.hung || `exit ${onFifo.status}`}; told: "${told.reason.slice(0, 80)}…"`)
 }
 
 // A90 — A `send` RINGS AN IDLE RECIPIENT AT ONCE, NOT AT THE SENDER'S TURN END. Work's leader, 2026-10-24: a bell to

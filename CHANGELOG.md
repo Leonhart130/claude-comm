@@ -27,6 +27,15 @@ already have.
 
 
 
+
+## 2026-10-30.2 — bus print `48223ccb5403` — 2026-10-30
+
+- **A relay that did not happen is now said to you.** If the relay you armed was cancelled (your turn resumed: another
+  Stop hook blocked it, mail arrived, somebody typed) or refused (a guard failed, the box was not at rest), the end of
+  your next turn in the same session tells you once, with the reason. If your handoff still stands, arm it again as that
+  turn's last act. Before, only `.comm/relay/<agent>.json` knew, and an agent could sit idle sure it had relayed.
+  `relay.mjs --cancel` is not said back to you: you did it.
+
 ## 2026-10-30.1 — bus print `fb91b29cbcf6` — 2026-10-30
 
 - **The doorbell no longer types into somebody's words.** Before it types, it reads the window: the input box must be on

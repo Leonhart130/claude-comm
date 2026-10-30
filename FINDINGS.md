@@ -3784,10 +3784,24 @@ armed early in a busy turn; two Stop hooks blocked once (its own, and the bus's 
 the turn resumed, and step 2 cancelled the relay - correctly, and too late for anyone to act. **Since `2026-10-30.1` the
 arming refuses while the agent's inbox holds mail** (exit 5, a dry run too), saying how to clear it: read, `dismiss`, arm
 again as the turn's last act. A95's `mail` leg, one message in the inbox and nothing else apart from `nominal`; mutated
-(the check skipped), it reddens `mailRefused` alone. Mail that arrives AFTER the arming still cancels it. **Not built,
-named:** a relay cancelled for any other reason - somebody typed, or (their hypothesis, unverified here) a background
-sub-agent's completion notice delivered as input - still tells nobody but its record: their expert idled at 192 k until
-its leader typed `/clear` by hand (14h17). Telling the agent at that turn's Stop is the shape; it is the hot path.
+(the check skipped), it reddens `mailRefused` alone. Mail that arrives AFTER the arming still cancels it, and so does
+anything else that resumes the turn - their expert idled at 192 k until its leader typed `/clear` by hand (14h17).
+
+**10-30: a relay that did not happen is now SAID to the agent, once, at a Stop of the session that armed it.** Work's
+`agence`, 22h04, read in its transcript: armed at 300 k; work's own 150 k Stop hook (in the leader's
+`settings.local.json`, so it runs in the experts too, `#settings-inheritance`) blocked that turn's end; the turn resumed;
+the watcher recorded the cancel 252 ms later; and the agent told its leader *"le relais que j'ai armé suit son cours"*
+and sat idle. Its leader found it five minutes on and fixed its hook (never block an expert's session); re-armed, the
+relay went through at 22h09. **The fix here** (`2026-10-30.2`): when no mail waits, the bus's Stop hook reads
+`.comm/relay/<agent>.json`; a record of THIS transcript with `relayed: false` and no `told_at` is marked, read back, and
+only then said - a block giving when it was armed, why it ended, and to arm it again if the handoff stands. Mail goes
+first (its block resumes the turn anyway; the next Stop says the relay). `relay.mjs --cancel` writes `told_at` itself:
+the agent did it. **A99**, the real hook with the record as the variable, 12 legs (the measured case on a continuation
+Stop, a plain turn end, a refusal, another transcript, relayed, still armed, self-cancelled, a SessionStart in the same
+transcript, mail first, a read-only record, a FIFO); A95's `selfcancel` leg arms then cancels for real. Mutated, 8 of 8
+redden their own leg alone. **Not covered, named:** a relay that stops AFTER its `/clear` (steps 5-6 - the new
+transcript is not the one that armed); a watcher killed before it writes an end; a resumed turn shorter than the
+watcher's 300 ms poll (its Stop would come before the cancel is written - 2.5 s in the field case).
 
 ## `#settings-inheritance` — an expert runs its leader's `settings.local.json`, not its `settings.json` (2026-09-27)
 

@@ -413,6 +413,27 @@ function stubNotices(argv) {
 	return out
 }
 
+// A RELAY THAT ENDED WITHOUT RELAYING IS SAID, ONCE, at a Stop of the session that armed it. The watcher can only write
+// its record, and a field expert at 300 k then told its leader "the relay follows its course" and sat idle (10-30
+// 22h04: another Stop hook blocked, the turn resumed, the relay cancelled). Matched on the transcript, so a /clear or
+// another session is never told; marked before it is said, and said only if the mark reads back, so it cannot loop.
+function untoldRelay(root, me, transcript) {
+	const f = join(root, ".comm", "relay", `${me}.json`)
+	let r
+	try { if (!transcript || !statSync(f).isFile()) return null; r = JSON.parse(readFileSync(f, "utf8")) } catch { return null }
+	if (!r || r.transcript !== transcript || r.relayed !== false || r.told_at) return null
+	return {
+		note: `[claude-comm] YOUR RELAY DID NOT HAPPEN. This is from the BUS, not your owner. The relay you armed at ${r.armed_at} ` +
+			`ended at ${r.ended_at} without the /clear: ${r.cancelled || r.refused || "no reason recorded"}. This session and its ` +
+			`context are the same. If your handoff still stands, arm it again as the LAST act of this turn; if you mean to stay, ` +
+			`say so and end. Its record: .comm/relay/${me}.json`,
+		mark: () => {
+			const at = new Date().toISOString()
+			try { writeFileSync(f, JSON.stringify({ ...r, told_at: at }, null, 1) + "\n"); return JSON.parse(readFileSync(f, "utf8")).told_at === at } catch { return false }
+		},
+	}
+}
+
 function hookDeliver(event) {
 	let p = {}
 	try { p = JSON.parse(readStdin()) } catch {}
@@ -435,6 +456,9 @@ function hookDeliver(event) {
 	const orient = event === "session-start" ? stubNotices(process.argv.slice(2)).join("\n\n") : ""
 	const { msgs, quarantined } = pending(root, me)
 	if (!msgs.length && !quarantined) {
+		// Mail first: its block resumes the turn anyway, and the relay is said at the Stop after it.
+		const relay = event === "stop" ? untoldRelay(root, me, p.transcript_path) : null
+		if (relay && relay.mark()) { process.stdout.write(JSON.stringify({ decision: "block", reason: relay.note })); process.exit(0) }
 		if (orient) process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: orient } }))
 		process.exit(0)
 	}

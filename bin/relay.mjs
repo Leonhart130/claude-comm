@@ -205,8 +205,9 @@ if (has("--cancel")) {
 	const pid = liveWatcher()
 	if (!pid) die(`nothing is armed for '${agent}' - no live relay in ${recordPath}`, 1)
 	try { process.kill(pid) } catch (e) { die(`the armed relay (pid ${pid}) could not be stopped: ${e.code || e.message}`, 4) }
+	// told_at: the agent cancelled it itself, so its Stop hook has nothing to tell it (comm.mjs, untoldRelay)
 	try { writeFileSync(recordPath, JSON.stringify({ ...JSON.parse(readFileSync(recordPath, "utf8")), relay_pid: null, relayed: false,
-		cancelled: "relay.mjs --cancel - nothing was typed", ended_at: now() }, null, 1) + "\n") } catch {}
+		cancelled: "relay.mjs --cancel - nothing was typed", ended_at: now(), told_at: now() }, null, 1) + "\n") } catch {}
 	console.log(`relay: cancelled - the relay of '${agent}' (pid ${pid}) was stopped; nothing will be typed`)
 	process.exit(0)
 }
