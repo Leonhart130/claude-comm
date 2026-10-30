@@ -1,32 +1,35 @@
-# STATUS — claude-comm, 2026-10-25 (sessions 4–24)
+# STATUS — claude-comm, 2026-10-30 (sessions 4–25)
 
 Design and gates are in `README.md`; **this file is only what is OPEN.** Keep it short — when it grows,
 fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-10-25 21h49 CET by `date`. **WORK IS THE MAIN FIELD.** The owner: "j'te laisse gérer tout ça ce soir"; **"tu peux
-utiliser tout l'usage jusque 100%"** - never self-throttle near the cap. Tonight he made the self-relay THE priority.)*
+*(2026-10-30 20h51 CET by `date`. **WORK IS THE MAIN FIELD**; the owner's word stands: *"tu peux utiliser tout l'usage
+jusque 100%"*. This session: the owner's ask through rigel (10-27) - own the bell's fix - SHIPPED as `2026-10-30.1`.)*
 
-0. **The two ⚠ at this boot were NAMED at the 10-25 close** (work's 21h49 letter asks nothing; rigel's dead claim is
-   its own) - and THAT is the gap the owner asked about: the boot shows a close's names for stranded letters, never for
-   `channel:` or claim rows, though `.boot-state.json` holds them (`lastClose.acked`, `ackCauses`). Build it, armed.
-   And a letter that expects no answer should not make a channel UNANSWERED (a reply would ping-pong with work's boot).
-1. **The first REAL relay in a field.** rigel's leader adds `"relay"` to its config and ends its 150 k Stop hook's message
-   with `relay.mjs` (letter `…20h37-…-livre.md`); its experts are its task T8. Read `.comm/relay/<agent>.json` there:
-   relayed, the clear's ms, the prompt's ms, whether the fresh session booted. Unarmed, uncovered: `FINDINGS.md#relay`.
-2. **Work owes nothing**: measurement 1 arrived 09h08 (`turn_ended` there). Usage's first real crossing waits on work's
-   thresholds; its `statusLine` waits on the owner's word. An EXPERT's first start on a new version is still unmeasured.
-3. **rigel's four memory ideas** (its 15h09 letter; my 20h06 reply disposes them): `claim --machine`, `launch --memory`,
-   memory in `who` (outside who.mjs - the bus is 50 754 of 58 000 B), "closed" vs "crashed" from `.comm/close/`.
+0. **Read the field's answer first.** rigel's leader was rung at 18h58 with `exchange/field/out/…18h58-…-la-cloche-lit-l-ecran.md`
+   (it took the bell: `working`). It answers all four of its letters. Any reply lands in `field/in/`.
+1. **A relay cancelled for any reason but mail still tells nobody** (rigel 10-26 14h17: an expert idled at 192 k).
+   The shape: the Stop of the turn that cancelled it says so to the agent. `Stop` is the hot path: own change, own arm,
+   `selftest` both ways. `FINDINGS.md#relay`, last paragraph.
+2. **What loses a bell's Enter** (rigel 14h17 §2: the text sat in the box, `comm sent` PENDING). Rule 8 now presses
+   the Enter alone at the next ring; the cause is unmeasured. And **Ctrl+Z in a shell-less window**: avoided, not
+   detected - `who` could say "no input box" per session (`screenAtRest`), outside the bus's bytes.
+3. **rigel's four memory ideas** (its 10-25 15h09 letter; my 20h06 reply disposes them): `claim --machine`, `launch --memory`,
+   memory in `who` (outside who.mjs - the bus is ~50 754 of 58 000 B), "closed" vs "crashed" from `.comm/close/`.
 4. **Arm LESSONS §8**: the `channel:` row compares my outgoing letters' written time with the file's (>10 min warns).
-5. **Letters waiting for a bell**: rigel's `…21h55-…` (its leader mid-turn twice), deneb's, atlas's - ring with
-   `node bin/exchange-bell.mjs --peer <channel> --ref <file>` when their leaders run.
-6. **Unarmed: the generated SKILL names every tool.** A92 gates the README's reference only; `.6`'s skill still said
-   "It does not relaunch you" until `.7`, found by hand at the close.
+5. **Letters waiting for a bell**: deneb's and atlas's - `node bin/exchange-bell.mjs --peer <channel> --ref <file>` when
+   their leaders run (the bell now reads the screen first, rule 8).
+6. **Unarmed: the generated SKILL names every tool.** A92 gates the README's reference only.
+7. **`boot --prove-red` is ~1 h** because `--only` cuts output, not work. 10-30 used a scratch harness that runs ONE
+   block in its fixture (`FINDINGS.md#stranded-named`, last paragraph) - make that `--only` itself (C).
 
-**Done 10-25** (night `0779386`..`0e1dbaf`: `.3`-`.5`, `#stranded-named`, F2's zombie; evening: `.6`, `.7` the skill) - `relay.mjs`,
-the owner's priority through rigel: measured live twice, refuses on a half-typed line; A95 + 9/9 mutants, each its own condition.
+**Done 10-30** (`b5859df` `.1`, `9b76066`): **wake's rule 8** - the bell reads the screen and never types into
+somebody's words (A98, 9 mutants; `#bell-into-typing` FIXED), the exchange bell too; `relay.mjs` refuses to arm on
+mail waiting (A95 `mail`); a letter or a dead claim a close NAMED stops gating (NEXT 0 of 10-25; prove-red arm, 6
+mutants). Full `boot --prove-red` green on these bytes (19h45-20h51, 66 min).
+Installed in the nine trees: rigel's DRIFT was its local bell patch + six experts' missing usage bar.
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a
 codename here; the mapping is in no repo. The boot report prints the REAL directory names: **never copy a `field:` row
@@ -48,11 +51,6 @@ fixed" - gate `record()` AND `refresh()` on the witness. Touches `Stop`, the hot
 
 **C - tests faster, still reliable (owner, 09-27): `test/mutate.mjs` is built and in use** (10-24/25: 11 batches, 45 mutants,
 each reddening its own condition; one batch VOID - its baseline found a real defect, `#docs-from-code`). Next: `attack` itself faster, `--only <arm>` for iteration; the full suite stays the gate.
-
-**D - `#bell-into-typing`**: the bell reads the AGENT's turn, never the PERSON's input line - it cut the owner's
-half-typed message 09-27. He says it is not serious, keep writing. Named, not fixed.
-
-**E - ✅ `who` prints each session's turn since 10-24** (`#who-shows-the-turn`, A91): working, IDLE n min, a dialog, the runtime's word.
 
 **F - carried, in priority order:** #15's names (`#review15`: the prove-red registry control blames itself for a live
 session's own `compact` rewrite (A31's twin of it FIXED 10-25, `#review19`; boot's control still has it); the prettier header and `readJson` outside the print) · `REVIEW-12b.md`'s seven points (`FINDINGS.md#review12b`, each already measured) ·

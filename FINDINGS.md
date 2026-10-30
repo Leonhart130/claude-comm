@@ -3774,7 +3774,8 @@ Mutated: the edge untitled again reddens `titledRelayed` (and `titledTypedRefuse
 title that waves text through reddens `titledTypedRefused` alone; A95 green under both. **This is the "another
 version's screen" bullet above, arriving through a setting rather than a version**, and it failed in the direction
 chosen: nothing typed. Not measured: a name containing `─`, a name long enough to be cut, a theme other than the
-default (the fake draws the grey measured here).
+default (the fake draws the grey measured here). **In the field after the fix**, rigel's first named-session relay
+(its 10-26 13h41 letter): relayed, `/clear` 201 ms, prompt 258 ms.
 - **The field's Stop hook** (rigel's, at 150 k) must let the handover turn end: it does, it never blocks when
   `stop_hook_active` (read, not run).
 
