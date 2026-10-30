@@ -31,7 +31,7 @@ somebody's words (A98, 9 mutants; `#bell-into-typing` FIXED), the exchange bell 
 mail waiting (A95 `mail`); a letter or a dead claim a close NAMED stops gating (NEXT 0 of 10-25; prove-red arm, 6
 mutants). Full `boot --prove-red` green on these bytes (19h45-20h51, 66 min).
 **`.2`**: a relay that did not happen is said to the agent at its next Stop (A99, 8/8 mutants;
-`#relay`). Installed in the nine trees.
+`#relay`). Installed in the ten trees: **altair** joined the bus 10-30 22h20 (codename and leak rule 16 set first).
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a
 codename here; the mapping is in no repo. The boot report prints the REAL directory names: **never copy a `field:` row
