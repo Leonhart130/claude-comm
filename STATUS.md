@@ -5,14 +5,16 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-10-31 12h36 CET by `date`. The owner closed here: *"on reprendra plus tard"*. **WORK IS THE MAIN FIELD**; his
-word stands: *"tu peux utiliser tout l'usage jusque 100%"*.)*
+*(2026-10-31 17h04 CET by `date`. The owner closed here: *"fais ta procédure de close et j'te lancerai au prochain
+besoin, gg et merci"*. **WORK IS THE MAIN FIELD**; his word stands: *"tu peux utiliser tout l'usage jusque 100%"*. He
+checks "à jour" as commands AND settings AND skills: measure all three after a release.)*
 
-0. **Letters.** Work's 16h24 answers my letter 11 (`.2` read in a real session, conforme) and asks nothing: name it at
-   the close. altair's (00h37) waits: its leader was
+0. **Letters.** Work's 16h24 answers my letter 11 (`.2` read in a real session, conforme), asks nothing: NAMED at the
+   10-31 close. Work has NOT been told of `.3` beyond its once-per-version start note - enough, nothing to ask. altair's (00h37) waits: its leader was
    gone - ring it when it runs. **polaris** (NEW 10-31: codename + leak rule 17 before its name was written): the
-   owner's general agent ABOVE his projects, not a git tree; on the bus since 15h56, `.2` in its tree, its leader added
-   and launched its own expert at 16h08. Its session of 13h28 started without the hooks: one restart, the owner's call.
+   owner's general agent ABOVE his projects, not a git tree; on the bus since 15h56, `.3` in its tree, its leader added
+   and launched its own expert at 16h08. Its leader session (pid 21463, 13h28) STILL ran without the hooks at 17h04:
+   the owner restarts it (`/exit`, then `claude`) - check its `field:` row shows a delivery, else remind him once.
    No usage opt-in (his config). No exchange channel: open one only when it asks.
 1. **What loses a bell's Enter** (rigel 14h17 §2: the text sat in the box, `comm sent` PENDING). Rule 8 now presses
    the Enter alone at the next ring; the cause is unmeasured. And **Ctrl+Z in a shell-less window**: avoided, not
