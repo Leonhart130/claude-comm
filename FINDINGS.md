@@ -3730,6 +3730,14 @@ of 7 killed** by their own arm. **Not verified:** a real agent acting on the lin
 `selftest` was not run, since delivery (Stop, SessionStart) is untouched; only Bash calls are checked, because the
 hook's matcher is `Bash`.
 
+**10-31: thresholds with no reading of their own are silent - OPEN.** Work, 01h15: `usage.mjs --json` frozen at 00h44,
+20 points below the account's page, its thresholds never firing. Measured 12h31: the record's `session` was THIS repo's
+leader (the only tree opted in); work's `usage` carries thresholds and no `"statusLine": true`, and no settings file of
+its root or three of its experts has a statusLine. So its sessions wrote nothing and read another project's reading,
+stale as soon as that session idled - the error on the reassuring side. Not a defect of the opt-in (the owner's config
+changes only on his word); the defect is that nothing SAYS it: the installer takes thresholds without a feed in
+silence, and a threshold note would not name whose reading it is. ▶ NEXT 0.
+
 ## `#relay` — a session hands over to a fresh copy of itself, with nobody at the keyboard (2026-10-25)
 
 **Asked by the owner through rigel's leader** (letters `…auto-relais.md` 18h41 and `…auto-relais-experts.md` 20h0x,

@@ -5,15 +5,16 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-10-31 00h41 CET by `date`. **WORK IS THE MAIN FIELD**; the owner's word stands: *"tu peux utiliser tout l'usage
-jusque 100%"*.)*
+*(2026-10-31 12h36 CET by `date`. The owner closed here: *"on reprendra plus tard"*. **WORK IS THE MAIN FIELD**; his
+word stands: *"tu peux utiliser tout l'usage jusque 100%"*.)*
 
-0. **The field** (10-30 20h52): `.1` in, its bell patch dropped, nothing asked; it writes if it sees a bell refused on
-   a busy box or a lone Enter.
-   **work** answered (22h10): its own 150 k Stop hook cancelled `agence`'s relay; fixed (it skips experts); nothing asked.
-   **altair** (new field, 10-30 22h20; the owner asked me to equip it and take its request): `.3` is its request. It
-   answered 23h13 (relay passes, nothing asked) and asked if a `--guard` replaces the config's: no, it adds - now said
-   and gated, `2026-10-31.1`. My answer (00h37, its channel) waits: its leader was gone at 00h45 - ring it when it runs.
+0. **Usage thresholds with no reading of their own are SILENT** (work, 10-31 01h15 `…-usage-fige.md`). The statusLine
+   that writes `usage.json` is installed only with `"usage": {"statusLine": true}`; work set thresholds without it, so it
+   read MY session's reading, frozen at 00h44, 20 points low (measured 12h31: no statusLine in any work settings).
+   Build: the installer warns at thresholds with no opt-in; the threshold note names the session (project) that wrote
+   the reading. Arm in A93/A94's fixture. Work adds the opt-in only on the owner's word (its rule) - I told it how.
+   **Letters**: my answer to it (`…12h31-9-…`, work mid-turn, a waiter retried the bell): grep work's transcripts for
+   its name, else ring it. altair's (00h37) waits: its leader was gone - ring it when it runs. The field: nothing asked.
 1. **What loses a bell's Enter** (rigel 14h17 §2: the text sat in the box, `comm sent` PENDING). Rule 8 now presses
    the Enter alone at the next ring; the cause is unmeasured. And **Ctrl+Z in a shell-less window**: avoided, not
    detected - `who` could say "no input box" per session (`screenAtRest`), outside the bus's bytes.
@@ -31,10 +32,8 @@ jusque 100%"*.)*
    agents"; the runtime's `status` stays `busy`). My bell waiter keyed on IDLE waited 40 min. Show the turn's end from
    the transcript (`wake.readTurn`) beside the runtime's word.
 
-**Done 10-30** (FINDINGS has each): `.1` the bell reads the screen first (A98, `#bell-into-typing` FIXED), relay
-refuses on waiting mail; `.2` a relay that did not happen is said at the next Stop (A99); `.3` installed mid-session is
-said (A100, A95); boot: a NAMED letter or dead claim stops gating, a cause is demanded only when waved (prove-red arms);
-10-31 `2026-10-31.1` a `--guard` adds (A95 `flagguard`). Mutants: each reddened its own leg. All in the ten trees.
+**Done 10-30/31**: releases `.1`-`.3` and `2026-10-31.1`, boot's NAMED-letter and per-cause demand - CHANGELOG and
+FINDINGS have each, mutants included. All in the ten trees.
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a
 codename here; the mapping is in no repo. The boot report prints the REAL directory names: **never copy a `field:` row
