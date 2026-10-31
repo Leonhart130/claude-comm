@@ -5,6 +5,11 @@
  *   node .comm/bin/usage.mjs              the last reading on this machine: session and week, their age and reset
  *   node .comm/bin/usage.mjs --json       the same, as the JSON the hooks read
  *
+ *   .comm/config.json  "usage": {"week": 93, "session": 85}           a threshold, in % of the 7-day and the 5-hour window
+ *   .comm/config.json  "usage": {"agents": {"leader": {"week": 98}}}  one agent's own, over the project's
+ *   .comm/config.json  "usage": {"statusLine": true}                  the bar that WRITES the reading: without it, no session of
+ *                                                                     this project feeds its thresholds (re-run install.mjs)
+ *
  * WHY (`FINDINGS.md#usage-statusline`, asked by work 2026-10-24). Its experts stop at a threshold of the WEEK or of the
  * 5-hour SESSION, and the value came from a page a leader read by hand about once an hour - so it could be an hour old,
  * and at 05h01 on 10-25, with the browser closed, there was no reading at all. Measured before designing: Claude Code

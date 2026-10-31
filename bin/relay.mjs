@@ -9,6 +9,7 @@
  *   node .comm/bin/relay.mjs --cancel                            disarm a relay armed in this session
  *
  *   .comm/config.json  "relay": {"leader": "hey leader expert", "app": {"say": "<prompt>", "guard": "<cmd>"}}
+ *                      the first prompt each agent's fresh session is given; "guard": a command that must exit 0 too
  *   .comm/relay/<agent>.json                                     the intent, then every step and its outcome
  *
  * WHY THIS EXISTS. The owner, 2026-10-25, through a field leader that hands over at ~150 k tokens and needed him at the

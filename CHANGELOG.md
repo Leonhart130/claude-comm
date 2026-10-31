@@ -30,6 +30,15 @@ already have.
 
 
 
+
+## 2026-10-31.3 — bus print `afa94a3d457d` — 2026-10-31
+
+- **Everything `.comm/config.json` can hold is now in `.comm/README.md`**, in a new last section, *"Every setting"*,
+  generated from the installed code like *"Every command"*: usage thresholds (per project and per agent), the
+  `"statusLine": true` that feeds them, the relay's first prompt and guard, `freshRestart`. Until now only the
+  commands were there, so a setting was known only from the release note that introduced it. Your skill's reference
+  line points at the section.
+
 ## 2026-10-31.2 — bus print `dcac3ab3f640` — 2026-10-31
 
 - **A usage threshold now says when nothing of its own feeds it.** Only the bus's statusLine writes the usage reading,

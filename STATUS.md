@@ -8,8 +8,8 @@ fold the settled parts into the README.
 *(2026-10-31 12h36 CET by `date`. The owner closed here: *"on reprendra plus tard"*. **WORK IS THE MAIN FIELD**; his
 word stands: *"tu peux utiliser tout l'usage jusque 100%"*.)*
 
-0. **Letters.** Work's letter 11 (`…16h18-11-…`: release `.2`, answers its 12h35 and 13h37): work was mid-turn, a waiter
-   rang it - check `exchange/work-leader/.last-bell.json` names it, else ring. altair's (00h37) waits: its leader was
+0. **Letters.** Work's 16h24 answers my letter 11 (`.2` read in a real session, conforme) and asks nothing: name it at
+   the close. altair's (00h37) waits: its leader was
    gone - ring it when it runs. **polaris** (NEW 10-31: codename + leak rule 17 before its name was written): the
    owner's general agent ABOVE his projects, not a git tree; on the bus since 15h56, `.2` in its tree, its leader added
    and launched its own expert at 16h08. Its session of 13h28 started without the hooks: one restart, the owner's call.
@@ -31,8 +31,8 @@ word stands: *"tu peux utiliser tout l'usage jusque 100%"*.)*
    agents"; the runtime's `status` stays `busy`). My bell waiter keyed on IDLE waited 40 min. Show the turn's end from
    the transcript (`wake.readTurn`) beside the runtime's word.
 
-**Done 10-30/31**: releases `.1`-`.3`, `2026-10-31.1` and `.2` (a threshold no reading of its own feeds says so,
-`#usage-statusline`), boot's NAMED-letter and per-cause demand - CHANGELOG and FINDINGS have each, mutants included.
+**Done 10-30/31**: releases `.1`-`.3`, `2026-10-31.1`, `.2` (a threshold no reading of its own feeds says so,
+`#usage-statusline`) and `.3` (every `.comm/config.json` setting generated into the README, A92 (6), `#docs-from-code`), boot's NAMED-letter and per-cause demand - CHANGELOG and FINDINGS have each, mutants included.
 All in the eleven trees.
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a

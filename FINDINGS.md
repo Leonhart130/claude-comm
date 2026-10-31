@@ -3027,6 +3027,23 @@ The bus is at 57 936 of 58 000 B after it: the next change to `comm.mjs`/`who.mj
 ⚠️ Not verified: whether agents READ the section. The news reaches their context, and what they do with it is behaviour,
 which this repo reports but never gates (`selftest`'s rule).
 
+**10-31: the SETTINGS were never generated - only the commands.** The owner asked, after `2026-10-31.2`, whether the docs
+and skills were current. Measured: the field README's generated part covered every command and NO key of
+`.comm/config.json`; the generated skill named none either. `usage` (thresholds since 10-25, the statusLine opt-in) was in
+neither, and neither was `freshRestart`; `relay` only through its `--say` flag. A new project - polaris, installed that
+afternoon - could learn that thresholds exist only from a CHANGELOG entry it is told once. `wake.mjs` and `relay.mjs`
+already carried a ` *   .comm/config.json  "<key>": …` line in their header; nothing read it. ⇒ **Same contract as the
+commands** (`2026-10-31.3`): a tool that reads a key documents it on such a line (continuation lines indented under it),
+and the installer writes them into a new last section, *"Every setting"*, after a short paragraph on the two keys the
+installer itself writes (`leader`, `agents`). `usage.mjs` got its three lines; `relay.mjs` a line saying what its key
+does. The skill's reference line names the section. **A92 leg (6):** every key read as `cfg.<key>` in the 13 files the
+installer ships (read from its `BUS_FILES`) is in the section, and every header setting line with its continuations is
+in it; positive control, one more key read is named. **A mutant found the leg's first version blind** before it ran:
+it checked the `.comm/config.json` lines only, so a README that dropped a continuation - the "re-run install.mjs" of
+the statusLine - would have read green. The leg reads them now, and that mutant is in the batch. **Mutated, 5 of 5 killed** by leg (6), each for its own reason (baseline green, 6 wide, 246 s).
+**Not covered:** a key read under another name than `cfg` (the scan's convention, today every one of them); the meaning
+of a key, beyond its line being there; the leader-expert skill, which is not this repo's.
+
 ## `#cache-lives-an-hour` — resuming an idle expert after an hour re-writes its whole context
 
 **Asked by the owner 2026-09-13, through atlas's leader:** *(paraphrased)* waking an agent an hour later at 600k tokens
@@ -3753,7 +3770,7 @@ these values, at the age it says, which stays true while another reports the sam
 double the writes of two busy projects. **Armed:** A93 (the writer recorded and named, here and elsewhere, in the line,
 the record and the bell; unfed told once a day; restored silent; `settings.local.json` hiding ours; every fed case
 silent of it) and A94 (the warning per reason, the fix to type, silent when fed and with no threshold). **Mutated, 12 of 12 killed**, each by
-its own arm and its own leg (baseline green, 5 wide, 540 s). **Not verified:** a real session reading the new line; Claude Code's precedence of `settings.local.json` over
+its own arm and its own leg (baseline green, 5 wide, 540 s). **Measured by work in a real session** (16h20, after a `/clear` on `.2`; its 16h24 letter): the CLI line names its folder, and nothing warned, as predicted. **Not verified:** a threshold note or the daily one read in a real session (none fired); Claude Code's precedence of `settings.local.json` over
 `settings.json` for `statusLine` (taken from the documented order, not measured here); managed settings; a project
 whose sessions all have the statusLine but all idle (the reading then ages honestly, and the note says how old). Work measured, 13h37, that a session already open takes the new statusLine without a restart (the record's `session` became its own): my letter 9's "not measured", closed by the field.
 

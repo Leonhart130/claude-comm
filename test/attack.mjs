@@ -4940,11 +4940,12 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 // A92 — EVERY COMMAND IS DOCUMENTED BY THE CODE ITSELF, AND --help DOES NOTHING ELSE. The owner, 2026-10-24: "tu
 // t'assures également que les experts et leaders, et enfin tous les utilisateurs du projet aient facilement accès à une
 // documentation constamment à jour". Measured that evening: the hand-written docs had drifted - wake.mjs documented none
-// of its user flags. Five legs: (1) every option a shipped tool's code names is in that tool's own header, or declared
+// of its user flags. Six legs: (1) every option a shipped tool's code names is in that tool's own header, or declared
 // FOREIGN here with its owner; (2) every flag of every comm command is on that command's help line; (3) --help on each
 // tool exits 0, prints its usage, and does NOTHING - a recording kitten logs no call, the waiting mail stays, no wake or
 // close record appears; (4) the field README a real install writes carries every one of those lines; (5) an agent is
-// told a new version's changelog entry at its first start on it, and only once. Positive controls on (1) and (3).
+// told a new version's changelog entry at its first start on it, and only once; (6) every setting the shipped code reads
+// is in the README's "Every setting". Positive controls on (1), (3) and (6).
 {
 	// kitty's own (launch, close, wake); wake's, which close passes on; close's own detached closer and probe; comm
 	// whoami's (claim); restart-signal's (restart); git's (handoff); comm send's (usage, a crossing's message)
@@ -4993,6 +4994,25 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 	const readme = readFileSync(join(r92, ".comm", "README.md"), "utf8")
 	const notInReadme = [...helpRuns.flatMap((h) => h.lines), ...help.filter((l) => /^\s+comm /.test(l)).map((l) => l.trim().replace(/^comm /, "node .comm/bin/comm.mjs "))].filter((l) => l && !readme.includes(l))
 
+	// (6) EVERY SETTING the shipped code reads is in the README's "Every setting" (work 10-31: a project could learn its
+	// thresholds exist only from a CHANGELOG entry told once). The keys are read from the code, `cfg.<key>` in every file
+	// the installer ships - the config's one name in them; a key read under another name escapes, said in FINDINGS. And
+	// every setting line a header carries is in it. Positive control: one more key read is named.
+	const shipped = ((readFileSync(join(PKG, "install.mjs"), "utf8").match(/const BUS_FILES = \[([^\]]*)\]/) || [])[1] || "").match(/[\w-]+\.mjs/g) || []
+	const keysOf = (src) => [...src.matchAll(/\bcfg\??\.(\w+)/g)].map((m) => m[1])
+	const keys92 = [...new Set(shipped.flatMap((f) => keysOf(readFileSync(join(PKG, "bin", f), "utf8"))))]
+	const settings92 = readme.slice(Math.max(0, readme.indexOf("## Every setting")))
+	const unsetDoc = (keys) => keys.filter((k) => !settings92.includes(`"${k}"`))
+	const keysUndoc = readme.includes("## Every setting") ? unsetDoc(keys92) : ["(no Every setting section)"]
+	const keyCtl = unsetDoc(keysOf("const x = cfg.a92NotAKey")).includes("a92NotAKey")
+	// each setting line AND the lines indented under it (its "re-run install.mjs" lives there: a README that dropped them
+	// read green on the first version of this leg - a mutant said so before it ran)
+	const headerSettings = shipped.flatMap((f) => { const ls = readFileSync(join(PKG, "bin", f), "utf8").split("\n"), out = []
+		ls.forEach((l, i) => { if (!/^ \*\s{2,}\.comm\/config\.json\s/.test(l)) return
+			out.push(l.replace(/^ \*\s+/, "")); for (let j = i + 1; j < ls.length && /^ \*\s{20,}\S/.test(ls[j]) && !/^ \*\s+(node |\.comm\/)/.test(ls[j]); j++) out.push(ls[j].replace(/^ \*\s+/, "")) })
+		return out })
+	const settingNotInReadme = headerSettings.filter((l) => !settings92.includes(l))
+
 	// (5) the news: the entry for the installed version, at the first start, once
 	const label = String(JSON.parse(readFileSync(join(r92, ".comm", "INSTALLED.json"), "utf8")).label || "").replace(/\+unreleased$/, "")
 	const entry = (readFileSync(join(PKG, "CHANGELOG.md"), "utf8").split(/^## /m).find((e) => e.startsWith(label + " ")) || "")
@@ -5003,14 +5023,17 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 	const s1 = start(), s2 = start()
 	const told = s1.includes(`claude-comm is now ${label}`) && s1.includes(firstLine.trim().slice(0, 60)), once = !s2.includes("claude-comm is now")
 
-	check("A92 every command is documented by the code itself, --help does nothing else, and each agent is told what changed",
+	check("A92 every command and every setting is documented by the code itself, --help does nothing else, and each agent is told what changed",
 		!Object.keys(gaps).length && ctlCaught && !commGaps.length && helpRuns.every((h) => h.ok) && commHelp.status === 0 && /comm send/.test(commHelp.stdout || "") && helpAnywhere.status === 0 && /comm send/.test(helpAnywhere.stdout || "") &&
-			quiet && recorderRecords && !notInReadme.length && !!entry && told && once,
+			quiet && recorderRecords && !notInReadme.length && !!entry && told && once &&
+			shipped.length >= 13 && keys92.length >= 5 && !keysUndoc.length && keyCtl && headerSettings.length >= 5 && !settingNotInReadme.length,
 		`(1) options neither in their tool's header nor declared foreign: ${Object.keys(gaps).length ? JSON.stringify(gaps) : "none"}; positive control, one more parsed flag is named=${ctlCaught}; ` +
 		`(2) comm flags missing from their help line: ${commGaps.join(", ") || "none"}; ` +
 		`(3) --help exits 0 with its usage: ${helpRuns.filter((h) => !h.ok).map((h) => h.t).join(",") || `all ${helpRuns.length}`}, comm --help=${commHelp.status === 0}, comm help outside any project=${helpAnywhere.status === 0}; nothing done (no kitten call, mail still waiting, no wake/close record)=${quiet}; positive control, the recorder records a real wake=${recorderRecords}; ` +
 		`(4) lines missing from the generated README: ${notInReadme.length ? notInReadme.slice(0, 3).join(" | ") : "none"}; ` +
-		`(5) ${label}'s entry at the first start=${told}, not again at the second=${once}`)
+		`(5) ${label}'s entry at the first start=${told}, not again at the second=${once}; ` +
+		`(6) settings read by the ${shipped.length} shipped files: ${keys92.join(", ")} - missing from "Every setting": ${keysUndoc.join(", ") || "none"}; ` +
+		`positive control, one more key read is named=${keyCtl}; header setting lines ${headerSettings.length}, missing from it: ${settingNotInReadme.length ? settingNotInReadme.slice(0, 2).join(" | ") : "none"}`)
 }
 
 // A93 — THE USAGE READING (FINDINGS.md#usage-statusline): the statusLine writes it ON CHANGE and the bar shows it; an agent

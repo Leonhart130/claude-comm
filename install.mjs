@@ -647,6 +647,14 @@ const GITIGNORE_BLOCK = "# claude-comm live state (regenerate with install.mjs)\
 const CLI_TOOLS = ["launch", "close", "relay", "wake", "claim", "restart", "handoff", "ledger", "usage"]
 const usageLines = (src) => src.split("\n").filter((l) => /^ \*\s{2,}node \S*bin\/[\w-]+\.mjs/.test(l))
 	.map((l) => l.replace(/^ \*\s+/, "").replace(/^node (\.comm\/)?bin\//, "node .comm/bin/"))
+// A SETTING IS DOCUMENTED WHERE IT IS READ (work 10-31: a project could learn that thresholds exist only from a CHANGELOG
+// entry it is told once). A tool that reads a key of .comm/config.json says so in its header, on a line that starts
+// `.comm/config.json  "<key>":`, its continuation lines indented under it - the contract of its usage lines. A92 (6).
+const settingLines = (src) => { const out = [], ls = src.split("\n")
+	for (let i = 0; i < ls.length; i++) if (/^ \*\s{2,}\.comm\/config\.json\s/.test(ls[i])) {
+		out.push(ls[i].replace(/^ \*\s+/, ""))
+		for (let j = i + 1; j < ls.length && /^ \*\s{20,}\S/.test(ls[j]) && !/^ \*\s+(node |\.comm\/)/.test(ls[j]); j++) out.push(ls[j].replace(/^ \*  /, "")) }
+	return out }
 function REFERENCE(here) {
 	const help = spawnSync(process.execPath, [join(here, "bin", "comm.mjs"), "help"], { cwd: here, encoding: "utf8" })
 	return ["## Every command — generated from the code installed here", "",
@@ -655,7 +663,14 @@ function REFERENCE(here) {
 		"expert's folder they take one `../` per level - its skill and its session start spell them for it.", "",
 		// the long form: in a non-interactive shell a bare `comm` is coreutils' (A47)
 		"```", ...(help.status === 0 ? help.stdout.trim().split("\n").map((l) => l.replace(/^(\s*)comm (?=[a-z])/, "$1node .comm/bin/comm.mjs ")) : ["(comm help could not be read)"]), "```", "",
-		...CLI_TOOLS.flatMap((t) => [`**${t}**`, "", "```", ...usageLines(readFileSync(join(here, "bin", `${t}.mjs`), "utf8")), "```", ""])].join("\n")
+		...CLI_TOOLS.flatMap((t) => [`**${t}**`, "", "```", ...usageLines(readFileSync(join(here, "bin", `${t}.mjs`), "utf8")), "```", ""]),
+		"## Every setting — `.comm/config.json`, generated from the code installed here", "",
+		"One JSON file at the project root. Two keys make the project, and the installer writes them: `\"leader\"`, the",
+		"leader's name, and `\"agents\"`, each agent's name to its folder from the root (`install.mjs <root> --add-agent",
+		"<name>=<dir>` adds one). Every other key is read by ONE tool, which documents it in its own header - listed here",
+		"from that code. A key no tool reads is ignored. Each is read when it is used, so most take effect without an install;",
+		"the ones that change `.claude/settings.json` say \"re-run install.mjs\".", "",
+		...CLI_TOOLS.flatMap((t) => { const ls = settingLines(readFileSync(join(here, "bin", `${t}.mjs`), "utf8")); return ls.length ? [`**${t}**`, "", "```", ...ls, "```", ""] : [] })].join("\n")
 }
 
 const NOTICE = (here, root) => [
@@ -1321,7 +1336,7 @@ function SKILL(ids, agentRoot) {
 	if (!isLeader && (!shared || hasExpert)) L.push(
 		`${shared ? "An expert tells" : "Tell"} your leader, by the bus, with a file: what you did, what you expected, the command, and what`,
 		"you did NOT check. The leader reports it to the bus's maintainer; you never write to another project.")
-	L.push("", `Full reference: \`${rel(".comm", "README.md")}\` - its last section, "Every command", is generated from the installed code; any tool's \`--help\` prints its part.`, "")
+	L.push("", `Full reference: \`${rel(".comm", "README.md")}\` - its last two sections, "Every command" and "Every setting" (what \`.comm/config.json\` can hold: thresholds of usage, the relay's first prompt, ...), are generated from the installed code; any tool's \`--help\` prints its commands.`, "")
 	return L.join("\n")
 }
 
