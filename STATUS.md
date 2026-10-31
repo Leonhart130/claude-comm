@@ -1,4 +1,4 @@
-# STATUS — claude-comm, 2026-10-30 (sessions 4–25)
+# STATUS — claude-comm, 2026-10-31 (sessions 4–26)
 
 Design and gates are in `README.md`; **this file is only what is OPEN.** Keep it short — when it grows,
 fold the settled parts into the README.
@@ -8,13 +8,12 @@ fold the settled parts into the README.
 *(2026-10-31 12h36 CET by `date`. The owner closed here: *"on reprendra plus tard"*. **WORK IS THE MAIN FIELD**; his
 word stands: *"tu peux utiliser tout l'usage jusque 100%"*.)*
 
-0. **Usage thresholds with no reading of their own are SILENT** (work, 10-31 01h15 `…-usage-fige.md`). The statusLine
-   that writes `usage.json` is installed only with `"usage": {"statusLine": true}`; work set thresholds without it, so it
-   read MY session's reading, frozen at 00h44, 20 points low (measured 12h31: no statusLine in any work settings).
-   Build: the installer warns at thresholds with no opt-in; the threshold note names the session (project) that wrote
-   the reading. Arm in A93/A94's fixture. Work adds the opt-in only on the owner's word (its rule) - I told it how.
-   **Letters**: my answer to it (`…12h31-9-…`, work mid-turn, a waiter retried the bell): grep work's transcripts for
-   its name, else ring it. altair's (00h37) waits: its leader was gone - ring it when it runs. The field: nothing asked.
+0. **Letters.** Work's letter 11 (`…16h18-11-…`: release `.2`, answers its 12h35 and 13h37): work was mid-turn, a waiter
+   rang it - check `exchange/work-leader/.last-bell.json` names it, else ring. altair's (00h37) waits: its leader was
+   gone - ring it when it runs. **polaris** (NEW 10-31: codename + leak rule 17 before its name was written): the
+   owner's general agent ABOVE his projects, not a git tree; on the bus since 15h56, `.2` in its tree, its leader added
+   and launched its own expert at 16h08. Its session of 13h28 started without the hooks: one restart, the owner's call.
+   No usage opt-in (his config). No exchange channel: open one only when it asks.
 1. **What loses a bell's Enter** (rigel 14h17 §2: the text sat in the box, `comm sent` PENDING). Rule 8 now presses
    the Enter alone at the next ring; the cause is unmeasured. And **Ctrl+Z in a shell-less window**: avoided, not
    detected - `who` could say "no input box" per session (`screenAtRest`), outside the bus's bytes.
@@ -32,8 +31,9 @@ word stands: *"tu peux utiliser tout l'usage jusque 100%"*.)*
    agents"; the runtime's `status` stays `busy`). My bell waiter keyed on IDLE waited 40 min. Show the turn's end from
    the transcript (`wake.readTurn`) beside the runtime's word.
 
-**Done 10-30/31**: releases `.1`-`.3` and `2026-10-31.1`, boot's NAMED-letter and per-cause demand - CHANGELOG and
-FINDINGS have each, mutants included. All in the ten trees.
+**Done 10-30/31**: releases `.1`-`.3`, `2026-10-31.1` and `.2` (a threshold no reading of its own feeds says so,
+`#usage-statusline`), boot's NAMED-letter and per-cause demand - CHANGELOG and FINDINGS have each, mutants included.
+All in the eleven trees.
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a
 codename here; the mapping is in no repo. The boot report prints the REAL directory names: **never copy a `field:` row

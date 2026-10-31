@@ -29,6 +29,17 @@ already have.
 
 
 
+
+## 2026-10-31.2 — bus print `dcac3ab3f640` — 2026-10-31
+
+- **A usage threshold now says when nothing of its own feeds it.** Only the bus's statusLine writes the usage reading,
+  and the installer adds it only where `.comm/config.json` `usage` has `"statusLine": true`. Without it, your thresholds
+  read whatever another project's session wrote last, as old as that session's last turn, and could stay silent while
+  the account was past them. Now an agent with a threshold and no statusLine of the bus in its session is told so,
+  once a day, with the reading it reads instead and how old it is. The installer warns at install too, naming the
+  agents and why. And every threshold note, plus `node .comm/bin/usage.mjs`, says whose session wrote the reading:
+  this project's, or another one by its path.
+
 ## 2026-10-31.1 — bus print `40e085a2bdee` — 2026-10-31
 
 - **A `--guard` you pass to `relay.mjs` adds to your project's guards; it never replaces them.** Every guard in

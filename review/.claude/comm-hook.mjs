@@ -58,7 +58,8 @@ const forward = (input, notices = []) => spawnSync(process.execPath,
 // THE STATUS BAR (`FINDINGS.md#usage-statusline`): a statusLine installed where the project opted in hands its usage
 // here; usage.mjs writes it for the whole machine on a change and returns the line the bar shows.
 if (process.argv[2] === "statusline") {
-	try { process.stdout.write((await import(pathToFileURL(join(dirname(bus), "usage.mjs")).href)).statusline(readFileSync(0, "utf8"))) } catch {}
+	// the PROJECT, from this stub's location: the reading names whose session wrote it (usage.mjs, work 10-31)
+	try { process.stdout.write((await import(pathToFileURL(join(dirname(bus), "usage.mjs")).href)).statusline(readFileSync(0, "utf8"), Date.now(), { project: projectRoot })) } catch {}
 	process.exit(0)
 }
 if (process.argv[2] === "post-tool") {

@@ -3730,13 +3730,32 @@ of 7 killed** by their own arm. **Not verified:** a real agent acting on the lin
 `selftest` was not run, since delivery (Stop, SessionStart) is untouched; only Bash calls are checked, because the
 hook's matcher is `Bash`.
 
-**10-31: thresholds with no reading of their own are silent - OPEN.** Work, 01h15: `usage.mjs --json` frozen at 00h44,
+**10-31: thresholds with no reading of their own are silent - CLOSED the same day, below.** Work, 01h15: `usage.mjs --json` frozen at 00h44,
 20 points below the account's page, its thresholds never firing. Measured 12h31: the record's `session` was THIS repo's
 leader (the only tree opted in); work's `usage` carries thresholds and no `"statusLine": true`, and no settings file of
 its root or three of its experts has a statusLine. So its sessions wrote nothing and read another project's reading,
 stale as soon as that session idled - the error on the reassuring side. Not a defect of the opt-in (the owner's config
 changes only on his word); the defect is that nothing SAYS it: the installer takes thresholds without a feed in
 silence, and a threshold note would not name whose reading it is. ▶ NEXT 0.
+
+**10-31, built the same afternoon (`2026-10-31.2`).** One thing the NEXT did not foresee, found by reading `check()`:
+the config is read LIVE, so a threshold starts counting the moment it is typed into `.comm/config.json` - no install.
+A warning at install alone could therefore never be seen by the project that most needs it. So three parts, each armed:
+**the reading records its project** (the stub passes its own root - never the session's cwd - and the CLI says it);
+**every threshold note names whose session wrote the reading** (this project, or ANOTHER one by its path, with the
+session's first 8 characters; the bell says `by <folder>`); and **an agent with a threshold whose own session has no
+statusLine of the bus is told so in its session, once a local day** (`feeds()`: ours in `.claude/settings.json`, not
+hidden by a person's own in `settings.local.json`), naming the reading it does read and its age. **The installer** warns
+at install, naming the agents and the reason (no opt-in, a person's own at user level, or one of theirs kept) - through
+the run-time `feeds()` on the files it just wrote, so the two cannot disagree; `oursStatus` and `thresholdsFor` moved
+into `usage.mjs` for the same reason. A change of writer alone does not rewrite the file: it names a session that wrote
+these values, at the age it says, which stays true while another reports the same, and treating it as a change would
+double the writes of two busy projects. **Armed:** A93 (the writer recorded and named, here and elsewhere, in the line,
+the record and the bell; unfed told once a day; restored silent; `settings.local.json` hiding ours; every fed case
+silent of it) and A94 (the warning per reason, the fix to type, silent when fed and with no threshold). **Mutated, 12 of 12 killed**, each by
+its own arm and its own leg (baseline green, 5 wide, 540 s). **Not verified:** a real session reading the new line; Claude Code's precedence of `settings.local.json` over
+`settings.json` for `statusLine` (taken from the documented order, not measured here); managed settings; a project
+whose sessions all have the statusLine but all idle (the reading then ages honestly, and the note says how old). Work measured, 13h37, that a session already open takes the new statusLine without a restart (the record's `session` became its own): my letter 9's "not measured", closed by the field.
 
 ## `#relay` — a session hands over to a fresh copy of itself, with nobody at the keyboard (2026-10-25)
 

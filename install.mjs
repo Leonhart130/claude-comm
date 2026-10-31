@@ -20,6 +20,7 @@ import { randomBytes, createHash } from "node:crypto"
 // Only for the git question below: this file already spawns nothing else, and it is the
 // installer rather than the bus, so A21's no-child_process rule does not reach it.
 import { spawnSync } from "node:child_process"
+import { oursStatus, thresholdsFor, feeds } from "./bin/usage.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const CHECK = process.argv.includes("--check")
@@ -113,7 +114,8 @@ const forward = (input, notices = []) => spawnSync(process.execPath,
 // THE STATUS BAR (\`FINDINGS.md#usage-statusline\`): a statusLine installed where the project opted in hands its usage
 // here; usage.mjs writes it for the whole machine on a change and returns the line the bar shows.
 if (process.argv[2] === "statusline") {
-	try { process.stdout.write((await import(pathToFileURL(join(dirname(bus), "usage.mjs")).href)).statusline(readFileSync(0, "utf8"))) } catch {}
+	// the PROJECT, from this stub's location: the reading names whose session wrote it (usage.mjs, work 10-31)
+	try { process.stdout.write((await import(pathToFileURL(join(dirname(bus), "usage.mjs")).href)).statusline(readFileSync(0, "utf8"), Date.now(), { project: projectRoot })) } catch {}
 	process.exit(0)
 }
 if (process.argv[2] === "post-tool") {
@@ -949,7 +951,8 @@ function withHooks(settings) {
  * hide), is never replaced; opting out removes ours.
  */
 const STATUS_COMMAND = `if command -v node >/dev/null 2>&1; then node "$CLAUDE_PROJECT_DIR/.claude/comm-hook.mjs" statusline; fi`
-const oursStatus = (sl) => /\.claude\/comm-hook\.mjs"? statusline\b/.test(String((sl && sl.command) || ""))
+// `oursStatus`, `thresholdsFor` and `feeds` are usage.mjs's: the warning below and the one an agent is told at run time
+// must never disagree about what feeds a reading.
 function withStatusLine(settings, want, userHasOwn) {
 	const s = { ...settings }
 	if (s.statusLine && !oursStatus(s.statusLine)) return s
@@ -1553,5 +1556,21 @@ if (CHECK) {
 		if (pids.length) console.log(`\n  ⚠ FIRST install for '${id}', and a session already runs there (pid ${pids.join(", ")}): it started with\n` +
 			`    none of the bus's hooks - no mail is handed to it and the registry does not know it, so relay.mjs\n` +
 			`    refuses there - until it restarts once: /exit, then claude in ${dir}`)
+	}
+	// THRESHOLDS THAT NO SESSION OF THEIRS FEEDS (work, 10-31 01h15; FINDINGS.md#usage-statusline): its thresholds had no
+	// `"statusLine": true`, so they read another project's reading, frozen 20 points low, and never spoke. Read from the
+	// files just written, through the run-time test itself. The config is read live, so a threshold added WITHOUT an
+	// install is not seen here: the agent is told at run time too (usage.mjs `check`), once a day. A94.
+	const unfed = Object.entries(cfg.agents).filter(([id, rel]) => Object.keys(thresholdsFor(cfg.usage, id)).length &&
+		existsSync(resolve(ROOT, rel)) && !feeds(resolve(ROOT, rel))).map(([id]) => `'${id}'`)
+	if (unfed.length) {
+		const optIn = !!(cfg.usage && cfg.usage.statusLine === true)
+		console.log(`\n  ⚠ usage thresholds that no session of their own feeds: ${unfed.join(", ")} - ` +
+			(!optIn ? `no "statusLine": true in .comm/config.json "usage"` : USER_STATUSLINE ? "a person's own statusLine at user level, which a project one would hide, so none was installed"
+				: "a person's own statusLine in their .claude/settings.json or settings.local.json, kept") + `.\n` +
+			`    Their checks read the last reading ANY session on this machine wrote, only as fresh as that session's last turn:\n` +
+			`    a threshold can stay silent while the account is past it (FINDINGS.md#usage-statusline).\n` +
+			(!optIn ? `    To feed them: add "statusLine": true to "usage" in ${cfgPath}, then: node ${join(HERE, "install.mjs")} ${ROOT}`
+				: `    That statusLine is a person's own: only they can change it.`))
 	}
 }

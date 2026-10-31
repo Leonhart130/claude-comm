@@ -5023,8 +5023,11 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 	atExit(() => { try { rmSync(r93, { recursive: true, force: true }) } catch {} })
 	mkdirSync(join(r93, ".comm"), { recursive: true }); mkdirSync(join(r93, "ex"), { recursive: true })
 	const cfg93 = (usage) => writeFileSync(join(r93, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", ex: "ex" }, ...(usage ? { usage } : {}) }))
-	cfg93({ week: 93, session: 85, agents: { leader: { week: 98, session: 98 } } })
-	execFileSync("node", [join(PKG, "install.mjs"), r93], { stdio: "pipe" })
+	// FED: "statusLine": true, the user level sandboxed so the operator's own settings never decide it - every case below
+	// but the unfed ones runs where each session writes its reading (work 10-31: a threshold with no feed of its own).
+	cfg93({ week: 93, session: 85, statusLine: true, agents: { leader: { week: 98, session: 98 } } })
+	mkdirSync(join(r93, "home"), { recursive: true })
+	execFileSync("node", [join(PKG, "install.mjs"), r93], { stdio: "pipe", env: { ...process.env, CLAUDE_CONFIG_DIR: join(r93, "home") } })
 	const env93 = { ...process.env, CLAUDE_COMM_RUNTIME: join(r93, "rt") }
 	delete env93.CLAUDE_COMM_AGENT
 	const uFile = join(r93, "rt", "claude-comm", "usage.json")
@@ -5046,18 +5049,40 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 	const second = post("ex"), mail2 = toLeader()
 	const lead = post("leader")                                // its own threshold, 98
 	bar(rl(51, 94.4, 1901100000)); const newWindow = post("ex")  // the same value, the next week
+	// WHOSE READING: the stub records its project, and a note names it - this project, or another one by its path.
+	const writer = (() => { try { return JSON.parse(readFileSync(uFile, "utf8")).project } catch { return null } })()
+	writeFileSync(uFile, JSON.stringify({ v: 1, at: Date.now(), five_hour: null, seven_day: { pct: 94.4, resets_at: 1901400000 }, session: "f0e1d2c3-x", project: "/elsewhere/proj" }))
+	const foreign = post("ex"), foreignRec = (() => { try { return readFileSync(join(r93, ".comm", "usage", "ex.md"), "utf8") } catch { return "" } })()
+	const foreignNote = (toLeader().map((x) => x.note || "").find((n) => /1901400000|by proj/.test(n))) || ""
+	// UNFED: one variable each - ex's statusLine removed from its settings.json; the leader's hidden by a settings.local.json
+	// of a person's own. Told once a day; the fed cases above are its negative control (every one of them silent of it).
+	const sPath = join(r93, "ex", ".claude", "settings.json"), sEx = JSON.parse(readFileSync(sPath, "utf8")), { statusLine: _sl, ...noSl } = sEx
+	writeFileSync(sPath, JSON.stringify(noSl)); const unfed = post("ex"), unfedAgain = post("ex")
+	writeFileSync(sPath, JSON.stringify(sEx)); const refed = post("ex")
+	writeFileSync(join(r93, ".claude", "settings.local.json"), JSON.stringify({ statusLine: { type: "command", command: "my-own-bar.sh" } }))
+	const hidden = post("leader")
+	rmSync(join(r93, ".claude", "settings.local.json"))
 	cfg93(null); bar(rl(51, 94.4, 1901700000)); const noConfig = post("ex")
 	const m = mail1[0] || {}
-	check("A93 the usage reading is written on change, and an agent at its threshold is told once per window, its leader too",
+	check("A93 the usage reading is written on change and names its writer, an agent at its threshold is told once per window, its leader too, and one whose session writes no reading is told once a day",
 		shown === "5h 50 % · 7d 92 %" && below === "" && unchangedKept && noLimits === "" && afterNone === at1 && changedWrote &&
 			/week \(7-day window\) is at 94 % - the threshold set for 'ex' is 93 %/.test(first) && /has been told/.test(first) &&
 			mail1.length === 1 && m.from === "ex" && m.kind === "fyi" && m.refPath === ".comm/usage/ex.md" && existsSync(join(r93, ".comm", "usage", "ex.md")) &&
-			second === "" && mail2.length === 1 && lead === "" && /is at 94 %/.test(newWindow) && noConfig === "",
+			second === "" && mail2.length === 1 && lead === "" && /is at 94 %/.test(newWindow) && noConfig === "" &&
+			writer === r93 && /from a session of this project/.test(first) &&
+			/from a session of ANOTHER project, \/elsewhere\/proj/.test(foreign) && /written by the statusLine of a session of ANOTHER project, \/elsewhere\/proj \(session f0e1d2c3\)/.test(foreignRec) && /by proj\)/.test(foreignNote) &&
+			/'ex' has a threshold, and its session writes NO usage reading/.test(unfed) && /by a session of ANOTHER project, \/elsewhere\/proj/.test(unfed) && !/NO usage reading/.test(unfedAgain) && refed === "" &&
+			/'leader' has a threshold, and its session writes NO usage reading/.test(hidden) && ![first, second, lead, newWindow, foreign, below].some((t) => /NO usage reading/.test(t)),
 		`bar "${shown}" (want "5h 50 % · 7d 92 %"); CONTROL below the threshold -> ${below ? `SAID: ${below.slice(0, 50)}` : "silent"}; ` +
 		`the same reading again -> file kept=${unchangedKept}; no rate_limits -> bar "${noLimits}", file kept=${afterNone === at1}; a new value -> rewritten=${changedWrote}; ` +
 		`94.4 % vs 93 % -> ${first ? `told ("${first.slice(14, 100)}…")` : "SILENT"}, the leader's inbox ${mail1.length} message (from ${m.from}, ${m.kind}, ${m.refPath}); ` +
 		`again -> ${second ? "TOLD AGAIN" : "silent"}, inbox ${mail2.length}; the leader at its own 98 % -> ${lead ? "TOLD" : "silent"}; ` +
-		`POSITIVE CONTROL the next window -> ${newWindow ? "told" : "SILENT"}; no "usage" in the config -> ${noConfig ? "TOLD" : "silent"}`)
+		`POSITIVE CONTROL the next window -> ${newWindow ? "told" : "SILENT"}; no "usage" in the config -> ${noConfig ? "TOLD" : "silent"}; ` +
+		`WHOSE: the reading's project=${writer === r93 ? "this one" : JSON.stringify(writer)}, the note says this project=${/from a session of this project/.test(first)}; ` +
+		`another project's reading -> named in the line=${/ANOTHER project, \/elsewhere\/proj/.test(foreign)}, in the record=${/ANOTHER project, \/elsewhere\/proj \(session f0e1d2c3\)/.test(foreignRec)}, in the bell="${foreignNote.slice(-40)}"; ` +
+		`UNFED: ex's statusLine removed -> ${/NO usage reading/.test(unfed) ? "told" : `SILENT ("${unfed.slice(0, 60)}")`}, naming the writer=${/ANOTHER project/.test(unfed)}; again the same day -> ${/NO usage reading/.test(unfedAgain) ? "TOLD AGAIN" : "silent"}; ` +
+		`restored -> ${refed ? `SAID: ${refed.slice(0, 60)}` : "silent"}; the leader's hidden by a settings.local.json of its own -> ${/NO usage reading/.test(hidden) ? "told" : "SILENT"}; ` +
+		`CONTROL every fed case silent of it=${![first, second, lead, newWindow, foreign, below].some((t) => /NO usage reading/.test(t))}`)
 }
 
 // A94 — THE STATUSLINE IS INSTALLED ONLY WHERE THE PROJECT OPTED IN, and never over a person's own (work's rule, 10-25: the
@@ -5069,22 +5094,34 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 	mkdirSync(join(r94, "p", ".comm"), { recursive: true }); mkdirSync(join(r94, "p", "ex", ".claude"), { recursive: true }); mkdirSync(join(r94, "home"), { recursive: true })
 	const P = join(r94, "p")
 	const cfg94 = (usage) => writeFileSync(join(P, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", ex: "ex" }, ...(usage ? { usage } : {}) }))
-	const inst = () => spawnSync(process.execPath, [join(PKG, "install.mjs"), P], { encoding: "utf8", env: { ...process.env, CLAUDE_CONFIG_DIR: join(r94, "home") } }).status
+	// THE WARNING (work 10-31): thresholds that no session of their own feeds are said at install, naming the agents and why
+	let out94 = ""
+	const inst = () => { const x = spawnSync(process.execPath, [join(PKG, "install.mjs"), P], { encoding: "utf8", env: { ...process.env, CLAUDE_CONFIG_DIR: join(r94, "home") } })
+		out94 = x.stdout || ""; return x.status }
+	const warned = () => (out94.match(/⚠ usage thresholds that no session of their own feeds: ([^\n]*)/) || [])[1] || ""
 	const slOf = (dir) => { try { return JSON.parse(readFileSync(join(dir, ".claude", "settings.json"), "utf8")).statusLine || null } catch { return null } }
 	const ours = (sl) => !!sl && /comm-hook\.mjs"? statusline/.test(sl.command || "")
-	cfg94(null); const e0 = inst(); const byDefault = slOf(P)
+	cfg94(null); const e0 = inst(); const byDefault = slOf(P), w0 = warned()
 	cfg94({ week: 93, statusLine: true })
 	writeFileSync(join(P, "ex", ".claude", "settings.json"), JSON.stringify({ statusLine: { type: "command", command: "my-own-bar.sh" } }))
-	const e1 = inst(); const optedIn = slOf(P), foreign = slOf(join(P, "ex"))
+	const e1 = inst(); const optedIn = slOf(P), foreign = slOf(join(P, "ex")), w1 = warned()
 	writeFileSync(join(r94, "home", "settings.json"), JSON.stringify({ statusLine: { type: "command", command: "users-bar.sh" } }))
-	inst(); const underUser = slOf(P)
+	inst(); const underUser = slOf(P), wUser = warned()
 	rmSync(join(r94, "home", "settings.json")); inst(); const back = slOf(P)
-	cfg94({ week: 93, statusLine: false }); inst(); const optedOut = slOf(P)
-	check("A94 the usage statusLine is installed only where the project opted in, and never over a person's own",
-		e0 === 0 && byDefault === null && e1 === 0 && ours(optedIn) && foreign && foreign.command === "my-own-bar.sh" && underUser === null && ours(back) && optedOut === null,
+	cfg94({ week: 93, statusLine: false }); inst(); const optedOut = slOf(P), wOut = warned(), fixLine = /To feed them: add "statusLine": true to "usage" in .*config\.json, then: node .*install\.mjs /.test(out94)
+	// POSITIVE CONTROLS for the warning's silence: every agent fed; and a statusLine with no threshold at all.
+	writeFileSync(join(P, "ex", ".claude", "settings.json"), "{}")
+	cfg94({ week: 93, statusLine: true }); inst(); const wFed = warned(), fedOut = out94
+	cfg94({ statusLine: true }); inst(); const wNoT = warned()
+	check("A94 the usage statusLine is installed only where the project opted in, and never over a person's own; thresholds no session feeds are said",
+		e0 === 0 && byDefault === null && e1 === 0 && ours(optedIn) && foreign && foreign.command === "my-own-bar.sh" && underUser === null && ours(back) && optedOut === null &&
+			w0 === "" && /^'ex' - a person's own statusLine in their/.test(w1) && /^'leader', 'ex' - a person's own statusLine at user level/.test(wUser) &&
+			/^'leader', 'ex' - no "statusLine": true/.test(wOut) && fixLine && wFed === "" && /installed at/.test(fedOut) && wNoT === "",
 		`no "usage" -> ${byDefault ? "ADDED" : "none"} (exit ${e0}); "statusLine": true -> ${ours(optedIn) ? "ours" : JSON.stringify(optedIn)} (exit ${e1}); ` +
 		`a person's own in ex/ -> ${foreign && foreign.command === "my-own-bar.sh" ? "kept" : JSON.stringify(foreign)}; one at user level -> ours ${underUser ? "LEFT" : "removed"}; ` +
-		`POSITIVE CONTROL it gone again -> ${ours(back) ? "ours" : "none"}; "statusLine": false -> ${optedOut ? "LEFT" : "removed"}`)
+		`POSITIVE CONTROL it gone again -> ${ours(back) ? "ours" : "none"}; "statusLine": false -> ${optedOut ? "LEFT" : "removed"}; ` +
+		`WARNING: no "usage" -> "${w0}"; ex's own kept -> "${w1.slice(0, 50)}"; user level -> "${wUser.slice(0, 50)}"; opted out -> "${wOut.slice(0, 50)}", the fix to type=${fixLine}; ` +
+		`CONTROLS every agent fed -> "${wFed}" (the install ran=${/installed at/.test(fedOut)}); a statusLine and no threshold -> "${wNoT}"`)
 }
 
 // A58 — close REFUSES over a claim this agent holds, and over claims it cannot read.
