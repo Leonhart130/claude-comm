@@ -5,12 +5,13 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-11-02 23h06 CET by `date`. The owner launched this session for work's letters: *"je te laisse voir ce qu'il en est,
-ce que t'en penses, et si c'est bon, ben, tu la traites"*. **WORK IS THE MAIN FIELD**; *"tu peux utiliser tout l'usage
-jusque 100%"*. He checks "à jour" as commands AND settings AND skills: measure all three after a release.)*
+*(2026-11-03 00h50 CET by `date`. The owner closed here: *"ok bien tu fais ta procédure de close"*, after launching this
+session for work's letters (*"si c'est bon, ben, tu la traites"*). **WORK IS THE MAIN FIELD**; *"tu peux utiliser tout
+l'usage jusque 100%"*. 🔴 **His rule, 11-02: after EVERY delivery, docs AND settings AND skills current for the agents
+(measured in work's tree), and a letter to work saying what changed and what comes next.**)*
 
-0. **Letters.** work's 23h02 (17) answered by my 23h05 note, NOT rung (asks nothing): read it at its next contact. work
-   will report its first real expert at 140 k (`relay-due`) and its first pair. altair's (00h37), deneb's and atlas's
+0. **Letters.** work's 23h35 (19) answers my 18 (`.4`), asks nothing: its own `PostToolUse` removal waits for the
+   OWNER's word (item 1). work will report its first real expert at 140 k and its first pair. altair's (00h37), deneb's and atlas's
    wait for a bell - `node bin/exchange-bell.mjs --peer <channel> --ref <file>` when their leaders run.
 1. **The middle of a turn: SHIPPED `2026-11-02.4`** (*RELAY SOON* after a tool, A104), read by work at 23h35. Its own
    `PostToolUse` guard is STILL in three experts: its removal was refused by work's auto-mode classifier and waits for
