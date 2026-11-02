@@ -3879,6 +3879,56 @@ arms it: the config's guard fails (no HANDOFF.md), the flag's passes and leaves 
 config's guard and not the flag's, the file there, no record. Mutants 2/2, each reddening that leg alone: flags replace
 the config's when given (it ARMED, exit 0); the config's replace the flags (no file). Release `2026-10-31.1`.
 
+## `#enter-in-the-paste` — a long text and its Enter read in one chunk are a paste, and nothing is submitted (2026-11-02)
+
+**The field case.** work's `recherche` relayed itself at 02:16Z on 11-02 (its 15th relay since 22:32Z): `/clear` proved
+302 ms later, the prompt (270 characters, accents) typed, then `refused: … no user row carrying it reached the new
+transcript within 15 s`. The screen showed the prompt WHOLE in the box, unsent; the new transcript held only the
+`/clear`. And then nothing could reach it: `wake` refused (*text on its input line*, rule 8, rightly), the project's guard
+refuses `send-text`, closing the window was refused by the auto-mode classifier, and `launch.mjs` will not start a second
+session on a live one (A17). The expert sat inert until somebody typed `/exit` at 17:35Z, 15 h later. Work's letter (11-02
+03h29, `exchange/work-leader/in/`) asked: could the relay press `\r` once more, since it knows that line is its own?
+
+**Measured the same evening, before building** - Claude Code 2.1.316, a real session (Haiku 5.5) in a minimized OS window,
+in a throwaway folder under a trusted parent, idle read from the TRANSCRIPT (a turn end + `turn_duration`), never from
+the box (the box is empty during a turn too - my first probe read it so and one leg came out unreadable):
+
+| typed with `kitten @ send-text` | submitted |
+| --- | --- |
+| a short text, then `\r` in a second write | 1/1 |
+| a short text and `\r` in ONE write | 1/1 |
+| **the field's 270-character prompt and `\r` in ONE write** | **0/3 - the prompt whole in the box, exactly the field's screen** |
+| then `\r` alone | 3/3 |
+| the long prompt, then `\r` in a second write, idle machine | 3/3 |
+| the long prompt, then `\r` once the box DRAWS it (57 and 68 ms) | 2/2 |
+
+So the mechanism is a paste: a long chunk is taken as pasted text, and an Enter inside the same read joins it instead of
+submitting. The relay typed the two in separate writes, which an idle machine reads separately (3/3); **that they were
+read as one at 02:16 is inferred, not measured** - the symptom is identical and the field leader names machine load as a
+candidate, but nothing recorded the reads. The same sequence (text, then `\r` at once) types every bell (`wake.mjs`, 313
+and 373 characters) and the exchange bell: the bell whose Enter was lost on 10-26 (`#bell-into-typing`'s "what loses a
+bell's Enter is unmeasured") is now a measured candidate too.
+
+**The fix, in `relay.mjs` (release `2026-11-02.1`):** (1) the Enter waits until the box SHOWS the prompt (read off the
+screen, `wake.sameText`, whitespace-blind as wake's rule 8 is) - its bytes were read, so the Enter is a key of its own;
+not shown within 5 s, it is typed as before. (2) When it is lost anyway: 3 s after the Enter, the prompt whole and ALONE
+in the box gets the Enter alone, ONCE - that box holds nothing but the relay's own words. Anything more in it, or an
+empty box, gets nothing. The record says when (`prompt.shown_ms`, `enter_again_at`), and so does the refusal.
+**A101**, in A95's bench, one variable each against `nominal`: `pasted` (the fake draws a long text 1200 ms late and loses
+an Enter read before it is drawn: ONE Enter, relayed, `shown_ms` >= 1100), `lostEnter` (the first Enter lost whatever the
+cause: pressed again, relayed), `lostEnterTyped` (lost, then somebody types: nothing more, refused); `untaken` (A95's,
+box emptied, nothing written) already demands exactly one Enter. Mutants 5/5, each reddening A101 (one also A95): no
+wait for the box; a fixed 500 ms nap instead; no second Enter; a second Enter on any text; a second Enter without
+reading the box.
+
+**Not done, said rather than implied:**
+- **The bells are not changed.** `wake` already recovers its own unsent bell at the next ring (rule 8, A98); the
+  exchange bell does not. Waiting for the box before their Enter is the same change, in a Stop hook's 10 s budget, and
+  their arms' fake sessions mostly draw no typed text - so it is its own change with its own arms, not this one.
+- **A prompt long enough to be collapsed** (`[Pasted text #1 …]`) is never "shown" and never "whole in the box": typed
+  as before, no second Enter. The threshold was not measured.
+- **The race** between the screen read and the Enter is the relay's existing one: milliseconds, narrowed, not closed.
+
 ## `#settings-inheritance` — an expert runs its leader's `settings.local.json`, not its `settings.json` (2026-09-27)
 
 **Reported by atlas's leader** (field letter 09-27): a `Stop` hook he put in his root's `settings.local.json` ran

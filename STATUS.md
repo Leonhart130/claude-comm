@@ -16,8 +16,10 @@ checks "à jour" as commands AND settings AND skills: measure all three after a 
    and launched its own expert at 16h08. Its leader session (pid 21463, 13h28) STILL ran without the hooks at 17h04:
    the owner restarts it (`/exit`, then `claude`) - check its `field:` row shows a delivery, else remind him once.
    No usage opt-in (his config). No exchange channel: open one only when it asks.
-1. **What loses a bell's Enter** (rigel 14h17 §2: the text sat in the box, `comm sent` PENDING). Rule 8 now presses
-   the Enter alone at the next ring; the cause is unmeasured. And **Ctrl+Z in a shell-less window**: avoided, not
+1. **A bell's Enter: the cause is MEASURED now** (`FINDINGS.md#enter-in-the-paste`, 11-02: a long text and its Enter in
+   one read are a paste, 0/3 submitted). The relay waits for the box since `2026-11-02.1` (A101); `wake`'s bell and the
+   exchange bell still type text then `\r` at once - same change, own arms (their fakes draw no typed text; Stop's 10 s
+   budget). Rule 8 still recovers wake's at the next ring. And **Ctrl+Z in a shell-less window**: avoided, not
    detected - `who` could say "no input box" per session (`screenAtRest`), outside the bus's bytes.
 2. **rigel's four memory ideas** (its 10-25 15h09 letter; my 20h06 reply disposes them): `claim --machine`, `launch --memory`,
    memory in `who` (outside who.mjs - the bus is at 91 %, A22), "closed" vs "crashed" from `.comm/close/`.

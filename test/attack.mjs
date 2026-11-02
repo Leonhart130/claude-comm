@@ -4448,7 +4448,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 // FINDINGS.md#relay
 {
 	const r95 = mkdtempSync(join(tmpdir(), "comm-attack-relay-"))
-	const opened95 = [], ARMS = ["nominal", "typed", "dialog", "guard", "noclear", "untaken", "grace", "titled", "titledTyped"], REFUSED = ["nosay", "noguard", "nested", "mail", "selfcancel", "unregistered", "unregisteredOld", "flagguard"], SC = [...ARMS, ...REFUSED]
+	const opened95 = [], ARMS = ["nominal", "typed", "dialog", "guard", "noclear", "untaken", "grace", "titled", "titledTyped", "pasted", "lostEnter", "lostEnterTyped"], REFUSED = ["nosay", "noguard", "nested", "mail", "selfcancel", "unregistered", "unregisteredOld", "flagguard"], SC = [...ARMS, ...REFUSED]
 	atExit(() => {
 		for (const [sock, id] of opened95)
 			try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
@@ -4477,7 +4477,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		fs.writeFileSync(c.keys, ""); fs.writeFileSync(c.pidFile, String(process.pid))
 		const RULE = "\x1b[38:2:136:136:136m" + "─".repeat(60) + "\x1b[39m"
 		const TOP = c.title ? "\x1b[38:2:136:136:136m" + "─".repeat(44) + ` ${c.title} ─` + "\x1b[39m" : RULE
-		let line = c.typed || "", tx = c.tx
+		let line = c.typed || "", tx = c.tx, pending = false, lost = false
 		const draw = () => process.stdout.write("\x1b[2J\x1b[H" + (c.dialog
 			? " Quick safety check: Is this a project you created or one you trust?\r\n\r\n ❯ No, exit\r\n   Yes, I trust this folder\r\n\r\n Enter to confirm · Esc to cancel\r\n"
 			: "\r\n\r\n" + TOP + "\r\n\x1b[m❯ " + (line || "\x1b[22;2mTry \"fake\"\x1b[22m") + "\r\n" + RULE + "\r\n  ⏵⏵ fake session\r\n"))
@@ -4485,8 +4485,15 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		if (process.stdin.setRawMode) process.stdin.setRawMode(true)
 		process.stdin.on("data", (d) => {
 			fs.appendFileSync(c.keys, d)
-			for (const ch of d.toString()) {
+			const s = d.toString()
+			// `paste` (A101): a long text is a PASTE, drawn 1200 ms later, and an Enter read before it is drawn joins it - lost.
+			// A loaded machine's reading of two writes as one, measured on a real session 11-02 (#enter-in-the-paste)
+			if (c.paste && s.replace(/\r/g, "").length > 20) { line += s.replace(/\r/g, ""); pending = true; setTimeout(() => { pending = false; draw() }, 1200); return }
+			for (const ch of s) {
 				if (ch !== "\r") { line += ch; draw(); continue }
+				if (pending) continue
+				// `loseEnter` (A101): the first Enter on a prompt is lost, whatever the cause; `appendOnLost`: then somebody types
+				if (c.loseEnter && line && line !== "/clear" && !lost) { lost = true; if (c.appendOnLost) { line += " hello"; draw() } continue }
 				const sub = line
 				line = ""
 				if (sub === "/clear") { if (c.clears) { tx = c.tx2; fs.copyFileSync(c.next, `${c.regDir}/${process.pid}.json`) } }
@@ -4531,6 +4538,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		for (const k of SC) {
 			const c = { keys: join(r95, `${k}.keys`), pidFile: join(r95, `${k}.pid`), go: join(r95, `${k}.go`), out: join(r95, `${k}.out`), cwd: join(r95, k),
 				tx: tx(k), tx2: tx2(k), next: join(r95, `${k}.next.json`), regDir: regDir95, clears: k !== "noclear", swallows: k === "untaken",
+				paste: k === "pasted", loseEnter: /^lostEnter/.test(k), appendOnLost: k === "lostEnterTyped",
 				typed: k === "typed" || k === "titledTyped" ? "hello" : "", dialog: k === "dialog", title: /^titled/.test(k) ? "leader expert" : "", boot: reg.bootId(), relay: R95, txNested: join(r95, "nested-inner.jsonl"),
 				// "nested": relay.mjs run by ANOTHER `claude` under this one - node under that name, so it is a session of its own
 				argv: k === "nested" ? [fake95, join(r95, "nested.cjs"), join(r95, `${k}.json`)]
@@ -4627,6 +4635,36 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		!!b95 && Object.values(ok96).every(Boolean),
 		`${b95 ? "" : "THE ARM COULD NOT RUN: no kitty bench for this suite; "}` + Object.entries(ok96).map(([k, v]) => `${k}=${v}`).join("; ") +
 		["titled", "titledTyped"].map((k) => `; ${k}: keys ${JSON.stringify((keys(k) || "").slice(0, 60))} "${(why(k) || (rec(k).relayed ? "relayed" : "-")).slice(0, 70)}"`).join(""))
+	// A101 — THE FIRST PROMPT'S ENTER IS A KEY OF ITS OWN, AND A LOST ONE IS PRESSED AGAIN ONLY ON THE RELAY'S OWN WORDS. work's
+	// `recherche`, 11-02 03h16: `/clear` proved, its prompt typed, the Enter lost - the prompt whole in the box, the expert
+	// inert 15 h, no bell or relaunch could reach it. Measured that day on a real session (2.1.316): a long text and its
+	// Enter read in one chunk are a paste, 3/3 left in the box; a lone Enter then submits, 3/3. Same bench, one variable
+	// each against `nominal`: `pasted` draws a long text 1200 ms late and loses an Enter read before (the Enter must wait for
+	// the box: ONE Enter, relayed); `lostEnter` loses the first Enter whatever the cause (pressed again: relayed, two);
+	// `lostEnterTyped` loses it and somebody types after it (the box is no longer the relay's own: nothing more). And
+	// `untaken`, a box emptied but nothing written, already demands ONE Enter (A95). Positive control: `nominal` and
+	// `pasted` record WHEN the box showed the prompt - read off the screen, not a fixed wait. FINDINGS.md#enter-in-the-paste
+	const after101 = {}
+	for (const k of ["pasted", "lostEnter"]) try { after101[k] = readFileSync(tx2(k), "utf8") } catch { after101[k] = "" }
+	const shownMs = (k) => rec(k).prompt ? rec(k).prompt.shown_ms : undefined
+	const ok101 = {
+		pastedOneEnter: rec("pasted").relayed === true && keys("pasted") === `/clear\r${say("pasted")}\r` && after101.pasted.includes(JSON.stringify(say("pasted"))),
+		// shown after the 1200 ms draw: the Enter waited for the SCREEN, not a fixed nap (any nap under 1200 ms loses the
+		// Enter here, and any nap leaves `nominal` with no reading). `shown_ms` is set ONLY by a match on the screen, so
+		// no upper bound: six suites at once made a read take ~1.5 s (11-02), and a bound would be measuring the load
+		pastedWaitedForTheBox: typeof shownMs("pasted") === "number" && shownMs("pasted") >= 1100,
+		nominalSawIt: typeof shownMs("nominal") === "number",
+		lostEnterPressedAgain: rec("lostEnter").relayed === true && keys("lostEnter") === `/clear\r${say("lostEnter")}\r\r` &&
+			!!rec("lostEnter").enter_again_at && after101.lostEnter.includes(JSON.stringify(say("lostEnter"))),
+		lostEnterTypedLeftAlone: rec("lostEnterTyped").relayed === false && keys("lostEnterTyped") === `/clear\r${say("lostEnterTyped")}\r` &&
+			!rec("lostEnterTyped").enter_again_at && /no user row carrying it/.test(why("lostEnterTyped")) && !/pressed again/.test(why("lostEnterTyped")),
+		control: ok.relayed && ok.untakenNotRelayed,
+	}
+	check("A101 a relay's Enter waits until the box shows its prompt, and a lost one is pressed again only on the relay's own words",
+		!!b95 && Object.values(ok101).every(Boolean),
+		`${b95 ? "" : "THE ARM COULD NOT RUN: no kitty bench for this suite; "}` + Object.entries(ok101).map(([k, v]) => `${k}=${v}`).join("; ") +
+		`; shown_ms nominal=${shownMs("nominal")} pasted=${shownMs("pasted")}` +
+		["pasted", "lostEnter", "lostEnterTyped"].map((k) => `; ${k}: keys ${JSON.stringify((keys(k) || "").slice(-12))} "${(why(k) || (rec(k).relayed ? "relayed" : "-")).slice(0, 70)}"`).join(""))
 }
 
 // A99 — A RELAY THAT DID NOT HAPPEN IS SAID TO THE AGENT, ONCE, AT A STOP OF THE SESSION THAT ARMED IT. Work's `agence`,

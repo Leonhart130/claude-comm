@@ -573,7 +573,9 @@ export function screenAtRest(win) {
 // A bell typed but never submitted (a field, 10-26: its text sat in the box, `comm sent` PENDING) is recognised whole,
 // wrapped or not; anything more in the box is somebody's words.
 const squash = (s) => String(s).replace(/\s+/g, "")
-const isOwnBell = (text) => typeof text === "string" && (squash(text) === squash(NUDGE) || squash(text) === squash(FRESH_NUDGE))
+/** Is the box's text (promptAtRest's `text`, every line joined) exactly `want`, however Claude Code wrapped it? relay.mjs's too. */
+export const sameText = (text, want) => typeof text === "string" && squash(text) === squash(want)
+const isOwnBell = (text) => sameText(text, NUDGE) || sameText(text, FRESH_NUDGE)
 
 /**
  * Does the RUNTIME keep a record of this session - <config>/sessions/<pid>.json, the file who.mjs's turnOf reads its

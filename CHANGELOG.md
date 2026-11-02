@@ -31,6 +31,15 @@ already have.
 
 
 
+
+## 2026-11-02.1 — bus print `6ac96ba40b80` — 2026-11-02
+
+- **A relay no longer leaves its first prompt sitting unsent in your box.** A long prompt and its Enter read by Claude
+  Code in one chunk are taken as a paste: the Enter becomes part of the text and nothing is submitted (measured on a
+  real session, 3 times out of 3). `relay.mjs` now presses Enter only once your box shows the prompt, and if the Enter
+  is lost anyway, it presses Enter once more after 3 s - only when the box holds exactly its own prompt and nothing
+  else. Your relay record gains two fields, `prompt.shown_ms` and `enter_again_at`; every field it had keeps its meaning.
+
 ## 2026-10-31.3 — bus print `afa94a3d457d` — 2026-10-31
 
 - **Everything `.comm/config.json` can hold is now in `.comm/README.md`**, in a new last section, *"Every setting"*,

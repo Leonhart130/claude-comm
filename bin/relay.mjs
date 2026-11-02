@@ -34,11 +34,13 @@
  * 4. THE SCREEN: the input box at rest and EMPTY (`promptAtRest`). The transcript says whether a TURN runs; only the
  *    screen says whether a PERSON has typed - and a half-typed line plus `/clear` is SUBMITTED as one prompt (09-13).
  * 5. `/clear`, PROVED: the registry names a new transcript for the same pid (the SessionStart hook writes it).
- * 6. THE SCREEN AGAIN, then the first prompt, PROVED: a user row carrying exactly it, in the NEW transcript.
+ * 6. THE SCREEN AGAIN, then the first prompt, PROVED: a user row carrying exactly it, in the NEW transcript. Its Enter
+ *    goes once the box SHOWS the prompt: a long text and its Enter in one read are a paste, and nothing is submitted.
  *
- * NOTHING IS RETRIED. A step that cannot be proved stops the relay where it is, says so in the record, and leaves the
- * session as it stands: `send-text` exits 0 doing nothing (kitty-remote-control), so a blind second try is a guess typed
- * twice into somebody's window.
+ * NOTHING IS RETRIED BLIND. A step that cannot be proved stops the relay where it is, says so in the record, and leaves
+ * the session as it stands: `send-text` exits 0 doing nothing (kitty-remote-control), so a blind second try is a guess
+ * typed twice into somebody's window. ONE exception, read before it is typed: the prompt left WHOLE and ALONE in the box
+ * 3 s after its Enter gets the Enter alone, once - that box holds nothing but the relay's own words (wake's rule 8).
  *
  * ── WHAT IT DOES NOT DO ─────────────────────────────────────────────────────────────────────────────────────────
  *
@@ -74,6 +76,10 @@ const GRACE_MS = 2000, AFTER_TURN_MAX_MS = 30 * 60_000
 // Measured 2026-10-25 on a real session: the registry named the new transcript within a second of the Enter; 09-13: 560 ms.
 // The prompt box was back at once. These bounds are what a relay waits before saying it could not prove a step.
 const CLEAR_CONFIRM_MS = 10_000, READY_MS = 15_000, TAKEN_MS = 15_000, GUARD_MS = 30_000
+// The box drew a 270-character prompt 57-68 ms after it was typed (11-02, a real session); the prompt was taken 252 ms
+// after its Enter (10-25). 5 s for the first: a loaded kitty answered a screen read in ~1.5 s (11-02, six suites at
+// once). An Enter still not taken after 3 s, with the prompt whole in the box, was lost.
+const SHOWN_MS = 5000, ENTER_LOST_MS = 3000
 
 const wake = await import(new URL("wake.mjs", import.meta.url))
 const { sessionPid, lookup } = await import(new URL("session-registry.mjs", import.meta.url))
@@ -159,16 +165,32 @@ if (ARGV[0] === "--after-turn") {
 	if (!ready || !ready.ok) stop({ refused: `cleared, but the prompt did not come back at rest within ${READY_MS / 1000} s (${ready ? ready.why : "never read"}) - the first prompt was NOT typed; the session is fresh and waits`, screen: ready && ready.tail })
 	const a = send(st.say)
 	if (a.status !== 0) stop({ refused: `cleared, but the first prompt could not be typed (send-text exit ${a.status}) - the session is fresh and waits` })
+	// 🔴 THE ENTER WAITS UNTIL THE BOX SHOWS THE PROMPT. A long text and its Enter read in ONE chunk are a paste: the Enter
+	// joins the text and nothing is submitted - measured 11-02 on 2.1.316, 270 characters + `\r` in one write left whole
+	// in the box 3/3 (FINDINGS.md#enter-in-the-paste). Two writes usually reach it as two reads; a loaded machine can hand
+	// them over as one (a field's relay, 11-02 03h16: its prompt whole in the box, the expert inert 15 h). Once the
+	// box draws the prompt, its bytes were read, and the Enter is a key of its own. Not shown in time: typed as before.
+	let shown = null
+	for (const t = Date.now(); Date.now() - t < SHOWN_MS; nap(40)) { const s = atRest(st.sock, st.window); if (s.typed && wake.sameText(s.text, st.say)) { shown = Date.now() - t; break } }
 	send("\r")
+	note({ prompt: { at: now(), shown_ms: shown } })
 	const t0 = Date.now()
+	let again = null
 	for (; Date.now() - t0 < TAKEN_MS; nap(250)) {
 		const h = lookup(me)
 		if (h.ok && taken(h.transcript, st.say)) {
 			note({ relayed: true, relay_pid: null, said_at: now(), taken_ms: Date.now() - t0, transcript_now: h.transcript })
 			process.exit(0)
 		}
+		// AND WHEN IT IS LOST ANYWAY: its OWN prompt, whole and alone, still in the box - the Enter alone, ONCE, as wake's
+		// rule 8 does for its own bell. That box holds nothing anybody else wrote; anything more in it, or an empty one, gets
+		// nothing. The field's question, 11-02: a lone `\r` then submitted 3/3.
+		if (!again && Date.now() - t0 >= ENTER_LOST_MS) {
+			const s = atRest(st.sock, st.window)
+			if (s.typed && wake.sameText(s.text, st.say)) { send("\r"); again = now(); note({ enter_again_at: again }) }
+		}
 	}
-	stop({ refused: `cleared and the first prompt typed, but no user row carrying it reached the new transcript within ${TAKEN_MS / 1000} s - look at window ${st.window}` })
+	stop({ refused: `cleared and the first prompt typed${again ? `, its Enter pressed again at ${again} on the prompt left whole in the box,` : ","} but no user row carrying it reached the new transcript within ${TAKEN_MS / 1000} s - look at window ${st.window}` })
 }
 
 // ── THE ARMING, inside the agent's own turn ──────────────────────────────────────────────────────────────────────
