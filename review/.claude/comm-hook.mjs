@@ -73,6 +73,18 @@ if (process.argv[2] === "post-tool") {
 		if (existsSync(um) && readFileSync(join(projectRoot, ".comm", "config.json"), "utf8").includes('"usage"'))
 			usage = (await import(pathToFileURL(um).href)).check({ projectRoot, agentRoot, bus }) || ""
 	} catch { /* usage is advice: it must never break a tool call */ }
+	// RELAY SOON (`FINDINGS.md#relay-due`, work 11-02 23h02: its overflows come MID-turn, where a Stop never looks): past an
+	// "at", advice in the model's context, never a block - once per 25 k step, silent while a relay is armed. The installer
+	// gives this hook every tool (matcher "*") only in a folder whose agent has an "at"; elsewhere it still hears Bash alone.
+	let soon = ""
+	try {
+		const rd = join(dirname(bus), "relay-due.mjs"), conf = readFileSync(join(projectRoot, ".comm", "config.json"), "utf8")
+		if (/"at"\s*:/.test(conf) && existsSync(rd)) {
+			const m = await import(pathToFileURL(rd).href), cfg = JSON.parse(conf), agent = m.agentOf({ root: projectRoot, cfg, agentRoot, bus })
+			const r = agent ? m.notice({ root: projectRoot, cfg, agent, payload: JSON.parse(raw || "{}"), relayBin: join(dirname(bus), "relay.mjs") }) : null
+			if (r && r.say) soon = r.text
+		}
+	} catch { /* advice must never break a tool call */ }
 	try {
 		// NOT THE COMMAND'S TEXT: a message that has just LANDED. Review #19 §4 counted 58 real sends a regex on the
 		// command missed (`C=.../comm.mjs; node $C send`) - a send that succeeded has written its file, whatever it was
@@ -86,10 +98,10 @@ if (process.argv[2] === "post-tool") {
 		if (fresh && existsSync(wake))
 			spawnSync(process.execPath, [wake, "--root", projectRoot], { timeout: 10000, stdio: "ignore" })
 	} catch { /* a doorbell must never break a tool call */ }
-	if (usage) {
+	if (usage || soon) {
 		let ev = "PostToolUse"
 		try { ev = JSON.parse(raw).hook_event_name || ev } catch {}
-		process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: ev, additionalContext: usage } }))
+		process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: ev, additionalContext: [usage, soon].filter(Boolean).join("\n\n") } }))
 	}
 	process.exit(0)
 }
@@ -119,10 +131,8 @@ if (process.argv[2] !== "session-start") {
 	if (!said.trim() && process.argv[2] === "stop") try {
 		const rd = join(dirname(bus), "relay-due.mjs"), conf = readFileSync(join(projectRoot, ".comm", "config.json"), "utf8")
 		if (/"at"\s*:/.test(conf) && existsSync(rd)) {
-			const w = spawnSync(process.execPath, [bus, "whoami", "--agent-root", agentRoot], { encoding: "utf8" })
-			const agent = w.status === 0 ? String(w.stdout).trim() : ""
-			const r = agent ? (await import(pathToFileURL(rd).href)).due({ root: projectRoot, cfg: JSON.parse(conf), agent,
-				payload: JSON.parse(stopRaw || "{}"), relayBin: join(dirname(bus), "relay.mjs") }) : null
+			const m = await import(pathToFileURL(rd).href), cfg = JSON.parse(conf), agent = m.agentOf({ root: projectRoot, cfg, agentRoot, bus })
+			const r = agent ? m.due({ root: projectRoot, cfg, agent, payload: JSON.parse(stopRaw || "{}"), relayBin: join(dirname(bus), "relay.mjs") }) : null
 			if (r && r.hold) said = JSON.stringify({ decision: "block", reason: r.reason })
 		}
 	} catch { /* a guard must never break a turn end */ }
