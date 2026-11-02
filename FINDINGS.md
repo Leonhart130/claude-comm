@@ -4020,7 +4020,14 @@ dropping `at > 0` changed nothing there - what it guards is a NEGATIVE "at", whi
 is the mail's delivery path): real sessions, delivered at the turn boundary and logged `via=hook`; hook removed, the mail
 stays. Release `2026-11-02.3`.
 
+**In the field the same evening, measured by work** (its 23h02 letter, `…-17-seuils-poses.md`): `"agence": {"at": 140000}`,
+`"*": {"at": 150000}`, its leader `"at": 0`; `relay-due.mjs` on a live expert read 83 k, under 140 k; on a REAL 227 k
+transcript, HOLD at 150 k under `"*"` and at 140 k under `agence`. Its own Stop guards are removed from four experts. It
+KEEPS its `PostToolUse` one, and the reason is a measurement: its overflows come MID-turn (an expert relayed at 180 k,
+then 297 k, in the middle of a file; turns often run past 60 k), and this one speaks only at a turn's end. ⇒ ▶ NEXT.
+
 **Not done, said rather than implied:**
+- **The middle of a turn** (above): a `PostToolUse` notice, not a block, sharing this step file so one step speaks once.
 - **Work's PreToolUse hard gate** (refuse tools past 160 k but the handoff's) is not taken: (a) was asked; a refusal of
   tools is a different contract with its own failure (an agent that cannot even write its handoff).
 - **`who` showing "IDLE, relay armed"** (work's (c)): not built - `who.mjs` is in the bus's byte budget.

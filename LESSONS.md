@@ -382,3 +382,7 @@ lot de mutants d'A102 était verte pendant que le titre manquait. Un pointeur ve
   suite entière, qui ne connaît pas `--help`. Arrêtée ; ses dossiers temporaires sont restés dans `/tmp`.
 - **zsh mange les arguments** (ma mémoire) : `echo ======` deux fois, deux sorties perdues. La règle est connue ; je l'ai
   tapée quand même.
+- **§8 encore, deux fois le même soir** : une lettre à work nommée et datée « 22h30 (`date`) », écrite à 22h25 - l'heure
+  lue juste avant ; une note nommée « 23h10 par `date` », écrite à 23h05 (renommée avant d'être lue, la première non : la
+  réponse de work la cite par son nom). Cinq minutes d'avance, dans le même sens qu'en octobre. Le bras de §8 n'est
+  toujours pas construit (▶ NEXT 6) : c'est lui qui l'aurait vu, pas moi.

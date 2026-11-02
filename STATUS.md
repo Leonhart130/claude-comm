@@ -1,48 +1,39 @@
-# STATUS — claude-comm, 2026-10-31 (sessions 4–26)
+# STATUS — claude-comm, 2026-11-02 (sessions 4–27)
 
 Design and gates are in `README.md`; **this file is only what is OPEN.** Keep it short — when it grows,
 fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-10-31 17h04 CET by `date`. The owner closed here: *"fais ta procédure de close et j'te lancerai au prochain
-besoin, gg et merci"*. **WORK IS THE MAIN FIELD**; his word stands: *"tu peux utiliser tout l'usage jusque 100%"*. He
-checks "à jour" as commands AND settings AND skills: measure all three after a release.)*
+*(2026-11-02 23h06 CET by `date`. The owner launched this session for work's letters: *"je te laisse voir ce qu'il en est,
+ce que t'en penses, et si c'est bon, ben, tu la traites"*. **WORK IS THE MAIN FIELD**; *"tu peux utiliser tout l'usage
+jusque 100%"*. He checks "à jour" as commands AND settings AND skills: measure all three after a release.)*
 
-0. **Letters.** Work's 16h24 answers my letter 11 (`.2` read in a real session, conforme), asks nothing: NAMED at the
-   10-31 close. Work has NOT been told of `.3` beyond its once-per-version start note - enough, nothing to ask. altair's (00h37) waits: its leader was
-   gone - ring it when it runs. **polaris** (NEW 10-31: codename + leak rule 17 before its name was written): the
-   owner's general agent ABOVE his projects, not a git tree; on the bus since 15h56, `.3` in its tree, its leader added
-   and launched its own expert at 16h08. Its leader session (pid 21463, 13h28) STILL ran without the hooks at 17h04:
-   the owner restarts it (`/exit`, then `claude`) - check its `field:` row shows a delivery, else remind him once.
-   No usage opt-in (his config). No exchange channel: open one only when it asks.
-1. **A bell's Enter: the cause is MEASURED now** (`FINDINGS.md#enter-in-the-paste`, 11-02: a long text and its Enter in
-   one read are a paste, 0/3 submitted). The relay waits for the box since `2026-11-02.1` (A101); `wake`'s bell and the
-   exchange bell still type text then `\r` at once - same change, own arms (their fakes draw no typed text; Stop's 10 s
-   budget). Rule 8 still recovers wake's at the next ring. And **Ctrl+Z in a shell-less window**: avoided, not
-   detected - `who` could say "no input box" per session (`screenAtRest`), outside the bus's bytes.
-2. **rigel's four memory ideas** (its 10-25 15h09 letter; my 20h06 reply disposes them): `claim --machine`, `launch --memory`,
-   memory in `who` (outside who.mjs - the bus is at 91 %, A22), "closed" vs "crashed" from `.comm/close/`.
-3. **Arm LESSONS §8**: the `channel:` row compares my outgoing letters' written time with the file's (>10 min warns).
-4. **Letters waiting for a bell**: deneb's and atlas's - `node bin/exchange-bell.mjs --peer <channel> --ref <file>` when
-   their leaders run.
-5. **Unarmed: the generated SKILL names every tool.** A92 gates the README's reference only.
-6. **`boot --prove-red` is 1-1.6 h** (66 then 98 min, 10-30) because `--only` cuts output, not work. 10-30 used a scratch harness that runs ONE
-   block in its fixture (`FINDINGS.md#stranded-named`, last paragraph) - make that `--only` itself (C).
-7. **`channel:` prints "arrived 20h ago" for a letter 1 min old**: its age is the NAME's date at 00:00Z (`stampOfName`),
-   right for ordering, wrong as an arrival. Show the mtime there, or "dated <day>".
-8. **`who` says `working` while only a background sub-agent runs** (altair 10-30 23h: turn ended, box at rest, "← 2
-   agents"; the runtime's `status` stays `busy`). My bell waiter keyed on IDLE waited 40 min. Show the turn's end from
-   the transcript (`wake.readTurn`) beside the runtime's word.
+0. **Letters.** work's 23h02 (17) answered by my 23h05 note, NOT rung (asks nothing): read it at its next contact. work
+   will report its first real expert at 140 k (`relay-due`) and its first pair. altair's (00h37), deneb's and atlas's
+   wait for a bell - `node bin/exchange-bell.mjs --peer <channel> --ref <file>` when their leaders run.
+1. **The middle of a turn** (work 23h02, measured: relays at 180 k then 297 k mid-file, turns past 60 k): a
+   `PostToolUse` notice from `relay-due` (advice, not a block), sharing its step file so one step speaks once. work keeps
+   its own `PostToolUse` guard until this ships - tell it that day. `FINDINGS.md#relay-due`.
+2. **The bells' Enter** (`#enter-in-the-paste`, the cause MEASURED 11-02): `wake`'s bell and the exchange bell still type
+   text then `\r` at once; the relay waits for the box since `2026-11-02.1`. Same change, own arms (their fakes draw no
+   typed text; Stop's 10 s budget). And **Ctrl+Z in a shell-less window**: avoided, not detected.
+3. **A31 blames a live session's own `/clear`** (a field expert's relay at 21:34:41Z, mid-suite, 11-02): `#review15`'s
+   twin for boot's control. Named in `#pairs`, not fixed.
+4. **`who`: "IDLE, relay armed"** (work's (c)) and **`working` while only a sub-agent runs** (altair 10-30: the runtime's
+   `busy`; show `wake.readTurn`'s turn end beside it). Both in `who.mjs`: the bus is at 93 % of A22.
+5. **`channel:` prints "arrived 22h ago" for a letter 1 min old**: the NAME's date at 00:00Z (`stampOfName`) - show the mtime.
+6. **rigel's four memory ideas** (10-25 15h09; my 20h06 reply): `claim --machine`, `launch --memory`, memory in `who`,
+   "closed" vs "crashed" from `.comm/close/`. **Arm LESSONS §8** (letters' written time vs the file's). **The generated
+   SKILL names every tool**: unarmed, A92 gates the README only. **`boot --prove-red` is 1-1.6 h**: make the one-block
+   harness of 10-30 (`#stranded-named`) be `--only` itself (C).
+7. **`/tmp/comm-attack-*`**: 61 folders from a suite I started by mistake and stopped (11-02, LESSONS §9); the
+   classifier refused my sweep of shared `/tmp` - the owner's to delete, or leave.
 
-**Done 11-02**: `2026-11-02.1` (a relay's Enter waits for the box, `#enter-in-the-paste`, A101) and `.2` (expert pairs,
-`pair.mjs`, `#pairs`, A102 - the star itself had no fast arm before it) and `.3` (the relay's trigger in the bus: an
-"at" holds the turn end until it is armed, `relay-due.mjs`, `#relay-due`, A103; `selftest` both ways). All in the eleven trees. polaris's tree is gone
-from disk (its bus config sits only in the owner's Trash): nothing to install there.
-
-**Done 10-30/31**: releases `.1`-`.3`, `2026-10-31.1`, `.2` (a threshold no reading of its own feeds says so,
-`#usage-statusline`) and `.3` (every `.comm/config.json` setting generated into the README, A92 (6), `#docs-from-code`), boot's NAMED-letter and per-cause demand - CHANGELOG and FINDINGS have each, mutants included.
-All in the eleven trees.
+**Done 11-02**: `2026-11-02.1` (a relay's Enter waits for the box, `#enter-in-the-paste`, A101), `.2` (expert pairs,
+`pair.mjs`, `#pairs`, A102 - the star itself had no fast arm before it), `.3` (the relay's trigger in the bus, `"at"`,
+`relay-due.mjs`, `#relay-due`, A103; `selftest` both ways). All in the eleven trees; polaris's tree is gone from disk
+(its config only in the owner's Trash). A27 reads the documents' own pointers (LESSONS §9).
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a
 codename here; the mapping is in no repo. The boot report prints the REAL directory names: **never copy a `field:` row
