@@ -44,10 +44,10 @@ for (;;) {
 // A missing bus must never break the session.
 if (!bus) process.exit(0)
 
-const forward = (input, notices = []) => spawnSync(process.execPath,
+const forward = (input, notices = [], capture = false) => spawnSync(process.execPath,
 	// --agent-root BEFORE any notice: the bus takes the FIRST one, so no notice text can stand in for it.
 	[bus, "hook", ...process.argv.slice(2), "--agent-root", agentRoot, ...notices.flatMap((n) => ["--notice", n])],
-	input === null ? { stdio: "inherit" } : { input, stdio: ["pipe", "inherit", "inherit"] })
+	input === null ? { stdio: "inherit" } : { input, stdio: ["pipe", capture ? "pipe" : "inherit", "inherit"], maxBuffer: 16 << 20 })
 
 // AFTER A SEND, RING (work's leader, 2026-10-24): the doorbell rode only the Stop hook, so a leader that sent to an
 // idle expert and went on working woke nobody until its own turn ended - measured that evening, its bell to a resting
@@ -111,7 +111,22 @@ if (process.argv[2] === "post-tool") {
 if (process.argv[2] !== "session-start") {
 	let stopRaw = ""
 	try { stopRaw = readFileSync(0, "utf8") } catch {}
-	const stopped = forward(stopRaw)
+	const stopped = forward(stopRaw, [], true)
+	// RELAY DUE (`FINDINGS.md#relay-due`, work's leader for the owner, 11-02): the bus's answer is CAPTURED, so a turn end
+	// is held for a relay only when the bus said nothing - mail first, always: mail waiting makes the relay's arming refuse,
+	// and the mail's own turn ends again. A project with no "at" in its config pays one read of it. Silent on any error.
+	let said = stopped.stdout ? String(stopped.stdout) : ""
+	if (!said.trim() && process.argv[2] === "stop") try {
+		const rd = join(dirname(bus), "relay-due.mjs"), conf = readFileSync(join(projectRoot, ".comm", "config.json"), "utf8")
+		if (/"at"\s*:/.test(conf) && existsSync(rd)) {
+			const w = spawnSync(process.execPath, [bus, "whoami", "--agent-root", agentRoot], { encoding: "utf8" })
+			const agent = w.status === 0 ? String(w.stdout).trim() : ""
+			const r = agent ? (await import(pathToFileURL(rd).href)).due({ root: projectRoot, cfg: JSON.parse(conf), agent,
+				payload: JSON.parse(stopRaw || "{}"), relayBin: join(dirname(bus), "relay.mjs") }) : null
+			if (r && r.hold) said = JSON.stringify({ decision: "block", reason: r.reason })
+		}
+	} catch { /* a guard must never break a turn end */ }
+	if (said) process.stdout.write(said)
 	try {
 		const reg = join(dirname(bus), "session-registry.mjs")
 		if (existsSync(reg)) {
@@ -192,8 +207,8 @@ try {
 		const names = others.slice(0, 12).join(", ") + (others.length > 12 ? ", +" + (others.length - 12) : "")
 		const role = whoIs === lead
 			? "the LEADER of this project's message bus - " + (others.length ? "experts: " + names : "no expert on the roster yet") +
-				". Experts write only to you: you are the bridge between them, and the one who answers the owner."
-			: "an EXPERT on this project's message bus. Your leader is '" + lead + "': you write to it, never to another expert."
+				". Experts write only to you - or to each other inside a pair you open (.comm/bin/pair.mjs) - you are the bridge between them, and the one who answers the owner."
+			: "an EXPERT on this project's message bus. Your leader is '" + lead + "': you write to it, never to another expert unless your leader opened a pair between you (its bell says so)."
 		notices.push([
 			"[claude-comm] You are '" + whoIs + "', " + role,
 			"A message is a doorbell that points at a FILE: " + cmd + " send " + (whoIs === lead ? "<agent>" : lead) +
