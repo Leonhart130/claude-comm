@@ -1164,12 +1164,25 @@ const POINTER_SOURCES = (() => {
 	// carries a title after it — a gate failing for a reason foreign to what it
 	// claims to verify. The closing backtick still keeps `#A2` from matching `#A20`.
 	const missing = refs.filter((a) => !new RegExp(`^## \`#${a}\``, "m").test(findings))
+	// 🔴 AND THE DOCUMENTS' OWN POINTERS (2026-11-02, LESSONS.md §9). One evening, three: two anchors cited from memory that
+	// never existed (`#wake-into-words`, `#stub-bytes` - form G), caught by hand before commit; and a heading my own edit
+	// ATE - its text was the edit's anchor and the replacement did not carry it back - committed in a release, while A27
+	// stayed green: it read only the code, and the pointers to that heading were in FINDINGS itself. `#anchor` in the README
+	// is the convention's placeholder, not a pointer.
+	const DOCS27 = ["FINDINGS.md", "STATUS.md", "README.md"]
+	const docRefsOf = (t) => [...String(t).matchAll(/FINDINGS\.md#([A-Za-z0-9_-]+)|`#([A-Za-z0-9_-]+)`/g)].map((m) => m[1] || m[2]).filter((a) => a !== "anchor")
+	const docRefs = [...new Set(DOCS27.flatMap((f) => { try { return docRefsOf(readFileSync(join(PKG, f), "utf8")) } catch { return [] } }))]
+	const resolves = (a) => new RegExp(`^## \`#${a}\``, "m").test(findings)
+	const docMissing = docRefs.filter((a) => !resolves(a))
+	// its control: a dangling pointer in a document, through the same reader, is caught; a real one is not
+	const docCtl = docRefsOf("see `#a27-no-such-anchor` and FINDINGS.md#relay").filter((a) => !resolves(a)).join() === "a27-no-such-anchor"
 	// A fixture control: if the bus somehow carries NO pointers, `missing` is empty
 	// and this passes while asserting nothing — the void-probe shape.
-	check("A27 every FINDINGS pointer resolves",
-		findings.length > 0 && refs.length >= 15 && missing.length === 0,
+	check("A27 every FINDINGS pointer resolves, from the code and from the documents",
+		findings.length > 0 && refs.length >= 15 && missing.length === 0 && docRefs.length >= 50 && docMissing.length === 0 && docCtl,
 		`FINDINGS.md read=${findings.length > 0}; pointers found=${refs.length} (want >=15); ` +
-		`dangling=${missing.length ? missing.join(", ") : "none"}`)
+		`dangling=${missing.length ? missing.join(", ") : "none"}; in ${DOCS27.join(", ")}: ${docRefs.length} (want >=50), ` +
+		`dangling=${docMissing.length ? docMissing.join(", ") : "none"}; control, a planted dangling one caught=${docCtl}`)
 }
 
 // A28 — every DOCUMENT the bus points at must exist.

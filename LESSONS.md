@@ -350,3 +350,35 @@ fait, et personne ne la revérifie, sauf le lecteur qui a une horloge sous les y
 **Pas encore armé, et je le nomme** (`STATUS.md` ▶ NEXT). La garde possible : la ligne `channel:` du boot compare l'heure
 écrite dans l'en-tête de mes propres lettres sortantes (« le AAAA-MM-JJ vers HHhMM ») avec la date du fichier, et prévient
 au-delà de 10 minutes d'écart. En attendant, la règle : **une heure écrite vient de `date`, jamais de ma tête.**
+
+## §9 — Un soir, trois ancres fausses : deux citées de mémoire, une mangée par ma propre modification.
+
+**Le 2026-11-02, entre 22h et 23h.** En écrivant trois sections de `FINDINGS.md` :
+- j'ai cité `#wake-into-words` (la vraie : `#bell-into-typing`) et `#stub-bytes` (la vraie : `#review12`). **Forme G**,
+  deux fois : le fond était juste, le nom inventé. Attrapées à la main avant le commit, parce que je les ai cherchées.
+- et j'ai **supprimé le titre `## #settings-inheritance`** : il servait d'ancre à ma modification (le texte remplacé
+  finissait par lui) et le texte de remplacement ne le reprenait pas. Le reste de la ligne est resté collé à la fin de ma
+  nouvelle section. **C'est parti dans une version publiée (`2026-11-02.2`)**, suite verte : A27 ne lisait que le code, et
+  les pointeurs vers ce titre étaient dans `FINDINGS.md` lui-même. Je ne l'ai vu que parce que je l'ai cherché pour répondre
+  à work une heure plus tard.
+
+### Le mécanisme
+
+Le deuxième est la forme de **§7** sous une autre peau : remplacer un bloc emporte ce qu'il contient, et l'ancre que JE
+choisis fait partie du bloc. §7 avait coûté un bras, celui-ci un titre. La vérification que je faisais (l'ancre est unique)
+ne voit pas ce que le remplacement oublie de remettre.
+
+### Le contrôle
+
+**Armé le soir même : A27 lit aussi les documents.** Chaque `` `#ancre` `` et chaque `FINDINGS.md#ancre` de `FINDINGS.md`,
+`STATUS.md` et `README.md` doit nommer un titre qui existe. Deux mutants : le titre mangé de ce soir, rejoué, et une ancre
+citée de mémoire dans `STATUS.md`. Chacun rougit A27. Et la mesure de la cécité d'avant existe déjà : la suite de base du
+lot de mutants d'A102 était verte pendant que le titre manquait. Un pointeur vers un nom de MÉMOIRE (`#prove-the-probe`)
+était le seul autre pendant : il pointe maintenant la forme J, qu'un lecteur du dépôt peut suivre.
+
+### Et deux de plus, déjà cataloguées, pour le compte
+
+- **« Une importation est une exécution »** (ma mémoire) : `node test/attack.mjs --help` pour lire un nombre a lancé une
+  suite entière, qui ne connaît pas `--help`. Arrêtée ; ses dossiers temporaires sont restés dans `/tmp`.
+- **zsh mange les arguments** (ma mémoire) : `echo ======` deux fois, deux sorties perdues. La règle est connue ; je l'ai
+  tapée quand même.

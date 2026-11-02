@@ -2568,7 +2568,7 @@ recent fix* holding for a fourth consecutive session. Alongside C4:
   🟢 **Fixed at close** — a 300 s ceiling that reports a HANG as a hang, because the arms that ran say
   nothing about the ones that never did. ⚠️ **Its first red proof was invalid and said so:** the fake suite
   used `await new Promise(() => {})`, which exits immediately on an empty event loop, so the probe never
-  hung. `setInterval` made it speak. ⇒ `#prove-the-probe`, again.
+  hung. `setInterval` made it speak. ⇒ the prove-the-probe lesson (`LESSONS.md` form J), again.
   ⚠️ C6's *named site* (A9's unbounded drain) was already bounded in `5af7e90`, after the brief's pinned
   range — **the reviewer read a tree that moved under it, and that is my fault for reviewing a live branch.**
 
