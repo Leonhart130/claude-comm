@@ -1414,6 +1414,71 @@ const POINTER_SOURCES = (() => {
 		Object.entries(ok).map(([k, v]) => `${k}=${v}`).join("; ") + `; over: "${(over.block || over.out || "").slice(0, 90)}"; mail: "${(mail.block || "").slice(0, 60)}"`)
 }
 
+// A104 — THE MIDDLE OF A TURN IS TOLD TOO: past its "at", after a tool call, ADVICE (never a block), once per 25 k - and
+// the turn-end hold stays the backstop. work 11-02 23h02 (`…-17-seuils-poses.md`): its overflows came mid-turn (180 k,
+// then 297 k, mid-file), where a Stop never looks. The REAL stub's post-tool path, one variable per leg: the installer
+// gives the hook every tool only in a folder whose agent has an "at" (the others keep Bash: a process per tool call is a
+// cost they never asked for), and takes it back - with no second entry - when the "at" goes; under; over; the same step;
+// the turn-end hold STILL comes at a step the notice told; the notice is silent at a step the hold told; the next step;
+// armed; an agent with no "at"; and a session that DECLARES another agent is that one, not the folder's. FINDINGS.md#relay-due
+{
+	const r104 = mkdtempSync(join(tmpdir(), "comm-attack-relaysoon-"))
+	atExit(() => { try { rmSync(r104, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(r104, ".comm"), { recursive: true })
+	for (const a of ["x", "y"]) mkdirSync(join(r104, a), { recursive: true })
+	const cfg104 = (xAt) => writeFileSync(join(r104, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", x: "x", y: "y" },
+		relay: { x: { say: "resume x", ...(xAt ? { at: 100000 } : {}) } } }))
+	const install104 = () => execFileSync("node", [join(PKG, "install.mjs"), r104], { stdio: "pipe" })
+	cfg104(true); install104()
+	const matchers = (a) => { try { const h = JSON.parse(readFileSync(join(r104, a, ".claude", "settings.json"), "utf8")).hooks
+		const ours = (ev) => (h[ev] || []).filter((g) => (g.hooks || []).some((x) => /comm-hook\.mjs"? post-tool\b/.test(x.command))).map((g) => g.matcher)
+		return `${ours("PostToolUse").join(",")}|${ours("PostToolUseFailure").join(",")}` } catch { return "unreadable" } }
+	const xEvery = matchers("x"), yBash = matchers("y")
+	const tx = (name, ctx) => { const f = join(r104, `${name}.jsonl`)
+		writeFileSync(f, JSON.stringify({ type: "assistant", message: { role: "assistant", content: [{ type: "text", text: "ok" }], usage: { input_tokens: 10, cache_read_input_tokens: ctx - 1010, cache_creation_input_tokens: 1000 } } }) + "\n")
+		return f }
+	const fire = (agent, verb, transcript, env = {}) => {
+		const e = { ...process.env, ...env }
+		const r = spawnSync(process.execPath, [join(r104, agent, ".claude", "comm-hook.mjs"), verb], { cwd: join(r104, agent), encoding: "utf8", env: e,
+			input: JSON.stringify({ cwd: join(r104, agent), hook_event_name: verb === "stop" ? "Stop" : "PostToolUse", tool_name: "Read", stop_hook_active: false, transcript_path: transcript }) })
+		let j = null
+		try { j = JSON.parse(r.stdout) } catch {}
+		return { s: r.status, ctx: j && j.hookSpecificOutput ? String(j.hookSpecificOutput.additionalContext || "") : "", block: j && j.decision === "block" ? String(j.reason) : "" }
+	}
+	const soon = (r) => /RELAY SOON/.test(r.ctx), steps = () => { try { return JSON.parse(readFileSync(join(r104, ".comm", "relay", "x.due.json"), "utf8")) } catch { return {} } }
+	const T1 = tx("t1", 90000)
+	const under = fire("x", "post-tool", T1)
+	tx("t1", 120000); const over = fire("x", "post-tool", T1), afterOver = steps()
+	tx("t1", 124000); const sameStep = fire("x", "post-tool", T1)
+	const holdAfterNotice = fire("x", "stop", T1)
+	const T2 = tx("t2", 130000); const holdFirst = fire("x", "stop", T2), noticeAfterHold = fire("x", "post-tool", T2)
+	tx("t1", 151000); const nextStep = fire("x", "post-tool", T1)
+	const T3 = tx("t3", 150000)
+	mkdirSync(join(r104, ".comm", "relay"), { recursive: true })
+	writeFileSync(join(r104, ".comm", "relay", "x.json"), JSON.stringify({ agent: "x", transcript: T3, relayed: null, armed_at: new Date().toISOString(), relay_pid: null }))
+	const armed = fire("x", "post-tool", T3)
+	const other = fire("y", "post-tool", tx("y1", 500000))
+	const declared = fire("x", "post-tool", tx("t4", 150000), { CLAUDE_COMM_AGENT: "y" }), undeclared = fire("x", "post-tool", tx("t5", 150000))
+	cfg104(false); install104(); const xBack = matchers("x")
+	const ok = {
+		matcherEveryTool: xEvery === "*|*" && yBash === "Bash|Bash",
+		matcherTakenBack: xBack === "Bash|Bash",
+		underSilent: under.s === 0 && !under.ctx,
+		overSays: soon(over) && /120 k/.test(over.ctx) && /'x''s relay threshold \(100 k\)/.test(over.ctx) && over.ctx.includes(join(r104, ".comm", "bin", "relay.mjs")) &&
+			!over.block && afterOver.notice === 100000 && afterOver.transcript === T1,
+		sameStepSilent: !sameStep.ctx,
+		holdStillComes: /RELAY DUE/.test(holdAfterNotice.block),
+		noticeAfterHoldSilent: /RELAY DUE/.test(holdFirst.block) && !noticeAfterHold.ctx,
+		nextStepSays: soon(nextStep) && /151 k/.test(nextStep.ctx),
+		armedSilent: !armed.ctx,
+		noAtSilent: other.s === 0 && !other.ctx,
+		declaredHonoured: !declared.ctx && soon(undeclared),
+	}
+	check("A104 past its \"at\" an agent is told mid-turn after a tool call - advice, once per 25 k - and the turn-end hold stays the backstop",
+		Object.values(ok).every(Boolean),
+		Object.entries(ok).map(([k, v]) => `${k}=${v}`).join("; ") + `; matchers x=${xEvery} y=${yBash} x after=${xBack}; over: "${over.ctx.slice(0, 80)}"`)
+}
+
 // ── A21/A22: the properties that erode by accretion, not by a single bad commit ──
 // Asked for directly by the owner (2026-08-05): "performant, compact and secure by
 // default", with a worry about memory leaks as features are added. The honest
@@ -5136,7 +5201,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 	// whoami's (claim); restart-signal's (restart); git's (handoff); comm send's (usage, a crossing's message; pair's bells)
 	const FOREIGN = { launch: ["--keep-focus", "--match", "--next-to", "--to"], close: ["--match", "--to", "--root", "--json", "--after-turn", "--verify"],
 		wake: ["--match", "--to", "--ansi"], claim: ["--agent-root"], restart: ["--by"], handoff: ["--porcelain", "--short", "--stdin"], ledger: [], usage: ["--ref", "--kind", "--note"],
-		pair: ["--kind", "--note"], "relay-due": [] }
+		pair: ["--kind", "--note"], "relay-due": ["--agent-root"] }
 	const undocumented = (src, foreign) => { const head = src.slice(0, src.indexOf("*/"))
 		return [...new Set([...src.matchAll(/["'](--[a-z][a-z0-9-]+)["']/g)].map((m) => m[1]))].filter((f) => f !== "--help" && !head.includes(f) && !foreign.includes(f)) }
 	const gaps = {}

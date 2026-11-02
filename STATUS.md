@@ -12,9 +12,8 @@ jusque 100%"*. He checks "à jour" as commands AND settings AND skills: measure 
 0. **Letters.** work's 23h02 (17) answered by my 23h05 note, NOT rung (asks nothing): read it at its next contact. work
    will report its first real expert at 140 k (`relay-due`) and its first pair. altair's (00h37), deneb's and atlas's
    wait for a bell - `node bin/exchange-bell.mjs --peer <channel> --ref <file>` when their leaders run.
-1. **The middle of a turn** (work 23h02, measured: relays at 180 k then 297 k mid-file, turns past 60 k): a
-   `PostToolUse` notice from `relay-due` (advice, not a block), sharing its step file so one step speaks once. work keeps
-   its own `PostToolUse` guard until this ships - tell it that day. `FINDINGS.md#relay-due`.
+1. **The middle of a turn: SHIPPED `2026-11-02.4`** (*RELAY SOON* after a tool, A104). work told at 23h20 to remove its
+   own `PostToolUse` guard; check its next letter says it did, and what its first real expert past 140 k did.
 2. **The bells' Enter** (`#enter-in-the-paste`, the cause MEASURED 11-02): `wake`'s bell and the exchange bell still type
    text then `\r` at once; the relay waits for the box since `2026-11-02.1`. Same change, own arms (their fakes draw no
    typed text; Stop's 10 s budget). And **Ctrl+Z in a shell-less window**: avoided, not detected.
@@ -32,7 +31,7 @@ jusque 100%"*. He checks "à jour" as commands AND settings AND skills: measure 
 
 **Done 11-02**: `2026-11-02.1` (a relay's Enter waits for the box, `#enter-in-the-paste`, A101), `.2` (expert pairs,
 `pair.mjs`, `#pairs`, A102 - the star itself had no fast arm before it), `.3` (the relay's trigger in the bus, `"at"`,
-`relay-due.mjs`, `#relay-due`, A103; `selftest` both ways). All in the eleven trees; polaris's tree is gone from disk
+`relay-due.mjs`, `#relay-due`, A103; `selftest` both ways), `.4` (the same, mid-turn, as advice, A104). All in the eleven trees; polaris's tree is gone from disk
 (its config only in the owner's Trash). A27 reads the documents' own pointers (LESSONS §9).
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a

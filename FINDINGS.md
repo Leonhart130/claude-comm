@@ -4024,10 +4024,28 @@ stays. Release `2026-11-02.3`.
 `"*": {"at": 150000}`, its leader `"at": 0`; `relay-due.mjs` on a live expert read 83 k, under 140 k; on a REAL 227 k
 transcript, HOLD at 150 k under `"*"` and at 140 k under `agence`. Its own Stop guards are removed from four experts. It
 KEEPS its `PostToolUse` one, and the reason is a measurement: its overflows come MID-turn (an expert relayed at 180 k,
-then 297 k, in the middle of a file; turns often run past 60 k), and this one speaks only at a turn's end. ⇒ ▶ NEXT.
+then 297 k, in the middle of a file; turns often run past 60 k), and this one speaks only at a turn's end.
+
+**The middle of a turn, built the same night at the owner's word** (*"tu peux le faire maintenant tant qu'on y est"*;
+`2026-11-02.4`): after a tool call, past the "at", **advice in the model's context, never a block** (*RELAY SOON*: finish
+the task in hand, start no other, hand over), once per 25 k, silent while a relay is armed - the same reading as the
+hold. **Its step has its own key in the same file**: a notice does NOT silence the hold, which stays the backstop for an
+agent that read the advice and ended its turn unarmed; a hold DOES silence the notice at its step. **It must hear every
+tool** - work's own guard listens with `matcher: "*"`, and a turn of Read/Edit has no Bash - so the installer widens the
+agent's PostToolUse (and PostToolUseFailure) matcher from `Bash` to `*` **only in a folder whose agent has an "at"**: one
+short process per tool call is a cost nobody else pays; an "at" added or removed needs one re-run of the installer, which
+puts the matcher back with no second entry. And since it runs per tool, identity takes the cheap path where it is the
+bus's own rule for one agent: the single agent whose folder is the stub's, when no session declares itself - else
+`comm whoami` as before (`agentOf`). **A104**, the real stub's post-tool path, one variable per leg: the matcher per
+folder and taken back; under; over; the same step; the hold still comes at a step the notice told; the notice silent at
+a step the hold told; the next step; armed; no "at"; a declared session honoured over the folder. **Mutants 8/8, each on
+its own row** (the installer never widens / widens for every agent - which also reddens A90 -; a notice silences the
+hold; a hold does not silence the notice; the notice at every tool; a declared session ignored; the stub drops the
+notice; the notice blind to an armed relay). **The first try of that last one SURVIVED, and the fault was the mutant**:
+it moved the clock an hour BACK, which makes an armed record look fresher - it changed nothing. An hour ahead, it
+reddens `armedSilent` alone. `selftest` both ways again (the Stop path's identity changed). Release `2026-11-02.4`.
 
 **Not done, said rather than implied:**
-- **The middle of a turn** (above): a `PostToolUse` notice, not a block, sharing this step file so one step speaks once.
 - **Work's PreToolUse hard gate** (refuse tools past 160 k but the handoff's) is not taken: (a) was asked; a refusal of
   tools is a different contract with its own failure (an agent that cannot even write its handoff).
 - **`who` showing "IDLE, relay armed"** (work's (c)): not built - `who.mjs` is in the bus's byte budget.

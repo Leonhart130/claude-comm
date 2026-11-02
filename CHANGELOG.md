@@ -34,6 +34,17 @@ already have.
 
 
 
+
+## 2026-11-02.4 — bus print `dbe7256c1f05` — 2026-11-02
+
+- **Past your relay threshold, you are now told in the middle of a turn too.** With an `"at"` set for you in
+  `.comm/config.json` `"relay"`, after a tool call past it you get a note, once per 25 k of context: *RELAY SOON* -
+  finish or park the task in hand, start no other, write your handoff and arm `relay.mjs` as the last act of the turn.
+  It never blocks anything, and it is silent while a relay is armed for your session. The hold at the end of your turn
+  (*RELAY DUE*) still comes if you end the turn unarmed. For this, an agent with an `"at"` has its tool hook listen to
+  every tool, not only Bash; adding or removing an `"at"` takes one re-run of the installer.
+  `node .comm/bin/relay-due.mjs <agent> <transcript>` now says what each of the two would do.
+
 ## 2026-11-02.3 — bus print `69c143cb43c3` — 2026-11-02
 
 - **The bus can now hold your turn end until you arm your relay.** Set `"at"` (tokens of context) beside your first

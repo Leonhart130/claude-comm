@@ -21,6 +21,7 @@ import { randomBytes, createHash } from "node:crypto"
 // installer rather than the bus, so A21's no-child_process rule does not reach it.
 import { spawnSync } from "node:child_process"
 import { oursStatus, thresholdsFor, feeds } from "./bin/usage.mjs"
+import { thresholdOf } from "./bin/relay-due.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const CHECK = process.argv.includes("--check")
@@ -129,6 +130,18 @@ if (process.argv[2] === "post-tool") {
 		if (existsSync(um) && readFileSync(join(projectRoot, ".comm", "config.json"), "utf8").includes('"usage"'))
 			usage = (await import(pathToFileURL(um).href)).check({ projectRoot, agentRoot, bus }) || ""
 	} catch { /* usage is advice: it must never break a tool call */ }
+	// RELAY SOON (\`FINDINGS.md#relay-due\`, work 11-02 23h02: its overflows come MID-turn, where a Stop never looks): past an
+	// "at", advice in the model's context, never a block - once per 25 k step, silent while a relay is armed. The installer
+	// gives this hook every tool (matcher "*") only in a folder whose agent has an "at"; elsewhere it still hears Bash alone.
+	let soon = ""
+	try {
+		const rd = join(dirname(bus), "relay-due.mjs"), conf = readFileSync(join(projectRoot, ".comm", "config.json"), "utf8")
+		if (/"at"\\s*:/.test(conf) && existsSync(rd)) {
+			const m = await import(pathToFileURL(rd).href), cfg = JSON.parse(conf), agent = m.agentOf({ root: projectRoot, cfg, agentRoot, bus })
+			const r = agent ? m.notice({ root: projectRoot, cfg, agent, payload: JSON.parse(raw || "{}"), relayBin: join(dirname(bus), "relay.mjs") }) : null
+			if (r && r.say) soon = r.text
+		}
+	} catch { /* advice must never break a tool call */ }
 	try {
 		// NOT THE COMMAND'S TEXT: a message that has just LANDED. Review #19 §4 counted 58 real sends a regex on the
 		// command missed (\`C=.../comm.mjs; node $C send\`) - a send that succeeded has written its file, whatever it was
@@ -142,10 +155,10 @@ if (process.argv[2] === "post-tool") {
 		if (fresh && existsSync(wake))
 			spawnSync(process.execPath, [wake, "--root", projectRoot], { timeout: 10000, stdio: "ignore" })
 	} catch { /* a doorbell must never break a tool call */ }
-	if (usage) {
+	if (usage || soon) {
 		let ev = "PostToolUse"
 		try { ev = JSON.parse(raw).hook_event_name || ev } catch {}
-		process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: ev, additionalContext: usage } }))
+		process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: ev, additionalContext: [usage, soon].filter(Boolean).join("\\n\\n") } }))
 	}
 	process.exit(0)
 }
@@ -175,10 +188,8 @@ if (process.argv[2] !== "session-start") {
 	if (!said.trim() && process.argv[2] === "stop") try {
 		const rd = join(dirname(bus), "relay-due.mjs"), conf = readFileSync(join(projectRoot, ".comm", "config.json"), "utf8")
 		if (/"at"\\s*:/.test(conf) && existsSync(rd)) {
-			const w = spawnSync(process.execPath, [bus, "whoami", "--agent-root", agentRoot], { encoding: "utf8" })
-			const agent = w.status === 0 ? String(w.stdout).trim() : ""
-			const r = agent ? (await import(pathToFileURL(rd).href)).due({ root: projectRoot, cfg: JSON.parse(conf), agent,
-				payload: JSON.parse(stopRaw || "{}"), relayBin: join(dirname(bus), "relay.mjs") }) : null
+			const m = await import(pathToFileURL(rd).href), cfg = JSON.parse(conf), agent = m.agentOf({ root: projectRoot, cfg, agentRoot, bus })
+			const r = agent ? m.due({ root: projectRoot, cfg, agent, payload: JSON.parse(stopRaw || "{}"), relayBin: join(dirname(bus), "relay.mjs") }) : null
 			if (r && r.hold) said = JSON.stringify({ decision: "block", reason: r.reason })
 		}
 	} catch { /* a guard must never break a turn end */ }
@@ -949,8 +960,9 @@ const hookCommand = (verb) => {
 		`node lives under nvm and nvm is loaded from .zshrc, which a login shell never reads."; fi`
 }
 
-/** Merge our three hooks into a settings object without disturbing anything else. */
-function withHooks(settings) {
+/** Merge our hooks into a settings object without disturbing anything else. `everyTool`: this folder's agent has a relay
+ * "at", so its PostToolUse hears every tool, not only Bash - the middle of a long turn is where it overflows (#relay-due). */
+function withHooks(settings, everyTool = false) {
 	const s = { ...settings }
 	s.hooks = { ...(s.hooks || {}) }
 	// PER HOOK, NOT PER GROUP (measured 2026-09-27): the filter dropped every GROUP holding our command, so a person's
@@ -962,7 +974,8 @@ function withHooks(settings) {
 	const ours = (h) => /\.claude\/comm-hook\.mjs"? (stop|session-start|post-tool)\b/.test(String((h && h.command) || ""))
 	// PostToolUse on Bash: the ring after a `send` (the stub's post-tool branch, A90).
 	// A Bash that exits non-zero fires PostToolUseFailure, not PostToolUse (review #19 §4, CLI 2.1.310): both ring.
-	for (const [event, verb, matcher] of [["Stop", "stop"], ["SessionStart", "session-start"], ["PostToolUse", "post-tool", "Bash"], ["PostToolUseFailure", "post-tool", "Bash"]]) {
+	const tools = everyTool ? "*" : "Bash"
+	for (const [event, verb, matcher] of [["Stop", "stop"], ["SessionStart", "session-start"], ["PostToolUse", "post-tool", tools], ["PostToolUseFailure", "post-tool", tools]]) {
 		const keep = (s.hooks[event] || [])
 			.map((g) => g && Array.isArray(g.hooks) && g.hooks.some(ours) ? { ...g, hooks: g.hooks.filter((h) => !ours(h)) } : g)
 			.filter((g) => !(g && Array.isArray(g.hooks)) || g.hooks.length)
@@ -1337,9 +1350,11 @@ function SKILL(ids, agentRoot) {
 		`The first prompt is set once, in \`.comm/config.json\`: \`"relay": {"${id}": "<the sentence your fresh session starts from>"}\``,
 		"(`--say` overrides it). No guard: refused - what survives a `/clear` is only what was written down. Anything that",
 		`starts another turn first cancels it. Every step lands in \`.comm/relay/${id}.json\`; \`--dry-run\` checks it all and arms nothing.`,
-		"When to restart is yours - or your project's: an `\"at\"` beside your prompt (or under `\"*\"`) in that `\"relay\"` key holds",
-		"your turn end, once per 25 k of context past it, until you arm the relay; it is silent while one is armed for your",
-		"session (`relay-due.mjs <agent> <transcript>` says what it would do now).", "",
+		"When to restart is yours - or your project's: an `\"at\"` beside your prompt (or under `\"*\"`) in that `\"relay\"` key, in",
+		"tokens of context. Past it you are told after a tool call, once per 25 k (*RELAY SOON*: finish the task in hand, start",
+		"no other), and your turn's end is held until you arm the relay (*RELAY DUE*); both are silent while a relay is armed",
+		"for your session. `relay-due.mjs <agent> <transcript>` says what each would do now. Setting an `\"at\"` needs one",
+		"re-run of the installer: the hook then hears every tool, not only Bash.", "",
 		`To carry what you READ across it: \`node ${B}/restart.mjs prepare --obligations <notes.md> --read <a file you read>...\``,
 		`first, then relay with \`--guard "node ${B}/handoff.mjs verify"\`. The next session runs \`node ${B}/handoff.mjs verify\``,
 		"FIRST: UNCHANGED files stand as read, CHANGED ones are read again.", "",
@@ -1384,7 +1399,7 @@ for (const [id, relPath] of Object.entries(cfg.agents)) {
 	// reported as installed either.
 	const sPath = join(agentRoot, ".claude", "settings.json")
 	try {
-		const merged = withStatusLine(withHooks(readJson(sPath, {})), !!(cfg.usage && cfg.usage.statusLine === true), USER_STATUSLINE)
+		const merged = withStatusLine(withHooks(readJson(sPath, {}), folderIds.some((a) => !!thresholdOf(cfg, a))), !!(cfg.usage && cfg.usage.statusLine === true), USER_STATUSLINE)
 		write(sPath, JSON.stringify(merged, null, 2) + "\n", results)
 	} catch (e) {
 		console.error(`  ✗ ${id}: ${e.message}`)
