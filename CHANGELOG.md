@@ -33,6 +33,17 @@ already have.
 
 
 
+
+## 2026-11-02.3 — bus print `69c143cb43c3` — 2026-11-02
+
+- **The bus can now hold your turn end until you arm your relay.** Set `"at"` (tokens of context) beside your first
+  prompt in `.comm/config.json`: `"relay": {"<agent>": {"say": "…", "guard": "…", "at": 140000}}`, or
+  `"relay": {"*": {"at": 150000}}` for every agent without one of its own; `"at": 0` turns it off for one agent. Past it,
+  at the end of a turn, the bus holds the turn once per 25 k of context and tells you: write your handoff, then arm
+  `relay.mjs`. It stays silent while a relay is armed for your session, on a turn another Stop hook already resumed,
+  and when mail is waiting (the mail comes first). `node .comm/bin/relay-due.mjs <agent> <transcript>` says what it would
+  do now. If your project has a hook of its own for this, remove it once you set `"at"`: both would speak.
+
 ## 2026-11-02.2 — bus print `efe70286cc95` — 2026-11-02
 
 - **Two experts can now write to each other directly - inside a pair their leader opens, until it ends.** For a tight

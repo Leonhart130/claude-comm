@@ -100,10 +100,10 @@ for (;;) {
 // A missing bus must never break the session.
 if (!bus) process.exit(0)
 
-const forward = (input, notices = []) => spawnSync(process.execPath,
+const forward = (input, notices = [], capture = false) => spawnSync(process.execPath,
 	// --agent-root BEFORE any notice: the bus takes the FIRST one, so no notice text can stand in for it.
 	[bus, "hook", ...process.argv.slice(2), "--agent-root", agentRoot, ...notices.flatMap((n) => ["--notice", n])],
-	input === null ? { stdio: "inherit" } : { input, stdio: ["pipe", "inherit", "inherit"] })
+	input === null ? { stdio: "inherit" } : { input, stdio: ["pipe", capture ? "pipe" : "inherit", "inherit"], maxBuffer: 16 << 20 })
 
 // AFTER A SEND, RING (work's leader, 2026-10-24): the doorbell rode only the Stop hook, so a leader that sent to an
 // idle expert and went on working woke nobody until its own turn ended - measured that evening, its bell to a resting
@@ -167,7 +167,22 @@ if (process.argv[2] === "post-tool") {
 if (process.argv[2] !== "session-start") {
 	let stopRaw = ""
 	try { stopRaw = readFileSync(0, "utf8") } catch {}
-	const stopped = forward(stopRaw)
+	const stopped = forward(stopRaw, [], true)
+	// RELAY DUE (\`FINDINGS.md#relay-due\`, work's leader for the owner, 11-02): the bus's answer is CAPTURED, so a turn end
+	// is held for a relay only when the bus said nothing - mail first, always: mail waiting makes the relay's arming refuse,
+	// and the mail's own turn ends again. A project with no "at" in its config pays one read of it. Silent on any error.
+	let said = stopped.stdout ? String(stopped.stdout) : ""
+	if (!said.trim() && process.argv[2] === "stop") try {
+		const rd = join(dirname(bus), "relay-due.mjs"), conf = readFileSync(join(projectRoot, ".comm", "config.json"), "utf8")
+		if (/"at"\\s*:/.test(conf) && existsSync(rd)) {
+			const w = spawnSync(process.execPath, [bus, "whoami", "--agent-root", agentRoot], { encoding: "utf8" })
+			const agent = w.status === 0 ? String(w.stdout).trim() : ""
+			const r = agent ? (await import(pathToFileURL(rd).href)).due({ root: projectRoot, cfg: JSON.parse(conf), agent,
+				payload: JSON.parse(stopRaw || "{}"), relayBin: join(dirname(bus), "relay.mjs") }) : null
+			if (r && r.hold) said = JSON.stringify({ decision: "block", reason: r.reason })
+		}
+	} catch { /* a guard must never break a turn end */ }
+	if (said) process.stdout.write(said)
 	try {
 		const reg = join(dirname(bus), "session-registry.mjs")
 		if (existsSync(reg)) {
@@ -644,7 +659,7 @@ const GITIGNORE_BLOCK = "# claude-comm live state (regenerate with install.mjs)\
 // drifted - wake.mjs documented none of its user flags, `who --all` and `comm log` were nowhere. So this section is
 // BUILT, at every install, from each tool's own usage lines (what its --help prints) and from `comm help`, read from
 // the very files written beside it: it cannot describe a version other than the one installed. A92 gates both ends.
-const CLI_TOOLS = ["launch", "close", "relay", "wake", "claim", "pair", "restart", "handoff", "ledger", "usage"]
+const CLI_TOOLS = ["launch", "close", "relay", "relay-due", "wake", "claim", "pair", "restart", "handoff", "ledger", "usage"]
 const usageLines = (src) => src.split("\n").filter((l) => /^ \*\s{2,}node \S*bin\/[\w-]+\.mjs/.test(l))
 	.map((l) => l.replace(/^ \*\s+/, "").replace(/^node (\.comm\/)?bin\//, "node .comm/bin/"))
 // A SETTING IS DOCUMENTED WHERE IT IS READ (work 10-31: a project could learn that thresholds exist only from a CHANGELOG
@@ -1029,7 +1044,7 @@ function write(path, content, results) {
 // restarts happen HERE - 53 cold starts in one field tree against 5 declared reboots - and
 // the ledger verdict stays UNKNOWN until declared restarts exist to count. A tool only the
 // maintainer can run cannot fill an arm the field is the source of.
-const BUS_FILES = ["comm.mjs", "session-registry.mjs", "ledger.mjs", "wake.mjs", "restart-signal.mjs", "claim.mjs", "launch.mjs", "close.mjs", "handoff.mjs", "restart.mjs", "who.mjs", "usage.mjs", "relay.mjs", "pair.mjs"]
+const BUS_FILES = ["comm.mjs", "session-registry.mjs", "ledger.mjs", "wake.mjs", "restart-signal.mjs", "claim.mjs", "launch.mjs", "close.mjs", "handoff.mjs", "restart.mjs", "who.mjs", "usage.mjs", "relay.mjs", "pair.mjs", "relay-due.mjs"]
 const CHANGELOG = join(HERE, "CHANGELOG.md")
 function busPrint() {
 	const h = createHash("sha256")
@@ -1322,7 +1337,9 @@ function SKILL(ids, agentRoot) {
 		`The first prompt is set once, in \`.comm/config.json\`: \`"relay": {"${id}": "<the sentence your fresh session starts from>"}\``,
 		"(`--say` overrides it). No guard: refused - what survives a `/clear` is only what was written down. Anything that",
 		`starts another turn first cancels it. Every step lands in \`.comm/relay/${id}.json\`; \`--dry-run\` checks it all and arms nothing.`,
-		"When to restart is yours, or your project's hook's: the relay has no trigger of its own.", "",
+		"When to restart is yours - or your project's: an `\"at\"` beside your prompt (or under `\"*\"`) in that `\"relay\"` key holds",
+		"your turn end, once per 25 k of context past it, until you arm the relay; it is silent while one is armed for your",
+		"session (`relay-due.mjs <agent> <transcript>` says what it would do now).", "",
 		`To carry what you READ across it: \`node ${B}/restart.mjs prepare --obligations <notes.md> --read <a file you read>...\``,
 		`first, then relay with \`--guard "node ${B}/handoff.mjs verify"\`. The next session runs \`node ${B}/handoff.mjs verify\``,
 		"FIRST: UNCHANGED files stand as read, CHANGED ones are read again.", "",

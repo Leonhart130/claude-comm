@@ -44,9 +44,10 @@
  *
  * ── WHAT IT DOES NOT DO ─────────────────────────────────────────────────────────────────────────────────────────
  *
- * - **No trigger.** WHEN to hand over is the agent's, or its project's hook (the field's is a Stop hook at 150 k). The
- *   ledger still says UNKNOWN on whether a reboot costs a defect (restart.mjs's header): this makes a declared handover
- *   cost nobody's attention. Each one is a start with source "clear", which the ledger counts in the reboot arm.
+ * - **No trigger HERE.** WHEN to hand over is the agent's, its project's hook, or since 2026-11-02.3 the bus's own:
+ *   an "at" in .comm/config.json "relay" holds the turn end past it until this is armed (relay-due.mjs, its header).
+ *   The ledger still says UNKNOWN on whether a reboot costs a defect (restart.mjs's header): this makes a declared
+ *   handover cost nobody's attention. Each one is a start with source "clear", which the ledger counts in the reboot arm.
  * - **No memory back.** `/clear` returns no RSS (DESIGN-autonomy.md, measured 09-04): this frees the CONTEXT. A process
  *   grown fat is relaunched (launch.mjs), which is the rare path.
  * - **No other session.** It acts on the window its caller is the foreground process of, and on nothing else.

@@ -3979,7 +3979,55 @@ Named, not fixed.
 - **Closing rings nobody**: each expert learns it at its next send to the other, whose refusal says when it closed.
 - **A pair's messages are not kept apart from the leader's mail** in `inbox`/`sent`: same queue, marked in the file.
 - **No field use yet**: the shape is work's, the property is A102's, the cost saved is work's estimate, not a measurement.
- — an expert runs its leader's `settings.local.json`, not its `settings.json` (2026-09-27)
+
+## `#relay-due` — the relay's trigger moves into the bus: past an "at", the turn end is held until it is armed (2026-11-02)
+
+**Asked by the owner through work's leader** (11-02 21h52, `exchange/work-leader/in/…-14-declencheur-du-relais.md`, and its
+21h57 correction): *"est-ce que ça devrait être Claude Comm qui devrait développer ça ?"*. `relay.mjs` said "No trigger"
+since 10-25: when to hand over was the agent's, or its project's hook. **Three measured reasons it was the wrong side:**
+(1) two field projects already carried copies of the same Stop hook, and each project that launches experts would write
+it again; (2) the two pieces got in each other's way when they ignored each other - 10-30, that hook blocked a turn end
+3 s after the relay was armed, and the relay cancelled (`exchange/work-leader/out/…-8-le-relais-d-agence-annule.md`);
+(3) 11-02 evening an expert wrote its handoff twice without arming, sure it had relayed - its threshold was a sentence
+in its brief, and the project's own guard was silently off in every sub-folder (their correction: it exited before
+reading its own `--expert` flag; three experts finished at 176-227 k with no message).
+
+**The design**, work's option (a): `.comm/config.json` `"relay": {"<agent>": {"at": <tokens>}, "*": {"at": <tokens>}}`,
+beside the agent's `say` and `guard`; `"at": 0` turns it off for one agent. At a Stop, past it, the turn end is held ONCE
+per 25 k (work's step), with a message saying what to write and what to type. **Silent while a relay is armed for THIS
+transcript and not finished** - work's own `relaisArme` rule over the fields `relay.mjs` writes (`transcript`, `relayed`
+null, no `ended_at`, the watcher alive or armed under 5 min), so the measured cancellation of 10-30 cannot come from
+this one. **Never on a continuation** (`stop_hook_active`): whatever resumed that turn is answered first, and no two
+hooks can loop on each other through it. **Never over mail**: the stub now CAPTURES the bus's Stop answer and asks
+`bin/relay-due.mjs` only when the bus said nothing - mail waiting makes the relay's arming refuse (exit 5), and the
+mail's turn ends again. A step that cannot be written holds nothing (a failed mark must not hold every turn end). The
+context is the model's LAST call in the transcript's tail (input + cache read + cache creation), work's measure.
+**Why a module of its own and not `relay.mjs`:** the check runs at every Stop of an agent with an "at"; `relay.mjs` loads
+`wake.mjs` (51 KB) at import. A project with no "at" pays one read of its config.
+
+**A103**, against the real stub an install writes, one variable per leg (under; the same step; the next; a
+continuation; armed for this transcript, and for another as its control; ended unrelayed, which the BUS says first -
+A99 - and which is held at the next end; mail waiting; the `"*"` default under and over; `"at": 0`; an unwritable step).
+**Found while building it**: my first stub wrote the config test as `/"at"s*:/` - the regex's backslash eaten by two
+levels of quoting (a script's string, then the stub's template literal), the same trap as A1's raw NUL byte in `#review12`. It
+would have missed `"at" :` with a space and matched nothing else wrong; caught by reading the GENERATED stub, not the
+source. **Mutants 10/10, each on its own row**: held on a continuation; an armed relay never silences; armed for any session
+silences; no once-per-step; every token a new step; the `"*"` default ignored; a non-positive "at" a threshold; a failed
+mark still holds; the context without the cache; the relay speaking over the bus (it REPLACED the mail's block). **The
+first batch had a survivor and it was the arm's**: `"at": 0` is stopped twice (`thresholdOf`, and `due`'s own `!at`), so
+dropping `at > 0` changed nothing there - what it guards is a NEGATIVE "at", which held every turn end and no leg tried;
+`"at": -1` is a leg now, and reddens alone. **`selftest` both ways** (the stub's Stop now captures the bus's answer, which
+is the mail's delivery path): real sessions, delivered at the turn boundary and logged `via=hook`; hook removed, the mail
+stays. Release `2026-11-02.3`.
+
+**Not done, said rather than implied:**
+- **Work's PreToolUse hard gate** (refuse tools past 160 k but the handoff's) is not taken: (a) was asked; a refusal of
+  tools is a different contract with its own failure (an agent that cannot even write its handoff).
+- **`who` showing "IDLE, relay armed"** (work's (c)): not built - `who.mjs` is in the bus's byte budget.
+- **The leader of a project is held too** when it has an "at" (or `"*"` covers it): intended, and not field-measured.
+- **The 25 k step and the 5 min freshness are work's numbers**, adopted, not re-derived here.
+
+## `#settings-inheritance` — an expert runs its leader's `settings.local.json`, not its `settings.json` (2026-09-27)
 
 **Reported by atlas's leader** (field letter 09-27): a `Stop` hook he put in his root's `settings.local.json` ran
 in his expert `scribe`'s session, resolved against `scribe`'s folder (`$CLAUDE_PROJECT_DIR` = the expert's), and failed there.

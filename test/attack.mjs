@@ -1325,6 +1325,82 @@ const POINTER_SOURCES = (() => {
 		`bad exits ${bad.map((r) => r.status).join(",")}; open: "${said(open).split("\n")[0].slice(0, 70)}"`)
 }
 
+// A103 — PAST ITS "at", AN AGENT'S TURN END IS HELD ONCE PER 25 k UNTIL IT ARMS ITS RELAY - NEVER OVER MAIL, NEVER TWICE IN
+// A TURN, NEVER WHILE A RELAY IS ARMED FOR ITS SESSION. work's leader for the owner (11-02 21h52, `…-14-declencheur-du-
+// relais.md`): two projects carried copies of the same Stop hook, and theirs cancelled a relay armed 3 s earlier (10-30).
+// The REAL stub an install writes, fired as Claude Code fires it, against fixture transcripts whose last call carries a
+// known usage. One variable per leg against `over`: under the threshold; the same step again; the next step; a
+// continuation (`stop_hook_active`); a relay armed for THIS transcript (and, its control, armed for another one: held);
+// a relay that ended unrelayed (the bus says so first, A99; held at the next end); mail waiting (the BUS's block, not this one, and no step spent); an agent with no
+// "at" of its own under the project's "*" (held past it, not under it); "at": 0 and "at": -1 (never); a step file that cannot be
+// written (never: a failed mark must not hold every turn end). FINDINGS.md#relay-due
+{
+	const r103 = mkdtempSync(join(tmpdir(), "comm-attack-relaydue-"))
+	atExit(() => { try { rmSync(r103, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(r103, ".comm"), { recursive: true })
+	for (const a of ["x", "y", "z", "v", "w"]) mkdirSync(join(r103, a), { recursive: true })
+	writeFileSync(join(r103, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", x: "x", y: "y", z: "z", v: "v", w: "w" },
+		relay: { x: { say: "resume x", guard: "true", at: 100000 }, "*": { at: 200000 }, z: { say: "resume z", at: 0 }, v: { say: "resume v", at: -1 }, w: { say: "resume w", at: 100000 } } }))
+	execFileSync("node", [join(PKG, "install.mjs"), r103], { stdio: "pipe" })
+	const tx = (name, ctx) => { const f = join(r103, `${name}.jsonl`)
+		writeFileSync(f, JSON.stringify({ type: "user", message: { role: "user", content: "go" } }) + "\n" +
+			JSON.stringify({ type: "assistant", message: { role: "assistant", content: [{ type: "text", text: "ok" }], usage: { input_tokens: 10, cache_read_input_tokens: ctx - 1010, cache_creation_input_tokens: 1000 } } }) + "\n")
+		return f }
+	const stop = (agent, transcript, active = false) => {
+		const r = spawnSync(process.execPath, [join(r103, agent, ".claude", "comm-hook.mjs"), "stop"], { cwd: join(r103, agent), encoding: "utf8",
+			input: JSON.stringify({ cwd: join(r103, agent), hook_event_name: "Stop", stop_hook_active: active, transcript_path: transcript }) })
+		let j = null
+		try { j = JSON.parse(r.stdout) } catch {}
+		return { s: r.status, out: r.stdout, block: j && j.decision === "block" ? String(j.reason) : null }
+	}
+	const due = (r) => !!r.block && /RELAY DUE/.test(r.block)
+	const rec = (agent, o) => { mkdirSync(join(r103, ".comm", "relay"), { recursive: true }); writeFileSync(join(r103, ".comm", "relay", `${agent}.json`), JSON.stringify(o)) }
+	const dueStep = (agent) => { try { return JSON.parse(readFileSync(join(r103, ".comm", "relay", `${agent}.due.json`), "utf8")) } catch { return null } }
+	const T1 = tx("t1", 120000)
+	const under = stop("x", tx("t0", 90000))
+	const over = stop("x", T1), afterOver = dueStep("x")
+	tx("t1", 124000); const sameStep = stop("x", T1)   // higher than 120 k, the SAME 25 k step: silent
+	tx("t1", 126000); const nextStep = stop("x", T1)
+	const continued = stop("x", tx("t2", 150000), true)
+	const T3 = tx("t3", 150000)
+	rec("x", { agent: "x", transcript: T3, relayed: null, armed_at: new Date().toISOString(), relay_pid: null })
+	const armed = stop("x", T3)
+	const T3b = tx("t3b", 150000); const armedElsewhere = stop("x", T3b)
+	const T4 = tx("t4", 150000)
+	rec("x", { agent: "x", transcript: T4, relayed: false, armed_at: new Date().toISOString(), ended_at: new Date().toISOString(), cancelled: "x" })
+	// the bus speaks first of a relay that did not happen (A99), once; the relay is due at the next turn end
+	const endedTold = stop("x", T4), ended = stop("x", T4)
+	// mail waiting: the bus's own block, and no step spent on it
+	mkdirSync(join(r103, ".comm", "inbox", "x"), { recursive: true }); writeFileSync(join(r103, "x", "M.md"), "m\n")
+	spawnSync(process.execPath, [join(r103, ".comm", "bin", "comm.mjs"), "send", "x", "--ref", "M.md"], { cwd: r103, encoding: "utf8" })
+	const T5 = tx("t5", 150000); const mail = stop("x", T5), mailStep = dueStep("x")
+	const yUnder = stop("y", tx("y1", 150000)), yOver = stop("y", tx("y2", 210000))
+	const zOff = stop("z", tx("z1", 500000)), vOff = stop("v", tx("v1", 500000))
+	mkdirSync(join(r103, ".comm", "relay", "w.due.json"), { recursive: true })   // a directory: the step cannot be written
+	const wUnwritable = stop("w", tx("w1", 150000))
+	const ok = {
+		underSilent: under.s === 0 && !under.block,
+		overHeld: due(over) && /120 k/.test(over.block) && /100 k/.test(over.block) && over.block.includes(join(r103, ".comm", "bin", "relay.mjs")) &&
+			!!afterOver && afterOver.step === 100000 && afterOver.transcript === T1,
+		sameStepSilent: !sameStep.block,
+		nextStepHeld: due(nextStep) && /126 k/.test(nextStep.block),
+		continuationSilent: !continued.block,
+		armedSilent: !armed.block,
+		armedElsewhereHeld: due(armedElsewhere),
+		endedHeld: !!endedTold.block && /YOUR RELAY DID NOT HAPPEN/.test(endedTold.block) && due(ended),
+		mailFirst: !!mail.block && !/RELAY DUE/.test(mail.block) && /arrived for 'x'/.test(mail.block) && !!mailStep && mailStep.transcript !== T5,
+		starDefault: !yUnder.block && due(yOver) && /200 k/.test(yOver.block),
+		// 0 is stopped twice (thresholdOf, and due's own `!at`); a NEGATIVE one only by thresholdOf - the mutant that
+		// survived the first batch (`at > 0` dropped) holds every turn end of `v`
+		zeroIsOff: !zOff.block,
+		negativeIsOff: !vOff.block,
+		unwritableSilent: wUnwritable.s === 0 && !wUnwritable.block,
+	}
+	check("A103 past its \"at\" an agent's turn end is held once per 25 k until it arms its relay - never over mail, a continuation, or an armed relay",
+		Object.values(ok).every(Boolean),
+		Object.entries(ok).map(([k, v]) => `${k}=${v}`).join("; ") + `; over: "${(over.block || over.out || "").slice(0, 90)}"; mail: "${(mail.block || "").slice(0, 60)}"`)
+}
+
 // ── A21/A22: the properties that erode by accretion, not by a single bad commit ──
 // Asked for directly by the owner (2026-08-05): "performant, compact and secure by
 // default", with a worry about memory leaks as features are added. The honest
@@ -5047,7 +5123,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 	// whoami's (claim); restart-signal's (restart); git's (handoff); comm send's (usage, a crossing's message; pair's bells)
 	const FOREIGN = { launch: ["--keep-focus", "--match", "--next-to", "--to"], close: ["--match", "--to", "--root", "--json", "--after-turn", "--verify"],
 		wake: ["--match", "--to", "--ansi"], claim: ["--agent-root"], restart: ["--by"], handoff: ["--porcelain", "--short", "--stdin"], ledger: [], usage: ["--ref", "--kind", "--note"],
-		pair: ["--kind", "--note"] }
+		pair: ["--kind", "--note"], "relay-due": [] }
 	const undocumented = (src, foreign) => { const head = src.slice(0, src.indexOf("*/"))
 		return [...new Set([...src.matchAll(/["'](--[a-z][a-z0-9-]+)["']/g)].map((m) => m[1]))].filter((f) => f !== "--help" && !head.includes(f) && !foreign.includes(f)) }
 	const gaps = {}

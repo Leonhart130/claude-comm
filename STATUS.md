@@ -36,7 +36,8 @@ checks "à jour" as commands AND settings AND skills: measure all three after a 
    the transcript (`wake.readTurn`) beside the runtime's word.
 
 **Done 11-02**: `2026-11-02.1` (a relay's Enter waits for the box, `#enter-in-the-paste`, A101) and `.2` (expert pairs,
-`pair.mjs`, `#pairs`, A102 - the star itself had no fast arm before it). Both in the eleven trees. polaris's tree is gone
+`pair.mjs`, `#pairs`, A102 - the star itself had no fast arm before it) and `.3` (the relay's trigger in the bus: an
+"at" holds the turn end until it is armed, `relay-due.mjs`, `#relay-due`, A103; `selftest` both ways). All in the eleven trees. polaris's tree is gone
 from disk (its bus config sits only in the owner's Trash): nothing to install there.
 
 **Done 10-30/31**: releases `.1`-`.3`, `2026-10-31.1`, `.2` (a threshold no reading of its own feeds says so,
