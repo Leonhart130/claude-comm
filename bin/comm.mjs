@@ -215,6 +215,13 @@ function refForRecipient(root, cfg, msg) {
 	return rel || msg.refPath
 }
 
+// ── pairs: two experts the LEADER lets write to each other, until a time it set (work and the owner, 11-01) ──
+// The star's reason stands - nothing coordinates off the board: off by default, opened by the leader alone (bin/pair.mjs)
+// with a file saying why, ended by itself, every message in the log the leader reads. Unreadable is no pair. FINDINGS.md#pairs
+const PAIRS = (root) => join(root, ".comm", "pairs.json"), pairKey = (a, b) => [a, b].sort().join("+")
+function readPairs(root) { try { const p = JSON.parse(readFileSync(PAIRS(root), "utf8")); return p && typeof p === "object" ? p : {} } catch { return {} } }
+const isOpen = (p) => !!p && Date.parse(p.until) > Date.now()
+
 // When did `from` last message `to`? The inbox AND the log: the log is written only at delivery, so mail
 // pending for an agent not running would make every second message look like a first.
 function lastSentTs(root, from, to) {
@@ -254,11 +261,15 @@ function send(root, cfg, { from, to, kind, ref, note, force = false, toState = n
 	}
 	// HUB ENFORCEMENT (README.md "Topology is enforced, not documented"): the leader is at one end of
 	// every message. A peer send is refused, never rerouted - a reroute lets two experts coordinate off-board.
+	// The one way round it is the leader's own: a pair it opened, still open (above).
+	let pair
 	if (from !== cfg.leader && to !== cfg.leader) {
-		throw new Error(
-			`hub-enforced: '${from}' may not message '${to}' directly.\n` +
-			`Every message has '${cfg.leader}' at one end. Send to '${cfg.leader}' and ask them to relay.`
-		)
+		const all = readPairs(root), k = pairKey(from, to), p = Object.prototype.hasOwnProperty.call(all, k) ? all[k] : null
+		if (!isOpen(p)) throw new Error(
+			`hub-enforced: '${from}' may not message '${to}' directly${p ? ` - their pair closed at ${clock(p.until)}` : ""}.\n` +
+			`Every message has '${cfg.leader}' at one end. Send to '${cfg.leader}' and ask them to relay - or, for a tight loop\n` +
+			`between you two, to open a pair: node .comm/bin/pair.mjs ${from} ${to} --for 2h --ref <the file saying why>`)
+		pair = k
 	}
 	if (from === to) throw new Error(`'${from}' cannot message itself`)
 
@@ -278,7 +289,7 @@ function send(root, cfg, { from, to, kind, ref, note, force = false, toState = n
 	const id = `${new Date().toISOString().replace(/[:.]/g, "-")}-${randomBytes(3).toString("hex")}`
 	// `to_state`: what the SENDER WAS TOLD about the recipient (review #11 R4). Mail that later
 	// strands is the sender's to act on only if the sender was told it would; boot reads this.
-	const msg = { id, from, to, kind, ref, refPath, note: sanitizeNote(note), ts: new Date().toISOString(), to_state: toState }
+	const msg = { id, from, to, kind, ref, refPath, note: sanitizeNote(note), ts: new Date().toISOString(), to_state: toState, ...(pair ? { pair } : {}) }
 
 	const dir = inboxDir(root, to)
 	mkdirSync(dir, { recursive: true })
@@ -594,7 +605,7 @@ function dispatch(root, cfg, me, cmd, rest) {
 			// Busy if any session is, idle only if all are, else CANNOT SAY. `FINDINGS.md#idle-send`
 			const live = liveAgents(root, cfg)[to], t = (live || []).map((l) => l.turn)
 			const turn = !live?.length ? null : t.some((x) => x.state === "busy") ? "busy" : t.every((x) => x.state === "idle") ? "idle" : null
-			const m = send(root, cfg, { from, to, kind: arg(rest, "kind", from === cfg.leader ? "nudge" : "done"), ref: arg(rest, "ref"), note: arg(rest, "note"), force: rest.includes("--force"),
+			const m = send(root, cfg, { from, to, kind: arg(rest, "kind", from === cfg.leader || to !== cfg.leader ? "nudge" : "done"), ref: arg(rest, "ref"), note: arg(rest, "note"), force: rest.includes("--force"),
 				toState: !live?.length ? "not-running" : turn === "idle" ? "idle" : "running" })
 			console.log(`✓ ${m.from} → ${m.to}  [${m.kind}]  they will read: ${refForRecipient(root, cfg, m)}`)
 			// The SILENT case: `LEAD.md` at the root and in the spoke, and the send succeeds on the spoke's
@@ -724,7 +735,7 @@ function dispatch(root, cfg, me, cmd, rest) {
 			if (!existsSync(f)) { console.log("(no deliveries yet)"); break }
 			const n = Number(arg(rest, "n", "20"))
 			for (const r of readFileSync(f, "utf8").trim().split("\n").filter(Boolean).slice(-n)) {
-				try { const m = JSON.parse(r); console.log(`${m.delivered}  ${m.from} → ${m.to_agent}  [${m.kind}]  ${safeRef(m.ref)}`) } catch {}
+				try { const m = JSON.parse(r); console.log(`${m.delivered}  ${m.from} → ${m.to_agent}${m.pair ? " (pair)" : ""}  [${m.kind}]  ${safeRef(m.ref)}`) } catch {}
 			}
 			break
 		}
@@ -738,6 +749,7 @@ function dispatch(root, cfg, me, cmd, rest) {
   comm sent [<agent>] [--n 20]      what you sent, and whether it actually landed
   comm dismiss [<agent>] [--id X]   clear mail SAFELY (moves to delivered/ + logs; never deletes) [--force: not yours]
   comm log [--n 20]                 delivery audit trail
+  (two experts writing to each other: a pair the leader opens, node .comm/bin/pair.mjs --help)
   comm init                         create .comm/ at the project root
 
 A message may only ever point at a file. The file is the artifact; this is the doorbell.

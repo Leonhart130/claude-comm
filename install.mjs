@@ -248,8 +248,8 @@ try {
 		const names = others.slice(0, 12).join(", ") + (others.length > 12 ? ", +" + (others.length - 12) : "")
 		const role = whoIs === lead
 			? "the LEADER of this project's message bus - " + (others.length ? "experts: " + names : "no expert on the roster yet") +
-				". Experts write only to you: you are the bridge between them, and the one who answers the owner."
-			: "an EXPERT on this project's message bus. Your leader is '" + lead + "': you write to it, never to another expert."
+				". Experts write only to you - or to each other inside a pair you open (.comm/bin/pair.mjs) - you are the bridge between them, and the one who answers the owner."
+			: "an EXPERT on this project's message bus. Your leader is '" + lead + "': you write to it, never to another expert unless your leader opened a pair between you (its bell says so)."
 		notices.push([
 			"[claude-comm] You are '" + whoIs + "', " + role,
 			"A message is a doorbell that points at a FILE: " + cmd + " send " + (whoIs === lead ? "<agent>" : lead) +
@@ -644,7 +644,7 @@ const GITIGNORE_BLOCK = "# claude-comm live state (regenerate with install.mjs)\
 // drifted - wake.mjs documented none of its user flags, `who --all` and `comm log` were nowhere. So this section is
 // BUILT, at every install, from each tool's own usage lines (what its --help prints) and from `comm help`, read from
 // the very files written beside it: it cannot describe a version other than the one installed. A92 gates both ends.
-const CLI_TOOLS = ["launch", "close", "relay", "wake", "claim", "restart", "handoff", "ledger", "usage"]
+const CLI_TOOLS = ["launch", "close", "relay", "wake", "claim", "pair", "restart", "handoff", "ledger", "usage"]
 const usageLines = (src) => src.split("\n").filter((l) => /^ \*\s{2,}node \S*bin\/[\w-]+\.mjs/.test(l))
 	.map((l) => l.replace(/^ \*\s+/, "").replace(/^node (\.comm\/)?bin\//, "node .comm/bin/"))
 // A SETTING IS DOCUMENTED WHERE IT IS READ (work 10-31: a project could learn that thresholds exist only from a CHANGELOG
@@ -1029,7 +1029,7 @@ function write(path, content, results) {
 // restarts happen HERE - 53 cold starts in one field tree against 5 declared reboots - and
 // the ledger verdict stays UNKNOWN until declared restarts exist to count. A tool only the
 // maintainer can run cannot fill an arm the field is the source of.
-const BUS_FILES = ["comm.mjs", "session-registry.mjs", "ledger.mjs", "wake.mjs", "restart-signal.mjs", "claim.mjs", "launch.mjs", "close.mjs", "handoff.mjs", "restart.mjs", "who.mjs", "usage.mjs", "relay.mjs"]
+const BUS_FILES = ["comm.mjs", "session-registry.mjs", "ledger.mjs", "wake.mjs", "restart-signal.mjs", "claim.mjs", "launch.mjs", "close.mjs", "handoff.mjs", "restart.mjs", "who.mjs", "usage.mjs", "relay.mjs", "pair.mjs"]
 const CHANGELOG = join(HERE, "CHANGELOG.md")
 function busPrint() {
 	const h = createHash("sha256")
@@ -1273,7 +1273,10 @@ function SKILL(ids, agentRoot) {
 		"(with the command that rings it), or that it CANNOT SAY and why - e.g. *WAITING on permission prompt*: a person must",
 		"answer it, and no ring is offered (it would type into the dialog).", "",
 		"## Who talks to whom: a star", "",
-		"- An expert writes to its leader only. Expert-to-expert is refused by the bus.",
+		"- An expert writes to its leader only. Expert-to-expert is refused by the bus - unless the leader has opened a **pair**",
+		"  between those two (`pair.mjs <a> <b> --for 2h --ref <file>`): until it ends they may send to each other directly,",
+		"  each was rung pointing at the file saying why, and every message is in the leader's `comm log`. A pair coordinates",
+		"  work; a decision, a change to the spec or a question for the owner still goes to the leader.",
 		"- The leader is the bridge: a question that crosses two experts goes through it, and it answers with a measurement, not a relay.",
 		"- An expert does not ask the owner: it asks its leader, by the bus. The owner decides what commits his account, money,",
 		"  name or time, and hears it from the leader.", "",
@@ -1299,6 +1302,9 @@ function SKILL(ids, agentRoot) {
 		"  Opus for review, law, arbitration, and anything only checked by re-reading. `--effort high` by default, `xhigh` for",
 		"  adversarial review.",
 		"- The expert reports with `--kind done` and a file. Read the file, decide, answer with a file.",
+		`- **Two experts in a tight loop** (one writes a script, the other runs it on its cases): \`node ${B}/pair.mjs <a> <b> --for 2h --ref <file>\``,
+		"  lets them send to each other until then (24 h at most), so each round no longer costs you a turn. The file says why",
+		"  and on what; each is rung pointing at it. `comm log` shows every message, marked `(pair)`; `--close` ends it early.",
 		"- **A hook of your own** in your `.claude/settings.local.json` also runs in your experts' sessions, in their folders",
 		"  (measured with your folder at the root of the git repo). One that must stay yours goes in your",
 		"  `.claude/settings.json`: the installer replaces only its own command there.", "")

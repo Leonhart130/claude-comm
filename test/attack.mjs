@@ -1267,6 +1267,64 @@ const POINTER_SOURCES = (() => {
 		`${process.env.CLAUDE_COMM_AGENT === undefined}`)
 }
 
+// A102 — TWO EXPERTS WRITE TO EACH OTHER ONLY INSIDE A PAIR THE LEADER OPENED, AND ONLY UNTIL IT ENDS. work's leader for
+// the owner, 11-01 (`exchange/work-leader/in/…-12-canal-entre-deux-experts.md`): every "your script misses on this
+// site" between two experts cost a leader turn. The star's reason stays, so: closed by default, opened by the leader
+// alone with a file, ended by itself, every message logged. One scratch project, three experts. Before any pair a->b
+// is refused - THE STAR ITSELF, which until now only selftest's real sessions held, never this suite - and the refusal
+// names the way. An expert cannot open one; over 24 h, no --for, the leader as a member, an expert with itself, a
+// missing ref: each refused, nothing written, nobody rung. Opened: both rung pointing at the SAME file; a->b and b->a
+// land, marked, a's ref shown to b from b's folder; a->c still refused. Then one variable at a time on the record: its
+// end in the past (refused, saying when; put back, it lands again - the leg's positive control), closed by the
+// leader, unreadable (it fails CLOSED). And `comm log` marks a pair's message. FINDINGS.md#pairs
+{
+	const r102 = mkdtempSync(join(tmpdir(), "comm-attack-pair-"))
+	atExit(() => { try { rmSync(r102, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(r102, ".comm", "bin"), { recursive: true })
+	for (const a of ["leader", "a", "b", "c"]) { mkdirSync(join(r102, ".comm", "inbox", a), { recursive: true }); if (a !== "leader") mkdirSync(join(r102, a), { recursive: true }) }
+	writeFileSync(join(r102, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", a: "a", b: "b", c: "c" } }))
+	for (const f of ["comm.mjs", "who.mjs", "pair.mjs"]) cpSync(join(PKG, "bin", f), join(r102, ".comm", "bin", f))
+	writeFileSync(join(r102, "a", "PAIR.md"), "why, and on what\n"); writeFileSync(join(r102, "a", "FIX.md"), "your script misses on site 3\n")
+	const run = (who, tool, args) => spawnSync(process.execPath, [join(r102, ".comm", "bin", tool), ...args], { cwd: who === "leader" ? r102 : join(r102, who), encoding: "utf8" })
+	const comm = (who, ...args) => run(who, "comm.mjs", args), pair = (who, ...args) => run(who, "pair.mjs", args)
+	const box = (a) => readdirSync(join(r102, ".comm", "inbox", a)).filter((f) => f.endsWith(".json")).map((f) => JSON.parse(readFileSync(join(r102, ".comm", "inbox", a, f), "utf8")))
+	const PJ = join(r102, ".comm", "pairs.json"), pairs = () => { try { return JSON.parse(readFileSync(PJ, "utf8")) } catch { return null } }
+	const said = (r) => `${r.stdout}${r.stderr}`, refused = (r) => r.status !== 0 && /hub-enforced/.test(said(r))
+	const star = comm("a", "send", "b", "--ref", "FIX.md")
+	const byExpert = pair("a", "a", "b", "--for", "1h", "--ref", "PAIR.md")
+	const bad = [["a", "b", "--for", "25h", "--ref", "PAIR.md"], ["a", "b", "--ref", "PAIR.md"], ["a", "leader", "--for", "1h", "--ref", "PAIR.md"],
+		["a", "a", "--for", "1h", "--ref", "PAIR.md"], ["a", "b", "--for", "1h", "--ref", "NOPE.md"]].map((args) => pair("leader", ...args))
+	const untouched = pairs() === null && box("a").length === 0 && box("b").length === 0
+	const open = pair("leader", "a", "b", "--for", "1h", "--ref", "PAIR.md"), p = pairs() || {}
+	const told = [...box("a"), ...box("b")].filter((m) => m.from === "leader")
+	const ab = comm("a", "send", "b", "--ref", "FIX.md"), ba = comm("b", "send", "a", "--ref", "../a/FIX.md"), ac = comm("a", "send", "c", "--ref", "FIX.md")
+	const toB = box("b").find((m) => m.from === "a"), shownToB = comm("b", "inbox")
+	writeFileSync(PJ, JSON.stringify({ "a+b": { ...p["a+b"], until: new Date(Date.now() - 60_000).toISOString() } }))
+	const expired = comm("a", "send", "b", "--ref", "FIX.md")
+	writeFileSync(PJ, JSON.stringify(p)); const putBack = comm("a", "send", "b", "--ref", "FIX.md")
+	const close = pair("leader", "a", "b", "--close"), afterClose = comm("a", "send", "b", "--ref", "FIX.md")
+	writeFileSync(PJ, "{ not json"); const corrupt = comm("a", "send", "b", "--ref", "FIX.md")
+	comm("b", "dismiss", "b"); const log = comm("leader", "log")
+	const ok = {
+		starHolds: refused(star) && /pair\.mjs a b --for/.test(said(star)) && box("b").length === 0,
+		expertCannotOpen: byExpert.status !== 0 && /only 'leader'/.test(said(byExpert)),
+		badRefused: bad.every((r) => r.status !== 0) && untouched,
+		opened: open.status === 0 && !!p["a+b"] && Date.parse(p["a+b"].until) - Date.now() > 55 * 60_000 && Date.parse(p["a+b"].until) - Date.now() <= 3600_000,
+		bothRungOneFile: told.length === 2 && told.every((m) => m.refPath === "a/PAIR.md" && /pair with/.test(m.note)) && new Set(told.map((m) => m.to)).size === 2,
+		pairLands: ab.status === 0 && ba.status === 0 && !!toB && toB.pair === "a+b" && toB.kind === "nudge",
+		refFromB: /ref: \.\.\/a\/FIX\.md/.test(shownToB.stdout),
+		otherRefused: refused(ac),
+		expiredRefused: refused(expired) && /closed at/.test(said(expired)) && putBack.status === 0,
+		closedRefused: close.status === 0 && refused(afterClose) && /closed at/.test(said(afterClose)),
+		corruptClosed: refused(corrupt),
+		logMarked: /a → b \(pair\)/.test(log.stdout),
+	}
+	check("A102 two experts write to each other only inside a pair the leader opened, and only until it ends",
+		Object.values(ok).every(Boolean),
+		Object.entries(ok).map(([k, v]) => `${k}=${v}`).join("; ") + `; star: "${said(star).split("\n")[0].slice(0, 70)}"; ` +
+		`bad exits ${bad.map((r) => r.status).join(",")}; open: "${said(open).split("\n")[0].slice(0, 70)}"`)
+}
+
 // ── A21/A22: the properties that erode by accretion, not by a single bad commit ──
 // Asked for directly by the owner (2026-08-05): "performant, compact and secure by
 // default", with a worry about memory leaks as features are added. The honest
@@ -4986,9 +5044,10 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 // is in the README's "Every setting". Positive controls on (1), (3) and (6).
 {
 	// kitty's own (launch, close, wake); wake's, which close passes on; close's own detached closer and probe; comm
-	// whoami's (claim); restart-signal's (restart); git's (handoff); comm send's (usage, a crossing's message)
+	// whoami's (claim); restart-signal's (restart); git's (handoff); comm send's (usage, a crossing's message; pair's bells)
 	const FOREIGN = { launch: ["--keep-focus", "--match", "--next-to", "--to"], close: ["--match", "--to", "--root", "--json", "--after-turn", "--verify"],
-		wake: ["--match", "--to", "--ansi"], claim: ["--agent-root"], restart: ["--by"], handoff: ["--porcelain", "--short", "--stdin"], ledger: [], usage: ["--ref", "--kind", "--note"] }
+		wake: ["--match", "--to", "--ansi"], claim: ["--agent-root"], restart: ["--by"], handoff: ["--porcelain", "--short", "--stdin"], ledger: [], usage: ["--ref", "--kind", "--note"],
+		pair: ["--kind", "--note"] }
 	const undocumented = (src, foreign) => { const head = src.slice(0, src.indexOf("*/"))
 		return [...new Set([...src.matchAll(/["'](--[a-z][a-z0-9-]+)["']/g)].map((m) => m[1]))].filter((f) => f !== "--help" && !head.includes(f) && !foreign.includes(f)) }
 	const gaps = {}

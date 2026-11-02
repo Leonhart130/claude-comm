@@ -3929,7 +3929,57 @@ reading the box.
   as before, no second Enter. The threshold was not measured.
 - **The race** between the screen read and the Enter is the relay's existing one: milliseconds, narrowed, not closed.
 
-## `#settings-inheritance` — an expert runs its leader's `settings.local.json`, not its `settings.json` (2026-09-27)
+## `#pairs` — two experts may write to each other, inside a pair the leader opened, until it ends (2026-11-02)
+
+**Asked by the owner through work's leader** (11-01 01h20, `exchange/work-leader/in/…-12-canal-entre-deux-experts.md`):
+*"Je pense que ce serait bien qu'il y ait cette capacité sur Claude-comm, t'en penses quoi ? […] c'est rare ici […] mais ça
+peut arriver."* The case: `recherche` analysed sites one by one, `automatisation` scripted the mechanical gestures of that
+analysis, and each round of "your script misses on this site" → fix → rerun was two hops through the leader - a leader
+turn each (its whole window re-read), and a wait for that turn's end. On 11-02 the owner, to me: *"si c'est bon, tu la
+traites"*.
+
+**My view, given before building: yes, in the shape work's leader proposed** - it keeps the star's reason and removes only
+the hop. The reason (README "Topology is enforced, not documented") is that nothing may coordinate off the board. So:
+closed by default, the bus refusing as before; opened by the LEADER alone, for two named experts, with a FILE saying why
+and on what; it ENDS BY ITSELF (`--for`, at most 24 h); every message in it is delivered and logged as any other and
+marked `(pair)` in `comm log`, which the leader reads when it chooses - **not rung**, since a ring starts its turn and
+spends its budget. A pair coordinates work; a decision, a spec change or a question for the owner still goes to it.
+
+**What did NOT need building, measured in the code:** a ref between two experts already had a right base. `subjectOf`
+returns the SENDER when neither end is the leader, so `--ref` resolves from the sender's folder (what an expert always
+types), and `refForRecipient` re-expresses it from the recipient's: `FIX.md` from `a` reaches `b` as `../a/FIX.md`
+(A102 `refFromB`). And the ring is agent-agnostic: a send's `PostToolUse` rings whoever has fresh mail.
+
+**The split, for A22:** the bus carries only the check in `send` (a pair read from `.comm/pairs.json`, open while its
+`until` is ahead; unreadable is no pair - it fails CLOSED), the `pair` field on the message, the `(pair)` mark in `log`,
+and `nudge` as an expert-to-expert default kind (`done` means a round finished FOR THE LEADER). 1.3 KB: the bus is 92.8 %
+of its 58 000 B. Opening, closing and listing are `bin/pair.mjs`, shipped beside it (first draft in `comm.mjs` itself:
+98.6 %, one feature from red). It rings both experts through `comm.mjs send` from the leader's folder, so every rule of
+a send holds, and asks `comm.mjs whoami` who runs it - one implementation of each. The ref is checked by the first bell
+before anything is written; the pair is written after the second.
+
+**A102**, in a scratch project with three experts: before any pair a->b refused - **the star itself, which until now no
+arm of this suite held**, only `selftest`'s real sessions - and the refusal names the way; an expert cannot open one;
+over 24 h, no `--for`, the leader as a member, an expert with itself, a missing ref: each refused, nothing written,
+nobody rung; opened, both rung at the SAME file; a->b and b->a land, marked, `nudge`; a->c refused; then one variable at a
+time on the record: its end in the past (refused, saying when; put back, it lands - the leg's positive control), closed,
+unreadable. And `comm log` marks the message. **Mutants 11/11, each reddening its own row of A102**: a pair never lets a
+send through; a pair never ends; any open pair lets any two experts; no record means open; the log unmarked; `done` as
+the expert-to-expert default; an expert may open one; no 24 h cap; the second expert not rung; its ref not
+re-expressed; a refused first bell still opens. Release `2026-11-02.2`. **A31 went red once in that batch, in the last
+mutant's run, and it was the WORLD**: entry `3267602` is a field expert's live session rewritten by its own relay
+`/clear` at 21:34:41Z, mid-suite - A31 blamed the suite for a live session's own rewrite, the twin `#review15` names for
+boot's control. Its new transcript existed when I looked an hour later; whether it existed at the snapshot is not known.
+Named, not fixed.
+
+**Not done, said rather than implied:**
+- **The leader is not told a pair's traffic as it happens.** Work's open question (a counter in its statusLine?) is
+  answered no for now: the log is the copy, and `pair.mjs` with no argument counts each pair's logged messages.
+  A count nobody reads would be one more surface agreeing on a plausible wrong answer.
+- **Closing rings nobody**: each expert learns it at its next send to the other, whose refusal says when it closed.
+- **A pair's messages are not kept apart from the leader's mail** in `inbox`/`sent`: same queue, marked in the file.
+- **No field use yet**: the shape is work's, the property is A102's, the cost saved is work's estimate, not a measurement.
+ — an expert runs its leader's `settings.local.json`, not its `settings.json` (2026-09-27)
 
 **Reported by atlas's leader** (field letter 09-27): a `Stop` hook he put in his root's `settings.local.json` ran
 in his expert `scribe`'s session, resolved against `scribe`'s folder (`$CLAUDE_PROJECT_DIR` = the expert's), and failed there.

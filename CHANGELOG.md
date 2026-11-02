@@ -32,6 +32,18 @@ already have.
 
 
 
+
+## 2026-11-02.2 — bus print `efe70286cc95` — 2026-11-02
+
+- **Two experts can now write to each other directly - inside a pair their leader opens, until it ends.** For a tight
+  loop (one writes a script, the other runs it on its cases), the leader runs
+  `node .comm/bin/pair.mjs <a> <b> --for 2h --ref <file saying why and on what>` (24 h at most). Both experts are rung,
+  pointing at that file; until then they `comm send` to each other as usual (`--kind` defaults to `nudge` between
+  experts). Every message is delivered and logged like any other and marked `(pair)` in `comm log`; the leader is not
+  rung for them. `pair.mjs <a> <b> --close` ends it early, `pair.mjs` alone lists every pair. Outside a pair, or after it
+  ends, expert-to-expert is refused as before, and the refusal says how to ask for one. A pair coordinates work: a
+  decision, a change to the spec or a question for the owner still goes to the leader.
+
 ## 2026-11-02.1 — bus print `6ac96ba40b80` — 2026-11-02
 
 - **A relay no longer leaves its first prompt sitting unsent in your box.** A long prompt and its Enter read by Claude

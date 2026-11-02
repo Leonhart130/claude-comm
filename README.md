@@ -159,6 +159,12 @@ $ comm send sable-carrier --from sable-seller --ref docs/REVIEW.md
 Error: hub-enforced: 'sable-seller' may not message 'sable-carrier' directly.
 ```
 
+**The one way round it is the leader's own: a pair** (since `2026-11-02.2`, `FINDINGS.md#pairs`). For a tight loop
+between two experts - one writes a script, the other runs it on its cases - the leader runs
+`pair.mjs <a> <b> --for 2h --ref <file saying why>`: both are rung at that file, they may send to each other until
+then (24 h at most), and every message is logged and marked `(pair)` in `comm log`. It ends by itself; an unreadable
+pairs file is no pair. A pair coordinates work: a decision still goes to the leader.
+
 ## Refs resolve for the READER, not the writer
 
 A ref is written relative to the **subject** repo — whichever end is not the leader — because that is what
