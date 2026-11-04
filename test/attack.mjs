@@ -5248,8 +5248,9 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 // is in the README's "Every setting". Positive controls on (1), (3) and (6).
 {
 	// kitty's own (launch, close, wake); wake's, which close passes on; close's own detached closer and probe; comm
-	// whoami's (claim); restart-signal's (restart); git's (handoff); comm send's (usage, a crossing's message; pair's bells)
-	const FOREIGN = { launch: ["--keep-focus", "--match", "--next-to", "--to"], close: ["--match", "--to", "--root", "--json", "--after-turn", "--verify"],
+	// whoami's (claim); restart-signal's (restart); git's (handoff); comm send's (usage, a crossing's message; pair's bells);
+	// claude's own permission flags, which launch names only to REFUSE them in a "launch" entry (A106)
+	const FOREIGN = { launch: ["--keep-focus", "--match", "--next-to", "--to", "--dangerously-skip-permissions", "--allow-dangerously-skip-permissions", "--permission-mode"], close: ["--match", "--to", "--root", "--json", "--after-turn", "--verify"],
 		wake: ["--match", "--to", "--ansi"], claim: ["--agent-root"], restart: ["--by"], handoff: ["--porcelain", "--short", "--stdin"], ledger: [], usage: ["--ref", "--kind", "--note"],
 		pair: ["--kind", "--note"], "relay-due": ["--agent-root"] }
 	const undocumented = (src, foreign) => { const head = src.slice(0, src.indexOf("*/"))
@@ -6236,6 +6237,78 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		`opus/max reaches it on a second launch=${landsSecond} ` +
 		`(the control for the line before: one launch alone would pass for a launcher that hardcodes a tier)` +
 		`${caller57 ? "" : " — THE ARM COULD NOT RUN: no kitty window for this suite"}`)
+}
+
+// A106 — AN AGENT'S OWN LAUNCH: more arguments and environment, from config.json alone. A field leader for the owner,
+// 11-04 (`exchange/field/in/…-lancer-un-expert-avec-telegram.md`): an expert holding a Telegram channel must start with
+// `--channels plugin:…` and a TELEGRAM_STATE_DIR of its own. Measured where it LANDS, as A57: the fake `claude` writes its
+// argv AND its environment, from a real launch in the bench. Legs: the agent's entry in --print, in its order (before
+// --model: an option of several values would swallow the prompt); an agent with no entry launches exactly as before; eight
+// refusals, none composing an argv (the launch's own flags, the permission flags, PATH and the agent's NAME, a misspelt
+// key, args not a list, a value of two lines) - the --print of the good entry is their positive control, the same file
+// and code; and the child's own argv and env, its name not overridable. FINDINGS.md#launch-extra
+{
+	const r106 = mkdtempSync(join(tmpdir(), "comm-attack-launchextra-"))
+	const opened106 = []
+	atExit(() => {
+		for (const [sock, id] of opened106)
+			try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
+		try { rmSync(r106, { recursive: true, force: true }) } catch {}
+	})
+	mkdirSync(join(r106, ".comm", "bin"), { recursive: true })
+	for (const a of ["db", "app"]) mkdirSync(join(r106, a), { recursive: true })
+	const GOOD106 = { args: ["--channels", "plugin:t@x"], env: { T_STATE_DIR: "/a b/c" } }
+	const cfg106 = (db) => writeFileSync(join(r106, ".comm", "config.json"),
+		JSON.stringify({ leader: "leader", agents: { leader: ".", db: "db", app: "app" }, launch: { db } }))
+	for (const f of ["comm.mjs", "who.mjs", "launch.mjs", "wake.mjs", "session-registry.mjs", "close.mjs", "claim.mjs"])
+		cpSync(join(PKG, "bin", f), join(r106, ".comm", "bin", f))
+	const L106 = join(r106, ".comm", "bin", "launch.mjs"), bin106 = join(r106, "fakebin"), argv106 = join(r106, "argv.txt"), envf106 = join(r106, "env.txt")
+	mkdirSync(bin106, { recursive: true })
+	writeFileSync(join(bin106, "claude"), `#!/bin/sh\nprintf '%s\\n' "$@" > ${JSON.stringify(argv106)}\n` +
+		`printf '%s\\n' "T=$T_STATE_DIR" "A=$CLAUDE_COMM_AGENT" > ${JSON.stringify(envf106)}\nexec sleep 120\n`, { mode: 0o755 })
+	const env106 = { ...process.env, PATH: `${bin106}${delimiter}${process.env.PATH}` }
+	delete env106.CLAUDE_COMM_AGENT
+	const print106 = (agent) => { const r = spawnSync(process.execPath, [L106, agent, "--print", "--model", "sonnet", "--effort", "low", "--prompt", "x"], { cwd: r106, encoding: "utf8", env: env106 })
+		let j = null
+		try { j = JSON.parse(r.stdout) } catch {}
+		return { s: r.status, j, err: r.stderr, out: r.stdout } }
+	cfg106(GOOD106)
+	const pDb = print106("db"), pApp = print106("app")
+	const at = (j, v) => j ? j.argv.indexOf(v) : -1
+	const printCarries = pDb.s === 0 && !!pDb.j && pDb.j.argv.includes("--env=T_STATE_DIR=/a b/c") &&
+		at(pDb.j, pDb.j.claude) < at(pDb.j, "--channels") && at(pDb.j, "--channels") + 1 === at(pDb.j, "plugin:t@x") &&
+		at(pDb.j, "plugin:t@x") + 1 === at(pDb.j, "--model") && JSON.stringify(pDb.j.launch) === JSON.stringify(GOOD106)
+	const otherUnchanged = pApp.s === 0 && !!pApp.j && pApp.j.launch === null && at(pApp.j, pApp.j.claude) + 1 === at(pApp.j, "--model") &&
+		!pApp.j.argv.some((x) => /channels|T_STATE_DIR/.test(x))
+	const BAD106 = [
+		["the launch's own flag", { args: ["--model", "opus"] }, /holds --model .*REFUSING/],
+		["a permission flag, with =", { args: ["--permission-mode=bypassPermissions"] }, /never widens permissions/],
+		["the permission bypass", { args: ["--dangerously-skip-permissions"] }, /never widens permissions/],
+		["PATH", { env: { PATH: "/x" } }, /sets PATH .*REFUSING/],
+		["the agent's name", { env: { CLAUDE_COMM_AGENT: "leader" } }, /sets CLAUDE_COMM_AGENT .*REFUSING/],
+		["a misspelt key", { argz: ["--channels", "x"] }, /has "argz" .*REFUSING/],
+		["args not a list", { args: "--channels x" }, /must be a list of non-empty strings/],
+		["a value of two lines", { env: { T_STATE_DIR: "a\nb" } }, /on one line .*REFUSING/],
+	]
+	const refused = BAD106.map(([name, db, re]) => { cfg106(db); const r = print106("db"); return { name, ok: r.s !== 0 && re.test(r.err) && !/"argv"/.test(r.out), err: r.err.trim().slice(0, 90) } })
+	cfg106(GOOD106)
+	const caller106 = await bench()
+	let landedArgv = null, landedEnv = null
+	if (caller106) {
+		const run = benchRun(caller106, [process.execPath, L106, "db", "--model", "sonnet", "--effort", "low", "--prompt", "report to leader"], { cwd: r106, env: env106 })
+		const id = Number((run.stdout.match(/window: (\d+)/) || [])[1])
+		if (Number.isInteger(id) && id > 0) opened106.push([caller106.sock, id])
+		const until = Date.now() + 10000
+		while (Date.now() < until && !(existsSync(argv106) && existsSync(envf106))) spawnSync(process.execPath, ["-e", "setTimeout(()=>{},200)"])
+		try { landedArgv = readFileSync(argv106, "utf8").trim().split("\n"); landedEnv = readFileSync(envf106, "utf8").trim().split("\n") } catch {}
+	}
+	const lands = JSON.stringify(landedArgv) === JSON.stringify(["--channels", "plugin:t@x", "--model", "sonnet", "--effort", "low", "report to leader"]) &&
+		JSON.stringify(landedEnv) === JSON.stringify(["T=/a b/c", "A=db"])
+	check("A106 an agent's own launch adds its arguments and environment from config.json - before --model, refused for what the launch owns, the child receives exactly those",
+		printCarries && otherUnchanged && refused.every((r) => r.ok) && !!caller106 && lands,
+		`--print of the entry, in order=${printCarries}; an agent with none, unchanged=${otherUnchanged}; ` +
+		`refused: ${refused.map((r) => `${r.name}=${r.ok}`).join(", ")}; bench=${!!caller106}; landed=${lands} ` +
+		`argv ${JSON.stringify(landedArgv)} env ${JSON.stringify(landedEnv)}` + (refused.some((r) => !r.ok) ? `; first bad: ${JSON.stringify(refused.find((r) => !r.ok))}` : ""))
 }
 
 // A54 — EVERY control suite scrubs the operator's identity, not just the one that was bitten.

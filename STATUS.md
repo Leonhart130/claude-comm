@@ -13,9 +13,12 @@ changed and what comes next.**)*
    Its 20 (11-02 23h48): its own `PostToolUse` guard REMOVED from three experts at the owner's word. work will report
    its expert past 140 k (now: does *RELAY SOON* reach the expert itself) and its first pair. altair's (00h37), deneb's
    and atlas's wait for a bell - `node bin/exchange-bell.mjs --peer <channel> --ref <file>` when their leaders run.
-1. **NEW FIELD 11-04: capella** (codename; rule 18, proved on 4 spellings BEFORE install), a leader-only kickstart of the
-   leader-expert method, installed at the owner's word. Its first session (20h39) started BEFORE the hooks: told the
-   owner to restart it once. Not a git repo yet (its own close script needs one) - its leader's.
+1. **NEW FIELD 11-04: capella** (codename; rule 18, proved on 4 spellings BEFORE install), leader-expert kickstart,
+   installed at the owner's word; now on the bus with a secretary expert (Telegram). Its 21h14 request answered by
+   `.2` (`#launch-extra`, A106): a field ran `--add-agent` from my WORKING TREE mid-change - same bytes as gated, this
+   time. Not a git repo yet (its own close script needs one) - its leader's.
+1b. 🔴 **`selftest`'s real sessions load the machine's plugins** - the owner's Telegram server started at each run and took
+   the bot (the field's log, 19:59Z 11-04: mine). Measure which flag isolates a plugin's MCP server, then arm it.
 2. **The bells' Enter** (`#enter-in-the-paste`, the cause MEASURED 11-02): `wake`'s bell and the exchange bell still type
    text then `\r` at once; the relay waits for the box since `2026-11-02.1`. Same change, own arms (their fakes draw no
    typed text; Stop's 10 s budget). And **Ctrl+Z in a shell-less window**: avoided, not detected.
@@ -33,7 +36,7 @@ changed and what comes next.**)*
 
 **Done**: 11-02 `.1`-`.4` (`#enter-in-the-paste` A101, `#pairs` A102, `#relay-due` A103-A104). **11-04 `.1`**
 (`#subagent-note`, A105, mutants 4/4, `selftest` both ways): a sub-agent's tool call carries no note and spends no step
-- measured, its payload has `agent_id` (a `--agent` main thread does not). In the twelve trees; work's 16 stubs and skills.
+- measured, its payload has `agent_id` (a `--agent` main thread does not). **`.2`**: an agent's own `claude` args and env from config `"launch"` (A106, mutants 10/10). Both in the twelve trees, measured in work's.
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a
 codename here; the mapping is in no repo. The boot report prints the REAL directory names: **never copy a `field:` row

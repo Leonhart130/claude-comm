@@ -4086,6 +4086,41 @@ defect), the test made on `agent_type` (the main thread silenced), every call ta
 a runtime that stops sending `agent_id` would bring the old behaviour back, silently (nothing here reddens on it; the
 next field report would). The Stop path is untouched: a sub-agent ends with `SubagentStop`, which the bus does not hook.
 
+## `#launch-extra` — an expert's own `claude` options and environment, from config.json (2026-11-04)
+
+**Asked by a new field's leader, for the owner** (11-04, `exchange/field/in/…-lancer-un-expert-avec-telegram.md`): an
+expert that holds the project's Telegram channel must start with `--channels plugin:telegram@claude-plugins-official`
+(without it, their plugin log: *"not in --channels list"*, nothing is pushed) and with `TELEGRAM_STATE_DIR` set to a
+folder of its own. `launch.mjs` could say neither. Their proposal is the design: `"launch": {"<agent>": {"args": [...],
+"env": {...}}}`, read from config.json like the name, never from a message.
+
+**Two choices, each with its reason.** The arguments go **before `--model`**: whether `--channels` takes several values
+is not known here (it is not even in `claude --help`), and a variadic option placed last would take the first prompt as
+one more value. The file is **trusted already** - a relay's `guard` is a command run from it - so the checks guard
+against MISTAKES, not against the file: the launch's own flags (`--model`, `--effort`, `-p`/`--print`: the tier is chosen
+per task, A57, and a launch is interactive), `PATH` and `CLAUDE_COMM_*` (the child's hooks find node through the first;
+the second is its NAME), a key other than `args`/`env` (a misspelt key would launch without it), a value of two lines.
+**One line is policy**: no flag that widens permissions, because the launcher is a tool agents run; permissions are set
+where the owner sets them, in the folder's settings. Anything else passes - Claude Code has options this file cannot list.
+
+**A106**, measured where it lands as A57: a fake `claude` writes its argv and its environment from a real launch in the
+bench; the entry in `--print`, in order; an agent with no entry unchanged; eight refusals with no argv composed; the
+child's own argv and env, its name not overridden.
+
+**Reported with it, about my tests**: the Telegram plugin is enabled for every session on the machine, and each of its
+servers that starts takes the bot from the previous one. `selftest`'s real sessions (`/tmp/comm-selftest-*`) started it
+while its token sat in the default folder - their plugin log names one, 19:59Z on 11-04: my `selftest` run of that
+evening. They moved the token since. **A test that starts the owner's plugins is a control that writes into the world it
+runs in** (`#measurement-traps`); named, not fixed - an isolation of `selftest`'s sessions from user plugins must be
+measured first (which flag a plugin's MCP server obeys).
+
+**In use the same evening, measured on the live process** (the field's secretary expert, launched by its own boot through
+`launch.mjs`): its argv is `claude --channels plugin:telegram@claude-plugins-official --model haiku --effort xhigh
+<prompt>`, its environment carries `TELEGRAM_STATE_DIR` and `CLAUDE_COMM_AGENT=<its name>`, and **the plugin's MCP server
+(its child, `bun run …/telegram/0.0.7`) carries `TELEGRAM_STATE_DIR` too** - so an `"env"` does reach a plugin. That
+real messages go in and out is the field's report, not re-run here. Note: that field ran `--add-agent` from my working
+tree at 21:22, before the gates; the bytes were the ones gated after (my reinstall rewrote only `INSTALLED.json`).
+
 ## `#settings-inheritance` — an expert runs its leader's `settings.local.json`, not its `settings.json` (2026-09-27)
 
 **Reported by atlas's leader** (field letter 09-27): a `Stop` hook he put in his root's `settings.local.json` ran

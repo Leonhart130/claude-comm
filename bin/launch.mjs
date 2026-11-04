@@ -6,6 +6,12 @@
  *   node bin/launch.mjs <agent> --model <m> --effort <e> ... --print                   the launch it would make; nothing launched
  *   node bin/launch.mjs <agent> --model <m> --effort <e> ... --os-window [--minimized]  a separate OS window (minimized: out of view)
  *
+ *   .comm/config.json  "launch": {"<agent>": {"args": ["--channels", "plugin:telegram@claude-plugins-official"],
+ *                                             "env": {"TELEGRAM_STATE_DIR": "/a/folder/of/its/own"}}}
+ *                      more for that agent's `claude`, from this file alone, never from a message: "args" go BEFORE
+ *                      --model, "env" into its environment. Refused: --model, --effort, -p/--print (each launch's
+ *                      own), a flag that widens permissions, PATH and CLAUDE_COMM_* (its hooks and its name).
+ *
  * WHY THIS REFUSES INSTEAD OF TRYING. `kitten @ launch` starts the child from the
  * KITTY process, so the child inherits kitty's environment — and kitty here was
  * started from a .desktop file, where nvm has never been on PATH. The session comes
@@ -201,6 +207,40 @@ if (!MODEL_RE.test(model))
 if (!EFFORTS.includes(effort))
 	die(`--effort ${JSON.stringify(effort)} is not an effort level — REFUSING.${flagShaped(effort)}\n` + TIER_HELP)
 
+// ── THE AGENT'S OWN LAUNCH: more arguments and environment, from config.json alone (A106) ──
+// Asked by a field leader 2026-11-04, for the owner (`exchange/field/in/…-lancer-un-expert-avec-telegram.md`): an expert
+// that holds a Telegram channel must start with `--channels plugin:…` - without it the plugin pushes nothing ("not in
+// --channels list") - and with a TELEGRAM_STATE_DIR of its own. Neither could be said. Like the agent's name, they come
+// from .comm/config.json, never from message text. That file is trusted already (a relay's "guard" is a command run from
+// it), so what follows guards against MISTAKES - plus one line of policy: no permission is widened through a launcher an
+// agent can run; permissions are set where the owner sets them, in that folder's own settings. Claude Code has options
+// this file cannot list (`--channels` is not in its --help), so anything else passes: a guard, not a sandbox.
+// The arguments go BEFORE --model: an option that takes several values would otherwise swallow the first prompt.
+const OWN_ARGS = ["--model", "--effort", "-p", "--print"]
+const WIDENS = ["--dangerously-skip-permissions", "--allow-dangerously-skip-permissions", "--permission-mode"]
+const extra = (cfg.launch && typeof cfg.launch === "object" ? cfg.launch[agent] : undefined) ?? null
+let extraArgs = [], extraEnv = []
+if (extra !== null) {
+	const where = `.comm/config.json "launch" "${agent}"`
+	if (typeof extra !== "object" || Array.isArray(extra)) die(`${where} is not an object — REFUSING. Write: "${agent}": {"args": [...], "env": {...}}`)
+	const unknown = Object.keys(extra).filter((k) => k !== "args" && k !== "env")
+	if (unknown.length) die(`${where} has ${unknown.map((k) => JSON.stringify(k)).join(", ")} — REFUSING: only "args" and "env" are read, and a misspelt key would launch without it.`)
+	const a = extra.args ?? []
+	if (!Array.isArray(a) || a.some((x) => typeof x !== "string" || x === "")) die(`${where} "args" must be a list of non-empty strings — REFUSING. It is ${JSON.stringify(a)}.`)
+	const named = (list) => a.filter((x) => list.includes(x.split("=")[0]))
+	if (named(OWN_ARGS).length) die(`${where} "args" holds ${named(OWN_ARGS).join(", ")} — REFUSING: the model and the effort are chosen for each TASK, on the command line, and a launch is interactive.`)
+	if (named(WIDENS).length) die(`${where} "args" holds ${named(WIDENS).join(", ")} — REFUSING: a launcher an agent can run never widens permissions. They are set where the owner sets them: ${join(cfg.agents[agent], ".claude", "settings.json")}.`)
+	const e = extra.env ?? {}
+	if (typeof e !== "object" || e === null || Array.isArray(e)) die(`${where} "env" must be an object of names to strings — REFUSING.`)
+	for (const [k, v] of Object.entries(e)) {
+		if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(k)) die(`${where} "env" name ${JSON.stringify(k)} is not a variable name — REFUSING.`)
+		if (k === "PATH" || k.startsWith("CLAUDE_COMM_")) die(`${where} "env" sets ${k} — REFUSING: this launcher builds it (PATH is how the child's hooks find node, CLAUDE_COMM_AGENT is its name).`)
+		if (typeof v !== "string" || /[\0\n\r]/.test(v)) die(`${where} "env" ${k} must be a string on one line — REFUSING.`)
+	}
+	extraArgs = a
+	extraEnv = Object.entries(e).map(([k, v]) => `--env=${k}=${v}`)
+}
+
 // ── refuse to launch what is already alive (A17) ─────────────────────────────
 // comm.mjs is resolved RELATIVE TO THIS FILE, never rebuilt from the project root:
 // the field layout is .comm/bin/, the dev layout is bin/, and a path guessed from the
@@ -235,8 +275,8 @@ const childPath = [dirname(nodeBin), dirname(claudeBin), ...(process.env.PATH ||
 	.filter((d, i, a) => a.indexOf(d) === i).join(delimiter)
 const cwd = join(root, cfg.agents[agent] ?? ".")
 const argv = ["@", "launch", `--type=${osWindow ? "os-window" : "window"}`, ...(minimized ? ["--os-window-state=minimized"] : []), "--keep-focus", `--cwd=${cwd}`,
-	`--env=PATH=${childPath}`, `--env=CLAUDE_COMM_AGENT=${agent}`, claudeBin,
-	"--model", model, "--effort", effort,
+	...extraEnv, `--env=PATH=${childPath}`, `--env=CLAUDE_COMM_AGENT=${agent}`, claudeBin,
+	...extraArgs, "--model", model, "--effort", effort,
 	...(prompt ? [prompt] : [])]
 
 const wake = await import(new URL("wake.mjs", import.meta.url))
@@ -274,7 +314,7 @@ if (printOnly) {
 	// `--print` showed an argv the real launch never used — the same "the checking mode is
 	// quieter than the thing it checks" defect A53 exists to forbid, one flag-pair over.
 	console.log(JSON.stringify({ agent, cwd, node: nodeBin, claude: claudeBin, path: childPath, argv,
-		type: osWindow ? "os-window" : "window", model, effort, prompt }, null, 2))
+		type: osWindow ? "os-window" : "window", model, effort, prompt, launch: extra ? { args: extraArgs, env: extra.env ?? {} } : null }, null, 2))
 	// 🔴 THE WARNING BELONGS HERE TOO. Reported by the `atlas` field leader 2026-09-11:
 	// --print is the mode someone uses to CHECK a launch before making it, and it was the one
 	// mode that omitted the consequence of launching with no first turn. An absent prompt is

@@ -37,6 +37,16 @@ already have.
 
 
 
+
+## 2026-11-04.2 — bus print `7228313a60ca` — 2026-11-04
+
+- **An expert can now be launched with more of `claude`: an option or an environment variable of its own.** Write it
+  once in `.comm/config.json`: `"launch": {"<agent>": {"args": ["--channels", "plugin:…"], "env": {"NAME": "value"}}}`;
+  `launch.mjs <agent> --model … --effort …` then adds the arguments before `--model` and the variables to that session's
+  environment, and `--print` shows them. Refused, saying why: `--model`, `--effort` and `-p` (still chosen per launch),
+  a flag that widens permissions (set those in that folder's own settings), `PATH` and `CLAUDE_COMM_*`, a key other than
+  `"args"`/`"env"`. An agent with no `"launch"` entry launches exactly as before.
+
 ## 2026-11-04.1 — bus print `d33710262941` — 2026-11-04
 
 - **The bus's notes after a tool call are no longer said inside your sub-agents.** Claude Code runs your tool hook for
