@@ -1479,6 +1479,56 @@ const POINTER_SOURCES = (() => {
 		Object.entries(ok).map(([k, v]) => `${k}=${v}`).join("; ") + `; matchers x=${xEvery} y=${yBash} x after=${xBack}; over: "${over.ctx.slice(0, 80)}"`)
 }
 
+// A105 — A SUB-AGENT'S TOOL CALL CARRIES NO NOTE, AND SPENDS NOTHING. work 11-03 13h00 (`…-21-relay-soon-lu-par-un-
+// sous-agent.md`): the hook fires for a sub-agent's tools with the SESSION's transcript and an `agent_id` (measured,
+// Claude Code 2.1.318), and a RELAY SOON for the main thread's 142 k landed in a background designer while its expert
+// heard the next one at 169 k. The REAL stub, ONE variable moved - `agent_id`: the same transcript and the same usage
+// reading, fired first as a sub-agent (no note, no step written, no window told, no letter to the leader), then as a main
+// thread started with --agent (`agent_type` alone, measured too): BOTH notes, at the very step and window the sub-agent
+// left unspent. That second leg is the positive control AND the property: what work lost was the step, not only the text.
+// FINDINGS.md#subagent-note
+{
+	const r105 = mkdtempSync(join(tmpdir(), "comm-attack-subagent-"))
+	atExit(() => { try { rmSync(r105, { recursive: true, force: true }) } catch {} })
+	mkdirSync(join(r105, ".comm"), { recursive: true }); mkdirSync(join(r105, "x"), { recursive: true })
+	writeFileSync(join(r105, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", x: "x" },
+		relay: { x: { say: "resume x", at: 100000 } }, usage: { statusLine: true, week: 50 } }))
+	execFileSync("node", [join(PKG, "install.mjs"), r105], { stdio: "pipe" })
+	const env105 = { ...process.env, CLAUDE_COMM_RUNTIME: join(r105, "rt") }
+	delete env105.CLAUDE_COMM_AGENT
+	mkdirSync(join(r105, "rt", "claude-comm"), { recursive: true })
+	writeFileSync(join(r105, "rt", "claude-comm", "usage.json"), JSON.stringify({ v: 1, at: Date.now(), five_hour: null,
+		seven_day: { pct: 80, resets_at: 1900000000 }, session: null, project: r105 }))
+	const T105 = join(r105, "t.jsonl")
+	writeFileSync(T105, JSON.stringify({ type: "assistant", message: { role: "assistant", content: [{ type: "text", text: "ok" }],
+		usage: { input_tokens: 10, cache_read_input_tokens: 120000 - 1010, cache_creation_input_tokens: 1000 } } }) + "\n")
+	const fire = (extra) => {
+		const r = spawnSync(process.execPath, [join(r105, "x", ".claude", "comm-hook.mjs"), "post-tool"], { cwd: join(r105, "x"), encoding: "utf8", env: env105,
+			input: JSON.stringify({ cwd: join(r105, "x"), hook_event_name: "PostToolUse", tool_name: "Bash", transcript_path: T105, ...extra }) })
+		let j = null
+		try { j = JSON.parse(r.stdout) } catch {}
+		return { s: r.status, ctx: j && j.hookSpecificOutput ? String(j.hookSpecificOutput.additionalContext || "") : "" }
+	}
+	const tryOr = (f, d) => { try { return f() } catch { return d } }
+	const spent = () => ({
+		step: tryOr(() => JSON.parse(readFileSync(join(r105, ".comm", "relay", "x.due.json"), "utf8")).notice ?? null, null),
+		told: tryOr(() => readdirSync(join(r105, ".comm", "usage")).filter((f) => f.startsWith(".told-x-seven_day")).length, 0),
+		letters: tryOr(() => readdirSync(join(r105, ".comm", "inbox", "leader")).filter((f) => f.endsWith(".json")).length, 0),
+	})
+	const sub = fire({ agent_id: "a2f9a105e9586186f", agent_type: "general-purpose" }), afterSub = spent()
+	const main = fire({ agent_type: "probe" }), afterMain = spent()
+	const ok = {
+		subSilent: sub.s === 0 && sub.ctx === "",
+		subSpentNothing: afterSub.step === null && afterSub.told === 0 && afterSub.letters === 0,
+		mainHearsRelay: /RELAY SOON/.test(main.ctx) && /context is 120 k/.test(main.ctx) && afterMain.step === 100000,
+		mainHearsUsage: /the week \(7-day window\) is at 80 %/.test(main.ctx) && afterMain.told === 1 && afterMain.letters === 1,
+	}
+	check("A105 a sub-agent's tool call carries no note and spends no step - the main thread's next call hears both",
+		Object.values(ok).every(Boolean),
+		Object.entries(ok).map(([k, v]) => `${k}=${v}`).join("; ") + `; after sub ${JSON.stringify(afterSub)}, after main ${JSON.stringify(afterMain)}; ` +
+			`sub: "${sub.ctx.slice(0, 60)}"; main: "${main.ctx.slice(0, 80)}"`)
+}
+
 // ── A21/A22: the properties that erode by accretion, not by a single bad commit ──
 // Asked for directly by the owner (2026-08-05): "performant, compact and secure by
 // default", with a worry about memory leaks as features are added. The honest

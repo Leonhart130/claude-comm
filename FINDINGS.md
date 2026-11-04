@@ -4052,6 +4052,40 @@ reddens `armedSilent` alone. `selftest` both ways again (the Stop path's identit
 - **The leader of a project is held too** when it has an "at" (or `"*"` covers it): intended, and not field-measured.
 - **The 25 k step and the 5 min freshness are work's numbers**, adopted, not re-derived here.
 
+## `#subagent-note` — a sub-agent's tool call spent its session's RELAY SOON (2026-11-04)
+
+**Reported by work's leader** (11-03 13h00, `exchange/work-leader/in/…-21-relay-soon-lu-par-un-sous-agent.md`, from an
+expert's report, not reproduced by them): during a design round the expert ran designers as sub-agents, and its *RELAY
+SOON* arrived in a designer, which did not follow it. Their question: does the hook fire in a session's sub-agents, and
+should it abstain.
+
+**Measured in their transcripts, 11-04** (the expert's session of 11-03 morning): the note is an `attachment` of type
+`hook_additional_context` in `subagents/agent-….jsonl`, `isSidechain: true`, at 09:50:18Z, after a Bash of a
+BACKGROUND sub-agent (its `.meta.json`: `requestShape: "background"`). It says **142 k - the MAIN thread's context**
+(142 265 at 09:50:02Z in the session's own transcript; the sub-agent's own was past 200 k, in a file `lastContext` never
+reads). So the reading was right and the recipient wrong - **and the step was spent**: the main thread was next told
+mid-turn at 169 k, the next step. The hold at its turn end (its own key) still came, at 154 k.
+
+**Measured here, Claude Code 2.1.318**, a throwaway session in a scratch folder with a PostToolUse `"*"` hook writing its
+stdin: a sub-agent's Bash carries **`agent_id` and `agent_type`, and the SESSION's `transcript_path`**; the main thread's
+calls carry neither. A second run, a main session started with `--agent`: **`agent_type` alone, no `agent_id`**. So
+`agent_id` is the test, and `agent_type` would silence real sessions.
+
+**The fix, in the stub** (`install.mjs`): a post-tool payload with a non-empty `agent_id` reads **neither note** - the
+relay's advice nor the usage threshold, which had the same shape (told once per window, by an exclusive create, into
+whichever context fired first). The main thread's next tool call reads both, at the step and window left unspent. The
+ring after a send still runs: a send is a send, whoever typed it. **A105**, the real stub, one variable moved (`agent_id`):
+the same transcript (120 k, "at" 100 k) and the same usage reading (week 80 %, threshold 50 %) fired as a sub-agent -
+silent, no step written, no window told, no letter to the leader - then as a `--agent` main thread: both notes, step
+100 k, one window told, one letter. **Mutants 4/4 red, the control green, each on its own leg**: the usage leg
+unguarded, the relay leg unguarded (each makes the sub-agent speak AND the main thread lose that very note - the field's
+defect), the test made on `agent_type` (the main thread silenced), every call taken for a sub-agent. Release
+`2026-11-04.1`.
+
+**Not verified:** the hook payload of a sub-agent inside a sub-agent (`spawnDepth` 2), and of any version but 2.1.318 -
+a runtime that stops sending `agent_id` would bring the old behaviour back, silently (nothing here reddens on it; the
+next field report would). The Stop path is untouched: a sub-agent ends with `SubagentStop`, which the bus does not hook.
+
 ## `#settings-inheritance` — an expert runs its leader's `settings.local.json`, not its `settings.json` (2026-09-27)
 
 **Reported by atlas's leader** (field letter 09-27): a `Stop` hook he put in his root's `settings.local.json` ran

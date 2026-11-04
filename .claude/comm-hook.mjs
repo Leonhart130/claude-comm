@@ -65,12 +65,20 @@ if (process.argv[2] === "statusline") {
 if (process.argv[2] === "post-tool") {
 	let raw = ""
 	try { raw = readFileSync(0, "utf8") } catch {}   // drained, and read only for its event name: a closed pipe is Claude Code's error
+	// A SUB-AGENT'S TOOL CALL CARRIES NO NOTE (work 11-03 13h00, `FINDINGS.md#subagent-note`, A105). This hook fires for the
+	// tools of a session's sub-agents too, with the SESSION's transcript_path and an `agent_id` (measured, Claude Code
+	// 2.1.318); a main thread has none, even one started with --agent (it carries `agent_type` alone, so that is not the
+	// test). A note said there lands in the sub-agent's context and SPENDS the session's step or window: in the field a
+	// RELAY SOON for the main thread's 142 k went to a background designer, and its expert next heard one at 169 k. So
+	// neither note is read here: the main thread's next tool call reads both. The ring below runs: a send is a send.
+	let sub = false
+	try { const p = JSON.parse(raw || "{}"); sub = typeof p.agent_id === "string" && p.agent_id !== "" } catch {}
 	// USAGE FIRST: an agent at its project's threshold is told once per window, and its leader gets a message - which the
 	// ring below then rings. A project with no `usage` in its config pays one read of it. `FINDINGS.md#usage-statusline`
 	let usage = ""
 	try {
 		const um = join(dirname(bus), "usage.mjs")
-		if (existsSync(um) && readFileSync(join(projectRoot, ".comm", "config.json"), "utf8").includes('"usage"'))
+		if (!sub && existsSync(um) && readFileSync(join(projectRoot, ".comm", "config.json"), "utf8").includes('"usage"'))
 			usage = (await import(pathToFileURL(um).href)).check({ projectRoot, agentRoot, bus }) || ""
 	} catch { /* usage is advice: it must never break a tool call */ }
 	// RELAY SOON (`FINDINGS.md#relay-due`, work 11-02 23h02: its overflows come MID-turn, where a Stop never looks): past an
@@ -79,7 +87,7 @@ if (process.argv[2] === "post-tool") {
 	let soon = ""
 	try {
 		const rd = join(dirname(bus), "relay-due.mjs"), conf = readFileSync(join(projectRoot, ".comm", "config.json"), "utf8")
-		if (/"at"\s*:/.test(conf) && existsSync(rd)) {
+		if (!sub && /"at"\s*:/.test(conf) && existsSync(rd)) {
 			const m = await import(pathToFileURL(rd).href), cfg = JSON.parse(conf), agent = m.agentOf({ root: projectRoot, cfg, agentRoot, bus })
 			const r = agent ? m.notice({ root: projectRoot, cfg, agent, payload: JSON.parse(raw || "{}"), relayBin: join(dirname(bus), "relay.mjs") }) : null
 			if (r && r.say) soon = r.text

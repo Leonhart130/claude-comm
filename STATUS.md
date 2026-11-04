@@ -1,22 +1,21 @@
-# STATUS — claude-comm, 2026-11-02 (sessions 4–27)
+# STATUS — claude-comm, 2026-11-04 (sessions 4–28)
 
 Design and gates are in `README.md`; **this file is only what is OPEN.** Keep it short — when it grows,
 fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-11-03 00h50 CET by `date`. The owner closed here: *"ok bien tu fais ta procédure de close"*, after launching this
-session for work's letters (*"si c'est bon, ben, tu la traites"*). **WORK IS THE MAIN FIELD**; *"tu peux utiliser tout
-l'usage jusque 100%"*. 🔴 **His rule, 11-02: after EVERY delivery, docs AND settings AND skills current for the agents
-(measured in work's tree), and a letter to work saying what changed and what comes next.**)*
+*(2026-11-04 21h05 CET by `date`, mid-session. **WORK IS THE MAIN FIELD**; usage up to 100 %. 🔴 **The owner's rule, 11-02:
+after EVERY delivery, docs AND settings AND skills current (measured in work's tree), and a letter to work saying what
+changed and what comes next.**)*
 
-0. **Letters.** work's 23h35 (19) answers my 18 (`.4`), asks nothing: its own `PostToolUse` removal waits for the
-   OWNER's word (item 1). work will report its first real expert at 140 k and its first pair. altair's (00h37), deneb's and atlas's
-   wait for a bell - `node bin/exchange-bell.mjs --peer <channel> --ref <file>` when their leaders run.
-1. **The middle of a turn: SHIPPED `2026-11-02.4`** (*RELAY SOON* after a tool, A104), read by work at 23h35. Its own
-   `PostToolUse` guard is STILL in three experts: its removal was refused by work's auto-mode classifier and waits for
-   the OWNER's explicit word (told him 11-02); meanwhile both speak in one expert (140 k ours, 150 k theirs). work
-   will report its first real expert past 140 k, and its first pair.
+0. **Letters.** work's 21 (11-03, a *RELAY SOON* read by a sub-agent) answered by my 22 (`.1`), rung 21h01, read at once.
+   Its 20 (11-02 23h48): its own `PostToolUse` guard REMOVED from three experts at the owner's word. work will report
+   its expert past 140 k (now: does *RELAY SOON* reach the expert itself) and its first pair. altair's (00h37), deneb's
+   and atlas's wait for a bell - `node bin/exchange-bell.mjs --peer <channel> --ref <file>` when their leaders run.
+1. **NEW FIELD 11-04: capella** (codename; rule 18, proved on 4 spellings BEFORE install), a leader-only kickstart of the
+   leader-expert method, installed at the owner's word. Its first session (20h39) started BEFORE the hooks: told the
+   owner to restart it once. Not a git repo yet (its own close script needs one) - its leader's.
 2. **The bells' Enter** (`#enter-in-the-paste`, the cause MEASURED 11-02): `wake`'s bell and the exchange bell still type
    text then `\r` at once; the relay waits for the box since `2026-11-02.1`. Same change, own arms (their fakes draw no
    typed text; Stop's 10 s budget). And **Ctrl+Z in a shell-less window**: avoided, not detected.
@@ -32,10 +31,9 @@ l'usage jusque 100%"*. 🔴 **His rule, 11-02: after EVERY delivery, docs AND se
 7. **`/tmp/comm-attack-*`**: 61 folders from a suite I started by mistake and stopped (11-02, LESSONS §9); the
    classifier refused my sweep of shared `/tmp` - the owner's to delete, or leave.
 
-**Done 11-02**: `2026-11-02.1` (a relay's Enter waits for the box, `#enter-in-the-paste`, A101), `.2` (expert pairs,
-`pair.mjs`, `#pairs`, A102 - the star itself had no fast arm before it), `.3` (the relay's trigger in the bus, `"at"`,
-`relay-due.mjs`, `#relay-due`, A103; `selftest` both ways), `.4` (the same, mid-turn, as advice, A104). All in the eleven trees; polaris's tree is gone from disk
-(its config only in the owner's Trash). A27 reads the documents' own pointers (LESSONS §9).
+**Done**: 11-02 `.1`-`.4` (`#enter-in-the-paste` A101, `#pairs` A102, `#relay-due` A103-A104). **11-04 `.1`**
+(`#subagent-note`, A105, mutants 4/4, `selftest` both ways): a sub-agent's tool call carries no note and spends no step
+- measured, its payload has `agent_id` (a `--agent` main thread does not). In the twelve trees; work's 16 stubs and skills.
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a
 codename here; the mapping is in no repo. The boot report prints the REAL directory names: **never copy a `field:` row
@@ -77,7 +75,7 @@ order:** adoption (orion measured 09-19) → Rust port → value, with atlas's l
 | boot | `node bin/boot.mjs` — every gating row armed; `--fast` is injected at session start, contract in `CLAUDE.md` |
 | **ledger** | `node bin/ledger.mjs` — the reboot instrument, here AND in the field (`--root <tree>`); arms run inside `attack` as A34. Each start stores `pending`, the peer's covariate — **never inbox depth**: session #41 had an empty mailbox and the largest real queue of its last five boots. **Counts live in boot's output, never here** |
 | **sensor** | `node bin/context.mjs` — pid → transcript through `bin/session-registry.mjs` (the `SessionStart` hook writes it, keyed on pid + start time + boot id); **refuses on a miss**. `FINDINGS.md#clear-blind` |
-| reviews | #1–#12b **dispositioned** (#12b's seven points carried — `FINDINGS.md#review12b`); **#13, #14 and #15 disposed 2026-09-27** — `FINDINGS.md#review13`, `#review14`, `#review15`, released as `2026-09-27.1`, `.2`, `.5`. #5's amendment stands in `CLAUDE.md`: *a gate that CAN redden is not yet one that reddens for the property in its own title* — **#12b was its seventh instance, inside an arm the previous disposition had just written**; **#13 its eighth, in the arm #12b's disposition wrote**; #16-#18 disposed 09-27/28; **#19 disposed 10-25**: its 🔴 was in the previous session's newest fix again, and 6 of 7 of its mutants had survived that session's arms |
+| reviews | #1–#19 **disposed** (`FINDINGS.md#review12b` … `#review19`; #12b's seven points carried). #5's amendment in `CLAUDE.md` had its 7th and 8th instances inside the arms the previous disposition wrote; #19's 🔴 was in the newest fix again |
 
 ## ⏭️ OPEN
 1. **🔴 Latency is a mailbox, not an interrupt.** Re-derive with `node test/latency.mjs <log>`; never

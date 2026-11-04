@@ -35,6 +35,17 @@ already have.
 
 
 
+
+
+## 2026-11-04.1 — bus print `d33710262941` — 2026-11-04
+
+- **The bus's notes after a tool call are no longer said inside your sub-agents.** Claude Code runs your tool hook for
+  the tools of a sub-agent you launch (the Agent tool) too, and *RELAY SOON* and the usage note could land in that
+  sub-agent instead of you - measured in the field: a designer got its expert's *RELAY SOON*, and the expert was next
+  told 25 k later. Now a sub-agent's tool call gets neither note and uses up nothing: your own next tool call gets them,
+  at the same threshold. Nothing changes for your own tools, nor for the hold at the end of your turn (*RELAY DUE*), nor
+  for mail; a `comm send` run by a sub-agent still rings its recipient.
+
 ## 2026-11-02.4 — bus print `dbe7256c1f05` — 2026-11-02
 
 - **Past your relay threshold, you are now told in the middle of a turn too.** With an `"at"` set for you in
