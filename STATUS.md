@@ -5,22 +5,40 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-11-05 01h01 CET by `date`, mid-session. **WORK IS THE MAIN FIELD**; usage up to 100 %. 🔴 **The owner's rule, 11-02:
-after EVERY delivery, docs AND settings AND skills current (measured in work's tree), and a letter to work saying what
-changed and what comes next.**)*
+*(2026-11-05 21h06 CET by `date`, CLOSED. **WORK IS THE MAIN FIELD**; usage up to 100 %. 🔴 The owner's rule, 11-02: after
+EVERY delivery, docs AND settings AND skills current (measured in work's tree), and a letter to work. 🔴 **Owner 11-05: the
+tests use his RAM and fill his desktop with kitty windows - run them when he says, never wide while he works.**)*
 
-0a. 🔴 **THE TOOLBOX (owner, 11-05): *"je veux que ce soit toi qui gères tous les outils"*.** `.1` took the fields' handoff
-   tool (`#relay-guard`), switched 11-05 18h by me on the owner's yes (auto mode refuses a leader its own hook), 8/8 guards
-   equal, letters 18h15. Next release: the skill says a hook switch asks the owner (work's 27). **Inventory done 11-05**
-   (`exchange/TOOLS-INVENTORY.md`, untracked: 162 tools, 11 fields). Order, one per release: ① the leader's next-bell
-   Stop hold (atlas = rigel, deneb; not work) ② the machine lock `borne` (work, rigel, deneb: one lock, two behaviours;
-   rigel's `claim --machine`, item 6) ③ the leader's watcher ④ per-agent usage readers ⑤ a threshold with an end date
-   ⑥ the zsh `=` guard. **Owner asked:** the leader-expert method's own tools, mine too?
-0. **Letters.** work will report its first sub-agent since `11-04.1`, its first expert past 140 k and its first pair.
+0. 🔴 **RESUME `2026-11-05.2`: built, reviewed, NEVER RUN - on the LOCAL branch `wip/2026-11-05.2`** (`3323160`, not
+   pushed; main holds the last green bytes). Back as uncommitted changes: `git restore --source=wip/2026-11-05.2 -- bin
+   install.mjs test FINDINGS.md`, then `git add -N bin/next-bell.mjs bin/heavy.mjs` (mutate copies the TRACKED tree). In
+   it, from THE TOOLBOX (owner 11-05: *"je veux que ce soit toi qui gères tous les outils"*; `exchange/TOOLS-INVENTORY.md`,
+   untracked: 162 tools in 11 fields): ① `bin/next-bell.mjs`, `"nextBell"` hold|advise (A108) ② `bin/heavy.mjs`, the
+   machine lock, runner only (A109; work's 32 agreed - `"available": 1500`, `"wait": 60` - rigel not yet) ③ the CLI's
+   caller from its session (`#cli-identity`, A110: a bus defect work guarded for two weeks) ④ the suite's bench on a
+   private Xvfb display, opt-in `CLAUDE_COMM_BENCH=xvfb`. An adversarial review (Opus, read only) found 12 confirmed + 9
+   plausible: fixed in that code, unmeasured; FINDINGS `#next-bell` `#heavy` `#cli-identity` say which. **Order:** (0) add item 1's dirty-source refusal to the installer (not in the branch), with its arm; (1) ONE
+   attack run under `CLAUDE_COMM_BENCH=xvfb`, alone - every kitty arm holds, then make it the default; (2) fix the red;
+   (3) mutants `exchange/WIP-next-bell-mutants-nb.json` (47), 4 wide, xvfb; (4) RESULTS108/109/110 in FINDINGS; (5) `node
+   install.mjs --release 2026-11-05.2` + its body `exchange/WIP-next-bell-changelog-2.md`; (6) full boot, commit on main,
+   push, delete the branch; (7) install 12, measure work's docs; (8) letters: work 35 (`exchange/WIP-next-bell-letter-35.md`),
+   rigel and deneb drafts beside it, capella's to write (its realisateur waited 50 min at 19h5x, the tool's first real
+   catch). selftest: blocked by 1b (it would take capella's Telegram bot) - solve 1b first, or name it skipped.
+0a. **After `.2`, the inventory's order:** ③ the leader's watcher ④ usage readers, with leader-expert's `usage-sessions.py`
+   if rigel agrees (work's 30, (b): the templates stay the method's, the skill points at mine and keeps no copy) ⑤ a
+   threshold with an end date ⑥ the zsh `=` guard; then the PreToolUse hook the stub lacks: heavy's guard (one list per
+   tool, work's 32) and the bus refusing to type into an agent's window (work: yes, for all). work's cd guard goes only
+   after A110 is green and measured on its tree. work's request (32): a chief who leads a team without daily pairs - wait
+   for its day's report.
+0b. **Letters.** work: 26-34 today, all answered; it will report its first sub-agent since `11-04.1`, its first expert past 140 k, its first pair, its first relay on the declaration.
    altair's, deneb's and atlas's wait for a bell (`node bin/exchange-bell.mjs --peer <channel> --ref <file>`) when their
    leaders run.
-1. **capella** (new field 11-04, codename rule 18): a leader and a Telegram secretary, a git repo since 11-05. `.2`
-   (`#launch-extra`) answered it; it once ran `--add-agent` from my WORKING TREE mid-change.
+1. 🔴 **A field installed from my WORKING TREE mid-change - twice now**: capella's `--add-agent` 11-04; work's 11-05 at
+   20h07 and 20h37 (its two new chiefs): untested next-bell / heavy / identity code, versions from BEFORE the review, ran
+   in work's tree about an hour. Found by boot's `field:work` DRIFT at the close; restored from clean main at 21h1x (79
+   files, 19 agents, `2026-11-05.1`), the two orphan files removed, work told (34). **Fix in `.2`, armed:** the installer
+   refuses a source whose shipped files are uncommitted (`--allow-dirty` for my own arms). capella: a leader and a
+   Telegram secretary, a git repo since 11-05.
 1b. 🔴 **`selftest`'s real sessions load the machine's plugins** - the owner's Telegram server started at each run and took
    the bot (the field's log, 19:59Z 11-04: mine). Measure which flag isolates a plugin's MCP server, then arm it.
 2. **The bells' Enter** (`#enter-in-the-paste`, the cause MEASURED 11-02): `wake`'s bell and the exchange bell still type
@@ -38,8 +56,7 @@ changed and what comes next.**)*
 7. **`/tmp/comm-attack-*`**: 61 folders from a suite I started by mistake and stopped (11-02, LESSONS §9); the
    classifier refused my sweep of shared `/tmp` - the owner's to delete, or leave.
 
-**Done**: 11-02 `.1`-`.4` (A101-A104). 11-04 `.1` (`#subagent-note`, A105), `.2` (`#launch-extra`, A106). **11-05 `.1`**
-(`#relay-guard`, A107 + two A95 scenarios, mutants 15/15). Each in the twelve trees, measured in work's.
+**Done**: 11-04 `.1` (A105), `.2` (A106); **11-05 `.1`** (`#relay-guard`, A107, mutants 15/15). Each in the 12 trees.
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a
 codename here; the mapping is in no repo. The boot report prints the REAL directory names: **never copy a `field:` row
@@ -58,13 +75,9 @@ fixed" - gate `record()` AND `refresh()` on the witness. Touches `Stop`, the hot
 
 **C - tests faster, still reliable (owner, 09-27): `test/mutate.mjs` is built and in use.** Next: `attack` itself faster, `--only <arm>` for iteration; the full suite stays the gate.
 
-**F - carried, in priority order:** #15's names (`#review15`: the prove-red registry control blames itself for a live
-session's own `compact` rewrite (A31's twin of it FIXED 10-25, `#review19`; boot's control still has it); the prettier header and `readJson` outside the print) · `REVIEW-12b.md`'s seven points (`FINDINGS.md#review12b`, each already measured) ·
-`boot.mjs --hook` records with NO ownership test (the `has("--hook") && payload` branch; needs a declared test seam
-first - its own `--prove-red` fires are foreign by construction) ·
-#13 §7b/§7c (`handoff.mjs`'s D2 guard masked by `restart.mjs`'s; `INSIDE` unarmed) · the stub files
-`basename(transcript_path)` as the session, not the witnessed id · #14's names: a DETACHED replay of a live id is counted (by design, E1), `rootRecords` overwrites the witness's reason, a ledger killed at 5 s after its append · D2 mid-turn: timing now measured 4/4
-(`#midturn-channel`), obedience to a POINTER is the open half - build `--kind blocked` only on atlas's field count.
+**F - carried, each named in FINDINGS:** #15's (`#review15`), REVIEW-12b's seven points (`#review12b`), `boot.mjs --hook`
+records with no ownership test, #13 §7b/§7c (`#review13`), the stub filing `basename(transcript_path)` as the session, #14's
+(`#review14`), D2's obedience to a pointer (`#midturn-channel`: build `--kind blocked` only on atlas's field count).
 
 **Carried:** A2 marker · the installer overwrites a `SKILL.md` it did not generate · S6 · atlas's `rings.jsonl`
 (A62, A65) · #9 A3 · C7 · the restart trigger (ledger UNKNOWN) · C3. **Later, owner's
@@ -75,27 +88,12 @@ order:** adoption (orion measured 09-19) → Rust port → value, with atlas's l
 | | state |
 | --- | --- |
 | repo | `origin` = `Leonhart130/claude-comm`. **The push is the leader's call**, delegated 2026-09-05, along with installing into field trees — do not ask again |
-| **vega** | in real daily use — 26 real deliveries, both directions |
-| gates | `attack` (deterministic, every case armed) · `ledger --prove-red`, now run INSIDE it · `selftest` (real sessions, not gated by boot) · `context` and `boot` controls. **Counts live in boot's output, never here** |
-| boot | `node bin/boot.mjs` — every gating row armed; `--fast` is injected at session start, contract in `CLAUDE.md` |
-| **ledger** | `node bin/ledger.mjs` — the reboot instrument, here AND in the field (`--root <tree>`); arms run inside `attack` as A34. Each start stores `pending`, the peer's covariate — **never inbox depth**: session #41 had an empty mailbox and the largest real queue of its last five boots. **Counts live in boot's output, never here** |
-| **sensor** | `node bin/context.mjs` — pid → transcript through `bin/session-registry.mjs` (the `SessionStart` hook writes it, keyed on pid + start time + boot id); **refuses on a miss**. `FINDINGS.md#clear-blind` |
-| reviews | #1–#19 **disposed** (`FINDINGS.md#review12b` … `#review19`; #12b's seven points carried). #5's amendment in `CLAUDE.md` had its 7th and 8th instances inside the arms the previous disposition wrote; #19's 🔴 was in the newest fix again |
 
 ## ⏭️ OPEN
 1. **🔴 Latency is a mailbox, not an interrupt.** Re-derive with `node test/latency.mjs <log>`; never
    transcribe the table. 26 deliveries: leader→expert median **1462 s**, expert→leader **586 s** — mail
    lands at the recipient's *turn boundary*. Since 10-24 an IDLE recipient is rung at once by the sender's
    `PostToolUse` (213 ms, measured live, A90); a BUSY one still waits for its turn end. Never call it real-time. A16.
-
-2. **`--reply-to <id>` (threading).** Field-requested, then field-deprioritised: the substance lives in the
-   file.
-
-3. ✅ **The wake is BUILT** (`bin/wake.mjs`, A32; its text `#doorbell-text`). ⚠️ Within `QUIET_MS` of an UNANSWERED ring
-   it rings nobody and nothing retries - an answered ring no longer silences the next (`#quiet-answered`, A84).
-
-4. 🟢 **`bin/claim.mjs`, in production** (A38): advisory only; a claim in one project is invisible to another
-   (`FINDINGS.md#claim-file`). Their verdict, the scope: *a claim makes sharing visible; the first answer is not to share.*
 
 5. ✅ `who`'s states, BUILT 10-24 (A91, `#who-shows-the-turn`): working / IDLE n min / WAITING / the runtime's word, from
    the runtime's own record - the 2 h 30 a leader lost reading `running` for four sessions at their prompt is closed.
