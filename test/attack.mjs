@@ -1529,6 +1529,102 @@ const POINTER_SOURCES = (() => {
 			`sub: "${sub.ctx.slice(0, 60)}"; main: "${main.ctx.slice(0, 80)}"`)
 }
 
+// A107 — A DECLARED HANDOFF IS CHECKED BY THE BUS, each check red on its own variable, and both hooks name it. The owner,
+// 2026-11-05: claude-comm is a toolbox and its leader manages every tool - said of a field's handoff tool, measured that
+// day as FOUR guard scripts and three copies of one Stop hook, each copy differing only in its words. One variable per
+// leg against a positive control passing all six checks at once (`green`): the file gone; a journal that opens on an OPEN
+// session; a regex absent; written now but committed 2 h ago, and committed now but written 2 h ago - two facts, measured
+// apart that day on a field expert whose file git tracks; a file never committed; a tracked change under "clean"; no git
+// at all ("written" alone still passes there). Each fault of a declaration named; the CLI's exits 0, 1 (the failing check
+// FIRST on stderr - what relay.mjs reports) and 2. RELAY DUE and RELAY SOON name the file, its "how" and the check, and
+// nothing of it without a declaration or with a malformed one. A last line bigger than the tail still reads the call
+// before it (work's L1, adopted). The installer says a declaration it cannot check at install, not at 150 k.
+// FINDINGS.md#relay-guard
+{
+	const r107 = mkdtempSync(join(tmpdir(), "comm-attack-relayguard-")), bare107 = mkdtempSync(join(tmpdir(), "comm-attack-relayguard-nogit-"))
+	atExit(() => { for (const d of [r107, bare107]) try { rmSync(d, { recursive: true, force: true }) } catch {} })
+	const git107 = (env, ...a) => spawnSync("git", ["-C", r107, "-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", "-c", "user.name=t", "-c", "user.email=t@t", ...a],
+		{ encoding: "utf8", env: { ...process.env, ...env } })
+	for (const d of ["notes", "dirt", "ex", "bad", "none", ".comm"]) mkdirSync(join(r107, d), { recursive: true })
+	const OPENS = { of: "^# (Session|Handoff) #[0-9]+", is: "^# Handoff #" }
+	const green = { file: "notes/BOARD.md", has: "^## Done$", first: OPENS, written: 30, committed: 30, clean: ["notes"], how: "notes/PROTOCOL.md § handoff" }
+	writeFileSync(join(r107, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", ex: "ex", bad: "bad", none: "none" },
+		relay: { leader: { say: "hey", at: 100000, handoff: green }, ex: { say: "go", handoff: { file: "RAPPORT.md", written: 30 } },
+			bad: { say: "go", handoff: { file: "R.md", bogus: 1 } }, none: { say: "go", at: 100000 } } }))
+	const inst = spawnSync(process.execPath, [join(PKG, "install.mjs"), r107], { encoding: "utf8" })
+	git107({}, "init", "-q")
+	writeFileSync(join(r107, "notes", "OLD.md"), "## Done\n")
+	git107({}, "add", "notes/OLD.md")
+	const twoHoursAgo = new Date(Date.now() - 2 * 3600_000).toISOString()
+	git107({ GIT_COMMITTER_DATE: twoHoursAgo, GIT_AUTHOR_DATE: twoHoursAgo }, "commit", "-q", "-m", "old")
+	writeFileSync(join(r107, "notes", "OLD.md"), "## Done\n")   // written NOW, its last commit 2 h old - and the same bytes, so "clean" holds
+	writeFileSync(join(r107, "notes", "BOARD.md"), "# Board\n\n# Handoff #2 (today)\n## Done\n\n# Session #2 (today)\n")
+	writeFileSync(join(r107, "notes", "OPEN.md"), "# Board\n\n# Session #3 (today)\n\n# Handoff #2 (yesterday)\n## Done\n")
+	writeFileSync(join(r107, "notes", "NEW.md"), "## Done\n")
+	writeFileSync(join(r107, "dirt", "x.md"), "one\n")
+	git107({}, "add", "notes", "dirt")
+	git107({}, "commit", "-q", "-m", "now")
+	{ const t = new Date(Date.now() - 2 * 3600_000); utimesSync(join(r107, "notes", "NEW.md"), t, t) }   // committed now, written 2 h ago
+	writeFileSync(join(r107, "notes", "UNTRACKED.md"), "## Done\n")
+	writeFileSync(join(r107, "dirt", "x.md"), "two\n")   // a tracked change outside "notes"
+	writeFileSync(join(bare107, "R.md"), "## Done\n")
+	const bareIsGit = spawnSync("git", ["-C", bare107, "rev-parse", "--git-dir"], { encoding: "utf8" }).status === 0
+	const RG = await import(pathToFileURL(join(PKG, "bin", "relay-guard.mjs")).href)
+	const RD = await import(pathToFileURL(join(PKG, "bin", "relay-due.mjs")).href)
+	const run = (d, dir = r107) => { const r = RG.checks(d, dir); return { all: r.every((x) => x.ok), bad: r.filter((x) => !x.ok).map((x) => x.check), r } }
+	const only = (x, name, re = /./) => !x.all && x.bad.length === 1 && x.bad[0] === name && re.test(x.r.find((y) => y.check === name).says)
+	const F = (d) => RG.faults(d).join(" | ")
+	const cli = (agent, cwd = r107) => spawnSync(process.execPath, [join(r107, ".comm", "bin", "relay-guard.mjs"), ...(agent ? ["--agent", agent] : [])],
+		{ cwd, encoding: "utf8", env: { ...process.env, CLAUDE_COMM_AGENT: "" } })
+	const cG = cli("leader"), cEx = cli("ex"), cBad = cli("bad"), cNone = cli("none"), cSelf = cli(null, join(r107, "ex"))
+	const tx107 = (name, ctx, extra = "") => { const f = join(r107, `${name}.jsonl`)
+		writeFileSync(f, JSON.stringify({ type: "user", message: { role: "user", content: "go" } }) + "\n" + JSON.stringify({ type: "assistant", message: { role: "assistant",
+			content: [{ type: "text", text: "ok" }], usage: { input_tokens: 10, cache_read_input_tokens: ctx - 1010, cache_creation_input_tokens: 1000 } } }) + "\n" + extra)
+		return f }
+	const cfg107 = JSON.parse(readFileSync(join(r107, ".comm", "config.json"), "utf8")), relayBin = join(r107, ".comm", "bin", "relay.mjs")
+	const hook = (fn, agent, cfg = cfg107) => fn({ root: r107, cfg, agent, payload: { transcript_path: tx107(`${agent}-${fn.name}`, 120000) }, relayBin, mark: false })
+	const hold = hook(RD.due, "leader"), soon = hook(RD.notice, "leader"), holdNone = hook(RD.due, "none")
+	const holdMalformed = hook(RD.due, "bad", { ...cfg107, relay: { ...cfg107.relay, bad: { at: 100000, handoff: { file: 5 } } } })
+	const names = (t) => typeof t === "string" && t.includes("Your handoff, as your project declares it: notes/BOARD.md - how: notes/PROTOCOL.md § handoff") &&
+		t.includes(join(r107, ".comm", "bin", "relay-guard.mjs"))
+	const big = JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "tool_result", tool_use_id: "t", content: "x".repeat(1_500_000) }] } }) + "\n"
+	const noCall = join(r107, "nocall.jsonl"); writeFileSync(noCall, big + big)
+	const g = run(green)
+	const ok = {
+		green: g.all && g.r.map((x) => x.check).join() === "file,has,first,written,committed,clean",
+		fileGone: only(run({ ...green, file: "notes/GONE.md" }), "file", /does not exist/),
+		opensOnAnOpenSession: only(run({ ...green, file: "notes/OPEN.md" }), "first", /Session #3/),
+		hasAbsent: only(run({ ...green, has: "^## Nowhere$" }), "has"),
+		committedOld: only(run({ file: "notes/OLD.md", has: "^## Done$", written: 30, committed: 30, clean: ["notes"] }), "committed", /committed 1[12]\d min ago/),
+		writtenOld: only(run({ file: "notes/NEW.md", has: "^## Done$", written: 30, committed: 30, clean: ["notes"] }), "written", /written 1[12]\d min ago/),
+		neverCommitted: only(run({ file: "notes/UNTRACKED.md", committed: 30 }), "committed", /never committed/),
+		dirty: only(run({ ...green, clean: ["dirt"] }), "clean", /dirt\/x\.md/),
+		noGitRed: !bareIsGit && (() => { const x = run({ file: "R.md", committed: 30, clean: ["."] }, bare107); return x.bad.join() === "committed,clean" })(),
+		noGitWrittenGreen: run({ file: "R.md", written: 30 }, bare107).all,
+		faults: F(green) === "" && /unknown key "bogus"/.test(F({ file: "x", bogus: 1 })) && /"file" is required/.test(F({ has: "x" })) &&
+			/"has" is not a regex/.test(F({ file: "x", has: "(" })) && /"first" must be/.test(F({ file: "x", first: "^#" })) &&
+			/"first\.is" must be/.test(F({ file: "x", first: { of: "^#" } })) && /"written" must be/.test(F({ file: "x", written: 0 })) &&
+			/"committed" must be/.test(F({ file: "x", committed: "30" })) && /"clean" must be/.test(F({ file: "x", clean: [] })) &&
+			/"how" must be one line/.test(F({ file: "x", how: "a\nb" })) && /must be an object/.test(F(["x"])),
+		cliGreen: cG.status === 0 && /relay-guard: written/.test(cG.stdout) && cG.stderr === "",
+		cliRedFirstLine: cEx.status === 1 && /^handoff not written: file - RAPPORT\.md does not exist/.test(cEx.stderr),
+		cliFaulty: cBad.status === 2 && /unknown key "bogus"/.test(cBad.stderr),
+		cliUndeclared: cNone.status === 2 && /no "handoff" for 'none'/.test(cNone.stderr),
+		cliOwnAgent: cSelf.status === 1 && /'ex'/.test(cSelf.stdout),
+		holdNames: hold.hold === true && names(hold.reason),
+		soonNames: soon.say === true && names(soon.text),
+		undeclaredSaysNothing: holdNone.hold === true && !/Your handoff/.test(holdNone.reason),
+		malformedSaysNothing: holdMalformed.hold === true && !/Your handoff/.test(holdMalformed.reason),
+		deepTail: RD.lastContext(tx107("deep", 150000, big)) === 150000,
+		noCallIsNull: RD.lastContext(noCall) === null,
+		installWarns: inst.status === 0 && /⚠ "relay" "bad" "handoff" cannot be checked/.test(inst.stdout) && !/"relay" "(leader|ex)" "handoff" cannot/.test(inst.stdout),
+	}
+	check("A107 a declared handoff is checked by the bus, each check red on its own variable, and both relay hooks name it",
+		Object.values(ok).every(Boolean),
+		Object.entries(ok).map(([k, v]) => `${k}=${v}`).join("; ") + `; green: ${g.r.map((x) => `${x.check}:${x.ok}`).join(",")}; ex stderr "${cEx.stderr.slice(0, 80)}"; ` +
+			`hold "${String(hold.reason || hold.why).slice(-200)}"`)
+}
+
 // ── A21/A22: the properties that erode by accretion, not by a single bad commit ──
 // Asked for directly by the owner (2026-08-05): "performant, compact and secure by
 // default", with a worry about memory leaks as features are added. The honest
@@ -4707,10 +4803,12 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 // record says it was told, so its own Stop hook says nothing back (A99). And no registry entry: the refusal says why when
 // the bus's stub is newer than the session (installed from inside it, 10-30), and not when it is older. And a --guard
 // flag ADDS to the config's guards: its own passes, the config's fails, refused - both ran (a field leader asked, 10-30).
+// And a handoff DECLARED in place of any guard (relay-guard.mjs, 11-05): relayed when it is written, the record naming
+// the bus's check as its guard - and, the file not saying what the declaration asks, refused at the arming.
 // FINDINGS.md#relay
 {
 	const r95 = mkdtempSync(join(tmpdir(), "comm-attack-relay-"))
-	const opened95 = [], ARMS = ["nominal", "typed", "dialog", "guard", "noclear", "untaken", "grace", "titled", "titledTyped", "pasted", "lostEnter", "lostEnterTyped"], REFUSED = ["nosay", "noguard", "nested", "mail", "selfcancel", "unregistered", "unregisteredOld", "flagguard"], SC = [...ARMS, ...REFUSED]
+	const opened95 = [], ARMS = ["nominal", "typed", "dialog", "guard", "noclear", "untaken", "grace", "titled", "titledTyped", "pasted", "lostEnter", "lostEnterTyped", "declared"], REFUSED = ["nosay", "noguard", "nested", "mail", "selfcancel", "unregistered", "unregisteredOld", "flagguard", "declaredStale"], SC = [...ARMS, ...REFUSED]
 	atExit(() => {
 		for (const [sock, id] of opened95)
 			try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
@@ -4725,8 +4823,11 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 	mkdirSync(dirname(stub95("unregisteredOld")), { recursive: true }); writeFileSync(stub95("unregisteredOld"), "// stub\n")
 	{ const t = new Date(Date.now() - 3600_000); utimesSync(stub95("unregisteredOld"), t, t) }
 	writeFileSync(join(r95, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", ...Object.fromEntries(SC.map((k) => [k, k])) },
-		relay: Object.fromEntries(SC.filter((k) => k !== "nosay").map((k) => [k, k === "noguard" ? say(k) : { say: say(k), guard: "test -f HANDOFF.md" }])) }))
-	for (const f of ["relay.mjs", "wake.mjs", "session-registry.mjs"]) cpSync(join(PKG, "bin", f), join(r95, ".comm", "bin", f))
+		relay: Object.fromEntries(SC.filter((k) => k !== "nosay").map((k) => [k, k === "noguard" ? say(k)
+			: k === "declared" ? { say: say(k), handoff: { file: "HANDOFF.md", has: "^written$" } }
+			: k === "declaredStale" ? { say: say(k), handoff: { file: "HANDOFF.md", has: "^OÙ J'EN SUIS$" } }
+			: { say: say(k), guard: "test -f HANDOFF.md" }])) }))
+	for (const f of ["relay.mjs", "wake.mjs", "session-registry.mjs", "relay-guard.mjs"]) cpSync(join(PKG, "bin", f), join(r95, ".comm", "bin", f))
 	// `mail`: one message waits in its inbox at the arming - the only thing it has that `nominal` has not
 	mkdirSync(join(r95, ".comm", "inbox", "mail"), { recursive: true })
 	writeFileSync(join(r95, ".comm", "inbox", "mail", "a95-mail.json"), JSON.stringify({ id: "a95-mail", from: "leader", to: "mail", ref: "HANDOFF.md", kind: "fyi" }))
@@ -4810,8 +4911,10 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 					: k === "flagguard" ? [process.execPath, R95, "--guard", "touch FLAG-RAN"]
 					: [process.execPath, R95] }
 			writeFileSync(join(r95, `${k}.json`), JSON.stringify(c))
-			// `mail` is refused before any screen is read: its own tab, so the panes that ARE read are not made smaller (A98)
-			const where = /^(mail|selfcancel|unregistered|flagguard)/.test(k) ? ["--type=tab", "--match", `window_id:${b95.id}`] : ["--type=window", ...besideMe(b95)]
+			// `mail` is refused before any screen is read: its own tab, so the panes that ARE read are not made smaller (A98).
+			// `declared` IS read, in a tab of its own: one more split narrowed every pane and `nominal`'s prompt was not
+			// seen whole in its box before the Enter (A101 nominalSawIt red, 11-05, the first run with it as a split)
+			const where = /^(mail|selfcancel|unregistered|flagguard|declared)/.test(k) ? ["--type=tab", "--match", `window_id:${b95.id}`] : ["--type=window", ...besideMe(b95)]
 			const id = Number(spawnSync("kitten", ["@", "--to", `unix:${b95.sock}`, "launch", "--keep-focus", ...where,
 				`--cwd=${join(r95, k)}`, `--env=CLAUDE_COMM_RUNTIME=${rt95}`, fake95, join(r95, "fake.cjs"), join(r95, `${k}.json`)], { encoding: "utf8", timeout: 10000 }).stdout)
 			if (Number.isInteger(id) && id > 0) opened95.push([b95.sock, id])
@@ -4874,6 +4977,11 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		// a flag that replaced the config's guards would arm here; one the config's replaced would leave no FLAG-RAN
 		flagAddsToConfig: out("flagguard").s === 3 && /guard failed/.test(out("flagguard").e || "") && /test -f HANDOFF\.md/.test(out("flagguard").e || "") &&
 			!/touch FLAG-RAN/.test(out("flagguard").e || "") && existsSync(join(r95, "flagguard", "FLAG-RAN")) && !S95.flagguard.rec,
+		// a declaration is a guard: relayed on it alone, the bus's check the only guard recorded; one the file does not meet refuses
+		declaredRelayed: rec("declared").relayed === true && keys("declared") === `/clear\r${say("declared")}\r` &&
+			(rec("declared").guards || []).length === 1 && /relay-guard\.mjs' --agent 'declared'$/.test((rec("declared").guards || [])[0] || ""),
+		declaredStaleRefused: out("declaredStale").s === 3 && /guard failed/.test(out("declaredStale").e || "") &&
+			/handoff not written: has - HANDOFF\.md does not contain/.test(out("declaredStale").e || "") && !S95.declaredStale.rec,
 	}
 	check("A95 a session relays itself after its turn - /clear proved, its prompt proved - and types nothing a step cannot prove",
 		!!b95 && Object.values(ok).every(Boolean),

@@ -22,6 +22,7 @@ import { randomBytes, createHash } from "node:crypto"
 import { spawnSync } from "node:child_process"
 import { oursStatus, thresholdsFor, feeds } from "./bin/usage.mjs"
 import { thresholdOf } from "./bin/relay-due.mjs"
+import { faults as handoffFaults } from "./bin/relay-guard.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const CHECK = process.argv.includes("--check")
@@ -678,7 +679,7 @@ const GITIGNORE_BLOCK = "# claude-comm live state (regenerate with install.mjs)\
 // drifted - wake.mjs documented none of its user flags, `who --all` and `comm log` were nowhere. So this section is
 // BUILT, at every install, from each tool's own usage lines (what its --help prints) and from `comm help`, read from
 // the very files written beside it: it cannot describe a version other than the one installed. A92 gates both ends.
-const CLI_TOOLS = ["launch", "close", "relay", "relay-due", "wake", "claim", "pair", "restart", "handoff", "ledger", "usage"]
+const CLI_TOOLS = ["launch", "close", "relay", "relay-due", "relay-guard", "wake", "claim", "pair", "restart", "handoff", "ledger", "usage"]
 const usageLines = (src) => src.split("\n").filter((l) => /^ \*\s{2,}node \S*bin\/[\w-]+\.mjs/.test(l))
 	.map((l) => l.replace(/^ \*\s+/, "").replace(/^node (\.comm\/)?bin\//, "node .comm/bin/"))
 // A SETTING IS DOCUMENTED WHERE IT IS READ (work 10-31: a project could learn that thresholds exist only from a CHANGELOG
@@ -1069,7 +1070,7 @@ function write(path, content, results) {
 // restarts happen HERE - 53 cold starts in one field tree against 5 declared reboots - and
 // the ledger verdict stays UNKNOWN until declared restarts exist to count. A tool only the
 // maintainer can run cannot fill an arm the field is the source of.
-const BUS_FILES = ["comm.mjs", "session-registry.mjs", "ledger.mjs", "wake.mjs", "restart-signal.mjs", "claim.mjs", "launch.mjs", "close.mjs", "handoff.mjs", "restart.mjs", "who.mjs", "usage.mjs", "relay.mjs", "pair.mjs", "relay-due.mjs"]
+const BUS_FILES = ["comm.mjs", "session-registry.mjs", "ledger.mjs", "wake.mjs", "restart-signal.mjs", "claim.mjs", "launch.mjs", "close.mjs", "handoff.mjs", "restart.mjs", "who.mjs", "usage.mjs", "relay.mjs", "pair.mjs", "relay-due.mjs", "relay-guard.mjs"]
 const CHANGELOG = join(HERE, "CHANGELOG.md")
 function busPrint() {
 	const h = createHash("sha256")
@@ -1360,7 +1361,9 @@ function SKILL(ids, agentRoot) {
 		"2 s after THIS turn ends it reads your screen (the input empty, no dialog open), types `/clear` and proves it, then",
 		"types your first prompt and proves it. Same process, so the same model and effort; mail waiting stays in your inbox.",
 		`The first prompt is set once, in \`.comm/config.json\`: \`"relay": {"${id}": "<the sentence your fresh session starts from>"}\``,
-		"(`--say` overrides it). No guard: refused - what survives a `/clear` is only what was written down. Anything that",
+		"(`--say` overrides it). No guard: refused - what survives a `/clear` is only what was written down. Your project may",
+		"instead declare what your handoff is, beside that prompt - `\"handoff\": {\"file\": \"RAPPORT.md\", \"written\": 30}` - and the",
+		`bus checks it as a guard: \`node ${B}/relay-guard.mjs\` says what is still missing. Anything that`,
 		`starts another turn first cancels it. Every step lands in \`.comm/relay/${id}.json\`; \`--dry-run\` checks it all and arms nothing.`,
 		"When to restart is yours - or your project's: an `\"at\"` beside your prompt (or under `\"*\"`) in that `\"relay\"` key, in",
 		"tokens of context. Past it you are told after a tool call of yours - never in a sub-agent you launch, whose tool calls",
@@ -1569,6 +1572,12 @@ if (CHECK) {
 	console.log(`  agents:  ${Object.keys(cfg.agents).join(", ")}`)
 	console.log(`  wrote:   ${results.wrote.length} file(s)${results.ok.length ? `  (${results.ok.length} already current)` : ""}`)
 	if (current) console.log(`  version: ${label}  (print ${print})`)
+	// A DECLARED HANDOFF THAT CANNOT BE CHECKED is said NOW, not at 150 k when its relay refuses on it (relay-guard.mjs).
+	for (const [a, c] of Object.entries(cfg.relay || {})) {
+		const d = c && typeof c === "object" && !Array.isArray(c) ? c.handoff : undefined
+		const f = d === undefined ? [] : handoffFaults(d)
+		if (f.length) console.log(`  ⚠ "relay" "${a}" "handoff" cannot be checked, so that agent's relay will refuse: ${f.join("; ")}`)
+	}
 
 	// THE PATCH NOTES: every entry newer than what this project had, and nothing else. A
 	// changelog dumped in full at every install is a changelog nobody reads.

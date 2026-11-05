@@ -4121,6 +4121,68 @@ measured first (which flag a plugin's MCP server obeys).
 real messages go in and out is the field's report, not re-run here. Note: that field ran `--add-agent` from my working
 tree at 21:22, before the gates; the bytes were the ones gated after (my reinstall rewrote only `INSTALLED.json`).
 
+## `#relay-guard` — the fields' handoff tool comes into the bus: a declared handoff, checked by it (2026-11-05)
+
+**The owner, 11-05**, about the handoff tool work's leader runs: *"claude-comm est devenu une toolbox aujourd'hui. Et
+moi je veux que ce soit toi qui gères tous les outils."* Measured before designing anything, across `~/Dev`:
+
+- **The trigger**, `outils/relais-150k.mjs` (a Stop hook past 150 k, once per 25 k, a PostToolUse `--expert` variant, an
+  unwired `--pre`): written by rigel's leader (10-26, its `--pre` checked by a second reading, 800b445), copied by work
+  on 10-30, and by the new field (`capella`) from work **that night, at 00h07, an hour before this entry** - three files, three different
+  checksums, each header saying *only the messages change*. Wired in 10 settings files across 3 fields. The bus has carried
+  the same trigger since 11-02 (`#relay-due`), and work moved its experts onto it; its **leader** stayed `"at": 0` on its
+  own hook, because that hook's message carries the project's words: *where the handoff is written, and how*.
+- **The guard**, `outils/garde-relais.sh` (what `relay.mjs --guard` runs): **four versions** (rigel, work, altair,
+  the new field) and a fifth for one expert. Each checks the same few things in its own words: a file that OPENS on a
+  handoff heading, committed recently, the notes clean - or, for an expert, a report containing a section, written
+  recently.
+
+**So the bus takes the words and the checks.** `"relay": {"<agent>": {"handoff": {...}}}` declares the handoff once:
+`"file"`, and any of `"has"` (a regex in it), `"first"` (`{"of", "is"}`: the first line matching `of` matches `is` - a
+journal that must open on a handoff), `"written"` and `"committed"` (minutes), `"clean"` (git paths), `"how"` (where the
+procedure is written). `relay.mjs` runs `relay-guard.mjs` as one more guard for every agent with a declaration (a
+declaration satisfies *no guard, no relay*; a project's `"guard"` commands still run beside it), at the arming and again
+before the `/clear`. RELAY SOON and RELAY DUE name the file, its `"how"`, and the check that says what is missing. The
+installer says a declaration it cannot check at install, not at 150 k.
+
+**Two freshness keys, not one rule - measured.** The first draft had one `"within"`: *committed* when git tracks the
+file, else *written*. Run on the new field's real trees beside their own guards, it agreed on its leader (red, same
+reason: notes uncommitted) and **disagreed on its secretary expert**: its guard checks "written under 30 min" and says it
+has no git - but the project became a git repo since, and git tracks its report. Committed 175 min before, written 14
+min before: one rule judged by the wrong fact. `"written"` and `"committed"` are now two keys, each a fact a project
+chooses. Equivalence on the real trees after the split: work's leader green/green, the new field's leader red/red, its
+secretary green/green.
+
+**What is no primitive stays a command.** rigel's and altair's guards bind the close heading to the number of the
+session that is open (*the handoff of ANOTHER session fails*); altair's also refuses a note newer than its board and
+runs its own close check. Those stay a `"guard"` beside the declaration. **Not ported:** `--pre` (refuse every tool past
+160 k except a whitelist) - wired in no settings file of any field (grep across `~/Dev`), its whitelist naming one
+project's own script. **Adopted from work's copy unmeasured here:** a transcript tail with no model call in it is read
+again twice as far back (their L1: one line bigger than the tail must not read as "no call").
+
+**A107** (no window): six checks green at once as the positive control, then one variable per leg - the file gone, a
+journal opening on an OPEN session, a regex absent, written-now-committed-2-h-ago and the reverse, never committed, a
+tracked change under `"clean"`, no git (where `"written"` alone still passes); every fault of a declaration named; the
+CLI's exits 0 / 1 (the failing check FIRST on stderr, which is what `relay.mjs` reports) / 2; both hooks naming the
+handoff, and nothing without a declaration or with a malformed one; the deep tail; the installer's warning. **A95**
+gains two bench scenarios: a relay armed on a declaration alone (relayed, the bus's check the only guard recorded) and
+one whose file does not say what is declared (refused at the arming, exit 3, the check named) - each in a TAB of its
+own: as one more split of the bench, it narrowed every pane and A101's `nominal` prompt was not seen whole in its box
+before the Enter (the first run, red; green with the tab). **Mutants 15/15**, each on its own row (the green control
+reddening too where the mutant makes every heading count): `first` ignoring `is`, or taking any heading; `has`,
+`written`, `committed`, `clean` (dirt, or no git) passing blind; unknown keys passing (A107 `faults`, the CLI's exit 2,
+the installer's warning); no failing check on stderr's first line, or exit 0 unwritten (A107 and A95's refusal); the
+declaration not counted as a guard (A95: refused, nothing armed); either hook naming nothing; the tail read once; the
+installer silent. One run also reddened **A33** (8 claimers through rename, 0 winners - want 1) under four suites at once:
+that mutant touches nothing A33 runs, and A33 was green in the baseline and the 14 other runs. Load, named here: a
+second such red is a change in the world (`#A20`), not a flake.
+
+**Not verified:** a real field relay on a declaration (the bench's fake session only); whether a running session drops
+a Stop hook removed from its settings at a `/clear` - the installer's own note says hooks are read when a session
+starts, so the field hook is expected to live on in a running process until it restarts, and both would speak at the
+same step until then (both are silent once a relay is armed). The switch of each field is its leader's, in its own
+protocol: proposed by letter with the exact declaration, measured equal on its tree.
+
 ## `#settings-inheritance` — an expert runs its leader's `settings.local.json`, not its `settings.json` (2026-09-27)
 
 **Reported by atlas's leader** (field letter 09-27): a `Stop` hook he put in his root's `settings.local.json` ran

@@ -9,7 +9,8 @@
  *   node .comm/bin/relay.mjs --cancel                            disarm a relay armed in this session
  *
  *   .comm/config.json  "relay": {"leader": "hey leader expert", "app": {"say": "<prompt>", "guard": "<cmd>"}}
- *                      the first prompt each agent's fresh session is given; "guard": a command that must exit 0 too
+ *                      the first prompt each agent's fresh session is given; "guard": a command that must exit 0 too;
+ *                      "handoff": the handoff declared (relay-guard.mjs, its header), checked as one more guard
  *   .comm/relay/<agent>.json                                     the intent, then every step and its outcome
  *
  * WHY THIS EXISTS. The owner, 2026-10-25, through a field leader that hands over at ~150 k tokens and needed him at the
@@ -94,7 +95,7 @@ function runGuards(guards, cwd) {
 	const failed = []
 	for (const g of guards) {
 		const r = spawnSync("sh", ["-c", g], { cwd, encoding: "utf8", timeout: GUARD_MS })
-		if (r.status !== 0) failed.push(`\`${g}\` ${r.error ? `did not finish (${r.error.code})` : `exit ${r.status}`}${(r.stderr || "").trim() ? `: ${(r.stderr || "").trim().split("\n")[0].slice(0, 80)}` : ""}`)
+		if (r.status !== 0) failed.push(`\`${g}\` ${r.error ? `did not finish (${r.error.code})` : `exit ${r.status}`}${(r.stderr || "").trim() ? `: ${(r.stderr || "").trim().split("\n")[0].slice(0, 160)}` : ""}`)
 	}
 	return failed
 }
@@ -261,13 +262,19 @@ if (!has("--dry-run") && liveWatcher()) {
 const conf = cfg.relay && cfg.relay[agent]
 const say = opt("--say", typeof conf === "string" ? conf : conf && typeof conf.say === "string" ? conf.say : null)
 const confGuards = conf && typeof conf === "object" ? [].concat(conf.guard || []).filter((g) => typeof g === "string") : []
-const guards = [...all("--guard"), ...confGuards]
+// A DECLARED HANDOFF IS A GUARD (2026-11-05, relay-guard.mjs's header): the project says once what its handoff is, and the
+// bus checks it here and again before the /clear - no script of its own to copy from one project to the next.
+const sq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`
+const declGuard = conf && typeof conf === "object" && conf.handoff !== undefined
+	? [`${sq(process.execPath)} ${sq(fileURLToPath(new URL("relay-guard.mjs", import.meta.url)))} --agent ${sq(agent)}`] : []
+const guards = [...all("--guard"), ...confGuards, ...declGuard]
 const cfgFile = join(root, ".comm", "config.json")
 if (!say || !say.trim()) die(`no first prompt for '${agent}': pass --say "<what the fresh session is told first>", or add it once to ${cfgFile}:\n` +
 	`    "relay": {"${agent}": "${agent === (cfg.leader || "leader") ? "hey leader expert" : "<the sentence that resumes this agent's work>"}"}`)
 if (/[\r\n]/.test(say)) die(`the first prompt must be ONE line: a newline typed into the prompt submits it half-way`)
 if (!guards.length) die(`no guard: pass --guard "<a command that exits 0 only when your handoff is written>" (repeatable), or add\n` +
-	`    "relay": {"${agent}": {"say": ${JSON.stringify(say)}, "guard": "<cmd>"}}  to ${cfgFile}.\n` +
+	`    "relay": {"${agent}": {"say": ${JSON.stringify(say)}, "guard": "<cmd>"}}  to ${cfgFile}\n` +
+	`  - or declare the handoff itself there, and the bus checks it: "handoff": {"file": "<it>", "written": 30} (relay-guard.mjs --help).\n` +
 	`  A relay with nothing proving the handoff is a /clear on faith: what survives it is only what was written down.`)
 // MAIL ALREADY WAITING CANCELS IT, ALWAYS: this turn's Stop hook hands the mail over, the turn resumes, and a resumed turn
 // cancels the relay (step 2). A field's leader lost one so on 10-26, armed early in a busy turn; the record said

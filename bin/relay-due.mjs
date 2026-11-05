@@ -12,7 +12,8 @@
  *                      each once per 25 k; the hold never on a turn a Stop hook already resumed; both silent while a
  *                      relay is armed for that session. "*": every agent without an "at" of its own; "at": 0 turns it
  *                      off for one agent. Beside its "say" and "guard". Adding or removing one: re-run install.mjs -
- *                      an agent with an "at" has its PostToolUse hear every tool, the others Bash alone.
+ *                      an agent with an "at" has its PostToolUse hear every tool, the others Bash alone. With a
+ *                      "handoff" declared (relay-guard.mjs), both name its "file" and its "how" to the agent.
  *
  * WHY THE BUS DOES IT. relay.mjs said "No trigger" (10-25): WHEN to hand over was the agent's, or its project's hook.
  * Then work's leader, for the owner (11-02 21h52, `exchange/work-leader/in/…-14-declencheur-du-relais.md`): two projects
@@ -42,23 +43,39 @@ import { spawnSync } from "node:child_process"
 export const STEP = 25_000
 const ARMED_FRESH_MS = 5 * 60_000
 
-/** The context of the model's LAST call in a transcript, read from its tail; null when no call carries usage. */
+/**
+ * The context of the model's LAST call in a transcript, read from its tail; null when no call carries usage. A tail
+ * with no call in it is read again twice as far back, up to the whole file - work's choice in its own copy (L1): one
+ * line bigger than the tail (an image read, a long tool result) must not read as "no call" and leave the agent untold.
+ */
 export function lastContext(transcript, tailBytes = 1 << 20) {
 	let fd
 	try {
 		fd = openSync(transcript, "r")
-		const size = fstatSync(fd).size, n = Math.min(size, tailBytes), buf = Buffer.alloc(n)
-		readSync(fd, buf, 0, n, size - n)
-		const lines = buf.toString("utf8").split("\n")
-		for (let i = lines.length - 1; i >= (n < size ? 1 : 0); i--) {   // the first line of a cut tail is partial
-			if (!lines[i].includes('"assistant"')) continue
-			let r
-			try { r = JSON.parse(lines[i]) } catch { continue }
-			const u = r && r.type === "assistant" && !r.isSidechain && r.message && r.message.usage
-			if (u) return (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0)
+		const size = fstatSync(fd).size
+		for (let want = tailBytes; ; want *= 2) {
+			const n = Math.min(size, want), buf = Buffer.alloc(n)
+			readSync(fd, buf, 0, n, size - n)
+			const lines = buf.toString("utf8").split("\n")
+			for (let i = lines.length - 1; i >= (n < size ? 1 : 0); i--) {   // the first line of a cut tail is partial
+				if (!lines[i].includes('"assistant"')) continue
+				let r
+				try { r = JSON.parse(lines[i]) } catch { continue }
+				const u = r && r.type === "assistant" && !r.isSidechain && r.message && r.message.usage
+				if (u) return (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0)
+			}
+			if (n >= size) return null
 		}
-		return null
 	} catch { return null } finally { if (fd !== undefined) try { closeSync(fd) } catch {} }
+}
+
+/** What both hooks add when the agent's handoff is declared: its file, its procedure, and the check that says what is missing. */
+function handoffLine(cfg, agent, relayBin) {
+	const c = cfg && cfg.relay && cfg.relay[agent], d = c && typeof c === "object" ? c.handoff : null
+	if (!d || typeof d !== "object" || typeof d.file !== "string" || !d.file.trim()) return ""
+	const how = typeof d.how === "string" && d.how.trim() && !/[\r\n]/.test(d.how) ? d.how.trim().slice(0, 200) : ""
+	return ` Your handoff, as your project declares it: ${d.file.trim()}${how ? ` - how: ${how}` : ""}; ` +
+		`node ${join(dirname(relayBin), "relay-guard.mjs")} says what is still missing.`
 }
 
 /** This agent's threshold: its own "at", else the project's "*", else none. 0 or not a number: none. */
@@ -132,7 +149,7 @@ export function due({ root, cfg, agent, payload, relayBin, mark = true, now = Da
 	return { hold: true, reason: `[claude-comm] RELAY DUE. This is from the BUS, not your owner. This session's context is ` +
 		`${k(r.ctx)}, past '${agent}''s relay threshold (${k(r.at)}, .comm/config.json "relay"). ` +
 		`Finish or park what is in hand, write your handoff, then arm the relay as the LAST act of this turn: node ${relayBin} ` +
-		`(your first prompt and guard come from .comm/config.json; --dry-run checks them without arming). Said once per ` +
+		`(your first prompt and guard come from .comm/config.json; --dry-run checks them without arming).${handoffLine(cfg, agent, relayBin)} Said once per ` +
 		`${STEP / 1000} k; silent while a relay is armed for this session.` }
 }
 
@@ -148,7 +165,7 @@ export function notice({ root, cfg, agent, payload, relayBin, mark = true, now =
 	if (mark && !markStep(r, "notice", now)) return { say: false, why: "the step told could not be written" }
 	return { say: true, text: `[claude-comm] RELAY SOON. This is from the BUS, not your owner. This session's context is ` +
 		`${k(r.ctx)}, past '${agent}''s relay threshold (${k(r.at)}). Finish or park the task in hand - start no other - then ` +
-		`write your handoff and arm the relay as the LAST act of this turn: node ${relayBin}. Until it is armed, this turn's ` +
+		`write your handoff and arm the relay as the LAST act of this turn: node ${relayBin}.${handoffLine(cfg, agent, relayBin)} Until it is armed, this turn's ` +
 		`end will be held. Said once per ${STEP / 1000} k.` }
 }
 

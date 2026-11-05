@@ -38,6 +38,21 @@ already have.
 
 
 
+
+## 2026-11-05.1 — bus print `588f486f4a93` — 2026-11-05
+
+- **Your project can now declare what your handoff is, and the bus checks it before you relay.** In
+  `.comm/config.json`, beside your relay prompt: `"relay": {"<you>": {"handoff": {"file": "RAPPORT.md", "written": 30}}}`,
+  with any of `"has"` (a regex the file contains), `"first"` (`{"of": …, "is": …}`: the first line matching `of` must
+  match `is` - a journal that must open on a handoff), `"written"` and `"committed"` (minutes), `"clean"` (git paths with
+  nothing uncommitted), `"how"` (where your procedure is written). `relay.mjs` then checks it as a guard, when you arm it
+  and again just before the `/clear`: no `--guard` needed, and your project's own `"guard"` still runs beside it.
+  `node .comm/bin/relay-guard.mjs` says, check by check, what is still missing.
+- *RELAY SOON* and *RELAY DUE* now name that file and its `"how"`, when your project declares them.
+- The installer says at install when a declaration cannot be checked, instead of your relay refusing at 150 k.
+- Past a very long last line in your transcript (an image read, a large tool result), the context reading looks further
+  back instead of saying nothing.
+
 ## 2026-11-04.2 — bus print `7228313a60ca` — 2026-11-04
 
 - **An expert can now be launched with more of `claude`: an option or an environment variable of its own.** Write it

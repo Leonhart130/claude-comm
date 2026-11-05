@@ -1,22 +1,26 @@
-# STATUS — claude-comm, 2026-11-04 (sessions 4–28)
+# STATUS — claude-comm, 2026-11-05 (sessions 4–28)
 
 Design and gates are in `README.md`; **this file is only what is OPEN.** Keep it short — when it grows,
 fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-11-04 21h05 CET by `date`, mid-session. **WORK IS THE MAIN FIELD**; usage up to 100 %. 🔴 **The owner's rule, 11-02:
+*(2026-11-05 01h01 CET by `date`, mid-session. **WORK IS THE MAIN FIELD**; usage up to 100 %. 🔴 **The owner's rule, 11-02:
 after EVERY delivery, docs AND settings AND skills current (measured in work's tree), and a letter to work saying what
 changed and what comes next.**)*
 
-0. **Letters.** work's 21 (11-03, a *RELAY SOON* read by a sub-agent) answered by my 22 (`.1`), rung 21h01, read at once.
-   Its 20 (11-02 23h48): its own `PostToolUse` guard REMOVED from three experts at the owner's word. work will report
-   its expert past 140 k (now: does *RELAY SOON* reach the expert itself) and its first pair. altair's (00h37), deneb's
-   and atlas's wait for a bell - `node bin/exchange-bell.mjs --peer <channel> --ref <file>` when their leaders run.
+0a. 🔴 **THE TOOLBOX (owner, 11-05): *"je veux que ce soit toi qui gères tous les outils"*.** First taken: the fields'
+   handoff tool (`#relay-guard`, `.1`). Letters with each field's declaration, measured equal to its own guard: work 26,
+   capella, rigel - the switch is each leader's; altair keeps its `"guard"` (it binds a session number). **Next:** every
+   field's `outils/` (work ~40: a machine lock beside `claim.mjs`, a night watch, usage readers) - which are generic and
+   copied, measured, one per release.
+0. **Letters.** work will report its first sub-agent since `11-04.1`, its first expert past 140 k and its first pair.
+   altair's, deneb's and atlas's wait for a bell (`node bin/exchange-bell.mjs --peer <channel> --ref <file>`) when their
+   leaders run.
 1. **NEW FIELD 11-04: capella** (codename; rule 18, proved on 4 spellings BEFORE install), leader-expert kickstart,
    installed at the owner's word; now on the bus with a secretary expert (Telegram). Its 21h14 request answered by
    `.2` (`#launch-extra`, A106): a field ran `--add-agent` from my WORKING TREE mid-change - same bytes as gated, this
-   time. Not a git repo yet (its own close script needs one) - its leader's.
+   time. A git repo since (measured 11-05).
 1b. 🔴 **`selftest`'s real sessions load the machine's plugins** - the owner's Telegram server started at each run and took
    the bot (the field's log, 19:59Z 11-04: mine). Measure which flag isolates a plugin's MCP server, then arm it.
 2. **The bells' Enter** (`#enter-in-the-paste`, the cause MEASURED 11-02): `wake`'s bell and the exchange bell still type
@@ -34,9 +38,8 @@ changed and what comes next.**)*
 7. **`/tmp/comm-attack-*`**: 61 folders from a suite I started by mistake and stopped (11-02, LESSONS §9); the
    classifier refused my sweep of shared `/tmp` - the owner's to delete, or leave.
 
-**Done**: 11-02 `.1`-`.4` (`#enter-in-the-paste` A101, `#pairs` A102, `#relay-due` A103-A104). **11-04 `.1`**
-(`#subagent-note`, A105, mutants 4/4, `selftest` both ways): a sub-agent's tool call carries no note and spends no step
-- measured, its payload has `agent_id` (a `--agent` main thread does not). **`.2`**: an agent's own `claude` args and env from config `"launch"` (A106, mutants 10/10). Both in the twelve trees, measured in work's.
+**Done**: 11-02 `.1`-`.4` (A101-A104). 11-04 `.1` (`#subagent-note`, A105), `.2` (`#launch-extra`, A106). **11-05 `.1`**
+(`#relay-guard`, A107 + two A95 scenarios, mutants 15/15). Each in the twelve trees, measured in work's.
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a
 codename here; the mapping is in no repo. The boot report prints the REAL directory names: **never copy a `field:` row
