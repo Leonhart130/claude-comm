@@ -15,9 +15,9 @@ tests use his RAM and fill his desktop with kitty windows - run them when he say
    it, from THE TOOLBOX (owner 11-05: *"je veux que ce soit toi qui gères tous les outils"*; `exchange/TOOLS-INVENTORY.md`,
    untracked: 162 tools in 11 fields): ① `bin/next-bell.mjs`, `"nextBell"` hold|advise (A108) ② `bin/heavy.mjs`, the
    machine lock, runner only (A109; work's 32 agreed - `"available": 1500`, `"wait": 60` - rigel not yet) ③ the CLI's
-   caller from its session (`#cli-identity`, A110: a bus defect work guarded for two weeks) ④ the suite's bench on a
+   caller from its session (A110: a bus defect work guarded for two weeks) ④ the suite's bench on a
    private Xvfb display, opt-in `CLAUDE_COMM_BENCH=xvfb`. An adversarial review (Opus, read only) found 12 confirmed + 9
-   plausible: fixed in that code, unmeasured; FINDINGS `#next-bell` `#heavy` `#cli-identity` say which. **Order:** (0) add item 1's dirty-source refusal to the installer (not in the branch), with its arm; (1) ONE
+   plausible: fixed in that code, unmeasured; the BRANCH's FINDINGS sections next-bell, heavy and cli-identity say which (main's has none yet: no anchor here, A27). **Order:** (0) add item 1's dirty-source refusal to the installer (not in the branch), with its arm; (1) ONE
    attack run under `CLAUDE_COMM_BENCH=xvfb`, alone - every kitty arm holds, then make it the default; (2) fix the red;
    (3) mutants `exchange/WIP-next-bell-mutants-nb.json` (47), 4 wide, xvfb; (4) RESULTS108/109/110 in FINDINGS; (5) `node
    install.mjs --release 2026-11-05.2` + its body `exchange/WIP-next-bell-changelog-2.md`; (6) full boot, commit on main,
@@ -77,7 +77,8 @@ fixed" - gate `record()` AND `refresh()` on the witness. Touches `Stop`, the hot
 
 **F - carried, each named in FINDINGS:** #15's (`#review15`), REVIEW-12b's seven points (`#review12b`), `boot.mjs --hook`
 records with no ownership test, #13 §7b/§7c (`#review13`), the stub filing `basename(transcript_path)` as the session, #14's
-(`#review14`), D2's obedience to a pointer (`#midturn-channel`: build `--kind blocked` only on atlas's field count).
+(`#review14`), D2's obedience to a pointer (`#midturn-channel`: build `--kind blocked` only on atlas's field count) · A27 reads STATUS and README, undeclared in
+`gate-docs` (11-05: a STATUS pointer reddened a gate that said CODE UNCHANGED).
 
 **Carried:** A2 marker · the installer overwrites a `SKILL.md` it did not generate · S6 · atlas's `rings.jsonl`
 (A62, A65) · #9 A3 · C7 · the restart trigger (ledger UNKNOWN) · C3. **Later, owner's
