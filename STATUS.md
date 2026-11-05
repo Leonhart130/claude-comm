@@ -9,23 +9,21 @@ fold the settled parts into the README.
 after EVERY delivery, docs AND settings AND skills current (measured in work's tree), and a letter to work saying what
 changed and what comes next.**)*
 
-0a. 🔴 **THE TOOLBOX (owner, 11-05): *"je veux que ce soit toi qui gères tous les outils"*.** First taken: the fields'
-   handoff tool (`#relay-guard`, `.1`). Letters with each field's declaration, measured equal to its own guard: work 26,
-   capella, rigel - the switch is each leader's; altair keeps its `"guard"` (it binds a session number). **Next:** every
-   field's `outils/` (work ~40: a machine lock beside `claim.mjs`, a night watch, usage readers) - which are generic and
-   copied, measured, one per release.
+0a. 🔴 **THE TOOLBOX (owner, 11-05): *"je veux que ce soit toi qui gères tous les outils"*.** `.1` took the fields' handoff
+   tool (`#relay-guard`), switched 11-05 18h by me on the owner's yes (auto mode refuses a leader its own hook), 8/8 guards
+   equal, letters 18h15. Next release: the skill says a hook switch asks the owner (work's 27). **Next:** every field's
+   `outils/` (work ~40: a machine lock beside `claim.mjs`, a night watch, usage readers) - the generic, copied ones,
+   measured, one per release.
 0. **Letters.** work will report its first sub-agent since `11-04.1`, its first expert past 140 k and its first pair.
    altair's, deneb's and atlas's wait for a bell (`node bin/exchange-bell.mjs --peer <channel> --ref <file>`) when their
    leaders run.
-1. **NEW FIELD 11-04: capella** (codename; rule 18, proved on 4 spellings BEFORE install), leader-expert kickstart,
-   installed at the owner's word; now on the bus with a secretary expert (Telegram). Its 21h14 request answered by
-   `.2` (`#launch-extra`, A106): a field ran `--add-agent` from my WORKING TREE mid-change - same bytes as gated, this
-   time. A git repo since (measured 11-05).
+1. **capella** (new field 11-04, codename rule 18): a leader and a Telegram secretary, a git repo since 11-05. `.2`
+   (`#launch-extra`) answered it; it once ran `--add-agent` from my WORKING TREE mid-change.
 1b. 🔴 **`selftest`'s real sessions load the machine's plugins** - the owner's Telegram server started at each run and took
    the bot (the field's log, 19:59Z 11-04: mine). Measure which flag isolates a plugin's MCP server, then arm it.
 2. **The bells' Enter** (`#enter-in-the-paste`, the cause MEASURED 11-02): `wake`'s bell and the exchange bell still type
    text then `\r` at once; the relay waits for the box since `2026-11-02.1`. Same change, own arms (their fakes draw no
-   typed text; Stop's 10 s budget). And **Ctrl+Z in a shell-less window**: avoided, not detected.
+   typed text; Stop's 10 s budget). Field evidence: capella's relay refused 11-05 13h48, a bell left in its box. And **Ctrl+Z in a shell-less window**: avoided, not detected.
 3. **A31 blames a live session's own `/clear`** (a field expert's relay at 21:34:41Z, mid-suite, 11-02): `#review15`'s
    twin for boot's control. Named in `#pairs`, not fixed.
 4. **`who`: "IDLE, relay armed"** (work's (c)) and **`working` while only a sub-agent runs** (altair 10-30: the runtime's

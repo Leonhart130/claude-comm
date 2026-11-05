@@ -4183,6 +4183,20 @@ starts, so the field hook is expected to live on in a running process until it r
 same step until then (both are silent once a relay is armed). The switch of each field is its leader's, in its own
 protocol: proposed by letter with the exact declaration, measured equal on its tree.
 
+**The switch, measured (2026-11-05 18h).** work's leader applied it at 01h14 and was **refused by auto mode's classifier
+as "Self-Modification"**: removing a relay hook from one's own settings is self-modification, whoever proposed it. It did
+not work around it and asked the owner. The owner then gave the yes to me, for three fields: *"je préfère que tu t'en
+occupes, t'as mon oui pour les trois projets"*. Applied from here, every file backed up first and round-tripped
+(`JSON.stringify(…, 2)` reproduced each byte for byte, so only the intended keys moved): three `config.json` (work's
+leader; capella's leader and one expert; rigel's leader, its guard KEPT, and 5 experts whose guard the declaration
+replaced), ten `settings.local.json`, **15 hook entries** removed and the 4 unrelated hooks beside them kept; the installer
+re-run, which widened the bus's PostToolUse matcher to `"*"` for each agent given an `"at"` (and left one without at
+`Bash`, the control). Then, at one instant, each field's own guard against `relay-guard.mjs` for the 8 agents whose
+handoff it replaces: **8 red / 8 red, the same failing checks** (work: committed 106 min + two dirty files, both named by
+both; rigel's experts: committed 25 h to 11 days ago). No green pair this time - nobody was mid-handoff; the green pairs
+are the 01h measurement and A107. rigel's `--pre` mode (a hard refusal of tools past 160 k) was wired in no settings file:
+nothing lost. **Lesson for the next tool:** a switch that removes a hook asks the owner first, naming the gesture.
+
 ## `#settings-inheritance` — an expert runs its leader's `settings.local.json`, not its `settings.json` (2026-09-27)
 
 **Reported by atlas's leader** (field letter 09-27): a `Stop` hook he put in his root's `settings.local.json` ran
