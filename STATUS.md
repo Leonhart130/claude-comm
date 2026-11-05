@@ -11,9 +11,11 @@ changed and what comes next.**)*
 
 0a. 🔴 **THE TOOLBOX (owner, 11-05): *"je veux que ce soit toi qui gères tous les outils"*.** `.1` took the fields' handoff
    tool (`#relay-guard`), switched 11-05 18h by me on the owner's yes (auto mode refuses a leader its own hook), 8/8 guards
-   equal, letters 18h15. Next release: the skill says a hook switch asks the owner (work's 27). **Next:** every field's
-   `outils/` (work ~40: a machine lock beside `claim.mjs`, a night watch, usage readers) - the generic, copied ones,
-   measured, one per release.
+   equal, letters 18h15. Next release: the skill says a hook switch asks the owner (work's 27). **Inventory done 11-05**
+   (`exchange/TOOLS-INVENTORY.md`, untracked: 162 tools, 11 fields). Order, one per release: ① the leader's next-bell
+   Stop hold (atlas = rigel, deneb; not work) ② the machine lock `borne` (work, rigel, deneb: one lock, two behaviours;
+   rigel's `claim --machine`, item 6) ③ the leader's watcher ④ per-agent usage readers ⑤ a threshold with an end date
+   ⑥ the zsh `=` guard. **Owner asked:** the leader-expert method's own tools, mine too?
 0. **Letters.** work will report its first sub-agent since `11-04.1`, its first expert past 140 k and its first pair.
    altair's, deneb's and atlas's wait for a bell (`node bin/exchange-bell.mjs --peer <channel> --ref <file>`) when their
    leaders run.
@@ -72,7 +74,6 @@ order:** adoption (orion measured 09-19) → Rust port → value, with atlas's l
 
 | | state |
 | --- | --- |
-| toolkit | `bin/comm.mjs` · `session-registry.mjs` · `ledger.mjs` · `restart-signal.mjs` · `claim.mjs` · `wake.mjs` · `exchange-bell.mjs` · `context.mjs` · `handoff.mjs` · `restart.mjs` · `launch.mjs` · `close.mjs` · `relay.mjs` · `boot.mjs` · `install.mjs` · `test/` — no dependencies |
 | repo | `origin` = `Leonhart130/claude-comm`. **The push is the leader's call**, delegated 2026-09-05, along with installing into field trees — do not ask again |
 | **vega** | in real daily use — 26 real deliveries, both directions |
 | gates | `attack` (deterministic, every case armed) · `ledger --prove-red`, now run INSIDE it · `selftest` (real sessions, not gated by boot) · `context` and `boot` controls. **Counts live in boot's output, never here** |
