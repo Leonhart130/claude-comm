@@ -235,7 +235,7 @@ try {
 		notices.push([
 			"[claude-comm] You are '" + whoIs + "', " + role,
 			...(teamLine ? [teamLine] : []),
-			"A message is a doorbell that points at a FILE: " + cmd + " send " + (whoIs === lead ? "<agent>" : inTeam ? "@asker" : lead) +
+			"A message is a doorbell that points at a FILE: " + cmd + " send " + (whoIs === lead ? "<agent>" : teamLine.includes("You have several chiefs") ? "<chief>" : inTeam ? "@asker" : lead) +
 				' --ref <file> --note "<where to read, then what is decided>". It reaches the other session at its turn boundary.',
 			"How to work with it - replying, launching an expert, restarting, the rules: the claude-comm skill, or " +
 				relative(agentRoot, join(projectRoot, ".comm", "README.md")) + ".",
