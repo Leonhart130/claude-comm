@@ -220,7 +220,7 @@ try {
 		{ cwd: agentRoot, encoding: "utf8", timeout: 5000 })
 	if (t.status === 0) teamLine = String(t.stdout).trim()
 } catch {}
-const inTeam = !!teamLine && !teamLine.startsWith('"teams" is IGNORED')
+const inTeam = !!teamLine && !teamLine.startsWith('"teams" is IGNORED') && !teamLine.startsWith("⚠")
 try {
 	const cf = JSON.parse(readFileSync(join(projectRoot, ".comm", "config.json"), "utf8"))
 	const agents = (cf && cf.agents) || {}, lead = cf && cf.leader
