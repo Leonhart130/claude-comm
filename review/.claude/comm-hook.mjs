@@ -210,12 +210,17 @@ const notices = [], marks = []
 // every start is a new reader; four lines, because it is paid on every boot. The commands are written to
 // run from THIS agent's folder: .comm/bin/comm.mjs does not exist in an expert's subdirectory. The name
 // is asked of the bus - the one place identity is resolved - and reused by the ledger below.
-let whoIs = ""
+let whoIs = "", teamLine = ""
 try {
 	const w = spawnSync(process.execPath, [bus, "whoami", "--agent-root", agentRoot],
 		{ cwd: agentRoot, encoding: "utf8", timeout: 5000 })
 	if (w.status === 0) whoIs = String(w.stdout).trim()
+	// The bus says who works with whom ("teams"), the one reader of that declaration; nothing when there is none.
+	const t = spawnSync(process.execPath, [join(dirname(bus), "team.mjs"), "--agent-root", agentRoot],
+		{ cwd: agentRoot, encoding: "utf8", timeout: 5000 })
+	if (t.status === 0) teamLine = String(t.stdout).trim()
 } catch {}
+const inTeam = !!teamLine && !teamLine.startsWith('"teams" is IGNORED')
 try {
 	const cf = JSON.parse(readFileSync(join(projectRoot, ".comm", "config.json"), "utf8"))
 	const agents = (cf && cf.agents) || {}, lead = cf && cf.leader
@@ -225,11 +230,12 @@ try {
 		const names = others.slice(0, 12).join(", ") + (others.length > 12 ? ", +" + (others.length - 12) : "")
 		const role = whoIs === lead
 			? "the LEADER of this project's message bus - " + (others.length ? "experts: " + names : "no expert on the roster yet") +
-				". Experts write only to you - or to each other inside a pair you open (.comm/bin/pair.mjs) - you are the bridge between them, and the one who answers the owner."
-			: "an EXPERT on this project's message bus. Your leader is '" + lead + "': you write to it, never to another expert unless your leader opened a pair between you (its bell says so)."
+				(inTeam ? ". You are the one who answers the owner." : ". Experts write only to you - or to each other inside a pair you open (.comm/bin/pair.mjs) - you are the bridge between them, and the one who answers the owner.")
+			: "an EXPERT on this project's message bus. Your leader is '" + lead + "'" + (inTeam ? "." : ": you write to it, never to another expert unless your leader opened a pair between you (its bell says so).")
 		notices.push([
 			"[claude-comm] You are '" + whoIs + "', " + role,
-			"A message is a doorbell that points at a FILE: " + cmd + " send " + (whoIs === lead ? "<agent>" : lead) +
+			...(teamLine ? [teamLine] : []),
+			"A message is a doorbell that points at a FILE: " + cmd + " send " + (whoIs === lead ? "<agent>" : inTeam ? "@asker" : lead) +
 				' --ref <file> --note "<where to read, then what is decided>". It reaches the other session at its turn boundary.',
 			"How to work with it - replying, launching an expert, restarting, the rules: the claude-comm skill, or " +
 				relative(agentRoot, join(projectRoot, ".comm", "README.md")) + ".",
