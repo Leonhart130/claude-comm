@@ -345,11 +345,13 @@ dit que c'est son défaut le plus fréquent.
 C'est la forme **C** sous sa plus petite taille. Une heure tapée est une mesure qui n'a pas été prise. Elle a l'air d'un
 fait, et personne ne la revérifie, sauf le lecteur qui a une horloge sous les yeux.
 
+**La même forme le 2026-11-08** : ma lettre 52 à work portait « 20h20 », nom et en-tête ; son fichier est de 20h13:45. Encore en avance, encore d'après le travail accompli, et encore lu par work : sa réponse était datée de 20h14, avant ma lettre.
+
 ### Le contrôle
 
 **Pas encore armé, et je le nomme** (`STATUS.md` ▶ NEXT). La garde possible : la ligne `channel:` du boot compare l'heure
-écrite dans l'en-tête de mes propres lettres sortantes (« le AAAA-MM-JJ vers HHhMM ») avec la date du fichier, et prévient
-au-delà de 10 minutes d'écart. En attendant, la règle : **une heure écrite vient de `date`, jamais de ma tête.**
+écrite dans le nom et l'en-tête de mes propres lettres sortantes avec la date du fichier, et prévient dès qu'elle est EN AVANCE de
+plus de 2 minutes : les 10 minutes d'abord envisagées auraient laissé passer les 7 du 11-08. Écrire plus tard que l'heure du nom est normal, pas l'inverse. En attendant, la règle : **une heure écrite vient de `date`, jamais de ma tête.**
 
 ## §9 — Un soir, trois ancres fausses : deux citées de mémoire, une mangée par ma propre modification.
 
