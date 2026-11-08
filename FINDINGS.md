@@ -4974,7 +4974,7 @@ Run on the code before: 0 of 6. **So the replay reddens for the field's defect, 
   not offer: a person's character between the box read and the Enter goes with the bell, and between a read and a Ctrl+U it is erased. Milliseconds on an idle
   machine; a screen read's latency on a loaded one. `eraseOwn`'s prefix test only sees what landed before its read.
 - **A person who pastes exactly a bell and nothing else** gets it submitted, by the same recognition. A bell states a fact.
-- **The owner's notification is a desktop one.** `notify-send`'s exit says it ran, not that he read it, and asleep he reads it on waking: the
+- **The owner's notification is a desktop one.** `notify-send`'s exit says it ran, not that he read it (he confirmed seeing the one test sent, 11-08, the only live observation), and asleep he reads it on waking: the
   `notify` config takes a project's own command (a phone, say). `PushNotification` is a model's tool, out of a process's reach.
 - **The stale-lock break can remove a rival's fresh lock**: two holders, needing a burst AND a killed hook's leftover file. Its result is two bells, which every path now clears. Unarmed.
 - **A relay's focus test is armed as a function only**: a bench may not take the owner's focus, so `is_focused` true was never met live. Read off
