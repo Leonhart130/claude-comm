@@ -4808,7 +4808,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 // FINDINGS.md#relay
 {
 	const r95 = mkdtempSync(join(tmpdir(), "comm-attack-relay-"))
-	const opened95 = [], ARMS = ["nominal", "typed", "dialog", "guard", "noclear", "untaken", "grace", "titled", "titledTyped", "pasted", "lostEnter", "lostEnterTyped", "declared"], REFUSED = ["nosay", "noguard", "nested", "mail", "selfcancel", "unregistered", "unregisteredOld", "flagguard", "declaredStale"], SC = [...ARMS, ...REFUSED]
+	const opened95 = [], ARMS = ["nominal", "typed", "dialog", "guard", "noclear", "untaken", "grace", "titled", "titledTyped", "pasted", "lostEnter", "lostEnterTyped", "declared", "twoBells", "cutBell", "overBell", "waitBox", "turnInWait", "keyboardHeld", "guardInWait", "movedInWait", "exitInWait", "rearmInWait", "clearStuck", "sayStuck"], REFUSED = ["nosay", "noguard", "nested", "mail", "selfcancel", "unregistered", "unregisteredOld", "flagguard", "declaredStale"], SC = [...ARMS, ...REFUSED]
 	atExit(() => {
 		for (const [sock, id] of opened95)
 			try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
@@ -4822,7 +4822,12 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 	const stub95 = (k) => join(r95, k, ".claude", "comm-hook.mjs")
 	mkdirSync(dirname(stub95("unregisteredOld")), { recursive: true }); writeFileSync(stub95("unregisteredOld"), "// stub\n")
 	{ const t = new Date(Date.now() - 3600_000); utimesSync(stub95("unregisteredOld"), t, t) }
+	// `box`: a box somebody holds is looked at again, and refused at maxMs - A114's legs are the wait, the older legs its end.
+	// `notify`: what tells the owner here is a file of the arm's, so a refusal is counted and nothing reaches his desktop.
+	const told95 = join(r95, "told.txt")
+	const wk95 = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
 	writeFileSync(join(r95, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", ...Object.fromEntries(SC.map((k) => [k, k])) },
+		box: { retryMs: 200, notifyAfterMs: 300, maxMs: 4000 }, notify: ["sh", "-c", 'printf "%s\n" "$1" >> "$0"', told95],
 		relay: Object.fromEntries(SC.filter((k) => k !== "nosay").map((k) => [k, k === "noguard" ? say(k)
 			: k === "declared" ? { say: say(k), handoff: { file: "HANDOFF.md", has: "^written$" } }
 			: k === "declaredStale" ? { say: say(k), handoff: { file: "HANDOFF.md", has: "^OÙ J'EN SUIS$" } }
@@ -4853,8 +4858,13 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 			// A loaded machine's reading of two writes as one, measured on a real session 11-02 (#enter-in-the-paste)
 			if (c.paste && s.replace(/\r/g, "").length > 20) { line += s.replace(/\r/g, ""); pending = true; setTimeout(() => { pending = false; draw() }, 1200); return }
 			for (const ch of s) {
+				// Ctrl+U clears one visual line from the end, as Claude Code's box does (2.1.319, FINDINGS.md#left-in-the-box)
+				if (ch === "\x15") { line = line.slice(0, Math.max(0, line.length - 60)); draw(); continue }
 				if (ch !== "\r") { line += ch; draw(); continue }
 				if (pending) continue
+				// A113a: the Enter on /clear, or on the prompt every time, never reaches the box's owner
+				if (c.loseClearEnter && line === "/clear") continue
+				if (c.loseAllEnters && line && line !== "/clear") continue
 				// `loseEnter` (A101): the first Enter on a prompt is lost, whatever the cause; `appendOnLost`: then somebody types
 				if (c.loseEnter && line && line !== "/clear" && !lost) { lost = true; if (c.appendOnLost) { line += " hello"; draw() } continue }
 				const sub = line
@@ -4869,6 +4879,13 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 			clearInterval(t)
 			const r = spawnSync(c.argv[0], c.argv.slice(1), { encoding: "utf8", cwd: c.cwd })
 			fs.writeFileSync(c.out, JSON.stringify({ s: r.status, o: r.stdout, e: r.stderr }))
+		}, 50)
+		// `rearmInWait`: the agent arms again, in a turn of its own, while the first watcher waits for its box
+		const t2 = setInterval(() => {
+			if (!c.go2 || !fs.existsSync(c.go2)) return
+			clearInterval(t2)
+			const r = spawnSync(c.argv[0], c.argv.slice(1), { encoding: "utf8", cwd: c.cwd })
+			fs.writeFileSync(c.out2, JSON.stringify({ s: r.status, o: r.stdout, e: r.stderr }))
 		}, 50)
 		setTimeout(() => process.exit(0), 90000)
 	}
@@ -4902,7 +4919,9 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 			const c = { keys: join(r95, `${k}.keys`), pidFile: join(r95, `${k}.pid`), go: join(r95, `${k}.go`), out: join(r95, `${k}.out`), cwd: join(r95, k),
 				tx: tx(k), tx2: tx2(k), next: join(r95, `${k}.next.json`), regDir: regDir95, clears: k !== "noclear", swallows: k === "untaken",
 				paste: k === "pasted", loseEnter: /^lostEnter/.test(k), appendOnLost: k === "lostEnterTyped",
-				typed: k === "typed" || k === "titledTyped" ? "hello" : "", dialog: k === "dialog", title: /^titled/.test(k) ? "leader expert" : "", boot: reg.bootId(), relay: R95, txNested: join(r95, "nested-inner.jsonl"),
+				loseClearEnter: k === "clearStuck", loseAllEnters: k === "sayStuck", go2: join(r95, `${k}.go2`), out2: join(r95, `${k}.out2`),
+				typed: k === "typed" || k === "titledTyped" || /^(waitBox|turnInWait|guardInWait|movedInWait|exitInWait|rearmInWait)$/.test(k) ? "hello"
+					: k === "twoBells" ? wk95.NUDGE + wk95.NUDGE : k === "cutBell" ? wk95.NUDGE.slice(0, 150) : k === "overBell" ? `${wk95.NUDGE} hello` : "", dialog: k === "dialog", title: /^titled/.test(k) ? "leader expert" : "", boot: reg.bootId(), relay: R95, txNested: join(r95, "nested-inner.jsonl"),
 				// "nested": relay.mjs run by ANOTHER `claude` under this one - node under that name, so it is a session of its own
 				argv: k === "nested" ? [fake95, join(r95, "nested.cjs"), join(r95, `${k}.json`)]
 					// "selfcancel": armed, then `--cancel` once the watcher has exec'd (before that its cmdline is not yet its own)
@@ -4914,7 +4933,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 			// `mail` is refused before any screen is read: its own tab, so the panes that ARE read are not made smaller (A98).
 			// `declared` IS read, in a tab of its own: one more split narrowed every pane and `nominal`'s prompt was not
 			// seen whole in its box before the Enter (A101 nominalSawIt red, 11-05, the first run with it as a split)
-			const where = /^(mail|selfcancel|unregistered|flagguard|declared)/.test(k) ? ["--type=tab", "--match", `window_id:${b95.id}`] : ["--type=window", ...besideMe(b95)]
+			const where = /^(mail|selfcancel|unregistered|flagguard|declared|twoBells|cutBell|overBell|waitBox|turnInWait|keyboardHeld|guardInWait|movedInWait|exitInWait|rearmInWait|clearStuck|sayStuck)/.test(k) ? ["--type=tab", "--match", `window_id:${b95.id}`] : ["--type=window", ...besideMe(b95)]
 			const id = Number(spawnSync("kitten", ["@", "--to", `unix:${b95.sock}`, "launch", "--keep-focus", ...where,
 				`--cwd=${join(r95, k)}`, `--env=CLAUDE_COMM_RUNTIME=${rt95}`, fake95, join(r95, "fake.cjs"), join(r95, `${k}.json`)], { encoding: "utf8", timeout: 10000 }).stdout)
 			if (Number.isInteger(id) && id > 0) opened95.push([b95.sock, id])
@@ -4938,10 +4957,32 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		// the guard's file goes AFTER a passing arming: only the check at the moment of the relay can see it
 		rmSync(join(r95, "guard", "HANDOFF.md"), { force: true })
 		for (const k of ARMS) U(k, [{ type: "tool_result", tool_use_id: "t1", content: "relay: armed" }])
+		// `keyboardHeld`: a typist, alive, has the window's keyboard when the relay's look comes
+		if (S95.keyboardHeld.id) {
+			mkdirSync(join(rt95, "claude-comm", "typing"), { recursive: true })
+			const st95 = readFileSync("/proc/self/stat", "utf8")
+			writeFileSync(join(rt95, "claude-comm", "typing", `${basename(b95.sock)}-${S95.keyboardHeld.id}.json`), JSON.stringify({ pid: process.pid, tick: st95.slice(st95.lastIndexOf(") ") + 2).split(" ")[19], at: Date.now(), what: "the arm's typist" }))
+		}
 		for (const k of ARMS) if (k !== "grace") { endTurn(k); if (k === "nominal") S95.nominal.ended = Date.now() }
 		endTurn("grace"); nap(700); U("grace", "attends, ne vide pas"); A("grace", "end_turn", "ok")
 		const settled = (k) => { const r = recOf(k); return r && r.relayed !== null && !r.relay_pid }
-		for (const until = Date.now() + 25000; Date.now() < until && ARMS.some((k) => S95[k].pid && !settled(k)); nap(200)) {}
+		// A114a's legs act at the moment the relay SAYS it is waiting for its box, never after a guessed delay
+		const acted95 = {}, ctrlU = (k) => spawnSync("kitten", ["@", "--to", `unix:${b95.sock}`, "send-text", "--match", `id:${S95[k].id}`, "\x15"], { timeout: 5000 })
+		const held95 = S95.keyboardHeld.id ? join(rt95, "claude-comm", "typing", `${basename(b95.sock)}-${S95.keyboardHeld.id}.json`) : null
+		const once = (k, why, act) => { if (S95[k].pid && !acted95[k] && (recOf(k) || {})[why]) { acted95[k] = true; act() } }
+		for (const until = Date.now() + 45000; Date.now() < until && ARMS.some((k) => S95[k].pid && !settled(k)); nap(100)) {
+			once("waitBox", "waiting_for_the_box", () => { S95.waitBox.ctrlU = Date.now(); ctrlU("waitBox") })
+			once("turnInWait", "waiting_for_the_box", () => { U("turnInWait", "the owner answers here"); A("turnInWait", "end_turn", "ok") })
+			once("keyboardHeld", "box_wait_since", () => { try { rmSync(held95, { force: true }) } catch {} })
+			once("guardInWait", "waiting_for_the_box", () => { rmSync(join(r95, "guardInWait", "HANDOFF.md"), { force: true }); ctrlU("guardInWait") })
+			once("movedInWait", "waiting_for_the_box", () => { cpSync(S95.movedInWait.c.next, join(regDir95, `${S95.movedInWait.pid}.json`)) })
+			once("exitInWait", "waiting_for_the_box", () => { try { process.kill(S95.exitInWait.pid) } catch {} })
+			// the second arming, then its turn's end, then the same box emptied for the watcher it armed
+			once("rearmInWait", "box_wait_since", () => writeFileSync(S95.rearmInWait.c.go2, ""))
+			if (acted95.rearmInWait && !acted95.rearmEnd && existsSync(S95.rearmInWait.c.out2)) { acted95.rearmEnd = true; U("rearmInWait", [{ type: "tool_result", tool_use_id: "t1", content: "relay: armed" }]); endTurn("rearmInWait") }
+			if (acted95.rearmEnd && !acted95.rearmFree && (recOf("rearmInWait") || {}).waiting_for_the_box) { acted95.rearmFree = true; ctrlU("rearmInWait") }
+		}
+		for (const k of ["clearStuck", "sayStuck"]) if (S95[k].id) S95[k].boxAfter = wk95.screenAtRest({ sock: b95.sock, id: S95[k].id })
 		for (const k of SC) { S95[k].rec = recOf(k); S95[k].keys = keysOf(k) }
 	}
 	const rec = (k) => (S95[k] && S95[k].rec) || {}, keys = (k) => S95[k] && S95[k].keys, out = (k) => (S95[k] && S95[k].o) || {}
@@ -4988,6 +5029,57 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		`${b95 ? "" : "THE ARM COULD NOT RUN: no kitty bench for this suite; "}` + Object.entries(ok).map(([k, v]) => `${k}=${v}`).join("; ") +
 		ARMS.map((k) => `; ${k}: keys ${JSON.stringify((keys(k) || "").slice(0, 60))} "${(why(k) || (rec(k).relayed ? "relayed" : "-")).slice(0, 70)}"`).join("") +
 		REFUSED.map((k) => `; ${k}: exit ${out(k).s} "${(out(k).e || "").split("\n")[0].slice(0, 60)}"`).join(""))
+	// A113, the relay's half - THE BUS'S OWN TEXT IN THE BOX NEVER STOPS A RELAY, AND SOMEBODY'S WORDS STILL DO. A field's leader,
+	// 11-08: two bells in its box refused its relay twice (and rung nobody), and it slept until the owner came back. One variable
+	// each against `nominal`: the box holds two whole bells, or one cut. Erased, and only that, then the same /clear and prompt.
+	// Its pair: the same bell with a person's words after it stays refused, untouched. FINDINGS.md#left-in-the-box
+	const relayedAfterErase = (k, bells, cut) => { const m = /^(\x15+)\/clear\r(.*)\r$/.exec(keys(k) || "")
+		return rec(k).relayed === true && !!m && m[2] === say(k) && !!rec(k).erased_own && rec(k).erased_own.erased === true && rec(k).erased_own.bells === bells && rec(k).erased_own.cut === cut }
+	const ok113 = {
+		twoBellsRelayed: relayedAfterErase("twoBells", 2, false),
+		cutBellRelayed: relayedAfterErase("cutBell", 0, true),
+		overBellRefused: untouched("overBell", /not at rest/) && !rec("overBell").erased_own,
+		nominalErasedNothing: !rec("nominal").erased_own && !/\x15/.test(keys("nominal") || ""),
+		// ITS OWN WORD, NOT TAKEN, DOES NOT STAY: /clear with its Enter lost, then the prompt with every Enter lost
+		clearStuckErased: rec("clearStuck").relayed === false && /^\/clear\r\x15+$/.test(keys("clearStuck") || "") && /not confirmed/.test(why("clearStuck")) && !!S95.clearStuck.boxAfter && S95.clearStuck.boxAfter.ok === true,
+		sayStuckErased: rec("sayStuck").relayed === false && (keys("sayStuck") || "").startsWith(`/clear\r${say("sayStuck")}\r\r\x15`) && /no user row carrying it/.test(why("sayStuck")) && !!S95.sayStuck.boxAfter && S95.sayStuck.boxAfter.ok === true,
+	}
+	check("A113a a relay clears the bus's own text from its box and goes on - and a person's words after a bell still refuse it",
+		!!b95 && Object.values(ok113).every(Boolean),
+		`${b95 ? "" : "THE ARM COULD NOT RUN: no kitty bench for this suite; "}` + Object.entries(ok113).map(([k, v]) => `${k}=${v}`).join("; ") +
+		["twoBells", "cutBell", "overBell"].map((k) => `; ${k}: keys ${JSON.stringify((keys(k) || "").slice(0, 40))} erased ${JSON.stringify(rec(k).erased_own || null)} "${(why(k) || (rec(k).relayed ? "relayed" : "-")).slice(0, 70)}"`).join(""))
+	// A114, the relay's half - A REFUSAL LEAVES THE WINDOW, AND A BOX SOMEBODY HOLDS IS WAITED FOR. An idle session has no Stop hook
+	// left to read its record. `typed`: looked at until maxMs, the owner told once that it waits and once that it was refused,
+	// and what is in the box never in what he is told. `waitBox`: the same box emptied while it waits - relayed, with no key
+	// of its own before the /clear (the one Ctrl+U is the arm's, the person's). `turnInWait`: a turn taken meanwhile cancels it.
+	let told95Text = ""
+	try { told95Text = readFileSync(told95, "utf8") } catch {}
+	const toldOf = (k, re) => told95Text.split("\n").filter((l) => l.includes(`/ ${k} :`) && re.test(l)).length
+	const ok114r = {
+		armedLegs: !!S95.waitBox && !!rec("waitBox").waiting_for_the_box && !!rec("turnInWait").waiting_for_the_box && !!rec("keyboardHeld").box_wait_since,
+		typedToldWaiting: toldOf("typed", /attend depuis/) === 1,
+		typedToldRefused: toldOf("typed", /n'a pas eu lieu/) === 1 && rec("typed").owner_told === 0,
+		dialogToldRefused: toldOf("dialog", /n'a pas eu lieu/) === 1,
+		nominalToldNothing: toldOf("nominal", /./) === 0,
+		boxNeverQuoted: told95Text.length > 0 && !/hello/.test(told95Text),
+		waitBoxRelayed: rec("waitBox").relayed === true && keys("waitBox") === `\x15/clear\r${say("waitBox")}\r`,
+		// free TWICE IN A ROW, a look apart, before a /clear lands on somebody who may be between two sentences
+		freeTwiceBeforeClear: !!rec("waitBox").clear && !!S95.waitBox.ctrlU && Date.parse(rec("waitBox").clear.at) - S95.waitBox.ctrlU >= 200,
+		turnCancels: untouched("turnInWait", /took a turn/),
+		cancelIsTold: toldOf("turnInWait", /annulé/) === 1 && toldOf("turnInWait", /n'a pas eu lieu/) === 0,
+		// another typist holds the keyboard at its look: it waits, types nothing beside it, and goes once it is free
+		keyboardWaited: rec("keyboardHeld").relayed === true && keys("keyboardHeld") === `/clear\r${say("keyboardHeld")}\r`,
+		guardAgainAfterTheWait: rec("guardInWait").relayed === false && /guard failed after the wait/.test(why("guardInWait")) && keys("guardInWait") === "\x15",
+		movedCancels: untouched("movedInWait", /new transcript/),
+		exitCancels: untouched("exitInWait", /exited/),
+		// armed again while the first watcher waits: not "already armed" (that watcher would cancel at its next look): replaced
+		rearmReplaces: (() => { let o = {}; try { o = JSON.parse(readFileSync(S95.rearmInWait.c.out2, "utf8")) } catch {} return o.s === 0 && /relay: armed/.test(o.o || "") && !/already armed/.test(o.o || "") })() &&
+			rec("rearmInWait").relayed === true && keys("rearmInWait") === `\x15/clear\r${say("rearmInWait")}\r`,
+	}
+	check("A114a a relay waits for a box somebody holds, a turn taken meanwhile cancels it, and every refusal tells the owner",
+		!!b95 && Object.values(ok114r).every(Boolean),
+		`${b95 ? "" : "THE ARM COULD NOT RUN: no kitty bench for this suite; "}` + Object.entries(ok114r).map(([k, v]) => `${k}=${v}`).join("; ") +
+		`; waitBox: keys ${JSON.stringify((keys("waitBox") || "").slice(0, 30))} "${(why("waitBox") || (rec("waitBox").relayed ? "relayed" : "-")).slice(0, 80)}"; turnInWait: "${why("turnInWait").slice(0, 80)}"; told: ${JSON.stringify(told95Text.slice(0, 300))}`)
 	// A96 — A NAMED SESSION RELAYS TOO. A field's leader, 10-26, measured twice: a session the owner had named draws its
 	// name INTO the box's top edge (`──…── name ─`, 2.1.310, and still there after a /clear), the edge read as no rule,
 	// and the relay refused at a box empty and at rest - the owner typed /clear by hand at every handover. Measured here
@@ -5255,7 +5347,14 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		const RULE = "─".repeat(60)
 		process.stdout.write(c.line === null ? "\r\nzsh: suspended  claude\r\n% fg\r\n" : `\r\n${RULE}\r\n❯ ${c.line}\r\n${RULE}\r\n  ⏵⏵ fake session\r\n`)
 		if (process.stdin.setRawMode) process.stdin.setRawMode(true)
-		process.stdin.on("data", (d) => fs.appendFileSync(c.keys, d))
+		// the box takes its Enter and shows what is typed, as a session does: wake now reads whether its bell LEFT the box (rule 9)
+		let line = c.line
+		process.stdin.on("data", (d) => {
+			fs.appendFileSync(c.keys, d)
+			if (line === null) return
+			for (const ch of d.toString()) line = ch === "\r" ? "" : line + ch
+			process.stdout.write(`\x1b[2J\x1b[H\r\n${RULE}\r\n❯ ${line}\r\n${RULE}\r\n  ⏵⏵ fake session\r\n`)
+		})
 		fs.writeFileSync(c.pidFile, String(process.pid))
 		setTimeout(() => process.exit(0), 60000)
 	}
@@ -5329,7 +5428,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 	const wrapped = ["", RULE98, `❯ ${N.slice(0, 100)}`, `  ${N.slice(100, 200)}`, `  ${N.slice(200)}`, RULE98, "  ? for shortcuts"].join("\n")
 	const rootW = mkdtempSync(join(tmpdir(), "comm-attack-wrapped-"))
 	const wrappedR = wk98.wakeAgent(rootW, "w", 5151, { wins: [{ sock: "/tmp/kitty-attack", id: 7, shellPid: 1, fg: [5151] }], turn: { state: "idle", why: "a98" },
-		sendText: (_w, t) => { typedW.push(t); return { status: 0, stderr: "" } }, screen: () => wk98.promptAtRest(wrapped) })
+		sendText: (_w, t) => { typedW.push(t); return { status: 0, stderr: "" } }, screen: () => wk98.promptAtRest(typedW.includes("\r") ? ["", RULE98, "❯ ", RULE98, "  ? for shortcuts"].join("\n") : wrapped) })
 	rmSync(rootW, { recursive: true, force: true })
 	const wrappedOk = wrappedR.resubmitted === true && typedW.join("") === "\r"
 	const unreadable = wk98.screenAtRest({ sock: join(r98, "no-such.sock"), id: 1 })
@@ -5343,6 +5442,421 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		`NO box -> ${said("nobox")}; its OWN unsent bell -> ${said("own")}; that bell + a person's words -> ${said("ownplus")}; ` +
 		`exchange bell into the half-typed box -> exit ${ebTyped ? ebTyped.code : null}, recorded=${ebTyped ? ebTyped.recorded : null}; into the empty one -> exit ${ebEmpty ? ebEmpty.code : null}, ARRIVED=${ebEmpty ? ebEmpty.arrived : null}; ` +
 		`the unsent bell drawn on three hard lines -> typed ${JSON.stringify(typedW.join(""))} (${wrappedR.why || "resubmitted"}); an unreadable screen -> ${unreadable.ok ? "AT REST" : unreadable.why}`)
+}
+
+// A111 - A115: THE BUS'S TEXT NEVER STAYS IN A BOX. A field's leader, 2026-11-08: two rings 6 ms apart (01:43:06Z), both recorded
+// as rung, neither Enter taken, two bells in its box. wake refused it at 04:02Z as a person's words, relay at 03:00Z and 03:07Z, and
+// it slept until the owner came back at 12:04Z: "que ça n'affecte ni toi, ni un de tes agents, sous aucune forme" (its letter 41).
+// Measured on a real session before building (2.1.319, FINDINGS.md#left-in-the-box): the box reads one text of 626 characters that
+// is not "one bell" (6/6), Ctrl+U clears a visual line and starts no turn (12/12), a lone Enter submits both bells (6/6).
+// The bench draws that box: real kitty panes, real wake processes, each fake session taking keys as a session does.
+{
+	const rb = mkdtempSync(join(tmpdir(), "comm-attack-box-")), rc = mkdtempSync(join(tmpdir(), "comm-attack-boxwait-"))
+	const openedB = []
+	atExit(() => {
+		for (const [sock, id] of openedB) try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
+		for (const d of [rb, rc]) try { rmSync(d, { recursive: true, force: true }) } catch {}
+	})
+	const wkB = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
+	const ebB = await import(pathToFileURL(join(PKG, "bin", "exchange-bell.mjs")).href)
+	const N = wkB.NUDGE, F = wkB.FRESH_NUDGE
+	// `loseEnters`: that many Enters on a non-empty box do nothing (-1: all of them); `typesAfterLoss`: then a person types
+	function boxSession() {
+		const fs = require("fs")
+		const c = JSON.parse(fs.readFileSync(process.argv[2], "utf8"))
+		fs.writeFileSync(c.keys, ""); fs.writeFileSync(c.rows, "")
+		fs.writeFileSync(`${c.sessions}/${process.pid}.json`, "{}")   // a STARTED session (A88)
+		const RULE = "─".repeat(60)
+		let line = c.line || "", lost = c.loseEnters || 0, late = false
+		const draw = () => process.stdout.write(`\x1b[2J\x1b[H\r\n${RULE}\r\n❯ ${line}\r\n${RULE}\r\n  ⏵⏵ fake session\r\n`)
+		draw()
+		if (process.stdin.setRawMode) process.stdin.setRawMode(true)
+		process.stdin.on("data", (d) => {
+			fs.appendFileSync(c.keys, d)
+			// `lateMs`: a long text is drawn that much later, and an Enter read before it is drawn joins it - lost (#enter-in-the-paste)
+			if (c.lateMs && d.toString().replace(/\r/g, "").length > 20) { line += d.toString().replace(/\r/g, ""); late = true; setTimeout(() => { late = false; draw() }, c.lateMs); return }
+			for (const ch of d.toString()) {
+				if (ch === "\x15") { line = line.slice(0, Math.max(0, line.length - 60)); draw(); continue }
+				if (ch !== "\r") { line += ch; draw(); continue }
+				if (late || !line) continue
+				if (lost !== 0) { lost--; if (c.typesAfterLoss) { line += " hello"; draw() } continue }
+				fs.appendFileSync(c.rows, JSON.stringify(line) + "\n")
+				line = ""
+				draw()
+			}
+		})
+		fs.writeFileSync(c.pidFile, String(process.pid))
+		setTimeout(() => process.exit(0), 75000)
+	}
+	const bB = await bench()
+	/** A project on the bench: one pane per scenario, each an agent of its own (`leader`: the root's), mail waiting for each. */
+	function project(root, panes, box) {
+		mkdirSync(join(root, ".comm", "bin"), { recursive: true })
+		mkdirSync(join(root, "cfg", "sessions"), { recursive: true })
+		const told = join(root, "told.txt")
+		writeFileSync(join(root, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", postman: "postman", ...Object.fromEntries(Object.keys(panes).filter((k) => k !== "leader").map((k) => [k, k])) },
+			box, notify: ["sh", "-c", 'printf "%s\\n" "$1" >> "$0"', told] }))
+		for (const f of ["comm.mjs", "who.mjs", "wake.mjs", "session-registry.mjs"]) cpSync(join(PKG, "bin", f), join(root, ".comm", "bin", f))
+		const fake = join(root, "claude")
+		try { symlinkSync(process.execPath, fake) } catch {}
+		writeFileSync(join(root, "fake.cjs"), `(${boxSession.toString()})()\n`)
+		mkdirSync(join(root, "postman"), { recursive: true }); writeFileSync(join(root, "postman", "NOTE.md"), "go\n")
+		const P = {}
+		for (const [k, sc] of Object.entries(panes)) {
+			const dir = k === "leader" ? root : join(root, k)
+			mkdirSync(dir, { recursive: true }); writeFileSync(join(dir, "BRIEF.md"), "go\n")
+			const c = { keys: join(root, `${k}.keys`), rows: join(root, `${k}.rows`), pidFile: join(root, `${k}.pid`), sessions: join(root, "cfg", "sessions"), ...sc }
+			writeFileSync(join(root, `${k}.json`), JSON.stringify(c))
+			if (!bB) continue
+			const id = Number(spawnSync("kitten", ["@", "--to", `unix:${bB.sock}`, "launch", "--type=tab", "--keep-focus", "--match", `window_id:${bB.id}`,
+				`--cwd=${dir}`, `--env=CLAUDE_COMM_AGENT=${k}`, `--env=CLAUDE_CONFIG_DIR=${join(root, "cfg")}`, fake, join(root, "fake.cjs"), join(root, `${k}.json`)], { encoding: "utf8", timeout: 10000 }).stdout)
+			if (Number.isInteger(id) && id > 0) openedB.push([bB.sock, id])
+			P[k] = { id: Number.isInteger(id) && id > 0 ? id : null, pid: 0, c }
+		}
+		for (const until = Date.now() + 8000; Date.now() < until && Object.values(P).some((p) => !p.pid); nap(100))
+			for (const p of Object.values(P)) if (!p.pid) try { p.pid = Number(readFileSync(p.c.pidFile, "utf8")) } catch {}
+		const sendEnv = (from) => ({ ...process.env, CLAUDE_COMM_AGENT: from })
+		const up = !!bB && Object.keys(panes).every((k) => P[k] && P[k].id && P[k].pid)
+		if (up) for (const k of Object.keys(panes))
+			if (spawnSync(process.execPath, [join(root, ".comm", "bin", "comm.mjs"), "send", k, ...(k === "leader" ? ["--ref", "NOTE.md"] : ["--ref", "BRIEF.md"]), "--note", "box"],
+				{ cwd: k === "leader" ? join(root, "postman") : root, encoding: "utf8", env: sendEnv(k === "leader" ? "postman" : "leader") }).status !== 0) P[k].mailFailed = true
+		const keys = (k) => { try { return readFileSync(P[k].c.keys, "utf8") } catch { return null } }
+		const rows = (k) => { try { return readFileSync(P[k].c.rows, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)) } catch { return [] } }
+		const screen = (k) => wkB.screenAtRest({ sock: bB.sock, id: P[k].id })
+		const quiet = (k) => existsSync(join(root, ".comm", "wake", `${k}.json`))
+		const rings = (k) => { try { return readFileSync(join(root, ".comm", "wake", "rings.jsonl"), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)).filter((r) => r.agent === k) } catch { return [] } }
+		const pending = (k) => { try { return readdirSync(join(root, ".comm", "inbox", k)).filter((f) => f.endsWith(".json")).length } catch { return -1 } }
+		const ring = (k) => { let r = null; try { r = JSON.parse(spawnSync(process.execPath, [join(root, ".comm", "bin", "wake.mjs"), "--root", root, "--agent", k, "--json"], { cwd: root, encoding: "utf8", timeout: 30000 }).stdout).results.find((x) => x.agent === k) || null } catch {} return r }
+		return { root, P, up, keys, rows, screen, quiet, rings, pending, ring, told }
+	}
+	const bellsIn = (t) => (String(t || "").match(/\[claude-comm\] doorbell/g) || []).length
+	// retryMs is an hour here: what these legs type is what the ring they ran typed. Its first look (15 s) finds a recent ring quiet.
+	const W = project(rb, {
+		race: {}, nominal: {}, late: { lateMs: 400 }, lost1: { loseEnters: 1 }, typedAfter: { loseEnters: 1, typesAfterLoss: true },
+		two: { line: N + N }, one: { line: N }, three: { line: N + F + N }, words: { line: "bonjour je voul" }, twoPlus: { line: `${N}${N} et puis` },
+		leader: { line: N + N }, ebTwo: { line: N + N }, ebLost: { loseEnters: -1 }, ebWords: { line: "bonjour je voul" },
+	}, { retryMs: 3600_000, notifyAfterMs: 3600_000, maxMs: 7200_000 })
+	// Here the ring that keeps looking is the one under test: it alone erases.
+	const rd = mkdtempSync(join(tmpdir(), "comm-attack-boxlook-"))
+	atExit(() => { try { rmSync(rd, { recursive: true, force: true }) } catch {} })
+	const L = project(rd, { lostAll: { loseEnters: -1 }, cut: { line: N.slice(0, 150) }, twoLost: { line: N + N, loseEnters: 2 } }, { retryMs: 250, notifyAfterMs: 3600_000, maxMs: 60_000 })
+
+	// A111 — ONE TYPIST: every ring of a burst sees an idle agent, an empty box and no recent ring; one bell, one Enter, no more.
+	const hk = {}
+	{
+		const win = { sock: join(rb, "kitty-hold"), id: 7 }
+		const a = wkB.holdKeyboard(win, "first"), b = wkB.holdKeyboard(win, "second")
+		hk.firstHolds = a.ok === true
+		hk.secondRefused = b.ok === false && b.holder === "first"
+		a.release()
+		const c = wkB.holdKeyboard(win, "third")
+		hk.releaseFrees = c.ok === true
+		c.release()
+		// a holder that cannot be typing holds nothing: dead, its pid another process now, or held past any typist
+		const dir = join(process.env.CLAUDE_COMM_RUNTIME, "claude-comm", "typing"), file = join(dir, `kitty-hold-7.json`)
+		const dead = spawnSync("true").pid, tick = readFileSync("/proc/self/stat", "utf8"), myTick = tick.slice(tick.lastIndexOf(") ") + 2).split(" ")[19]
+		const plant = (h) => writeFileSync(file, JSON.stringify(h))
+		const takes = (h) => { plant(h); const x = wkB.holdKeyboard(win, "after"); const ok = x.ok === true; if (x.ok) x.release(); return ok }
+		hk.deadBroken = takes({ pid: dead, tick: "1", at: Date.now(), what: "dead" })
+		hk.reusedPidBroken = takes({ pid: process.pid, tick: "1", at: Date.now(), what: "reused" })
+		hk.oldBroken = takes({ pid: process.pid, tick: myTick, at: Date.now() - 121_000, what: "old" })
+		hk.liveHeld = !takes({ pid: process.pid, tick: myTick, at: Date.now(), what: "live" })
+		try { rmSync(file, { force: true }) } catch {}
+		// a ring that finds it held types nothing and says who has it; released, the same call rings
+		const typed = []
+		const f = { wins: [{ sock: win.sock, id: win.id, shellPid: 1, fg: [4242] }], turn: { state: "idle", why: "a111" }, sendText: (_w, t) => { typed.push(t); return { status: 0, stderr: "" } }, screen: () => ({ ok: true }) }
+		const rootH = mkdtempSync(join(tmpdir(), "comm-attack-hold-"))
+		const h = wkB.holdKeyboard(win, "a relay")
+		const refused = wkB.wakeAgent(rootH, "x", 4242, f)
+		h.release()
+		hk.heldRingTypesNothing = refused.sent === false && refused.ringing === true && /a relay/.test(refused.why) && typed.length === 0
+		const then = wkB.wakeAgent(rootH, "x", 4242, f)
+		hk.releasedRingRings = then.sent === true && typed.length === 2
+		rmSync(rootH, { recursive: true, force: true })
+		// THE QUIET CHECK IS READ BEFORE THE HOLD: a ring that lands between the two makes this one the second bell. The window list is
+		// the one thing wake reads between them, so that is where this arm lands it.
+		const rootL = mkdtempSync(join(tmpdir(), "comm-attack-hold-"))
+		mkdirSync(join(rootL, ".comm", "wake"), { recursive: true })
+		const typedL = []
+		let landed = false
+		const between = { id: 8, shellPid: 1, fg: [4243], get sock() { if (!landed) { landed = true; writeFileSync(join(rootL, ".comm", "wake", "y.json"), JSON.stringify({ at: new Date().toISOString(), agent: "y", pid: 1, window: 8 })) } return win.sock } }
+		const lb = wkB.wakeAgent(rootL, "y", 4243, { wins: [between], turn: { state: "idle", why: "a111" }, sendText: (_w, t) => { typedL.push(t); return { status: 0, stderr: "" } }, screen: () => ({ ok: true }) })
+		hk.landedBetweenIsNotASecondBell = landed && lb.sent === false && lb.ringing === true && typedL.length === 0
+		rmSync(rootL, { recursive: true, force: true })
+		// the exchange bell takes the same keyboard: another project's bell is the same typist problem
+		const exH = join(rb, "ex-held"), typedE = []
+		mkdirSync(join(exH, "peer", "out"), { recursive: true }); mkdirSync(join(exH, "peer", "in"), { recursive: true })
+		writeFileSync(join(exH, "peer", "out", "L.md"), "# a letter\n")
+		const ebArgs = ["--exchange", exH, "--peer", "peer", "--ref", join(exH, "peer", "out", "L.md"), "--project", rb, "--agent", "x"]
+		const ebOpts = { wins: [{ sock: win.sock, id: win.id, shellPid: 1, fg: [4242] }], who: () => ({ agents: { x: { pids: [4242] } } }), lookup: () => ({ ok: false, why: "a111" }), send: (_w, t) => { typedE.push(t); return { status: 0, stderr: "" } }, screen: () => ({ ok: true }) }
+		const hE = wkB.holdKeyboard(win, "a relay")
+		const eHeld = await ebB.bell(ebArgs, ebOpts)
+		hE.release()
+		hk.exchangeWaitsItsTurn = eHeld.code === 3 && /a relay/.test(eHeld.out) && typedE.length === 0
+		const eFree = await ebB.bell(ebArgs, ebOpts)
+		hk.exchangeThenRings = eFree.code === 0 && typedE.length === 2
+	}
+	let raceOut = []
+	if (W.up) {
+		const burst = Array.from({ length: 6 }, () => new Promise((res) => {
+			const c = spawn(process.execPath, [join(rb, ".comm", "bin", "wake.mjs"), "--root", rb, "--agent", "race", "--json"], { cwd: rb, stdio: ["ignore", "pipe", "ignore"] })
+			let o = ""
+			c.stdout.on("data", (d) => { o += d })
+			c.on("exit", () => { try { res(JSON.parse(o).results.find((x) => x.agent === "race") || null) } catch { res(null) } })
+		}))
+		raceOut = await Promise.all(burst)
+		nap(500)
+	}
+	const raceSent = raceOut.filter((r) => r && r.sent).length
+	const raceOk = W.up && raceSent === 1 && bellsIn(W.keys("race")) === 1 && (W.keys("race") || "").endsWith("\r") && (W.keys("race").match(/\r/g) || []).length === 1 && W.rows("race").length === 1
+	check("A111 one typist at a window: a burst of rings types one bell and one Enter, and a holder that cannot be typing holds nothing",
+		raceOk && Object.values(hk).every(Boolean),
+		`${bB ? "" : "THE ARM COULD NOT RUN: no kitty bench for this suite; "}burst of 6: sent=${raceSent}, bells typed=${bellsIn(W.up ? W.keys("race") : "")}, Enters=${W.up ? (W.keys("race").match(/\r/g) || []).length : "?"}, submitted=${W.up ? W.rows("race").length : "?"}; ` +
+		`others said: ${JSON.stringify([...new Set(raceOut.filter((r) => r && !r.sent).map((r) => (r.why || "").replace(/\d+/g, "N").slice(0, 44)))])}; ` + Object.entries(hk).map(([k, v]) => `${k}=${v}`).join("; "))
+
+	// A112 — THE BUS'S TEXT LEAVES THE BOX, OR IT IS ERASED: each leg one variable against `nominal`, and mail is never lost.
+	const r112 = {}
+	if (W.up) for (const k of ["nominal", "late", "lost1", "typedAfter"]) r112[k] = W.ring(k)
+	const ringRow = (k) => W.rings(k).find((x) => x.rang !== undefined) || {}
+	// what the ring that keeps looking does with a session whose Enter never goes: one hook ring leaves it, the watcher erases it twice, a person is told
+	let hookLost = null
+	if (L.up) {
+		hookLost = L.ring("lostAll")
+		for (const until = Date.now() + 25000; Date.now() < until && !L.rings("lostAll").some((x) => x.ended); nap(100)) {}
+		nap(300)
+	}
+	// One reading per call, then the last one again: the box as `typeAndProve` would read it, keys as they would be typed
+	const scripted = (reads) => { const keys = []; let i = 0; return { keys, read: () => reads[Math.min(i++, reads.length - 1)], send: (t) => { keys.push(t); return { status: 0, stderr: "" } } } }
+	const typed = (text) => ({ ok: false, typed: true, text })
+	const fast = { shownMs: 120, takenMs: 120, nap: 5 }
+	const u = {}
+	{
+		// the person's keystrokes landed before the bell / after it, before the first look: an Enter would submit them
+		let x = scripted([typed(`bonjour je ${N}`)]); let r = wkB.typeAndProve(x.read, x.send, N, fast)
+		u.wordsBeforeNoEnter = r.mixed === true && r.taken === false && !x.keys.includes("\r")
+		x = scripted([typed(`${N} et puis`)]); r = wkB.typeAndProve(x.read, x.send, N, fast)
+		u.wordsAfterNoEnter = r.mixed === true && !x.keys.includes("\r")
+		// "it left" is claimed only of text the box was seen to hold
+		x = scripted([{ ok: true }]); r = wkB.typeAndProve(x.read, x.send, N, fast)
+		u.neverSeenIsNotTaken = r.taken === false && r.unproved === true && x.keys.filter((k) => k === "\r").length === 1
+		x = scripted([typed(N), { ok: false, why: "its screen could not be read" }]); r = wkB.typeAndProve(x.read, x.send, N, fast)
+		u.unreadableIsNotTaken = r.taken === false && r.unproved === true
+		x = scripted([typed(N), { ok: true }]); r = wkB.typeAndProve(x.read, x.send, N, fast)
+		u.seenThenEmptyIsTaken = r.taken === true && r.unproved !== true
+		// partly drawn is not somebody's words
+		x = scripted([typed(N.slice(0, 100)), typed(N), { ok: true }]); r = wkB.typeAndProve(x.read, x.send, N, fast)
+		u.partialIsWaitedFor = r.taken === true && x.keys.filter((k) => k === "\r").length === 1
+		// no erase asked: the text stays, said
+		x = scripted([typed(N)]); r = wkB.typeAndProve(x.read, x.send, N, { ...fast, erase: false })
+		u.noEraseStays = r.stays === true && !x.keys.includes("\x15") && x.keys.filter((k) => k === "\r").length === 2
+		// erasing: anything but the start of what was there is somebody typing, and it stops
+		x = scripted([typed(N), typed(`${N.slice(0, 200)} MOTS`)]); r = wkB.eraseOwn(x.read, x.send, () => true, { pressMs: 1 })
+		u.eraseStopsOnWords = r.erased === false && /somebody started typing/.test(r.why) && x.keys.length === 1
+		x = scripted([typed("bonjour")]); r = wkB.eraseOwn(x.read, x.send, (t) => !!wkB.busText(t), { pressMs: 1 })
+		u.eraseRefusesOthers = r.erased === false && x.keys.length === 0
+		x = scripted([typed(N), typed(N), { ok: false, why: "a dialog" }]); r = wkB.eraseOwn(x.read, x.send, () => true, { pressMs: 1 })
+		u.eraseStopsOnADialog = r.erased === false && /went away/.test(r.why)
+	}
+	const bellOf = (k) => r112[k] || {}
+	let ebLost = null
+	const idleTx = join(rb, "idle.jsonl")
+	const exchange = async (k) => {
+		const ex = join(rb, `ex-${k}`)
+		mkdirSync(join(ex, "peer", "out"), { recursive: true }); mkdirSync(join(ex, "peer", "in"), { recursive: true })
+		writeFileSync(join(ex, "peer", "out", "LETTER.md"), "# a letter\n")
+		const at = new Date(Date.now() - 5000).toISOString()
+		writeFileSync(idleTx, [{ type: "user", timestamp: at, message: { role: "user", content: "x" } },
+			{ type: "assistant", timestamp: at, message: { role: "assistant", model: "claude-opus-5", stop_reason: "end_turn", content: [{ type: "text", text: "x" }] } },
+			{ type: "system", subtype: "stop_hook_summary", timestamp: at }, { type: "system", subtype: "turn_duration", timestamp: at }].map((r) => JSON.stringify(r)).join("\n") + "\n")
+		const r = await ebB.bell(["--exchange", ex, "--peer", "peer", "--ref", join(ex, "peer", "out", "LETTER.md"), "--project", rb, "--agent", k],
+			{ who: () => ({ agents: { [k]: { pids: [W.P[k].pid] } } }), lookup: () => ({ ok: true, transcript: idleTx }) })
+		return { ...r, recorded: existsSync(join(ex, "peer", ".last-bell.json")) }
+	}
+	if (W.up) ebLost = await exchange("ebLost")
+	const ok112 = W.up && L.up ? {
+		mailWaits: Object.values(W.P).every((p) => !p.mailFailed) && Object.values(L.P).every((p) => !p.mailFailed),
+		nominal: bellOf("nominal").sent === true && W.keys("nominal") === `${N}\r` && W.rows("nominal").length === 1 && bellsIn(W.rows("nominal")[0]) === 1 && W.quiet("nominal") && ringRow("nominal").rang === true && Number.isFinite(ringRow("nominal").shownMs),
+		// the box draws it 400 ms late and loses an Enter read before: the ONE Enter must come after it
+		enterWaitsForTheBox: bellOf("late").sent === true && W.keys("late") === `${N}\r` && W.rows("late").length === 1 && ringRow("late").shownMs >= 300 && !bellOf("late").enterAgain,
+		lost1: bellOf("lost1").sent === true && bellOf("lost1").enterAgain === true && W.keys("lost1") === `${N}\r\r` && W.rows("lost1").length === 1 && W.quiet("lost1"),
+		// a hook's ring never erases: it says the text stays, and the ring that keeps looking does it, then gives up and tells
+		hookLeavesIt: !!hookLost && hookLost.sent === false && hookLost.stays === true && L.keys("lostAll").startsWith(`${N}\r\r`),
+		watcherErases: /\x15/.test(L.keys("lostAll")) && L.rows("lostAll").length === 0 && L.screen("lostAll").ok === true && L.pending("lostAll") === 1,
+		watcherGivesUpAndTells: /gave up: its Enter/.test((L.rings("lostAll").find((x) => x.ended) || {}).ended || "") && (() => { try { return /Entrée ne prend pas/.test(readFileSync(L.told, "utf8")) } catch { return false } })(),
+		typedAfter: bellOf("typedAfter").sent === false && bellOf("typedAfter").mixed === true && W.keys("typedAfter") === `${N}\r` && /hello/.test(W.screen("typedAfter").text || "") && W.pending("typedAfter") === 1 && ringRow("typedAfter").mixed === true,
+		exchangeLost: !!ebLost && ebLost.code === 3 && !ebLost.recorded && /erased/.test(ebLost.out) && /cross-project/.test(W.keys("ebLost")) && /\r\r\x15/.test(W.keys("ebLost")) && W.screen("ebLost").ok === true,
+		...u,
+	} : {}
+	check("A112 the bus's text leaves the box: the Enter waits for it to be drawn, a lost one is pressed again, and text that will not go is erased with the mail kept",
+		W.up && L.up && Object.values(ok112).every(Boolean),
+		`${bB ? "" : "THE ARM COULD NOT RUN: no kitty bench for this suite; "}` + Object.entries(ok112).map(([k, v]) => `${k}=${v}`).join("; ") +
+		(W.up ? ["nominal", "late", "lost1", "typedAfter"].map((k) => `; ${k}: ${JSON.stringify(W.keys(k).replaceAll(N, "<bell>")).slice(0, 40)} (${(bellOf(k).why || "rung").slice(0, 60)}), rows ${W.rows(k).length}`).join("") + `; ebLost: exit ${ebLost && ebLost.code}` : "") +
+		(L.up ? `; lostAll: ${JSON.stringify(L.keys("lostAll").replaceAll(N, "<bell>")).slice(0, 60)}, ended ${JSON.stringify((L.rings("lostAll").find((x) => x.ended) || {}).ended || null)}, hook said ${hookLost && hookLost.why}` : ""))
+
+	// A113 — EVERY PATH KNOWS THE BUS'S OWN TEXT, AND ONE CHARACTER OF ANYBODY ELSE'S MAKES IT NOT THE BUS'S. The table first: the
+	// exchange bell's sentence read from the tool itself, so the recogniser and the sentence cannot drift. Then real panes.
+	const exPrint = join(rb, "ex-print")
+	mkdirSync(join(exPrint, "peer", "out"), { recursive: true }); mkdirSync(join(exPrint, "peer", "in"), { recursive: true })
+	writeFileSync(join(exPrint, "peer", "out", "L.md"), "# a letter\n")
+	const crossText = ((await ebB.bell(["--exchange", exPrint, "--peer", "peer", "--ref", join(exPrint, "peer", "out", "L.md"), "--project", rb, "--agent", "x", "--print-text"], {})).out || "").trim()
+	const bt = (t) => wkB.busText(t)
+	const table = {
+		oneBell: JSON.stringify(bt(N)) === '{"bells":1,"cut":false}',
+		wrapped: JSON.stringify(bt(`${N.slice(0, 100)}\n   ${N.slice(100)}`)) === '{"bells":1,"cut":false}',
+		twoBells: JSON.stringify(bt(N + N)) === '{"bells":2,"cut":false}',
+		mixedBells: JSON.stringify(bt(N + F + N)) === '{"bells":3,"cut":false}',
+		crossBell: /cross-project/.test(crossText) && JSON.stringify(bt(crossText)) === '{"bells":1,"cut":false}',
+		crossAndBell: JSON.stringify(bt(N + crossText)) === '{"bells":2,"cut":false}',
+		cutTail: JSON.stringify(bt(N.slice(0, 80))) === '{"bells":0,"cut":true}',
+		cutHead: JSON.stringify(bt(N.slice(-80))) === '{"bells":0,"cut":true}',
+		wholeThenCut: JSON.stringify(bt(N + N.slice(0, 80))) === '{"bells":1,"cut":true}',
+		cutThenWhole: JSON.stringify(bt(N.slice(-80) + N)) === '{"bells":1,"cut":true}',
+		wordsAfter: bt(`${N} et puis`) === null,
+		wordsBefore: bt(`et puis ${N}`) === null,
+		wordsBetween: bt(`${N} et puis ${N}`) === null,
+		tooShortToProve: bt(N.slice(0, 20)) === null && bt(N.slice(-20)) === null,
+		middlePiece: bt(N.slice(60, 160)) === null,
+		aPerson: bt("bonjour") === null && bt("") === null && bt(undefined) === null && bt("[claude-comm] doorbell") === null,
+		crossWithWords: bt(`${crossText} merci`) === null,
+		tailCutThenWhole: JSON.stringify(bt(N.slice(0, 80) + N)) === '{"bells":1,"cut":true}',
+		twoPieces: JSON.stringify(bt(N.slice(-80) + N.slice(0, 80))) === '{"bells":0,"cut":true}',
+		crossCut: JSON.stringify(bt(crossText.slice(0, 60))) === '{"bells":0,"cut":true}',
+		crossCutInItsPath: JSON.stringify(bt(crossText.slice(0, 120))) === '{"bells":0,"cut":true}',
+		crossCutLate: JSON.stringify(bt(crossText.slice(0, -10))) === '{"bells":0,"cut":true}',
+		crossCutWithWords: bt(`${crossText.slice(0, 60)} merci !`) === null,
+		pieceThenWords: bt(`${N.slice(0, 80)} merci`) === null,
+	}
+	const r113 = {}
+	if (W.up) for (const k of ["two", "one", "three", "words", "twoPlus", "leader"]) r113[k] = W.ring(k)
+	// the hook leaves what it cannot finish; the ring that keeps looking erases it and types one clean bell
+	if (L.up) {
+		r113.cut = L.ring("cut")
+		r113.twoLost = L.ring("twoLost")
+		for (const until = Date.now() + 12000; Date.now() < until && !(L.rows("cut").length && L.rows("twoLost").length); nap(100)) {}
+	}
+	let ebTwo = null, ebWords = null
+	if (W.up) { ebTwo = await exchange("ebTwo"); ebWords = await exchange("ebWords") }
+	const armed113 = W.up && L.up && ["two", "one", "three", "twoPlus", "leader", "ebTwo", "ebWords", "words"].every((k) => W.P[k].id)
+	const rr = (k) => r113[k] || {}
+	const enterOnly = (k, bells) => rr(k).sent === true && rr(k).resubmitted === true && W.keys(k) === "\r" && W.rows(k).length === 1 && bellsIn(W.rows(k)[0]) === bells
+	const refusedUntouched = (k) => rr(k).sent === false && rr(k).notAtRest === true && W.keys(k) === "" && !W.quiet(k) && W.screen(k).typed === true
+	const ok113p = armed113 ? {
+		two: enterOnly("two", 2), one: enterOnly("one", 1), three: enterOnly("three", 3),
+		leaderAsATimerRingsIt: enterOnly("leader", 2),
+		cutHookLeavesIt: rr("cut").sent === false && rr("cut").stays === true,
+		cutErasedThenOneBell: /^\x15+\[claude-comm\] doorbell/.test(L.keys("cut")) && L.keys("cut").endsWith(`${N}\r`) && L.rows("cut").length === 1 && L.rows("cut")[0] === N,
+		// Enter-only lost, erased, one clean bell: nobody receives two bells and the box does not stay
+		enterOnlyLostThenClean: rr("twoLost").sent === false && rr("twoLost").stays === true && /^\r\r\x15+\[claude-comm\] doorbell/.test(L.keys("twoLost")) && L.rows("twoLost").length === 1 && L.rows("twoLost")[0] === N,
+		wordsUntouched: refusedUntouched("words"),
+		twoPlusUntouched: refusedUntouched("twoPlus"),
+		exchangeClears: !!ebTwo && ebTwo.code === 0 && ebTwo.recorded && /^\x15+\[claude-comm\] cross-project/.test(W.keys("ebTwo")) && W.rows("ebTwo").length === 1 && /cross-project/.test(W.rows("ebTwo")[0]) && !bellsIn(W.rows("ebTwo")[0]),
+		exchangeRefusesWords: !!ebWords && ebWords.code === 3 && W.keys("ebWords") === "",
+	} : {}
+	check("A113 every path knows the bus's own text in a box, however many and however cut - one character of anybody else's and nothing is touched",
+		armed113 && Object.values(table).every(Boolean) && Object.values(ok113p).every(Boolean),
+		`${bB ? "" : "THE ARM COULD NOT RUN: no kitty bench for this suite; "}table: ` + Object.entries(table).filter(([, v]) => !v).map(([k]) => k).join(",") + ` (${Object.values(table).filter(Boolean).length}/${Object.keys(table).length} hold); ` + Object.entries(ok113p).map(([k, v]) => `${k}=${v}`).join("; ") +
+		(L.up ? ["cut", "twoLost"].map((k) => `; ${k}: ${JSON.stringify(L.keys(k).replaceAll(N, "<bell>")).slice(0, 44)} (${(rr(k).why || "rung").slice(0, 50)})`).join("") : "") +
+		(W.up ? ["two", "words", "twoPlus", "leader"].map((k) => `; ${k}: ${JSON.stringify(W.keys(k).replaceAll(N, "<bell>")).slice(0, 44)} (${(rr(k).why || "rung").slice(0, 50)})`).join("") + `; ebTwo: exit ${ebTwo && ebTwo.code}, ${JSON.stringify(W.keys("ebTwo")).slice(0, 44)}; ebWords: exit ${ebWords && ebWords.code}` : ""))
+
+	// A114 — A REFUSED RING KEEPS LOOKING, AND A REFUSAL THAT LASTS LEAVES THE WINDOW. Nobody else looks when everyone is asleep. `held`:
+	// a person's draft, then the box emptied: rung by the watcher, told once, and never what was in the box. `taken`: the
+	// mail is taken while it waits: it ends, having typed nothing. One watcher per agent, however many rings are refused.
+	const H = project(rc, { held: { line: "bonjour je voul" }, taken: { line: "bonjour je voul" }, keyboard: {} }, { retryMs: 250, notifyAfterMs: 700, maxMs: 30000 })
+	const readTold = () => { try { return readFileSync(H.told, "utf8") } catch { return "" } }
+	const r114 = { }
+	const rmw = mkdtempSync(join(tmpdir(), "comm-attack-boxmax-")), rww = mkdtempSync(join(tmpdir(), "comm-attack-boxwho-"))
+	atExit(() => { for (const d of [rmw, rww]) try { rmSync(d, { recursive: true, force: true }) } catch {} })
+	const M = project(rmw, { limit: { line: "bonjour je voul" } }, { retryMs: 200, notifyAfterMs: 3600_000, maxMs: 1200 })
+	const Wh = project(rww, { slow: { line: "bonjour je voul" } }, { retryMs: 250, notifyAfterMs: 3600_000, maxMs: 30000 })
+	if (H.up) {
+		r114.first = H.ring("held")
+		r114.second = H.ring("held")
+		r114.takenFirst = H.ring("taken")
+		// another typist has this window's keyboard when the ring comes: it types nothing, and somebody still looks after it
+		const stH = readFileSync("/proc/self/stat", "utf8"), heldFile = join(process.env.CLAUDE_COMM_RUNTIME, "claude-comm", "typing", `${basename(bB.sock)}-${H.P.keyboard.id}.json`)
+		mkdirSync(dirname(heldFile), { recursive: true })
+		writeFileSync(heldFile, JSON.stringify({ pid: process.pid, tick: stH.slice(stH.lastIndexOf(") ") + 2).split(" ")[19], at: Date.now(), what: "the arm's typist" }))
+		r114.kbRefused = H.ring("keyboard")
+		r114.kbKeys = H.keys("keyboard")
+		rmSync(heldFile, { force: true })
+		for (const until = Date.now() + 10000; Date.now() < until && !/\/ held :/.test(readTold()); nap(100)) {}
+		nap(800)    // long enough for several more looks: told means ONCE
+		r114.toldOnce = readTold().split("\n").filter((l) => l.includes("/ held :")).length
+		r114.keysBefore = H.keys("held")
+		for (const f of readdirSync(join(rc, ".comm", "inbox", "taken"))) rmSync(join(rc, ".comm", "inbox", "taken", f), { force: true })
+		spawnSync("kitten", ["@", "--to", `unix:${bB.sock}`, "send-text", "--match", `id:${H.P.held.id}`, "\x15"], { timeout: 5000 })
+		for (const until = Date.now() + 10000; Date.now() < until && !(H.rows("held").length && H.rings("held").some((x) => x.ended) && H.rings("taken").some((x) => x.ended) && H.rows("keyboard").length); nap(100)) {}
+	}
+	if (M.up) {
+		r114.limit = M.ring("limit")
+		for (const until = Date.now() + 8000; Date.now() < until && !M.rings("limit").some((x) => x.ended); nap(100)) {}
+	}
+	if (Wh.up) {
+		// the bus does not answer for a few looks (a loaded machine): that ends nothing
+		r114.slowFirst = Wh.ring("slow")
+		for (const until = Date.now() + 6000; Date.now() < until && !Wh.rings("slow").some((x) => x.blocked === true); nap(50)) {}
+		const busW = join(rww, ".comm", "bin", "comm.mjs"), kept = readFileSync(busW)
+		writeFileSync(busW, "process.exit(1)\n")
+		nap(900)
+		writeFileSync(busW, kept)
+		spawnSync("kitten", ["@", "--to", `unix:${bB.sock}`, "send-text", "--match", `id:${Wh.P.slow.id}`, "\x15"], { timeout: 5000 })
+		for (const until = Date.now() + 8000; Date.now() < until && !Wh.rings("slow").some((x) => x.ended); nap(100)) {}
+	}
+	const blocks = (k) => H.rings(k).filter((x) => x.blocked === true).length
+	const endOf = (k) => (H.rings(k).find((x) => x.ended) || {})
+	const ok114 = H.up ? {
+		refused: r114.first && r114.first.notAtRest === true && r114.second && r114.second.notAtRest === true,
+		toldOnce: r114.toldOnce === 1,
+		notWhatIsInTheBox: readTold().length > 0 && !/bonjour/.test(readTold()),
+		nothingTypedWhileHeld: r114.keysBefore === "",
+		oneWatcher: blocks("held") === 1,
+		rungWhenFreed: H.rows("held").length === 1 && bellsIn(H.rows("held")[0]) === 1 && endOf("held").ended === "rung" && endOf("held").told === true,
+		mailTakenEnds: endOf("taken").ended === "the mail was taken" && H.keys("taken") === "",
+		recorded: (() => { try { return readFileSync(join(rc, ".comm", "wake", "notified.jsonl"), "utf8").includes('"answered":0') } catch { return false } })(),
+		keyboardHeldTypesNothing: !!r114.kbRefused && r114.kbRefused.ringing === true && r114.kbKeys === "",
+		keyboardHeldIsLookedAfter: H.rows("keyboard").length === 1 && bellsIn(H.rows("keyboard")[0]) === 1,
+		givesUpAndTells: M.up && /gave up after/.test((M.rings("limit").find((x) => x.ended) || {}).ended || "") && (() => { try { return /s'arrête/.test(readFileSync(M.told, "utf8")) } catch { return false } })(),
+		aSlowBusEndsNothing: Wh.up && (Wh.rings("slow").find((x) => x.ended) || {}).ended === "rung" && Wh.rows("slow").length === 1,
+		retryHasAFloor: wkB.boxRules({ box: { retryMs: 0 } }).retryMs >= 50 && wkB.boxRules({}).retryMs === 60_000 && wkB.boxRules({ box: { retryMs: -5 } }).retryMs === 60_000,
+	} : {}
+	check("A114 a refused ring keeps looking and rings when the box is free; a refusal that lasts tells the owner once, never what is in the box",
+		H.up && Object.values(ok114).every(Boolean),
+		`${bB ? "" : "THE ARM COULD NOT RUN: no kitty bench for this suite; "}` + Object.entries(ok114).map(([k, v]) => `${k}=${v}`).join("; ") + `; told: ${JSON.stringify(readTold().slice(0, 200))}; held ended: ${JSON.stringify(endOf("held"))}; taken ended: ${JSON.stringify(endOf("taken"))}`)
+
+	// A115 — A BOX AT REST IS AT REST UNDER THE AGENTS' FOOTER, AND A BACKGROUND TASK IS NOBODY TYPING. Work's letter 36, off a
+	// real screen: `● main` and a `◯` per sub-agent under the two status lines, and an expert with designers at work could be
+	// neither relayed nor rung. Only that exact run at the very end; the same number of other lines stays a refusal.
+	const R = "─".repeat(60), STATUS_LINES = ["  7d 48 %", "  ⏵⏵ auto mode on · 21 shells · ← 2 agents"]
+	const AG = ["  ◯ general-purpose  Contrôle du CSS dans index.html      1h 19m 23s · ↓ 308.0k tokens", "  ◯ general-purpose  Examen de la planche bureau      44m 10s · ↓ 244.7k tokens", "  ◯ general-purpose  Surveillance de t3-index.txt      56m 44s · ↓ 258.9k tokens", "  ◯ general-purpose  Attente de la capture z-5.9.jpg      52m 21s · ↓ 285.4k tokens"]
+	const scr = (line, below) => ["", R, `❯ ${line}`, R, ...below].join("\n")
+	const footer = ["", "  ● main", ...AG]
+	const pr = wkB.promptAtRest
+	const ok115 = {
+		theFieldsScreen: pr(scr("", [...STATUS_LINES, ...footer])).ok === true,
+		twentyAgents: pr(scr("", [...STATUS_LINES, "", "  ● main", ...Array(20).fill(AG[0])])).ok === true,
+		// past five, off a real session (2.1.319, test/box-real.mjs s7): one status line, no blank... the overflow line closes it
+		overflowLine: pr(scr("", ["  ⏵⏵ auto mode on (shift+tab to cycle) · ← 2 agents · ↓ to manage", "", "  ● main", ...AG, AG[0], "  ↓ 2 more"])).ok === true,
+		moreIsNotAFreePass: pr(scr("", [...STATUS_LINES, "", "  1. Yes", "  2. No", "  3. Maybe", "  4. Later", "  ↓ 2 more"])).ok === false,
+		noFooterStillAtRest: pr(scr("", STATUS_LINES)).ok === true,
+		typedStaysTyped: pr(scr("bonjour", [...STATUS_LINES, ...footer])).typed === true,
+		bellStaysBell: wkB.busText(pr(scr(N, [...STATUS_LINES, ...footer])).text) !== null,
+		sameCountOtherLines: pr(scr("", [...STATUS_LINES, "", "  1. Yes", "  2. No", "  3. Maybe", "  4. Later", "  5. Never", "  6. Ask"])).ok === false,
+		agentsWithoutMain: pr(scr("", [...STATUS_LINES, "", ...AG, ...AG])).ok === false,
+		anotherAgentInFocus: pr(scr("", [...STATUS_LINES, "", "  ● general-purpose", ...AG, ...AG])).ok === false,
+		footerNotAtTheEnd: pr(scr("", [...STATUS_LINES, ...footer, "  1. Yes", "  2. No", "  3. Maybe", "  4. Later"])).ok === false,
+		noBlankBeforeMain: pr(scr("", [...STATUS_LINES, "  x", "  y", "  ● main", ...AG])).ok === false,
+		// who has the owner's focus: the field a relay reads before a /clear after a wait. Live, unarmed: a bench may not take his focus.
+		focusField: wkB.windowHasFocus([{ tabs: [{ windows: [{ id: 3, is_focused: true }, { id: 4, is_focused: false }] }] }], 3) === true && wkB.windowHasFocus([{ tabs: [{ windows: [{ id: 3, is_focused: true }, { id: 4, is_focused: false }] }] }], 4) === false && wkB.windowHasFocus([], 3) === false,
+	}
+	const queued = (prompt) => wkB.sinceArming([{ type: "attachment", attachment: { type: "queued_command", prompt } }])
+	const wording = {
+		taskIsNotAPerson: /background task/.test(queued("<task-notification>\n<task-id>x</task-id>").cancel || "") && !/somebody typed/.test(queued("<task-notification>x").cancel || ""),
+		aPersonStaysAPerson: /somebody typed/.test(queued("fais le toi").cancel || ""),
+		stillCancels: !!queued("<task-notification>x").cancel,
+	}
+	check("A115 a box at rest under the agents' footer is at rest, only that exact footer - and a background task's notice is not called somebody typing",
+		Object.values(ok115).every(Boolean) && Object.values(wording).every(Boolean),
+		Object.entries({ ...ok115, ...wording }).map(([k, v]) => `${k}=${v}`).join("; "))
 }
 
 // A92 — EVERY COMMAND IS DOCUMENTED BY THE CODE ITSELF, AND --help DOES NOTHING ELSE. The owner, 2026-10-24: "tu

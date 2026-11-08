@@ -4865,3 +4865,122 @@ field stub as binary. Never installed anywhere. A75 now refuses any control byte
 Attack: 79 checks green on the tree; nine mutations, each red on its own arm only. `boot --prove-red`: see the
 disposition commit — its close-amendment arm went red on the tree with every printed clause true (it tested an exit
 it did not print); re-run with the exit printed.
+
+## `#left-in-the-box` — the bus's own text stayed in a leader's box, and every path took it for a person's (2026-11-08)
+
+**The field case** (work's letters 40 and 41, re-measured here in its logs). Its leader slept from 04:07 to 13:04 local, an
+expert waited on its verdict from 05:30, and the team was not restarted at 05:00 as the owner had asked: *"C'était un message du
+bus de communication qui avait été écrit mais qui n'avait pas été envoyé [...] Il faut que ça affecte ni toi, ni un de tes
+agents à l'avenir. Sous aucune forme."*
+
+| when (Z, 11-08) | what | where it is written |
+| --- | --- | --- |
+| 01:43:06.932 and .938 | two senders' hooks ring the leader, 6 ms apart, both `rang: true` | `.comm/wake/rings.jsonl` |
+| 01:43:25 on | turns run on background-task notices; **no user row in that transcript ever carries a bell** | its transcript |
+| 02:56:28, 03:02:00 | two messages to an idle leader, and no ring recorded: refused, and a refusal was not recorded | `log.jsonl`, `rings.jsonl` |
+| 03:00, 03:07 | its relay refused: *the input holds more than one line of text*; the screen record shows a bell's last lines in the box | its transcript, a `cat` of the record |
+| 04:02 | its timer's ring refused: *a person typing, or a draft left there* | `journalctl` |
+| 12:04 | the owner clears the box and types: *"Pourquoi vous bossez pas ?"* | its transcript |
+
+**The cause, and what is measured of it.** Three defects in a row, each sufficient to make the next one matter:
+
+1. **Two typists.** The quiet period is a read of a record, then a write of it after typing: two processes both pass. Measured in
+   that field's history: 8 pairs of rings under a second apart, and **the only bells lost since 10-03 are two such pairs** (11-08
+   6 ms; 10-31 31 ms, an expert whose next ring came 11 h 38 later). 771 rings, 759 reached a transcript within 20 s.
+2. **An Enter nobody checked.** wake typed and pressed Enter blind. Two bells and their Enters read as one chunk are a paste
+   (`#enter-in-the-paste`), and nothing looked at the box afterwards.
+3. **A reader that knew one bell.** `isOwnBell` compared the box with ONE bell. Two read as somebody's words, on wake's path; the
+   relay had no such reader at all.
+
+**Measured on a real session before building** (Claude Code 2.1.319, Haiku, one minimized OS window, a throwaway folder under a
+trusted parent, `--strict-mcp-config` with no server and every plugin disabled in `--settings`: no Telegram child, `STATUS` 1b):
+
+| typed with `kitten @ send-text` | result |
+| --- | --- |
+| one bell, then `\r` in a second write, one process (the control) | 6/6 one row, one bell |
+| **two such processes 6 ms apart, idle machine** | **6/6 one row holding two bells, box empty: the race alone does NOT strand it** |
+| one bell and `\r` in one write | 6/6 stuck, `sameText(one bell)` true |
+| **two bells and `\r\r` in one write** | **6/6 stuck: one text of 626 characters, `sameText(one bell)` false: the field's refusal** |
+| then Ctrl+U until empty | 12/12 empty, no turn started; it clears a VISUAL line from the end, 626 -> 626 -> 600 -> 400 -> 198 -> empty |
+| then `\r` alone | 6/6 submitted, one row holding both |
+
+**So what is inferred, not measured:** that at 01:43:06Z the two bells and their Enters were read as one chunk. That is the only way
+these measurements produce the field's box, and the machine was loaded, but nothing recorded the reads, and I did not load the
+owner's machine to reproduce it. **What is measured** is the box that results, and every path's answer to it: `test/box-real.mjs` on
+the code before this fix gives word for word the field's three refusals.
+
+**The fix, in `wake.mjs` (rules 9 and 10), used by `relay.mjs` and `exchange-bell.mjs`:**
+
+- **`holdKeyboard`, one typist at a window**: everything from the screen read to the last key, machine-wide (a peer project's bell
+  rings the same window), in the user's runtime dir, published by link(2). A dead holder, a reused pid or a hold past any typist's
+  bound holds nothing. A ring that finds it held types nothing: the bell states one fact and the turn delivers everything. The
+  quiet check is asked again inside the hold, because it was read before it.
+- **`typeAndProve`**: no Enter while anybody else's characters are in the box; the Enter waits until the box draws the text; the box
+  is read after it; a lost Enter is pressed once more. **"It left" is said only of text the box was SEEN to hold**: otherwise the ring
+  is `unproved`, and the ring that keeps looking decides.
+- **`busText`**: the bus's words however many and however cut, in any order, the exchange bell's sentence included (a piece must be 40
+  characters to prove itself). **One character of anybody else's and it answers null**, and nothing is touched.
+- **`eraseOwn`**: Ctrl+U, and after every press what remains must be the start of what was there. Anything else is somebody typing.
+- **Who erases.** A hook's ring never does: 10 s could kill it half-way and leave a piece too short to recognise. It presses Enter on
+  whole bells and otherwise says the text stays. **`--until-rung`** is started before any ring's first key and by any refusal, one per
+  agent, so a killed hook leaves it behind. It erases, types one clean bell, and ends when the mail is taken, a turn runs or the ring
+  is proved (usually its first look, 15 s later). Past `box.notifyAfterMs` of refusals it tells the owner once (`notify` in the config,
+  else `notify-send`), and whenever it gives up (`box.maxMs`; the bus silent five looks; two bells erased because Enter is not taken).
+- **The relay** clears the bus's own text and goes on. A box a person or a dialog holds is waited for on the same rules. After a wait it
+  wants the box free twice in a row and a window without the owner's focus, re-runs its guards outside the hold, then looks once more
+  before the `/clear`. A turn taken meanwhile cancels it, and arming again replaces the waiting watcher. **Every refusal tells the owner**:
+  an idle session has no Stop hook left to read its record. What he is told never quotes the box. The `/clear` or the prompt that was
+  not taken does not stay in the box either.
+
+**Also in this release, from the same letters:** `promptAtRest` reads the agents' footer (`● main`, a `◯` per sub-agent, `↓ 2 more` past
+five: letter 36, an expert with more than two could be neither relayed nor rung; that also answers why its relay passed at two) - only
+that exact run, after a blank line, at the very end of the screen. A background task's notice cancelling a relay no longer reads
+"somebody typed". **The real session corrected my fake**: `↓ 2 more` came from `test/box-real.mjs` s7, nothing had drawn it.
+
+**The first version of this fix was wrong in the worst way, and a reviewer found it.** An adversarial read of it (Opus, read only, the code
+and the owner's words and no conclusion of mine) found 13 defects, four of them high. Each measured before it was changed:
+keystrokes landing before the bell were submitted WITH it (`taken: true`), against the rule the fix was written to keep; "the box is
+empty" counted as "it left" for a text never seen and for an unreadable screen, which is the field's "recorded as rung, not taken" all
+over again; a hook killed at 10 s left the text and nobody looking; guards ran under the hold with no look after them, so a person
+typing during a guard got `hello/clear`. Also: a re-arming told "already armed" by a watcher about to cancel; `/clear` on a person who has
+just emptied a draft; a watcher ended for good by one slow answer; typing into a dead Enter for 12 h. All fixed here and armed, except
+what is named below. *Attack the recent fix* again: my replay was green on that version.
+
+**The arms.** A111 one typist (a real burst of 6; the holder's staleness cases; a ring that finds it held; one that lands between the two
+reads; the exchange bell waiting its turn). A112 the text leaves the box (nominal, drawn late, one Enter lost, all lost, words before and
+after the Enter, never seen, unreadable, an erase that meets words). A113, A113a every path knows it (a table of 24, real panes, a timer's
+ring on the leader, the exchange bell, the relay; `/clear` and the prompt not left behind). A114, A114a a refusal leaves the window (told once,
+never the box's words, a held keyboard looked after, giving up told, a slow bus; the relay's wait, each way out of it, re-arming). A115 the
+footer and the wording. `A98` and `A95` now draw a box that takes its keys.
+
+**`test/box-real.mjs`, the same replay on a real session, reported and not gated** (Claude Code 2.1.319, Haiku, about 3 min):
+
+| scenario, real session | the code before (`--repo` main, c137edf) | this code |
+| --- | --- | --- |
+| s1 two bells left, then a ring | ✗ *a person typing, or a draft left there*: **the field's 04:02Z, word for word** | ✓ Enter only, box empty, one row |
+| s2 a person's words, then the box emptied | words intact, no bell, nobody rings it after | ✓ words intact, no bell, rung by the ring that kept looking |
+| s3 a cut bell | ✗ the same refusal | ✓ the hook leaves it, then erased, one whole bell |
+| s4 two rings 6 ms apart | ✗ 2 sent, two bells in one row | ✓ 1 sent, 1 bell; the other: *a bell for leader is typing* |
+| s5 a relay with two bells in its box | ✗ *the input holds more than one line of text*: **the field's 03:00Z, word for word** | ✓ relayed, 4 presses |
+| s6 a relay with a person's words | ✗ refused at once, silent | ✓ waited, told, relayed once emptied; his words not in what he is told |
+| s7 7 sub-agents' footer | (not run on it) | ✓ read at rest, rung; the runtime says `busy` meanwhile |
+| s8 the same box on an EXPERT | (not run on it) | ✓ Enter only, box empty |
+
+Run on the code before: 0 of 6. **So the replay reddens for the field's defect, and the fix greens it**, on the real thing.
+
+**Named, not fixed:**
+- **That at 01:43:06Z the Enters were read as one chunk is inferred** (above).
+- **A key landing in the gap between a read and the next key** is the one thing this cannot exclude without an input lock the terminal does
+  not offer: a person's character between the box read and the Enter goes with the bell, and between a read and a Ctrl+U it is erased. Milliseconds on an idle
+  machine; a screen read's latency on a loaded one. `eraseOwn`'s prefix test only sees what landed before its read.
+- **A person who pastes exactly a bell and nothing else** gets it submitted, by the same recognition. A bell states a fact.
+- **The owner's notification is a desktop one.** `notify-send`'s exit says it ran, not that he read it, and asleep he reads it on waking: the
+  `notify` config takes a project's own command (a phone, say). `PushNotification` is a model's tool, out of a process's reach.
+- **The stale-lock break can remove a rival's fresh lock**: two holders, needing a burst AND a killed hook's leftover file. Its result is two bells, which every path now clears. Unarmed.
+- **A relay's focus test is armed as a function only**: a bench may not take the owner's focus, so `is_focused` true was never met live. Read off
+  this repo's own window as `false` while he was elsewhere, `true` not observed.
+- **A session whose Enter never goes** is typed into again by later hooks' rings after its watcher gave up: at most one bell per hook, told each time. Never measured to exist: a lone Enter has been taken every time.
+- **An exchange bell refused** tells its sender (exit 3) and nobody else, with no retry: boot's `channel:` row is what sees the letter. `left for the ring that keeps looking` (the 6 s budget) is unarmed.
+- **The cost of the watcher**: a node process for one look per ring, 15 s. **Not measured** on a busy field; its letter asks work to say if it shows.
+- **Other fields' ring history**: my lost-bell count works on work only; on the others its directory mapping finds no transcripts, and that says nothing about them.
+- **Native path** (`#native-path`, a runtime socket per session): would type nothing at all, so this whole class would end. Its protocol is undocumented, and a process is not a session: **not tried**. The next thing to measure on this subject.

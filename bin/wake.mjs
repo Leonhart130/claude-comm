@@ -7,9 +7,13 @@
  *   node bin/wake.mjs --root <p> --dry-run    resolve and rate-limit, send nothing
  *   node bin/wake.mjs --root <p> --agent <a>  that agent only - the line `send` prints as "ring now"
  *   node bin/wake.mjs --root <p> --json       the same answer as JSON (what close.mjs reads)
+ *   node bin/wake.mjs --root <p> --agent <a> --until-rung   look again every minute until it can be rung (a refused ring starts this)
  *
  *   .comm/config.json  "freshRestart": ["scribe", "web"]   agents that may be restarted fresh before a ring (rule 7)
+ *   .comm/config.json  "box": {"retryMs": 60000, "notifyAfterMs": 300000, "maxMs": 43200000}   how a blocked box is retried (rule 10)
+ *   .comm/config.json  "notify": ["<cmd>", "<arg>"]   what tells the owner, the line appended; default notify-send (rule 10)
  *   .comm/wake/rings.jsonl                            every ring, append-only, whoever called - hooks included
+ *   .comm/wake/notified.jsonl                         every time the owner was told, and what the command answered
  *
  * WHY THIS EXISTS. Measured over 26 real field deliveries: leader→expert median 1462 s,
  * expert→leader 586 s. The asymmetry is structural, because mail lands at the recipient's
@@ -63,11 +67,27 @@
  *    be on it, at rest and empty (`promptAtRest`, the relay's own reader), or nothing is typed and
  *    nothing recorded. A box holding only an earlier bell whose Enter was lost gets the Enter alone.
  *    `FINDINGS.md#bell-into-typing`, A98.
+ *
+ * 9. **ONE TYPIST AT A WINDOW, AND THE BUS'S TEXT NEVER STAYS IN A BOX.** Two rings 6 ms apart both passed the quiet
+ *    check, which is a read and then a write, and a leader's box held two bells for ten hours (a field, 11-08). The whole
+ *    of read-then-type is now inside `holdKeyboard`, machine-wide, because another project's bell rings the same window.
+ *    `typeAndProve`: no Enter while anybody else's characters are in the box, the Enter waits until the box draws the text,
+ *    the box is read again after it, and a lost Enter is pressed once more. What still will not go is ERASED by the ring that
+ *    keeps looking (rule 10, a process no hook's 10 s can kill mid-way), and logged - the mail stays in the inbox. "It left the
+ *    box" is claimed only of text the box was SEEN to hold. `busText` knows the bus's words however many, however cut; ONE
+ *    character of anybody else's and it answers null, and nothing is touched. `FINDINGS.md#left-in-the-box`, A111, A112, A113.
+ *
+ * 10. **A REFUSAL THAT LASTS LEAVES THE WINDOW.** A person's draft, a dialog: rule 8 still refuses, and a refusal was
+ *    silent, so an idle session with mail stayed asleep until somebody looked. Any ring about to type, or refused, starts one
+ *    detached `--until-rung` per agent: a hook killed at 10 s leaves it behind. It looks again, ends as soon as the mail is
+ *    taken or a turn runs (the usual case: one look, 15 s later), and past `notifyAfterMs` of refusals it tells the owner,
+ *    once. `FINDINGS.md#left-in-the-box`, A114.
  */
-import { readFileSync, writeFileSync, appendFileSync, renameSync, readdirSync, mkdirSync, existsSync, statSync, openSync, readSync, closeSync, readlinkSync } from "node:fs"
-import { join, dirname } from "node:path"
+import { readFileSync, writeFileSync, appendFileSync, renameSync, readdirSync, mkdirSync, existsSync, statSync, openSync, readSync, closeSync, readlinkSync, linkSync, unlinkSync } from "node:fs"
+import { join, dirname, basename } from "node:path"
+import { tmpdir } from "node:os"
 import { fileURLToPath } from "node:url"
-import { spawnSync } from "node:child_process"
+import { spawnSync, spawn } from "node:child_process"
 
 const ARGV = process.argv.slice(2)
 const has = (f) => ARGV.includes(f)
@@ -470,7 +490,9 @@ export function sinceArming(rows, verdict = rowVerdict) {
 	for (const r of rows) {
 		if (!r || r.isSidechain) continue
 		if (r.type === "system" && r.subtype === "turn_duration") { if (ended) return { cancel: "a second turn ran after the one that asked" }; ended = true; continue }
-		if (r.type === "attachment" && r.attachment?.type === "queued_command") return { cancel: "somebody typed into the session while its last turn ran" }
+		// A background task's notice arrives the same way and is nobody typing (a field's leader, 11-08 12:06Z: told so while
+		// it was alone). It resumes the turn, so the relay is still cancelled: only the reason was wrong. A115
+		if (r.type === "attachment" && r.attachment?.type === "queued_command") return { cancel: /^\s*<task-notification>/.test(String(r.attachment.prompt || "")) ? "a background task ended during the last turn and its notice resumed it" : "somebody typed into the session while its last turn ran" }
 		const v = verdict(r)
 		if (!v) continue
 		const c = r.message?.content, tool = Array.isArray(c) && c.some((x) => x.type === "tool_result")
@@ -553,7 +575,18 @@ export function promptAtRest(screen) {
 	let bottom = -1
 	for (let j = top + 1; j < lines.length; j++) if (isRule(lines[j])) { bottom = j; break }
 	if (bottom < 0) return { ok: false, why: "the input box has no lower edge on screen" }
-	if (lines.length - 1 - bottom > 6) return { ok: false, why: `the input box is not at the bottom of the screen (${lines.length - 1 - bottom} lines below it): something is drawn under it` }
+	// THE AGENTS' FOOTER IS NOT A DIALOG. Sub-agents running or just returned draw, under the two status lines, a blank, `● main`
+	// and one `◯ <type>  <what>` each (a field's expert, 11-06, read off its screen), `↓ 2 more` past five (a real session, 2.1.319,
+	// test/box-real.mjs s7): with 3 or more the count below passed 6 and an expert with designers at work could be neither relayed
+	// nor rung. Only that exact run, at the very end. A115
+	let below = lines.length - 1 - bottom, k = lines.length
+	while (k - 1 > bottom && /^\s*(◯\s+\S|[↑↓]\s+\d+\s+more\s*$)/.test(plain(lines[k - 1]))) k--
+	if (k < lines.length && k - 2 > bottom && /^\s*●\s+main\s*$/.test(plain(lines[k - 1])) && !plain(lines[k - 2]).trim()) {
+		k--
+		while (k - 1 > bottom && !plain(lines[k - 1]).trim()) k--
+		below = k - 1 - bottom
+	}
+	if (below > 6) return { ok: false, why: `the input box is not at the bottom of the screen (${below} lines below it): something is drawn under it` }
 	const rest = lines[top].replace(/^(\x1b\[[0-9;:]*m)*❯[  ]?/, "")
 	// `typed` + `text`, every line of the box: wake must tell its OWN unsent bell from a person's words (rule 8)
 	const text = [rest, ...lines.slice(top + 1, bottom)].map((l) => plain(l).trim()).filter(Boolean).join(" ")
@@ -575,7 +608,215 @@ export function screenAtRest(win) {
 const squash = (s) => String(s).replace(/\s+/g, "")
 /** Is the box's text (promptAtRest's `text`, every line joined) exactly `want`, however Claude Code wrapped it? relay.mjs's too. */
 export const sameText = (text, want) => typeof text === "string" && squash(text) === squash(want)
-const isOwnBell = (text) => sameText(text, NUDGE) || sameText(text, FRESH_NUDGE)
+
+// ── THE BUS'S OWN WORDS IN A BOX ──────────────────────────────────────────────────────────────────────────
+// `sameText` on ONE bell answered "somebody's words" for two: a field's leader, 11-08, 01:43:06Z, two rings 6 ms apart, both
+// recorded as rung, neither Enter taken. wake then refused it at 04:02Z as "a person typing", relay.mjs at 03:00Z, and the
+// box stayed so until the owner came back at 12:04Z. Measured on a real session (2.1.319): that box reads one 626-character
+// text, sameText(one bell) false (6/6). A cut piece must be long enough to prove itself: nobody types 40 characters of it.
+const CUT_MIN = 40
+const BELLS = [NUDGE, FRESH_NUDGE].map(squash)
+// exchange-bell.mjs's sentence, its three fixed parts; between them, the two paths A35 checks there
+const CROSS = ["[claude-comm]cross-projectdoorbell.Afileiswaitingforyouandthefileistheartifact—thisisonlythebell:",
+	"—nothinginthismessageiscomputedorcurrentexceptthatpath,soreadthefile.Replyasafilein", "(thischannelisafileexchange,notabus)."]
+const PATHLIKE = /^[\w./~@+-]*/
+const crossWhole = (x) => {
+	let n = 0
+	for (let i = 0; i < CROSS.length; i++) {
+		if (!x.startsWith(CROSS[i], n)) return 0
+		n += CROSS[i].length
+		if (i < CROSS.length - 1) n += PATHLIKE.exec(x.slice(n))[0].length
+	}
+	return n
+}
+/** Is ALL of `x` the start of the exchange bell's sentence, cut anywhere? */
+const crossCut = (x) => {
+	let rest = x
+	for (let i = 0; i < CROSS.length; i++) {
+		if (CROSS[i].startsWith(rest)) return true
+		if (!rest.startsWith(CROSS[i])) return false
+		rest = rest.slice(CROSS[i].length)
+		if (i < CROSS.length - 1) rest = rest.slice(PATHLIKE.exec(rest)[0].length)
+		if (!rest) return true
+	}
+	return !rest
+}
+/**
+ * Is ALL of the box's text the bus's? { bells: whole ones, cut: pieces among them } - or null, as soon as one character is
+ * anybody else's. Whitespace-blind (Claude Code wraps), and a text a person typed around a bell is null: rule 8 stands.
+ * A person who pastes a WHOLE bell and nothing else gets the same answer, and a bell states a fact: said, not guarded.
+ */
+export function busText(text) {
+	if (typeof text !== "string") return null
+	let s = squash(text), bells = 0, cut = false
+	if (!s) return null
+	while (s) {
+		const b = BELLS.find((t) => s.startsWith(t)), n = b ? b.length : crossWhole(s)
+		if (n) { s = s.slice(n); bells++; continue }
+		// a piece: the start of a bell (cut where the next text begins), or its end
+		let piece = 0
+		for (const t of BELLS) { let i = 0; while (i < t.length && i < s.length && t[i] === s[i]) i++; if (i >= CUT_MIN && i > piece) piece = i }
+		for (const t of BELLS) for (let k = Math.min(t.length - 1, s.length); k >= CUT_MIN && k > piece; k--) if (s.startsWith(t.slice(-k))) { piece = k; break }
+		if (!piece && s.length >= CUT_MIN && crossCut(s)) piece = s.length
+		if (!piece) return null
+		s = s.slice(piece)
+		cut = true
+	}
+	return { bells, cut }
+}
+
+/**
+ * Erase text the bus has established as its own. Ctrl+U clears one VISUAL line, from the end - measured on a real session
+ * (2.1.319): 12/12 emptied, no turn started, 626 -> 626 -> 600 -> 400 -> 198 -> empty. Asked again after every press: what
+ * remains must be the START of what was there. Anything else is somebody typing, and it stops with their words untouched.
+ * { erased, presses } or { erased: false, presses, why }.
+ */
+export function eraseOwn(read, send, isOurs, { pressMs = 150, presses = 60 } = {}) {
+	const first = read()
+	if (first.ok) return { erased: true, presses: 0 }
+	if (!first.typed || !isOurs(first.text)) return { erased: false, presses: 0, why: "the box does not hold the bus's own text" }
+	let before = squash(first.text), n = 0
+	while (n < presses) {
+		send("\x15")
+		n++
+		sleepSync(pressMs)
+		const now = read()
+		if (now.ok) return { erased: true, presses: n }
+		if (!now.typed) return { erased: false, presses: n, why: `the box went away while it was being erased: ${now.why}` }
+		const after = squash(now.text)
+		if (!before.startsWith(after)) return { erased: false, presses: n, why: "somebody started typing while it was being erased - their words were left alone" }
+		before = after
+	}
+	return { erased: false, presses: n, why: `still text in the box after ${n} presses` }
+}
+
+// A box drew a 313-character bell in ~60 ms and took its Enter at once (real sessions, 11-02, 11-08). 1.5 s each: a screen
+// read took ~1.5 s on a loaded machine. Every wait here can run inside a hook's 10 s: a kill mid-way leaves the text, and the
+// ring that keeps looking, started before the first key, finds it (rule 10).
+const SHOWN_MS = 1500, TAKEN_MS = 1500
+/** One reading of the box against `text`: empty, whole, partial (still being drawn), theirs, or unknown (a dialog, an unreadable screen). */
+function boxAgainst(s, text) {
+	if (s.ok) return "empty"
+	if (!s.typed) return "unknown"
+	if (sameText(s.text, text)) return "whole"
+	return squash(text).startsWith(squash(s.text)) ? "partial" : "theirs"
+}
+/** Read the box until it is `empty` or `theirs`, or `takenMs` have passed: the last reading. */
+function untilItLeaves(read, text, takenMs, nap) {
+	for (const t = Date.now(); ; sleepSync(nap)) {
+		const st = boxAgainst(read(), text)
+		if (st === "empty" || st === "theirs" || Date.now() - t >= takenMs) return st
+	}
+}
+/**
+ * Type `text` and press Enter, and PROVE it left the box - rule 9.
+ *   · NO ENTER WHILE ANYBODY ELSE'S CHARACTERS ARE IN THE BOX: it would submit them. The review of this very function measured
+ *     it: keystrokes landing before the bell went out with it. Those words and the bell are left alone, and said.
+ *   · THE ENTER WAITS UNTIL THE BOX DRAWS THE TEXT: a long text and its Enter read as one are a paste (#enter-in-the-paste).
+ *     Not drawn in time: pressed as before, and what follows is not claimed.
+ *   · "IT LEFT" IS ONLY SAID OF TEXT THE BOX WAS SEEN TO HOLD. An empty box after a text never seen, or a screen that cannot be read,
+ *     is `unproved`: that was the field's "recorded as rung, not taken" all over again.
+ *   · A lost Enter is pressed once more. Still there: `stays`, or erased when `erase` is set (only a process no hook can kill).
+ * { typed, taken, unproved, stays, erased, mixed, shownMs, again, presses, why }
+ */
+export function typeAndProve(read, send, text, { shownMs = SHOWN_MS, takenMs = TAKEN_MS, nap = 40, erase = true } = {}) {
+	const a = send(text)
+	if (a && a.status !== 0) return { typed: false, taken: false, why: `send-text failed: ${(a.stderr || "").trim().slice(0, 80)}` }
+	const mixed = (again) => ({ typed: true, taken: false, mixed: true, again, why: "somebody's words are in the box with the bell: both left alone, and no Enter pressed on them" })
+	let shown = null
+	for (const t = Date.now(); Date.now() - t < shownMs; sleepSync(nap)) {
+		const st = boxAgainst(read(), text)
+		if (st === "theirs") return mixed(false)
+		if (st === "whole") { shown = Date.now() - t; break }
+	}
+	send("\r")
+	let state = untilItLeaves(read, text, takenMs, nap), again = false
+	if (state === "whole") { again = true; send("\r"); state = untilItLeaves(read, text, takenMs, nap) }
+	if (state === "theirs") return { ...mixed(again), shownMs: shown }
+	if (state === "empty" && shown !== null) return { typed: true, taken: true, shownMs: shown, again }
+	if (state === "empty" || state === "unknown") return { typed: true, taken: false, unproved: true, shownMs: shown, again,
+		why: state === "empty" ? "typed and Enter pressed, but the box was never seen to hold it" : "typed and Enter pressed, and the box could not be read afterwards" }
+	if (!erase) return { typed: true, taken: false, stays: true, shownMs: shown, again, why: "its Enter was not taken, twice: the text is still in the box, and the ring that keeps looking clears it" }
+	const e = eraseOwn(read, send, (t) => squash(text).startsWith(squash(t)))
+	return { typed: true, taken: false, shownMs: shown, again, erased: e.erased, presses: e.presses,
+		why: e.erased ? "its Enter was not taken, twice: the text was erased and the mail stays in the inbox" : `its Enter was not taken, twice, and it could not be erased: ${e.why}` }
+}
+
+// ── ONE TYPIST AT A WINDOW ────────────────────────────────────────────────────────────────────────────────
+// A file per WINDOW, in the user's runtime dir: wake from this project, wake from a timer, a peer project's exchange bell and
+// a relay all type into the same box. link(2) publishes it whole or not at all. A holder that is dead, or whose pid now
+// names another process, or that has held longer than any typist can (a relay's /clear and first prompt are bounded by
+// 45 s), holds nothing: a hook killed at its 10 s leaves a file and no typist. A dir that cannot be made does not silence the
+// bell: it types unguarded, as it did before this existed.
+const HOLD_MAX_MS = 120_000
+const startTick = (pid) => { try { const st = readFileSync(`/proc/${pid}/stat`, "utf8"); return st.slice(st.lastIndexOf(") ") + 2).split(" ")[19] } catch { return null } }
+const holderAlive = (h, maxMs) => {
+	if (!h || !h.pid || Date.now() - h.at >= maxMs) return false
+	const tick = startTick(h.pid)
+	return tick !== null && tick === h.tick
+}
+/** Claim `file`, or say who has it: { ok, release } / { ok: false, holder }. */
+function claimFile(file, what, maxMs) {
+	const body = JSON.stringify({ pid: process.pid, tick: startTick(process.pid), at: Date.now(), what })
+	const tmp = `${file}.${process.pid}.tmp`
+	try { writeFileSync(tmp, body) } catch { return { ok: true, unguarded: true, release() {} } }
+	try {
+		for (let tries = 0; tries < 3; tries++) {
+			try {
+				linkSync(tmp, file)
+				return { ok: true, release() { try { if (readFileSync(file, "utf8") === body) unlinkSync(file) } catch {} } }
+			} catch (e) { if (e.code !== "EEXIST") return { ok: true, unguarded: true, release() {} } }
+			let h = null
+			try { h = JSON.parse(readFileSync(file, "utf8")) } catch {}
+			if (holderAlive(h, maxMs)) return { ok: false, holder: h.what }
+			try { unlinkSync(file) } catch {}
+		}
+		return { ok: false, holder: "another typist" }
+	} finally { try { unlinkSync(tmp) } catch {} }
+}
+/** The window's keyboard: { ok: true, release() } or { ok: false, holder }. relay.mjs's and exchange-bell.mjs's too. */
+export function holdKeyboard(win, what) {
+	let dir
+	// the same dir from a session and from a cron with no XDG_RUNTIME_DIR, or it is two locks
+	const uid = typeof process.getuid === "function" ? process.getuid() : "x"
+	const base = process.env.CLAUDE_COMM_RUNTIME || process.env.XDG_RUNTIME_DIR || (existsSync(`/run/user/${uid}`) ? `/run/user/${uid}` : tmpdir())
+	try { dir = join(base, "claude-comm", "typing"); mkdirSync(dir, { recursive: true }) } catch { return { ok: true, unguarded: true, release() {} } }
+	return claimFile(join(dir, `${basename(String(win.sock))}-${win.id}.json`), what, HOLD_MAX_MS)
+}
+
+// ── A REFUSAL THAT LASTS LEAVES THE WINDOW ────────────────────────────────────────────────────────────────
+const BOX_DEFAULTS = { retryMs: 60_000, notifyAfterMs: 5 * 60_000, maxMs: 12 * 3600_000 }
+/** How long a blocked box is retried, the project's word over these defaults. relay.mjs's too. */
+export function boxRules(cfg) {
+	const b = (cfg && cfg.box) || {}, n = (k) => (Number.isFinite(b[k]) && b[k] >= 0 ? b[k] : BOX_DEFAULTS[k])
+	return { retryMs: Math.max(50, n("retryMs")), notifyAfterMs: n("notifyAfterMs"), maxMs: n("maxMs") }
+}
+/** Has this window the owner's focus right now? kitty's own field, which is false for a window whose OS window is not focused. */
+export function windowHasFocus(tree, id) {
+	for (const o of tree || []) for (const t of o.tabs || []) for (const w of t.windows || []) if (w.id === id) return w.is_focused === true
+	return false
+}
+/**
+ * Tell the owner, outside the window: the project's `notify` command, else notify-send. It carries the agent and the reason,
+ * never what is in the box. Its exit says the command ran, not that anybody read it (kitty-remote-control's lesson): the
+ * record keeps what it answered and nothing here claims more. A project under the temp dir is a test's: the default command
+ * never runs for it, because nothing a test does lands in the owner's view (STATUS.md, his rule); an arm names its own command.
+ */
+export function notifyOwner(root, cfg, agent, what) {
+	const line = `${basename(root)} / ${agent} : ${what}`
+	const custom = cfg && Array.isArray(cfg.notify) && cfg.notify.length
+	const argv = custom ? [...cfg.notify, line] : ["notify-send", "-u", "critical", "-a", "claude-comm", "claude-comm", line]
+	let answered = "not run: a test's project"
+	if (custom || ![tmpdir(), "/tmp"].some((d) => String(root).startsWith(`${d}/`))) {
+		const r = spawnSync(String(argv[0]), argv.slice(1).map(String), { stdio: "ignore", timeout: 5000 })
+		answered = r.error ? r.error.code : r.status
+	}
+	try {
+		mkdirSync(join(root, ".comm", "wake"), { recursive: true })
+		appendFileSync(join(root, ".comm", "wake", "notified.jsonl"), JSON.stringify({ at: new Date().toISOString(), agent, what, command: argv[0], answered }) + "\n")
+	} catch {}
+	return answered
+}
 
 /**
  * Does the RUNTIME keep a record of this session - <config>/sessions/<pid>.json, the file who.mjs's turnOf reads its
@@ -599,7 +840,7 @@ export function runtimeRecord(pid) {
 }
 
 export function wakeAgent(root, agent, pid, { dryRun = false, wins, turn = null, cfg = null, lookup = null, sendText = null,
-	allowClear = true, confirmMs = FRESH_CONFIRM_MS, fresh = {}, started = runtimeRecord, screen = screenAtRest } = {}) {
+	allowClear = true, confirmMs = FRESH_CONFIRM_MS, fresh = {}, started = runtimeRecord, screen = screenAtRest, watcher = false, onTyping = null } = {}) {
 	const prev = lastWake(root, agent)
 	// THE QUIET PERIOD GUARDS A RING THAT HAS NOT WORKED YET - not every ring. A recipient that took a turn AFTER the
 	// last ring and is idle again has consumed it: a second message within 120 s was swallowed and nothing ever retried
@@ -620,9 +861,10 @@ export function wakeAgent(root, agent, pid, { dryRun = false, wins, turn = null,
 	// `ending` counts as answered too: a ring typed then is queued and replayed at the turn's close (turnState, 5/5).
 	// `unknown` does not - a transcript we could not read vouches for nothing.
 	const answered = prev && turn && (turn.state === "idle" || turn.state === "ending") && turn.call && turn.call.at > Date.parse(prev.at)
-	if (prev && !answered && Date.now() - Date.parse(prev.at) < QUIET_MS) {
-		return { agent, pid, sent: false, why: `rung ${Math.round((Date.now() - Date.parse(prev.at)) / 1000)}s ago and no turn taken since, quiet period is ${QUIET_MS / 1000}s` }
-	}
+	const quiet = prev && !answered && Date.now() - Date.parse(prev.at) < QUIET_MS
+		? { agent, pid, sent: false, why: `rung ${Math.round((Date.now() - Date.parse(prev.at)) / 1000)}s ago and no turn taken since, quiet period is ${QUIET_MS / 1000}s` } : null
+	// The ring that keeps looking asks the box first: the bus's own text still there is a ring that did NOT work.
+	if (quiet && !watcher) return quiet
 	const seen = turn ? { turn: turn.state, turnWhy: turn.why } : {}
 	// Rule 7, decided on the same read rule 6 used.
 	const decision = freshDecision(agent, cfg, turn, fresh)
@@ -631,30 +873,71 @@ export function wakeAgent(root, agent, pid, { dryRun = false, wins, turn = null,
 	// Rule 1. A refusal, never a hopeful --match.
 	if (!r.ok) return { agent, pid, sent: false, why: r.why, ...seen, ...said }
 	if (dryRun) return { agent, pid, sent: false, dryRun: true, window: r.win.id, socket: r.win.sock, how: r.how, wouldClear: decision.clear, ...seen, ...said }
+	// 🔴 RULE 9, ONE TYPIST (header): everything from the screen read to the last key is inside this. A ring that finds it
+	// taken has nothing to add - the bell states one fact, and the turn it starts delivers everything waiting. Not recorded.
+	const kb = holdKeyboard(r.win, `a bell for ${agent}`)
+	if (!kb.ok) return { agent, pid, sent: false, ringing: true, why: `not rung: ${kb.holder} is typing into its window right now`, ...seen, ...said }
+	try {
+	// THE QUIET CHECK ABOVE READ BEFORE THE HOLD, so it is asked again inside it: a ring that typed and let go between the two
+	// reads has noted itself, and this one would be the second bell, into the turn the first one started.
+	const inHold = lastWake(root, agent)
+	if (inHold && (!prev || inHold.at !== prev.at)) return { agent, pid, sent: false, ringing: true, why: `not rung: another ring landed ${Math.max(0, Date.now() - Date.parse(inHold.at))} ms ago`, ...seen, ...said }
 	// 🔴 RULE 8, NEVER TYPE INTO SOMEBODY'S WORDS (header). Read after the refusals above, so they cost no screen read.
 	// Not recorded, like rule 6: the next hook looks again, and a person who submits their own prompt has the mail handed
 	// over at that turn's Stop. The sender is never told WHAT is typed there - it is somebody else's unsent text.
-	const rest = screen(r.win)
-	const ownUnsent = !rest.ok && rest.typed === true && isOwnBell(rest.text)
-	if (!rest.ok && !ownUnsent) return { agent, pid, sent: false, notAtRest: true, ...seen, ...said,
+	const read = () => screen(r.win)
+	const rest = read()
+	const own = !rest.ok && rest.typed === true ? busText(rest.text) : null
+	const ownUnsent = !!own && !own.cut
+	if (quiet && !own) return quiet
+	if (!rest.ok && !own) return { agent, pid, sent: false, notAtRest: true, ...seen, ...said,
 		why: `not rung, its input is not at rest: ${rest.typed ? "text is on its input line (a person typing, or a draft left there) - never typed into" : rest.why}` }
 	// ONE CLEAR PER RUN. A Stop hook kills this process after 10 s, and a confirmation may wait 4: a second
 	// clear could be typed and never proved or rung. The agent cleared first takes a turn, and ITS Stop hook
 	// runs wake again for the next one. Not rung meanwhile - ringing it now is the cold resume rule 7 avoids.
-	if (decision.clear && !allowClear && !ownUnsent) return { agent, pid, sent: false, deferred: true, why: `a fresh restart is due (${decision.why}) and this run already typed one - left for the next turn boundary, not rung cold`, ...seen, ...said }
+	if (decision.clear && !allowClear && !own) return { agent, pid, sent: false, deferred: true, why: `a fresh restart is due (${decision.why}) and this run already typed one - left for the next turn boundary, not rung cold`, ...seen, ...said }
 	const send = sendText ? (text) => sendText(r.win, text)
 		: (text) => spawnSync("kitten", ["@", "--to", `unix:${r.win.sock}`, "send-text", "--match", `id:${r.win.id}`, text], { encoding: "utf8", timeout: 5000 })
 	const ring = { at: new Date().toISOString(), agent, pid, window: r.win.id, turn: turn ? turn.state : null, cleared: null }
-	const done = (rang, extra) => {
-		noteWake(root, agent, { at: ring.at, agent, pid, window: r.win.id })
+	const done = (rang, extra, quiet = true) => {
+		if (quiet) noteWake(root, agent, { at: ring.at, agent, pid, window: r.win.id })
 		noteRing(root, { ...ring, rang, ...extra })
 	}
-	// An earlier bell is the WHOLE box: its Enter was lost, so the Enter alone goes - never a /clear or a second bell on it.
+	// Before the first key: a hook killed at its 10 s from here on leaves the ring that keeps looking behind it (rule 10).
+	if (onTyping) onTyping()
+	// Earlier bells are the WHOLE box: their Enter was lost, so the Enter alone goes - never a /clear or a second bell on them.
+	// Whether it went is read, not assumed: a box that still holds them is the next look's to erase, and gets one clean bell.
+	let wiped = null
 	if (ownUnsent) {
 		const e = send("\r")
 		if (e.status !== 0) return { agent, pid, sent: false, why: `send-text failed: ${(e.stderr || "").trim().slice(0, 80)}`, ...seen, ...said }
-		done(true, { text: "enter", resubmitted: true })
-		return { agent, pid, sent: true, resubmitted: true, window: r.win.id, socket: r.win.sock, how: r.how, ...seen, ...said }
+		let after = null
+		for (const t = Date.now(); ; sleepSync(40)) {
+			const s = read()
+			after = s.ok ? "empty" : !s.typed ? "unknown" : busText(s.text) ? "stays" : "theirs"
+			if (after === "empty" || after === "theirs" || Date.now() - t >= TAKEN_MS) break
+		}
+		if (after === "theirs") {
+			done(false, { text: "enter", mixed: true }, false)
+			return { agent, pid, sent: false, notAtRest: true, mixed: true, why: "not rung: somebody's words are in the box with the bell - both left alone", ...seen, ...said }
+		}
+		if (after !== "stays") {
+			done(true, { text: "enter", resubmitted: true, bells: own.bells, ...(after === "unknown" ? { unproved: true } : {}) })
+			return { agent, pid, sent: true, resubmitted: true, ...(after === "unknown" ? { unproved: true } : {}), window: r.win.id, socket: r.win.sock, how: r.how, ...seen, ...said }
+		}
+	}
+	if (own) {
+		// a hook's 10 s could kill an erase half-way, and leave a piece nobody can recognise: only the ring that keeps looking erases
+		if (!watcher) {
+			done(false, { stays: true, bells: own.bells, cut: own.cut }, false)
+			return { agent, pid, sent: false, notAtRest: true, stays: true, why: "not rung: the bus's own text is in its box and the ring that keeps looking clears it", ...seen, ...said }
+		}
+		wiped = eraseOwn(read, send, (t) => !!busText(t))
+		if (!wiped.erased) {
+			done(false, { erasedOwn: false, presses: wiped.presses, why: wiped.why }, false)
+			return { agent, pid, sent: false, notAtRest: true, ...seen, ...said, why: `not rung: the bus's own text is in its box and could not be erased (${wiped.why})` }
+		}
+		if (decision.clear && !allowClear) { done(false, { erasedOwn: true, presses: wiped.presses }, false); return { agent, pid, sent: false, deferred: true, erasedOwn: true, why: `its box was cleared of the bus's own text; a fresh restart is due (${decision.why}) and this run already typed one - left for the next turn boundary`, ...seen, ...said } }
 	}
 	let text = NUDGE, clearTyped = false
 	if (decision.clear) {
@@ -670,6 +953,8 @@ export function wakeAgent(root, agent, pid, { dryRun = false, wins, turn = null,
 					why: `${c.why}, and the session now reads ${again.state} (${again.why}): the keystrokes started a turn, probably on a half-typed line, so no ring goes on top` }
 			}
 		}
+		// Its own word, typed under this hold, not taken: it does not stay (rule 9). Somebody's words after it are not touched.
+		if (clearTyped && !c.cleared) eraseOwn(read, send, (t) => sameText(t, "/clear"))
 		// the clear took up to `confirmMs`: rule 8 is asked again before the bell, as the relay asks before its prompt
 		if (clearTyped) {
 			const now = screen(r.win)
@@ -680,14 +965,74 @@ export function wakeAgent(root, agent, pid, { dryRun = false, wins, turn = null,
 			}
 		}
 	}
-	const a = send(text)
-	if (a.status !== 0) {
+	const p = typeAndProve(read, send, text, { erase: watcher })
+	if (!p.typed) {
 		if (clearTyped) done(false, { sendFailed: true })
-		return { agent, pid, sent: false, cleared: ring.cleared, clearTyped, clearWhy: ring.clearWhy, why: `send-text failed: ${(a.stderr || "").trim().slice(0, 80)}`, ...seen, ...said }
+		return { agent, pid, sent: false, cleared: ring.cleared, clearTyped, clearWhy: ring.clearWhy, why: p.why, ...seen, ...said }
 	}
-	send("\r")
-	done(true, { text: text === FRESH_NUDGE ? "fresh" : "nudge" })
-	return { agent, pid, sent: true, window: r.win.id, socket: r.win.sock, how: r.how, cleared: ring.cleared, clearTyped, clearWhy: ring.clearWhy, ...seen, ...said }
+	const what = { text: text === FRESH_NUDGE ? "fresh" : "nudge", shownMs: p.shownMs, ...(p.again ? { enterAgain: true } : {}), ...(wiped ? { erasedOwn: true, presses: wiped.presses } : {}), ...(p.unproved ? { unproved: true } : {}) }
+	if (!p.taken && !p.unproved) {
+		// Not quiet: nothing was rung. A bell is typed only into an empty box, so this cannot pile up.
+		done(false, { ...what, ...(p.stays ? { stays: true } : {}), ...(p.erased !== undefined ? { erased: p.erased } : {}), ...(p.mixed ? { mixed: true } : {}), why: p.why }, false)
+		return { agent, pid, sent: false, notAtRest: true, ...(p.stays ? { stays: true } : {}), ...(p.erased ? { erased: true } : {}), ...(p.mixed ? { mixed: true } : {}), cleared: ring.cleared, clearTyped, clearWhy: ring.clearWhy, why: `not rung: ${p.why}`, ...seen, ...said }
+	}
+	done(true, what)
+	return { agent, pid, sent: true, window: r.win.id, socket: r.win.sock, how: r.how, cleared: ring.cleared, clearTyped, clearWhy: ring.clearWhy, ...(wiped ? { erasedOwn: true } : {}), ...(p.again ? { enterAgain: true } : {}), ...(p.unproved ? { unproved: true, unprovedWhy: p.why } : {}), ...seen, ...said }
+	} finally { kb.release() }
+}
+
+/**
+ * RULE 10: one per agent, detached, started before a ring types and by any ring refused. It looks again, by all the same rules, and
+ * ends when the mail was taken or the session is gone or mid-turn (its Stop delivers), or when a ring is proved. Its first look is
+ * soon, because the usual case ends there. Only it erases the bus's own text: no hook's 10 s can kill it half-way. Past
+ * `notifyAfterMs` of refusals it tells the owner, once, and whenever it gives up. A block leaves two rows in rings.jsonl.
+ */
+async function keepTrying(root, agent, lookup) {
+	const bus = join(root, ".comm", "bin", "comm.mjs")
+	let cfg = null
+	try { cfg = JSON.parse(readFileSync(join(root, ".comm", "config.json"), "utf8")) } catch { return }
+	const rules = boxRules(cfg), t0 = Date.now()
+	try { mkdirSync(join(root, ".comm", "wake", "trying"), { recursive: true }) } catch {}
+	const c = claimFile(join(root, ".comm", "wake", "trying", `${agent}.json`), `until-rung ${agent}`, rules.maxMs + rules.retryMs + 60_000)
+	if (!c.ok) return
+	let told = false, last = "refused", blockedAt = null, erasedTimes = 0, whoFailed = 0
+	const end = (how) => { if (blockedAt) noteRing(root, { at: new Date().toISOString(), agent, blocked: false, ended: how, afterMs: Date.now() - blockedAt, told }); c.release() }
+	const tell = (what) => { told = true; notifyOwner(root, cfg, agent, what) }
+	for (let wait = Math.min(rules.retryMs, 15_000); ; wait = rules.retryMs) {
+		// in slices: a project deleted meanwhile (a test's) leaves no process asleep for a minute, and no folder re-created by a note
+		for (const at = Date.now() + wait; Date.now() < at; sleepSync(Math.max(1, Math.min(5000, at - Date.now())))) if (!existsSync(bus)) { c.release(); return }
+		if (!existsSync(bus)) { c.release(); return }
+		let state = null
+		try { state = JSON.parse(spawnSync(process.execPath, [bus, "who", "--json"], { cwd: root, encoding: "utf8", timeout: 5000 }).stdout) } catch {}
+		// a loaded machine's slow answer ends nothing; only a bus that keeps not answering does, and that is said
+		if (!state) {
+			if (++whoFailed < 5) continue
+			if (!told) tell("le bus ne répond plus à la surveillance de sa sonnette")
+			return end("the bus did not answer, five times")
+		}
+		whoFailed = 0
+		const a = state.agents && state.agents[agent]
+		if (!a || !a.pending) return end("the mail was taken")
+		if (!a.pids.length) return end("the session is gone: its mail waits for its next start")
+		const wins = windows()
+		let blocked = false
+		for (const pid of a.pids) {
+			const r = wakeAgent(root, agent, pid, { wins, turn: readTurn(pid, lookup), cfg, lookup, watcher: true })
+			if (r.sent && !r.unproved) return end("rung")
+			if (r.busy) return end("it took a turn: its Stop delivers")
+			if (r.notAtRest) blocked = true
+			if (r.erased) erasedTimes++
+			if (r.why) last = r.why
+		}
+		if (blocked && !blockedAt) { blockedAt = Date.now(); noteRing(root, { at: new Date(blockedAt).toISOString(), agent, blocked: true }) }
+		// A SESSION THAT WILL NOT TAKE ITS ENTER is not typed into all night: twice, then a person is told. (Measured: a lone Enter has been taken every time.)
+		if (erasedTimes >= 2) { tell("sa touche Entrée ne prend pas : deux cloches effacées, le courrier reste dans sa boîte"); return end("gave up: its Enter is not taken") }
+		if (!told && blocked && Date.now() - blockedAt >= rules.notifyAfterMs) tell(`du courrier l'attend et sa fenêtre refuse la cloche depuis ${Math.round((Date.now() - blockedAt) / 60_000)} min : ${last}`)
+		if (Date.now() - t0 >= rules.maxMs) {
+			tell(`la surveillance de sa sonnette s'arrête après ${Math.round((Date.now() - t0) / 60_000)} min, le courrier attend toujours : ${last}`)
+			return end(`gave up after ${Math.round((Date.now() - t0) / 60_000)} min: ${last}`)
+		}
+	}
 }
 
 async function main() {
@@ -705,6 +1050,11 @@ async function main() {
 	const root = opt("--root", process.cwd())
 	const bus = join(root, ".comm", "bin", "comm.mjs")
 	if (!existsSync(bus)) { console.error(`wake: no bus at ${bus}`); process.exit(2) }
+	if (has("--until-rung")) {
+		if (!opt("--agent", null)) { console.error("wake: --until-rung needs --agent <name>"); process.exit(2) }
+		await keepTrying(root, opt("--agent"), lookup)
+		process.exit(0)
+	}
 	const q = spawnSync(process.execPath, [bus, "who", "--json"], { cwd: root, encoding: "utf8", timeout: 5000 })
 	let state = null
 	try { state = JSON.parse(q.stdout) } catch {}
@@ -723,15 +1073,22 @@ async function main() {
 	const wins = windows()
 	const results = []
 	let clearsLeft = 1
+	// A hook kills this at 10 s, and a ring whose Enter fails can take most of that: past this, the rest is the next hook's.
+	const budgetEnds = Date.now() + 6000
 	for (const [agent, a] of Object.entries(state.agents)) {
 		if (only && agent !== only) continue
 		if (!a.pending) continue
 		if (!a.pids.length) { results.push({ agent, sent: false, why: "not running — its mail waits for its next start, which is correct" }); continue }
 		for (const pid of a.pids) {
 			if (pid === self) continue          // never ring your own session
-			const r = wakeAgent(root, agent, pid, { dryRun: has("--dry-run"), wins, turn: readTurn(pid, lookup), cfg, lookup, allowClear: clearsLeft > 0 })
+			// Nobody else looks again if everyone is asleep. It claims per agent, so a second one ends at once.
+			const keepLooking = () => { try { spawn(process.execPath, [fileURLToPath(import.meta.url), "--root", root, "--agent", agent, "--until-rung"], { detached: true, stdio: "ignore" }).unref() } catch {} }
+			if (!has("--dry-run") && Date.now() > budgetEnds) { keepLooking(); results.push({ agent, pid, sent: false, why: "left for the ring that keeps looking: this run's time went on an earlier ring" }); continue }
+			let looking = false
+			const r = wakeAgent(root, agent, pid, { dryRun: has("--dry-run"), wins, turn: readTurn(pid, lookup), cfg, lookup, allowClear: clearsLeft > 0, onTyping: () => { looking = true; keepLooking() } })
 			if (r.clearTyped) clearsLeft--
 			results.push(r)
+			if ((r.notAtRest || r.ringing) && !looking && !has("--dry-run")) keepLooking()
 		}
 	}
 	// A dry run reports rule 7 for every listed agent, mail or not (freshReport, A66). A real run does not: it rings.
@@ -744,8 +1101,8 @@ async function main() {
 				: r.turn === "ending" ? " · its reply had just ended" : ""
 			const fresh = r.cleared === true ? ` · ${r.clearWhy}` : r.cleared === false ? ` · ⚠ ${r.clearWhy}`
 				: r.wouldClear ? ` · would restart it fresh first (${r.freshWhy})` : r.freshWhy ? ` · no fresh restart: ${r.freshWhy}` : ""
-			console.log(r.sent ? `  ● woke ${r.agent} (pid ${r.pid}) in window ${r.window} — ${r.how}${note}${fresh}${r.resubmitted ? " · Enter only: an earlier bell sat unsent in its box" : ""}`
-				: `  ○ ${r.agent}: ${r.dryRun ? `would wake in window ${r.window} (${r.how})${note}${fresh}` : r.why}`)
+			console.log(r.sent ? `  ● woke ${r.agent} (pid ${r.pid}) in window ${r.window} — ${r.how}${note}${fresh}${r.resubmitted ? " · Enter only: an earlier bell sat unsent in its box" : ""}${r.erasedOwn ? " · the bus's own text was erased from its box first" : ""}${r.enterAgain ? " · its first Enter was lost, pressed again" : ""}${r.unproved ? " · NOT PROVED, it looks again" : ""}`
+				: `  ○ ${r.agent}: ${r.dryRun ? `would wake in window ${r.window} (${r.how})${note}${fresh}` : r.why}${r.notAtRest ? " · it looks again every minute, and tells the owner if this lasts" : ""}`)
 		}
 		if (report.length) console.log("  fresh restart, for every agent in freshRestart (dry run — nothing typed):\n" +
 			report.map((f) => `    ${f.clear ? "●" : "○"} ${f.agent || "freshRestart"}${f.pid ? ` (pid ${f.pid})` : ""}: ` +

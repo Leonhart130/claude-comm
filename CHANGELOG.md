@@ -39,6 +39,23 @@ already have.
 
 
 
+
+## 2026-11-08.1 — bus print `714027775827` — 2026-11-08
+
+- **The bus's own text no longer stays in your input box, and no longer blocks you.** A bell whose Enter was lost, two bells at
+  once, a cut one: every path now recognises them as the bus's (wake, a timer's ring, a relay, an exchange bell), and submits or
+  erases them. One character of anybody else's in the box and nothing is touched, as before. Mail is never lost: an erased bell's
+  message stays in your inbox.
+- **One bell at a time in a window**, even from two senders or from another project, and the bus now checks that its text left the box.
+- **A ring or a relay refused by a person's draft or a dialog no longer fails in silence.** It looks again every minute and tells the
+  owner past 5 min, once. A relay waits for its box the same way, and every refused relay tells the owner: you have no Stop hook
+  left to read it from. Tune it in `.comm/config.json`: `"box": {"retryMs": 60000, "notifyAfterMs": 300000, "maxMs": 43200000}`, and
+  `"notify": ["<cmd>", "<arg>"]` to use your own channel instead of `notify-send` (the line is appended; it never quotes your box).
+- **After a wait, a relay fires only on a box free twice in a row and a window without the owner's focus**, and checks your guards
+  again. A turn you take while it waits cancels it; arming again replaces it, instead of answering "already armed".
+- **Sub-agents under your box no longer stop you being rung or relayed**: the `● main` / `◯ …` / `↓ 2 more` footer is read as a footer.
+- A background task ending during your last turn now cancels a relay with its true reason, not "somebody typed".
+
 ## 2026-11-05.1 — bus print `588f486f4a93` — 2026-11-05
 
 - **Your project can now declare what your handoff is, and the bus checks it before you relay.** In

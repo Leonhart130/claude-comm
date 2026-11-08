@@ -1,14 +1,18 @@
-# STATUS — claude-comm, 2026-11-05 (sessions 4–28)
+# STATUS — claude-comm, 2026-11-08 (sessions 4–29)
 
 Design and gates are in `README.md`; **this file is only what is OPEN.** Keep it short — when it grows,
 fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-11-05 21h06 CET by `date`, CLOSED. **WORK IS THE MAIN FIELD**; usage up to 100 %. 🔴 The owner's rule, 11-02: after
+*(2026-11-08, `2026-11-08.1` delivered. **WORK IS THE MAIN FIELD**; usage up to 100 %. 🔴 The owner's rule, 11-02: after
 EVERY delivery, docs AND settings AND skills current (measured in work's tree), and a letter to work. 🔴 **Owner 11-05: the
 tests use his RAM and fill his desktop with kitty windows - run them when he says, never wide while he works.**)*
 
+00. 🔴 **`2026-11-08.1`'s MUTANTS ARE NOT RUN: his word on when.** `exchange/WIP-box-mutants.json` (45, each applies once, untracked):
+   `node test/mutate.mjs exchange/WIP-box-mutants.json --jobs N`. 3 h 30 in series at ~4.5 min a suite; 2.7 GB free when asked, so measure a suite's peak before 4 wide.
+   A survivor is an arm to strengthen, in the test file only: nothing shipped depends on it. The fix stands on `test/box-real.mjs` (8/8, the code before 0/6) and an adversarial read: `#left-in-the-box`, which names what is left.
+01. **work's letters answered by 42, still open:** 37 a team without daily pairs (and H-2 warning), 38 `close.mjs --agent` (the owner's own question), 39 `comm remind --at`, the last reply carried by the relay, `--from` an unknown name. Order: 38, 39, 37.
 0. 🔴 **RESUME `2026-11-05.2`: built, reviewed, NEVER RUN - on the LOCAL branch `wip/2026-11-05.2`** (`3323160`, not
    pushed; main holds the last green bytes). Back as uncommitted changes: `git restore --source=wip/2026-11-05.2 -- bin
    install.mjs test FINDINGS.md`, then `git add -N bin/next-bell.mjs bin/heavy.mjs` (mutate copies the TRACKED tree). In
@@ -40,10 +44,8 @@ tests use his RAM and fill his desktop with kitty windows - run them when he say
    refuses a source whose shipped files are uncommitted (`--allow-dirty` for my own arms). capella: a leader and a
    Telegram secretary, a git repo since 11-05.
 1b. 🔴 **`selftest`'s real sessions load the machine's plugins** - the owner's Telegram server started at each run and took
-   the bot (the field's log, 19:59Z 11-04: mine). Measure which flag isolates a plugin's MCP server, then arm it.
-2. **The bells' Enter** (`#enter-in-the-paste`, the cause MEASURED 11-02): `wake`'s bell and the exchange bell still type
-   text then `\r` at once; the relay waits for the box since `2026-11-02.1`. Same change, own arms (their fakes draw no
-   typed text; Stop's 10 s budget). Field evidence: capella's relay refused 11-05 13h48, a bell left in its box. And **Ctrl+Z in a shell-less window**: avoided, not detected.
+   the bot (the field's log, 19:59Z 11-04: mine). `test/box-real.mjs` starts its session with `--strict-mcp-config --mcp-config '{"mcpServers":{}}'` and every plugin off in `--settings`: no Telegram child, read once per run. Same flags for selftest, then arm it.
+2. **Ctrl+Z in a shell-less window**: avoided, not detected. **The native path** (`#native-path`) would type nothing at all: measure it next on this subject.
 3. **A31 blames a live session's own `/clear`** (a field expert's relay at 21:34:41Z, mid-suite, 11-02): `#review15`'s
    twin for boot's control. Named in `#pairs`, not fixed.
 4. **`who`: "IDLE, relay armed"** (work's (c)) and **`working` while only a sub-agent runs** (altair 10-30: the runtime's
@@ -56,7 +58,7 @@ tests use his RAM and fill his desktop with kitty windows - run them when he say
 7. **`/tmp/comm-attack-*`**: 61 folders from a suite I started by mistake and stopped (11-02, LESSONS §9); the
    classifier refused my sweep of shared `/tmp` - the owner's to delete, or leave.
 
-**Done**: 11-04 `.1` (A105), `.2` (A106); **11-05 `.1`** (`#relay-guard`, A107, mutants 15/15). Each in the 12 trees.
+**Done**: 11-04 `.1` (A105), `.2` (A106); 11-05 `.1` (`#relay-guard`, A107, mutants 15/15); **11-08 `.1`** (`#left-in-the-box`, A111-A115; the `.2` branch keeps A108-A110, expect a merge in `attack.mjs`). Each in the 12 trees.
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a
 codename here; the mapping is in no repo. The boot report prints the REAL directory names: **never copy a `field:` row

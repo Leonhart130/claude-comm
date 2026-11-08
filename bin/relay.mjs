@@ -24,6 +24,11 @@
  * effort, its window, its env and its socket stay (measured 09-13, wake rule 7), and no second session ever shares the
  * inbox (A17). In order, each step recorded in .comm/relay/<agent>.json before the next:
  *
+ * (Everything from the screen read of step 4 to the first prompt is under the window's keyboard, wake.mjs's rule 9; the bus's
+ * own text found in the box is erased, and a box a person or a dialog holds is looked at again every `box.retryMs`, the owner
+ * told past `box.notifyAfterMs`, the relay refused only at `box.maxMs` - and any refusal tells the owner, because an idle session
+ * has no Stop hook left to read it. FINDINGS.md#left-in-the-box.)
+ *
  * 1. AT THE ARMING, in the agent's own turn: who it is (the registry, never the cwd), its window (as its FOREGROUND
  *    process, never by ancestry - see close.mjs's header), the first prompt, and the GUARDS - commands that exit 0 only
  *    when the handoff is written. **No guard, no relay**: a /clear on faith is the loss this repo's first rule exists to
@@ -107,6 +112,18 @@ function atRest(sock, id) {
 	if (s.status !== 0 || s.error) return { ok: false, why: `the screen could not be read (kitten @ get-text ${s.error ? s.error.code : `exit ${s.status}`})` }
 	return { ...wake.promptAtRest(s.stdout), tail: s.stdout.replace(/\x1b\[[0-9;:]*m/g, "").split("\n").filter((l) => l.trim()).slice(-6) }
 }
+/** Has the transcript gained, past `from`, a row that says a turn ran? A row still being written is read on the next look. */
+function grewBusy(transcript, from) {
+	let tail = ""
+	try { tail = readFileSync(transcript).subarray(from).toString("utf8") } catch { return false }
+	for (const l of tail.split("\n")) {
+		if (!l) continue
+		let r
+		try { r = JSON.parse(l) } catch { continue }
+		if (wake.rowVerdict(r) === "busy") return true
+	}
+	return false
+}
 /** Did the session take `text` as a prompt? A user row carrying exactly it, in `transcript`. */
 function taken(transcript, text) {
 	let raw = ""
@@ -133,7 +150,19 @@ if (ARGV[0] === "--after-turn") {
 		try { prev = JSON.parse(readFileSync(statePath, "utf8")) } catch { prev = { intent_unreadable: true } }
 		try { writeFileSync(statePath, JSON.stringify({ ...prev, ...o }, null, 1) + "\n") } catch {}
 	}
-	const stop = (o, code = 1) => { note({ ...o, relayed: false, relay_pid: null, ended_at: now() }); process.exit(code) }
+	let held = null, cfgNow = null
+	const rootOf = dirname(dirname(dirname(statePath)))
+	try { cfgNow = JSON.parse(readFileSync(join(rootOf, ".comm", "config.json"), "utf8")) } catch {}
+	// 🔴 A REFUSAL FROM AN IDLE SESSION REACHES NOBODY INSIDE IT: its turn is over, so no Stop hook will ever read this record.
+	// A field's leader slept nine hours on one (11-08, FINDINGS.md#left-in-the-box). So every refusal also leaves the window.
+	const stop = ({ tell, tellOwner, ...o }, code = 1) => {
+		note({ ...o, relayed: false, relay_pid: null, ended_at: now() })
+		// `tell`: what he may read when `refused` quotes the box. Never what is in it: this leaves the window.
+		const line = o.refused ? `son relais n'a pas eu lieu : ${tell || o.refused}` : tellOwner || null
+		if (line) note({ owner_told: wake.notifyOwner(rootOf, cfgNow, st.agent, line) })
+		process.exit(code)
+	}
+	process.on("exit", () => { if (held) held.release() })
 	note({ relay_pid: process.pid })
 	const me = st.session
 	// 2. the turn that asked, and nothing after it
@@ -150,15 +179,69 @@ if (ARGV[0] === "--after-turn") {
 	if (!r.ok || r.how !== "foreground process" || r.win.id !== st.window || r.win.sock !== st.sock)
 		stop({ refused: `window ${st.window} no longer runs this session as its foreground process (${r.ok ? `${r.how}, window ${r.win.id}` : r.why}) - nothing was typed` })
 	// 4. nobody has typed, no dialog is open, and the transcript agrees the session rests
-	const scr = atRest(st.sock, st.window)
-	if (!scr.ok) stop({ refused: `the prompt is not at rest: ${scr.why} - nothing was typed`, screen: scr.tail })
+	// 🔴 RULE 9 OF wake.mjs: everything from this read to the first prompt is under the window's keyboard, so no bell lands
+	// between the /clear and the prompt; and the bus's OWN text in the box is the bus's to clear (a field's leader, 11-08:
+	// two bells in its box refused this relay twice, then its timer's ring, and it slept until the owner came back).
+	const send = sendTo(st.sock, st.window)
+	const read = () => atRest(st.sock, st.window)
+	const rules = wake.boxRules(cfgNow), waitFrom = Date.now()
+	let scr = null, told = false, waited = false, size = 0, boxWaitSince = null
+	try { size = statSync(st.transcript).size } catch {}
+	for (;;) {
+		held = wake.holdKeyboard({ sock: st.sock, id: st.window }, `the relay of ${st.agent}`)
+		if (held.ok) {
+			scr = read()
+			const own = !scr.ok && scr.typed === true && wake.busText(scr.text)
+			if (own) {
+				const e = wake.eraseOwn(read, send, (t) => !!wake.busText(t))
+				note({ erased_own: { at: now(), bells: own.bells, cut: own.cut, erased: e.erased, presses: e.presses, ...(e.why ? { why: e.why } : {}) } })
+				scr = read()
+			}
+			// AFTER A WAIT a /clear must not land on somebody. A box emptied may be a person between two sentences, so it must be free
+			// twice in a row; and a window with the owner's focus is not free at all (a relay can be hours old by now).
+			if (scr.ok && waited) {
+				let focus = true
+				try { focus = wake.windowHasFocus(JSON.parse(spawnSync("kitten", ["@", "--to", `unix:${st.sock}`, "ls"], { encoding: "utf8", timeout: 5000 }).stdout), st.window) } catch {}
+				if (focus) { scr = { ok: false, why: "its window has the focus: somebody may be reading it, and what comes next is a /clear" }; waited = true }
+			}
+			if (scr.ok && !waited) break
+			if (scr.ok && waited === "free") break
+			waited = scr.ok ? "free" : true
+			held.release()
+		} else { scr = { ok: false, why: `${held.holder} is typing into this window right now` }; waited = true }
+		held = null
+		if (!boxWaitSince) { boxWaitSince = now(); note({ box_wait_since: boxWaitSince }) }
+		// The handoff, proved again after a wait, OUTSIDE the hold and BEFORE the look that lets the /clear go: nobody may start typing
+		// unseen during a guard, and a slow guard does not age the hold.
+		if (waited === "free") {
+			const stale = runGuards(st.guards, st.cwd)
+			if (stale.length) stop({ refused: `a guard failed after the wait for the box, so the handoff is not proved: ${stale.join("; ")} - nothing was typed` })
+		}
+		const spent = Date.now() - waitFrom
+		const safeWhy = scr.typed ? "du texte est sur sa ligne de saisie" : scr.why
+		if (!scr.ok && spent >= rules.maxMs) stop({ refused: `the prompt is not at rest: ${scr.why} - nothing was typed${spent >= 60_000 ? ` (looked for ${Math.round(spent / 60_000)} min)` : ""}`, screen: scr.tail, tell: safeWhy })
+		if (!told && !scr.ok && spent >= rules.notifyAfterMs) {
+			told = true
+			note({ waiting_for_the_box: safeWhy, owner_told: wake.notifyOwner(rootOf, cfgNow, st.agent, `son relais attend depuis ${Math.round(spent / 60_000)} min : ${safeWhy}`) })
+		}
+		nap(Math.min(rules.retryMs, Math.max(50, rules.maxMs - spent)))
+		// A wait is only worth it for the session it was armed in: a turn taken meanwhile is new work the handoff does not cover. Told
+		// outside the window: that turn's Stop may already have passed, and it believes it is armed.
+		if (grewBusy(st.transcript, size)) stop({ cancelled: "the session took a turn while the relay waited for its box - nothing was typed; arm it again at the end of the turn that is running now", tellOwner: "son relais est annulé : la session a repris pendant qu'il attendait sa ligne de saisie" })
+		const h = lookup(me)
+		if (h.ok && h.transcript !== st.transcript) stop({ cancelled: "the session moved to a new transcript (a /clear) while the relay waited for its box - nothing was typed", tellOwner: "son relais est annulé : la session a été vidée pendant qu'il attendait" })
+		try { process.kill(me, 0) } catch { stop({ cancelled: "the session exited while the relay waited for its box - nothing was typed" }) }
+	}
 	const turn = wake.readTurn(me, lookup)
 	if (turn.state !== "idle") stop({ refused: `the session reads ${turn.state} (${turn.why}) - nothing was typed` })
 	// 5. /clear, proved by the registry
-	const send = sendTo(st.sock, st.window)
 	const c = wake.clearFresh(me, lookup, send, CLEAR_CONFIRM_MS)
 	note({ clear: { at: now(), typed: c.typed, cleared: c.cleared, why: c.why } })
-	if (!c.cleared) stop({ refused: `${c.why} - the first prompt was NOT typed`, typed: c.typed ? ["/clear"] : [] })
+	if (!c.cleared) {
+		// ITS OWN WORD, TYPED SECONDS AGO BY THIS PROCESS UNDER THE KEYBOARD: left there, it blocks every later bell
+		const e = c.typed ? wake.eraseOwn(read, send, (t) => wake.sameText(t, "/clear")) : null
+		stop({ refused: `${c.why} - the first prompt was NOT typed`, typed: c.typed ? ["/clear"] : [], ...(e && e.presses ? { erased_own: { erased: e.erased, presses: e.presses } } : {}) })
+	}
 	const fresh = lookup(me)
 	note({ new_transcript: fresh.ok ? fresh.transcript : null })
 	// 6. the prompt box back and empty, then the first prompt, proved by the new transcript
@@ -192,6 +275,9 @@ if (ARGV[0] === "--after-turn") {
 			if (s.typed && wake.sameText(s.text, st.say)) { send("\r"); again = now(); note({ enter_again_at: again }) }
 		}
 	}
+	// Whatever it was, the prompt does not stay in the box: a fresh session at rest with an empty box can still be rung.
+	const left = wake.eraseOwn(read, send, (t) => wake.sameText(t, st.say))
+	if (left.presses) note({ erased_own: { erased: left.erased, presses: left.presses } })
 	stop({ refused: `cleared and the first prompt typed${again ? `, its Enter pressed again at ${again} on the prompt left whole in the box,` : ","} but no user row carrying it reached the new transcript within ${TAKEN_MS / 1000} s - look at window ${st.window}` })
 }
 
@@ -253,8 +339,15 @@ if (has("--cancel")) {
 	process.exit(0)
 }
 if (!has("--dry-run") && liveWatcher()) {
-	console.log(`relay: already armed for '${agent}' - it runs after this turn; \`relay.mjs --cancel\` disarms it`)
-	process.exit(0)
+	let live = null
+	try { live = JSON.parse(readFileSync(recordPath, "utf8")) } catch {}
+	if (!(live && live.box_wait_since)) {
+		console.log(`relay: already armed for '${agent}' - it runs after this turn; \`relay.mjs --cancel\` disarms it`)
+		process.exit(0)
+	}
+	// IT WAS WAITING FOR ITS BOX, AND THIS IS A NEW TURN: that watcher will see this turn at its next look and cancel. "Already armed"
+	// would be a lie the agent ends its turn on. This arming replaces it, with its own guards and this turn's end.
+	try { process.kill(liveWatcher()) } catch {}
 }
 
 // the first prompt and the guards: the flags, then the project's word for this agent. A --say replaces the config's; a

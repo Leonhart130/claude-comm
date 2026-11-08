@@ -44,8 +44,9 @@ arrives while an agent answers a notice is delivered in the same turn end, and a
 session.
 
 **An idle agent is rung, never delivered to.** When mail waits for someone else, a `Stop` hook spawns
-`bin/wake.mjs`, which types a doorbell into that agent's window so it takes a turn — and never into a running
-turn (A62). **Opt-in fresh restart** (A63): with `"freshRestart": ["scribe", "web"]` in `.comm/config.json`, `wake`
+`bin/wake.mjs`, which types a doorbell into that agent's window so it takes a turn — never into a running
+turn (A62), never onto anybody's words (A98), one typist at a window, and it proves the text left the box (A111-A113). A ring
+refused, or killed with its hook, leaves one `--until-rung` looking again; if the refusal lasts, the owner is told (A114). **Opt-in fresh restart** (A63): with `"freshRestart": ["scribe", "web"]` in `.comm/config.json`, `wake`
 first types `/clear` into an agent that is idle, whose last API call is over 60 min old (the cache has expired) and
 whose context is at least 300 000 tokens — never a leader, and a clear counts only when the session registry names a
 new transcript. Every ring, whoever caused it, is appended to `.comm/wake/rings.jsonl`. `FINDINGS.md#fresh-restart`.
@@ -219,9 +220,10 @@ too — it is how a check gets disabled wholesale a week later.*
 ## Known limits, stated rather than discovered
 
 - **Turn-boundary delivery, not interrupt** (above).
-- **The doorbell and the fresh restart type into the human's input line.** Whatever is half-typed there is
-  submitted with them — measured with `/clear`: `hello/clear` went out as a prompt. The screen cannot tell a
-  half-typed line from the placeholder, so nothing guards it; a leader is never cleared for that reason.
+- **The doorbell, the fresh restart and the relay type into the human's input line**, because Claude Code offers a
+  process no other way in. The screen is read first and text that is not the bus's is never typed into (A98), one typist
+  at a time, and the bus's own text never stays there (A111-A114, `FINDINGS.md#left-in-the-box`). A key landing in
+  the milliseconds between a read and a key is the limit that cannot be closed from outside the terminal.
 - **`comm who` is Linux-only** — it reads `/proc`. Elsewhere it degrades to "not running" for everyone,
   which is safe but useless; `send` still queues correctly.
 - **Identity is not a security boundary.** Every agent runs as the same Unix user, so cwd-derived identity

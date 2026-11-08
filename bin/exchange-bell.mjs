@@ -187,15 +187,22 @@ export async function bell(argv, { wins = null, lookup, send = null, who = null,
 		if (has("--dry-run")) return { code: 0, out: `would ring ${agent} (pid ${target.pid}) in window ${target.r.win.id} on ${target.r.win.sock} — ${target.r.how}${turnNote}\n  ${TEXT}\n`, err: "" }
 		// WAKE'S RULE 8, NEVER INTO SOMEBODY'S WORDS. This bell is the one that cut the owner's half-written message to a peer
 		// leader (09-27): the turn was over, so it typed. The screen, read now; not recorded, so the next run looks again. A98
-		const rest = (screen || wake.screenAtRest)(target.r.win)
-		if (!rest.ok) return { code: 3, out: `○ ${agent} (pid ${target.pid}): not rung, its input is not at rest - ${rest.typed ? "text is on its input line (a person typing, or a draft left there)" : rest.why}. The file is written and waits: ${ref}\n`, err: "" }
+		const read = () => (screen || wake.screenAtRest)(target.r.win)
 		const typeInto = send ? (t) => send(target.r.win, t) : (t) => spawnSync("kitten", ["@", "--to", `unix:${target.r.win.sock}`, "send-text", "--match", `id:${target.r.win.id}`, t],
 			{ encoding: "utf8", timeout: 5000 })
-		const a = typeInto(TEXT)
-		if (a.status !== 0) die(`send-text failed: ${(a.stderr || "").trim().slice(0, 120)}`)
-		typeInto("\r")
+		// WAKE'S RULE 9: one typist at a window, whichever project's bell it is, and the bus's own text is the bus's to clear.
+		const kb = wake.holdKeyboard(target.r.win, `the exchange bell of ${peer}`)
+		if (!kb.ok) return { code: 3, out: `○ ${agent} (pid ${target.pid}): not rung, ${kb.holder} is typing into its window right now. The file is written and waits: ${ref}\n`, err: "" }
+		try {
+		let rest = read()
+		if (!rest.ok && rest.typed && wake.busText(rest.text)) { wake.eraseOwn(read, typeInto, (t) => !!wake.busText(t)); rest = read() }
+		if (!rest.ok) return { code: 3, out: `○ ${agent} (pid ${target.pid}): not rung, its input is not at rest - ${rest.typed ? "text is on its input line (a person typing, or a draft left there)" : rest.why}. The file is written and waits: ${ref}\n`, err: "" }
+		const p = wake.typeAndProve(read, typeInto, TEXT)
+		if (!p.typed) die(p.why)
+		if (!p.taken && !p.unproved) return { code: 3, out: `○ ${agent} (pid ${target.pid}): not rung - ${p.why}. The file is written and waits: ${ref}\n`, err: "" }
 		try { writeFileSync(quietFile, JSON.stringify({ at: new Date().toISOString(), peer, agent, pid: target.pid, ref }) + "\n") } catch {}
-		return { code: 0, out: `● rang ${agent} (pid ${target.pid}) in window ${target.r.win.id} — ${target.r.how}${turnNote}\n  ref: ${ref}\n`, err: "" }
+		return { code: 0, out: `● rang ${agent} (pid ${target.pid}) in window ${target.r.win.id} — ${target.r.how}${turnNote}${p.unproved ? ` · NOT PROVED: ${p.why}` : ""}\n  ref: ${ref}\n`, err: "" }
+		} finally { kb.release() }
 	} catch (e) {
 		if (e instanceof Refusal) return { code: 64, out: "", err: `exchange-bell: ${e.message}\n` }
 		throw e
