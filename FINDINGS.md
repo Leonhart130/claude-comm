@@ -5049,6 +5049,8 @@ the opener's minute, the leader's pair, two chiefs at once, delivery to a chief 
 
 **Arms.** A119 who launches, each edge, a sub-session, off the roster, a plain shell, a star, a fault, the request, no folder. A120 each cap at and below, what does not count, faults, the lock each way, six takers after a death. A121 in real panes of the bench: identity, the window's two proofs, at rest and that `--force` does not lift it, unfinished and that it does, a real close gone and by name, requests withdrawn. A122 through the real stubs and a fake kitten that starts real processes. A123 the board.
 
+**Work's review of its skills (letter 51), `2026-11-08.4`.** An expert of three chiefs was told at each start `send @asker`, against its project's rule and into the wrong chief whenever the one it answers had opened no request. A chief's generated skill called it an expert, and told it to close when its task was done. Between chiefs `@asker` falls to the leader. The start sentence now names by what the agent is, and the skill stays generic, its wording true for either (a roster in a generated file drifts at every hand edit). A chief-to-chief request was the other way offered: not built, a chief names a chief.
+
 **Named, not fixed:**
 - **`close.mjs --agent`: the probe saying "still there" or "could not look"**, and a hung `kitten @ launch` (its 15 s): read, not armed, each costs 8-15 s of suite. **Boot's `config-fault`** is read, not run: `boot --prove-red` is 1-1.6 h, as for the `teams` row.
 - **The suite is 349 s with these arms, 114 s of it theirs** (the owner at work on the machine): `GATE_CEILING_MS` went from 300 to 480 s, which is a hang detector and no budget. STATUS item C stands, and is now dearer.

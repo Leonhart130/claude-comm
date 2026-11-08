@@ -5,11 +5,11 @@ fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-11-08, `2026-11-08.3` delivered. **WORK IS THE MAIN FIELD**; usage up to 100 %. 🔴 The owner's rule, 11-02: after
+*(2026-11-08, `2026-11-08.4` delivered. **WORK IS THE MAIN FIELD**; usage up to 100 %. 🔴 The owner's rule, 11-02: after
 EVERY delivery, docs AND settings AND skills current (measured in work's tree), and a letter to work. 🔴 **Owner 11-05: the
 tests use his RAM and fill his desktop with kitty windows - run them when he says, never wide while he works.**)*
 
-00. **`2026-11-08.3` delivered: B, D and C (`#teams-b`, letters 42-50 in `exchange/work-leader/`).** Waiting from work: its `"caps"` and `"reopen"`, its review, its 24 h measure of A (its step 7). Two adversarial reads before delivery found 24, two high plus one high in my fixes. `test/teams-real.mjs` 7/7, the code before 0/6: not a gate, run it before changing launch, close or reopen. **The suite is 349 s (A119-A123: 114 s), `GATE_CEILING_MS` 480 s, a hang detector and no budget: item C is dearer.** Named in `#teams-b`: a timer's send has no hook, a refusal at night with nothing running waits, a window the owner closes by hand over mail reopens if declared, boot's `config-fault` unrun.
+00. **`2026-11-08.3` and `.4` delivered: B, D, C, then work's three sentences (`#teams-b`, letters 42-53 in `exchange/work-leader/`).** Waiting from work: its `"caps"` and `"reopen"`, its review, its 24 h measure of A (its step 7). Two adversarial reads before delivery found 24, two high plus one high in my fixes. `test/teams-real.mjs` 7/7, the code before 0/6: not a gate, run it before changing launch, close or reopen. **The suite is 349 s (A119-A123: 114 s), `GATE_CEILING_MS` 480 s, a hang detector and no budget: item C is dearer.** Named in `#teams-b`: a timer's send has no hook, a refusal at night with nothing running waits, a window the owner closes by hand over mail reopens if declared, boot's `config-fault` unrun.
 01. **`2026-11-08.1`'s MUTANTS NOT RUN: an evening when he is inactive, his word 11-08, never while he works.** `exchange/WIP-box-mutants.json` (45, each applied once when written, untracked): `node test/mutate.mjs exchange/WIP-box-mutants.json --jobs N`. 3 h 30 in series at ~4.5 min a suite; 2.7 GB free when last read, so measure a suite's peak before 4 wide. Add A119-A123 to that batch (15 targeted mutants of them were run, one at a time, 11-08; the rest not). A survivor is an arm to strengthen: nothing shipped depends on it. The fix stands on `test/box-real.mjs` (8/8, the code before 0/6) and an adversarial read: `#left-in-the-box`. Waiting from work: its recount of letter 43, `chef-ventes`'s needs. Later, in 44: `comm remind`, the relay carrying the last reply, `--from` limited to the roster (tell work first, its timer signs `minuteur`). **Nothing rings me when work writes to `in/`**: 45 sat 29 min; 46 proposes `SendMessage`, untried from its side.
 0. 🔴 **RESUME `2026-11-05.2`: built, reviewed, NEVER RUN - on the LOCAL branch `wip/2026-11-05.2`** (`3323160`, not
    pushed; main holds the last green bytes). Back as uncommitted changes: `git restore --source=wip/2026-11-05.2 -- bin
@@ -56,7 +56,7 @@ tests use his RAM and fill his desktop with kitty windows - run them when he say
 7. **`/tmp/comm-attack-*`**: 61 folders from a suite I started by mistake and stopped (11-02, LESSONS §9); the
    classifier refused my sweep of shared `/tmp` - the owner's to delete, or leave.
 
-**Done**: 11-04 `.1` (A105), `.2` (A106); 11-05 `.1` (`#relay-guard`, A107, mutants 15/15); **11-08 `.1`** (`#left-in-the-box`, A111-A115), **`.2`** (`#teams`, A116-A118), **`.3`** (`#teams-b`, A119-A123); the parked branch keeps A108-A110, and its own `.2` label must change. A33 reddened once in two runs of the same bus bytes (0 winners, barrier fine): not triaged. Each in the 12 trees.
+**Done**: 11-04 `.1` (A105), `.2` (A106); 11-05 `.1` (`#relay-guard`, A107, mutants 15/15); **11-08 `.1`** (`#left-in-the-box`, A111-A115), **`.2`** (`#teams`, A116-A118), **`.3`** (`#teams-b`, A119-A123), **`.4`** (work's 51: three sentences, A118); the parked branch keeps A108-A110, and its own `.2` label must change. A33 reddened once in two runs of the same bus bytes (0 winners, barrier fine): not triaged. Each in the 12 trees.
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a
 codename here; the mapping is in no repo. The boot report prints the REAL directory names: **never copy a `field:` row

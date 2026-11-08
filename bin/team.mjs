@@ -37,7 +37,10 @@ export function roleOf(cfg, a) {
 	const hs = headsOf(cfg, a), lead = own(t, a), bits = []
 	if (lead) bits.push(`You LEAD a team: ${t[a].join(", ")}. Write to them, and to the other chiefs (${Object.keys(t).filter((h) => h !== a).join(", ") || "none"}), with no pair; you may open a pair for one of your experts, launch your experts and close their windows (close.mjs --agent <x>).`)
 	if (hs.length) bits.push(`You work for ${hs.map((h) => `'${h}'`).join(" and ")}: write directly to them and to your team (${[...new Set(hs.flatMap((h) => t[h]))].filter((x) => x !== a).join(", ") || "nobody else"}).`)
-	if (lead || hs.length) bits.push("Report with `send @asker --kind done`: it reaches the one who waits on your work, else your chief, else the leader; if several wait it says so, and you name one. A question is `--kind blocked`: a `done` closes the request.")
+	// Work's review of its skills, letter 51: `@asker` follows requests, and a chief that gave work some other way has none open, so an expert of several chiefs names the one it answers. And it does not reach another chief at all.
+	if (lead) bits.push("To another chief, name it: `send <chief>`.")
+	if (hs.length > 1) bits.push("You have several chiefs: name the one whose task you answer, `send <chief> --kind done`. A question is `--kind blocked`: a `done` closes the request.")
+	else if (lead || hs.length) bits.push("Report with `send @asker --kind done`: it reaches the one who waits on your work, else your chief, else the leader; if several wait it says so, and you name one. A question is `--kind blocked`: a `done` closes the request.")
 	return bits.join(" ")
 }
 

@@ -1583,6 +1583,11 @@ const POINTER_SOURCES = (() => {
 		startExpert: /You work for 'chiefA'/.test(sE1) && /shared/.test(sE1) && /send @asker/.test(sE1) && !/never to another expert/.test(sE1),
 		startChief: /You LEAD a team: e1, shared, lead4/.test(sChief) && /other chiefs \(chiefB, lead4\)/.test(sChief),
 		startShared: /You work for 'chiefA' and 'chiefB'/.test(sShared),
+		// work's letter 51: an expert of several chiefs names the one it answers, every sentence of its start; one chief, `@asker`; a chief is told it cannot reach another with it
+		severalChiefsName: /You have several chiefs: name the one whose task you answer, `send <chief> --kind done`/.test(sShared) && !/Report with `send @asker/.test(sShared) && !/comm\.mjs send @asker/.test(sShared) && /comm\.mjs send <chief> --ref/.test(sShared),
+		oneChiefAsker: !/You have several chiefs/.test(sE1) && /Report with `send @asker/.test(sE1) && /comm\.mjs send @asker --ref/.test(sE1),
+		aChiefNamesAChief: /To another chief, name it: `send <chief>`/.test(sChief) && !/To another chief/.test(sE1),
+		theSkillOfAChief: (() => { const sk = readFileSync(join(dirOf("chiefA"), ".claude", "skills", "claude-comm", "SKILL.md"), "utf8"); return !/an expert\*\*/.test(sk) && /your start message says if you also lead a team/.test(sk) && /once the chains you launched are returned/.test(sk) && /With several chiefs, always name/.test(sk) })(),
 		startLeader: /This project has teams/.test(sBoss) && !/Experts write only to you/.test(sBoss),
 		startLevel4: /You LEAD a team: sub/.test(sLead4) && /You work for 'chiefA'/.test(sLead4),
 		startLonerAsBefore: /never to another expert/.test(sLoner) && !/LEAD|work for/.test(sLoner),

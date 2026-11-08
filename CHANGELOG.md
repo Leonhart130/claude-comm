@@ -43,6 +43,13 @@ already have.
 
 
 
+
+## 2026-11-08.4 — bus print `065a5b43d879` — 2026-11-08
+
+- **An expert of several chiefs is told to name the one it answers**, at its start and in its skill: `send <chief> --kind done`. `send @asker` follows open requests, and a chief who gave work some other way has none. An expert of one chief: `send @asker`, as before.
+- **A chief is told**: to another chief, name it (`send <chief>`): `@asker` does not reach it.
+- **A chief's skill no longer calls it an expert**, and says to close its window once the chains it launched are returned.
+
 ## 2026-11-08.3 — bus print `015cc1d4391f` — 2026-11-08
 
 - **With `teams`, only your leader or a chief of an agent may launch it**, proved from the session's own process (a Bash that moved changes nothing). The refusal says who may and what to type. A plain shell, and a project with no `teams`: as before. A sub-session (`claude -p`) is refused: the session above runs it. **A `--prompt` opens a request**: the agent's `done` to you closes it, and its `send @asker` reaches you.

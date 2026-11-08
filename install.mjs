@@ -295,7 +295,7 @@ try {
 		notices.push([
 			"[claude-comm] You are '" + whoIs + "', " + role,
 			...(teamLine ? [teamLine] : []),
-			"A message is a doorbell that points at a FILE: " + cmd + " send " + (whoIs === lead ? "<agent>" : inTeam ? "@asker" : lead) +
+			"A message is a doorbell that points at a FILE: " + cmd + " send " + (whoIs === lead ? "<agent>" : teamLine.includes("You have several chiefs") ? "<chief>" : inTeam ? "@asker" : lead) +
 				' --ref <file> --note "<where to read, then what is decided>". It reaches the other session at its turn boundary.',
 			"How to work with it - replying, launching an expert, restarting, the rules: the claude-comm skill, or " +
 				relative(agentRoot, join(projectRoot, ".comm", "README.md")) + ".",
@@ -1307,7 +1307,7 @@ function SKILL(ids, agentRoot) {
 			? `This folder is shared by ${ids.map((a) => "`" + a + "`").join(", ")}: which one you are is set by \`CLAUDE_COMM_AGENT\` (\`${C} whoami\`), and the line the bus gives you at every start says it. Every command below runs from this folder.`
 			: isLeader
 			? `You are **\`${id}\`, the leader**. Your experts: \`${C} who\`, and the line the bus gives you at every start. Every command below runs from your own folder.`
-			: `You are **\`${id}\`, an expert**; your leader is **\`${leader}\`**. Every command below runs from your own folder.`,
+			: `You are **\`${id}\`**; your leader is **\`${leader}\`**, and your start message says if you also lead a team (\`team.mjs\` too). Every command below runs from your own folder.`,
 		"",
 		"## The one rule: the file is the artifact, the message is a doorbell", "",
 		"1. Write the brief, report or question to a **file** in your repo first.",
@@ -1372,11 +1372,11 @@ function SKILL(ids, agentRoot) {
 		"  `.claude/settings.json`: the installer replaces only its own command there.", "")
 	if (!isLeader && (!shared || hasExpert)) L.push(
 		shared ? "## If you are an expert: reporting to your leader" : "## Reporting to your leader", "",
-		`Write the report to a file, then \`${C} send @asker --ref <report> --kind done --note "<where to read, then the verdict>"\`: it reaches the one who waits on your work, else your chief, else \`${leader}\`. If several wait, it says so: name one.`,
+		`Write the report to a file, then \`${C} send @asker --ref <report> --kind done --note "<where to read, then the verdict>"\`: it reaches the one who waits on your work, else your chief, else \`${leader}\`. If several wait, it says so: name one. With several chiefs, always name the one whose task you answer: \`send <chief>\`. To another chief too.`,
 		"**If your start message says you LEAD a team**, you are its leader: give your experts their work (`send <expert>`, a file in their folder), judge what they return, and take to the leader only what is its own. Your start message and `team.mjs` say who is yours.",
 		`You launch your experts as a leader does (\`launch.mjs <expert> --model <m> --effort <e> --prompt "..."\`), close one at rest with \`node ${B}/close.mjs --agent <x>\`, and read them with \`node ${B}/team.mjs --board\`. Launching anyone else is refused.`,
 		"Stuck on a decision that is not yours: `--kind blocked`, same form, and wait for the ruling.",
-		`Your task done, the report sent, and you were launched for it: close your window (\`node ${B}/close.mjs\`, below).`, "")
+		`Your task done, the report sent, and you were launched for it: close your window (\`node ${B}/close.mjs\`, below). If you lead a team: once the chains you launched are returned.`, "")
 	L.push(
 		"## Restarting yourself: a fresh session in this window, with nobody at the keyboard", "",
 		"Write your handoff first, then:",
