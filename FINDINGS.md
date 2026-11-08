@@ -4984,3 +4984,41 @@ Run on the code before: 0 of 6. **So the replay reddens for the field's defect, 
 - **The cost of the watcher**: a node process for one look per ring, 15 s. **Not measured** on a busy field; its letter asks work to say if it shows.
 - **Other fields' ring history**: my lost-bell count works on work only; on the others its directory mapping finds no transcripts, and that says nothing about them.
 - **Native path** (`#native-path`, a runtime socket per session): would type nothing at all, so this whole class would end. Its protocol is undocumented, and a process is not a session: **not tried**. The next thing to measure on this subject.
+
+## `#teams` — the star becomes optional: a chief and its experts, declared once (2026-11-08)
+
+**The owner, through work's leader (letter 42):** *"Il faut que toi, tu supervises l'entièreté du projet et pas tous les messages un par un. [...] Je veux
+une structure efficace à 3 niveaux [...] ça peut également être 4 niveaux."* Measured in that field on 11-07 and 11-08: a pair dies at 24 h with no signal, and three
+of a chief's were dead for two days; each opening rings both ends, so opening them all (153) would ring each agent 17 times; an expert's `done` came to the leader 28 times
+against 1 to its chief; a chief's day was 0 messages to its experts and 12 from the leader. His three decisions: letter 45.
+
+**What it is.** `"teams": {"<chief>": ["<expert>", ...]}` in `.comm/config.json`, and the bus derives the rest (`linked`): a chief and its experts, two chiefs, two experts of one
+team. No pair, no end date, no bell at the start. An expert may be in several teams; a level 4 is a member who also leads. **No `"teams"` is exactly the star**: no record written, the same refusal.
+
+**What stays of the star's reason, nothing coordinating off the board.** A link exists only where the config declares it, an agent's name comes from the config and never from a
+message, all of it is in `comm log`. **One fault in the declaration is no team at all**, and is said at the installer, in boot's row (cause `teams-ignored`), at every agent's start and in
+the refusal itself. Work's first draft against its own roster today would have been exactly that: six names not yet on it.
+
+**`send @asker` (`@demandeur`).** A `nudge` from **its leader or a chief of it** opens a request, one per asker; the expert's `done` to that one closes it; `blocked` and a colleague's question move nothing. `@asker` is the ONE who
+waits, else its only chief, else the leader. **Several waiting: it refuses and names them.** My first model, "the last one who asked", sent one chief's work to another for an expert shared by three (work's review, letter 48); guessing is what a bus must not do with a report.
+Never rerouted: `send leader` goes to the leader, with a warning naming who still waits. Default kinds follow: upward is `done`, so **a question is `--kind blocked`**, or it closes the request.
+
+**A chief's `SPEC.md` is its expert's** (`subjectOf`): a chief is its team's leader for refs. **A chief opens a pair** for one of its own experts, the other perhaps another chief's. Its bell is an `fyi`:
+a pair is not work. It may ring the two of them for a minute (`opened_at`), never later. What the leader opened, a chief neither closes nor replaces. Many writers now, so `pairs.json` takes a lock.
+
+**The bus's size is why `team.mjs` exists:** the role sentences pushed the bus over A22 (59 084 B of 58 000). Only a start message needs them, so they left it. It sits right under the cap now, and step C goes in `team.mjs` too.
+
+**An adversarial read of the first version** (Opus, read only, no conclusion of mine) found 12 and four of them high, each run on a fixture before anything changed: `@asker` followed ANY nudge, so a
+teammate's question stole a chief's report, which defeats the point; it could return an agent the send then refused (a pair's bell, a chief moved away); boot statically imported `comm.mjs`,
+so a broken bus killed boot before its first row, silently through its hook (the very file it diagnoses); and the start message and SKILL still said `send <leader>`. Also: two chiefs opening pairs at
+once lost one (30 rounds, 0 clean); the "opener" clause lasted 24 h; a chief could close or shorten the leader's pair; a fault was silent in the field; two arms passed for the wrong reason. All fixed and armed here.
+
+**Arms.** A116 each edge each way and each wall, each kind of fault a star, names off Object's prototype. A117 the asker's every source and fallback, what does not move it, never rerouted, a chief's refs. A118 a chief's pairs,
+the opener's minute, the leader's pair, two chiefs at once, delivery to a chief through the real Stop stub, each role's start through the real SessionStart stub.
+
+**Named, not fixed:**
+- **`launch.mjs --prompt` writes no asker**: a launched task reports to whoever last sent work, or its chief. Step B, with who may launch.
+- **Boot's `teams` row and its surviving a broken `comm.mjs` are measured by hand, unarmed**: `boot --prove-red` is 1-1.6 h on the owner's machine. To arm with the next batch.
+- **A request nobody answers stays open**: no staleness (its date is kept, unread, for step C), so a chief who abandons one keeps `@asker` asking the expert to name.
+- **Declaring `teams` changes nothing in a running session's start message**, read at start; the links themselves act at once, the bus reads the config at each send. The SKILL is generic on purpose (a roster in a generated file drifts at every hand edit): it needs no install, the start message says what is yours.
+- **Renaming an agent**: no tool. Measured by hand on a throwaway project: stop it, move its folder, change `agents` and `teams`, move its inbox, re-run the installer; it reads its mail and reports. **Mail pending to or from it keeps a broken `refPath`**, so empty those inboxes first. `log.jsonl` keeps the old name, and Claude Code's own history and memory stay under the old folder's name.

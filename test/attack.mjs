@@ -1338,6 +1338,262 @@ const POINTER_SOURCES = (() => {
 		`bad exits ${bad.map((r) => r.status).join(",")}; open: "${said(open).split("\n")[0].slice(0, 70)}"`)
 }
 
+// A116 - A118: TEAMS. The owner, 11-08, through work's leader: "Il faut que toi, tu supervises l'entièreté du projet et pas tous les messages un
+// par un [...] une structure efficace à 3 niveaux [...] ça peut également être 4". Measured that day: pairs die at 24 h with no signal, each opening
+// rings both ends, a report goes back to the leader by default (28 to 1). One declaration, the real installer, the real stub. FINDINGS.md#teams
+{
+	const r116 = mkdtempSync(join(tmpdir(), "comm-attack-teams-"))
+	atExit(() => { try { rmSync(r116, { recursive: true, force: true }) } catch {} })
+	const NAMES = ["boss", "chiefA", "chiefB", "shared", "e1", "e2", "lead4", "sub", "loner"]
+	mkdirSync(join(r116, ".comm"), { recursive: true })
+	for (const a of NAMES.slice(1)) { mkdirSync(join(r116, a), { recursive: true }); writeFileSync(join(r116, a, "SPEC.md"), `the spec of ${a}\n`); writeFileSync(join(r116, a, "R.md"), `report of ${a}\n`) }
+	writeFileSync(join(r116, "SPEC.md"), "the leader's own\n")
+	const TEAMS = { chiefA: ["e1", "shared", "lead4"], chiefB: ["e2", "shared"], lead4: ["sub"] }
+	const cfg116 = { leader: "boss", agents: { boss: ".", ...Object.fromEntries(NAMES.slice(1).map((a) => [a, a])) }, teams: TEAMS }
+	const CF = join(r116, ".comm", "config.json")
+	const setCfg = (o) => writeFileSync(CF, JSON.stringify(o, null, 1))
+	setCfg(cfg116)
+	const instOut = spawnSync(process.execPath, [join(PKG, "install.mjs"), r116], { encoding: "utf8" })
+	const dirOf = (w) => (w === "boss" ? r116 : join(r116, w))
+	const bin = (tool) => join(r116, ".comm", "bin", tool)
+	const comm = (who, ...args) => spawnSync(process.execPath, [bin("comm.mjs"), ...args], { cwd: dirOf(who), encoding: "utf8", env: { ...process.env, CLAUDE_COMM_AGENT: "" } })
+	const pair = (who, ...args) => spawnSync(process.execPath, [bin("pair.mjs"), ...args], { cwd: dirOf(who), encoding: "utf8", env: { ...process.env, CLAUDE_COMM_AGENT: "" } })
+	const box = (a) => { try { return readdirSync(join(r116, ".comm", "inbox", a)).filter((f) => f.endsWith(".json")).map((f) => JSON.parse(readFileSync(join(r116, ".comm", "inbox", a, f), "utf8"))) } catch { return [] } }
+	const clear = () => { for (const a of NAMES) rmSync(join(r116, ".comm", "inbox", a), { recursive: true, force: true }); rmSync(join(r116, ".comm", "asked"), { recursive: true, force: true }); rmSync(join(r116, ".comm", "pairs.json"), { force: true }) }
+	const said = (r) => `${r.stdout}${r.stderr}`
+	const can = (a, b) => { const r = comm(a, "send", b, "--ref", "R.md"); return r.status === 0 && box(b).some((m) => m.from === a) }
+	const hub = (a, b) => { const n = box(b).length, r = comm(a, "send", b, "--ref", "R.md"); return r.status !== 0 && /hub-enforced/.test(said(r)) && box(b).length === n }
+
+	// A116 — WHO MAY WRITE TO WHOM, each edge of the table in its own leg and each way; a fault makes it no team at all.
+	clear()
+	const links = {
+		chiefToExpert: can("chiefA", "e1"), expertToChief: can("e1", "chiefA"),
+		chiefToChief: can("chiefA", "chiefB") && can("chiefB", "chiefA"),
+		sameTeam: can("e1", "shared") && can("shared", "e1"),
+		sharedSeesBothTeams: can("shared", "e2") && can("e2", "shared") && can("shared", "chiefB"),
+		level4Down: can("lead4", "sub") && can("sub", "lead4"),
+		level4Up: can("lead4", "chiefA"),
+		leaderStill: can("loner", "boss") && comm("boss", "send", "loner", "--ref", "R.md").status === 0,
+	}
+	const walls = {
+		otherTeamsExperts: hub("e1", "e2") && hub("e2", "e1"),
+		chiefToAnothersExpert: hub("chiefA", "e2") && hub("chiefB", "e1"),
+		anotherChiefToMe: hub("e2", "chiefA"),
+		outOfTeam: hub("loner", "e1") && hub("e1", "loner") && hub("loner", "chiefA"),
+		// the sub-team's expert stays one level down: its chief's other experts are not its team
+		subToUncle: hub("sub", "e1") && hub("sub", "chiefA"),
+	}
+	const namesVia = /Send to 'chiefA'/.test(said(comm("e1", "send", "e2", "--ref", "R.md"))) && /Send to 'chiefB'/.test(said(comm("e2", "send", "e1", "--ref", "R.md")))
+	// ONE FAULT IS NO TEAM, each kind, and the same send refuses as in a star; the control is the green table above
+	const FAULTS = { "an unknown member": { chiefA: ["e1", "nobody"] }, "an unknown head": { nobody: ["e1"] }, "the leader as head": { boss: ["e1"] }, "the leader as member": { chiefA: ["boss"] },
+		"an agent in its own team": { chiefA: ["chiefA"] }, "an empty team": { chiefA: [] }, "not a list": { chiefA: "e1" }, "not an object": ["chiefA"] }
+	const faultsStar = {}
+	for (const [k, t] of Object.entries(FAULTS)) { setCfg({ ...cfg116, teams: t }); clear(); faultsStar[k] = hub("chiefA", "e1") && /Every message has/.test(said(comm("chiefA", "send", "e1", "--ref", "R.md"))) }
+	// names off Object's prototype, and a member that is not a string, on the functions themselves: a name is read off the config as data
+	const cm116 = await import(pathToFileURL(join(PKG, "bin", "comm.mjs")).href)
+	const cfgP = { leader: "boss", agents: { boss: ".", constructor: "c", e1: "e1", chiefA: "a" }, teams: { chiefA: ["e1"] } }
+	const proto = cm116.linked(cfgP, "constructor", "e1") === false && cm116.leads(cfgP, "constructor", "e1") === false && cm116.leads(cfgP, "toString", "e1") === false && cm116.headsOf(cfgP, "constructor").length === 0 &&
+		cm116.teamFaults({ ...cfgP, teams: JSON.parse('{"__proto__":["e1"]}') }).length > 0 && cm116.teamFaults({ ...cfgP, teams: { chiefA: [["e1"]] } }).length > 0 && cm116.linked({ ...cfgP, teams: { chiefA: [["e1"]] } }, "chiefA", "e1") === false
+	const faultInst = (() => { setCfg({ ...cfg116, teams: { chiefA: ["nobody"] } }); return said(spawnSync(process.execPath, [join(PKG, "install.mjs"), r116], { encoding: "utf8" })) })()
+	const noTeams = { leader: "boss", agents: cfg116.agents }
+	setCfg(noTeams); clear()
+	const starHolds = hub("chiefA", "e1") && hub("e1", "chiefA") && can("e1", "boss")
+	setCfg(cfg116)
+	spawnSync(process.execPath, [join(PKG, "install.mjs"), r116], { encoding: "utf8" })
+	check("A116 teams link a chief and its experts, the chiefs, one team's experts, and nothing else; one fault in the declaration and it is a star again",
+		Object.values(links).every(Boolean) && Object.values(walls).every(Boolean) && namesVia && Object.values(faultsStar).every(Boolean) && proto && /"teams" is IGNORED/.test(faultInst) && /nobody/.test(faultInst) && starHolds,
+		Object.entries({ ...links, ...walls }).map(([k, v]) => `${k}=${v}`).join("; ") + `; the refusal names the chief to go through=${namesVia}; each fault is a star: ${Object.entries(faultsStar).filter(([, v]) => !v).map(([k]) => k).join(", ") || "all"}; ` +
+		`a name read off Object's prototype=${proto}; the installer says so=${/"teams" is IGNORED/.test(faultInst)}; no "teams" at all: the star holds=${starHolds}`)
+
+	// A117 — A REPORT REACHES WHO ASKED, a send is never rerouted, and a chief's `SPEC.md` is its expert's.
+	clear()
+	const askedBy = () => { try { return readdirSync(join(r116, ".comm", "asked", "shared")) } catch { return [] } }
+	const reportTo = (who) => { const r = comm(who, "send", "@asker", "--ref", "R.md"); return { r, m: NAMES.map((n) => box(n).find((x) => x.from === who && x.ref === "R.md")).find(Boolean) } }
+	const sentNoAsk = reportTo("e1")                                                         // no request yet: its only chief
+	clear()
+	const sharedNoAsk = reportTo("shared")                                                   // two chiefs, no request: the leader
+	clear()
+	comm("chiefA", "send", "shared", "--ref", "SPEC.md")
+	const a1 = reportTo("shared")
+	clear()
+	// ONE OPEN REQUEST PER CHIEF (work's review, letter 48): an expert shared by two never sends one's work to the other
+	comm("chiefA", "send", "shared", "--ref", "SPEC.md"); comm("chiefB", "send", "shared", "--ref", "SPEC.md")
+	const a2 = reportTo("shared")
+	const a2box = NAMES.flatMap((n) => box(n)).filter((m) => m.from === "shared").length
+	const answerA = comm("shared", "send", "chiefA", "--ref", "R.md")
+	const a2b = reportTo("shared"), oneLeft = box("chiefB").filter((m) => m.from === "shared").length === 1
+	const a2c = (() => { const r = comm("shared", "send", "@asker", "--ref", "R.md"); return { r, m: box("boss").find((x) => x.from === "shared") } })()
+	clear()
+	comm("chiefA", "send", "shared", "--ref", "SPEC.md"); comm("shared", "send", "chiefA", "--kind", "blocked", "--ref", "R.md")
+	const blockedKeeps = askedBy().includes("chiefA")
+	comm("shared", "send", "chiefA", "--ref", "R.md")
+	const doneCloses = askedBy().length === 0
+	clear()
+	comm("boss", "send", "shared", "--ref", "SPEC.md")
+	const a3 = reportTo("shared")
+	clear()
+	comm("chiefA", "send", "shared", "--kind", "fyi", "--ref", "SPEC.md"); const fyiDoesNotAsk = askedBy().length === 0
+	clear()
+	comm("chiefA", "send", "shared", "--ref", "SPEC.md"); comm("shared", "send", "chiefB", "--kind", "nudge", "--ref", "R.md")
+	const upwardKeeps = askedBy().join() === "chiefA" && !existsSync(join(r116, ".comm", "asked", "chiefB"))
+	clear()
+	// WORK IS WHAT A LEADER OR A CHIEF OF IT GIVES: a colleague's question, another chief's, a pair's bell move nothing
+	comm("chiefA", "send", "shared", "--ref", "SPEC.md"); comm("e1", "send", "shared", "--ref", "R.md")
+	const teammate = reportTo("shared")
+	clear()
+	comm("boss", "send", "chiefB", "--ref", "SPEC.md"); comm("chiefA", "send", "chiefB", "--ref", "R.md")
+	const otherChief = reportTo("chiefB")
+	clear()
+	comm("chiefB", "send", "e2", "--ref", "SPEC.md")
+	writeFileSync(join(r116, "e1", "WHY0.md"), "why\n")
+	const pairOpened117 = pair("chiefA", "e1", "e2", "--for", "1h", "--ref", "WHY0.md").status === 0
+	const pairBell = reportTo("e2")
+	clear()
+	// a chief no longer over it: the record is not obeyed, and @asker is never an agent the send would refuse
+	comm("chiefA", "send", "e1", "--ref", "SPEC.md")
+	setCfg({ ...cfg116, teams: { chiefA: ["shared"], chiefB: ["e1"] } })
+	const moved = reportTo("e1")
+	setCfg(cfg116)
+	clear()
+	mkdirSync(join(r116, ".comm", "asked", "e1"), { recursive: true }); writeFileSync(join(r116, ".comm", "asked", "e1", "gone"), "x")
+	const offRoster = reportTo("e1")
+	clear()
+	mkdirSync(join(r116, ".comm", "asked"), { recursive: true }); writeFileSync(join(r116, ".comm", "asked", "e1"), "not a folder")
+	const corrupt = reportTo("e1")
+	clear()
+	comm("chiefA", "send", "e1", "--ref", "SPEC.md")
+	const toLeader = comm("e1", "send", "boss", "--ref", "R.md")
+	const notRerouted = toLeader.status === 0 && box("boss").some((m) => m.from === "e1") && !box("chiefA").some((m) => m.from === "e1") && /'chiefA' still waits/.test(toLeader.stdout)
+	clear()
+	comm("boss", "send", "e1", "--ref", "SPEC.md")
+	const noWarnWhenLeaderAsked = !/still waits/.test(comm("e1", "send", "boss", "--ref", "R.md").stdout)
+	clear()
+	const leaderHasNone = comm("boss", "send", "@asker", "--ref", "R.md")
+	// THE SKILL SAYS `send @asker` IN EVERY PROJECT: in a star, with no record and no team, it is the leader
+	setCfg({ leader: "boss", agents: cfg116.agents }); clear()
+	const inAStar = reportTo("e1"); setCfg(cfg116); clear()
+	const alias = (() => { comm("chiefA", "send", "e1", "--ref", "SPEC.md"); const r = comm("e1", "send", "@demandeur", "--ref", "R.md"); return r.status === 0 && box("chiefA").some((m) => m.from === "e1") })()
+	clear()
+	comm("chiefA", "send", "e1", "--ref", "SPEC.md")
+	const ref = box("e1").find((m) => m.from === "chiefA") || {}
+	const notMine = comm("chiefA", "send", "chiefB", "--ref", "R.md"), refC = box("chiefB").find((m) => m.from === "chiefA") || {}
+	const ok117 = {
+		noRequestItsChief: sentNoAsk.r.status === 0 && sentNoAsk.m && sentNoAsk.m.to === "chiefA" && sentNoAsk.m.kind === "done",
+		twoChiefsNoRequestLeader: sharedNoAsk.m && sharedNoAsk.m.to === "boss" && sharedNoAsk.m.kind === "done",
+		toWhoAsked: a1.m && a1.m.to === "chiefA" && a1.m.kind === "done",
+		severalWaitingRefuses: a2.r.status !== 0 && /several wait/.test(said(a2.r)) && /chiefA/.test(said(a2.r)) && /chiefB/.test(said(a2.r)) && a2box === 0,
+		oneAnswered: answerA.status === 0 && a2b.r.status === 0 && oneLeft,
+		allAnsweredLeader: a2c.r.status === 0 && !!a2c.m,
+		blockedKeeps, doneCloses,
+		leaderAsked: a3.m && a3.m.to === "boss",
+		fyiDoesNotAsk, upwardKeeps,
+		colleagueDoesNotAsk: teammate.r.status === 0 && teammate.m && teammate.m.to === "chiefA",
+		anotherChiefDoesNotAsk: otherChief.r.status === 0 && otherChief.m && otherChief.m.to === "boss",
+		aPairsBellDoesNotAsk: pairOpened117 && pairBell.r.status === 0 && pairBell.m && pairBell.m.to === "chiefB",
+		aChiefMovedAway: moved.r.status === 0 && moved.m && moved.m.to === "chiefB",
+		offRosterFallsBack: offRoster.m && offRoster.m.to === "chiefA",
+		corruptFallsBack: corrupt.m && corrupt.m.to === "chiefA",
+		notRerouted, noWarnWhenLeaderAsked,
+		leaderHasNone: leaderHasNone.status !== 0 && /no asker/.test(said(leaderHasNone)),
+		inAStarItIsTheLeader: inAStar.r.status === 0 && inAStar.m && inAStar.m.to === "boss" && inAStar.m.kind === "done",
+		alias,
+		chiefsSpecIsItsExperts: ref.refPath === "e1/SPEC.md",
+		chiefToChiefIsItsOwn: refC.refPath === "chiefA/R.md" && refC.kind === "nudge",
+		askerNotARecipient: !existsSync(join(r116, ".comm", "inbox", "@asker")),
+	}
+	check("A117 `send @asker` reaches the one who waits, else the only chief, else the leader, and refuses when several wait; a send is never rerouted, and a chief's SPEC.md is its expert's",
+		Object.values(ok117).every(Boolean), Object.entries(ok117).map(([k, v]) => `${k}=${!!v}`).join("; ") + `; e1 alone -> ${sentNoAsk.m && sentNoAsk.m.to}, shared alone -> ${sharedNoAsk.m && sharedNoAsk.m.to}; two waiting -> ${JSON.stringify(said(a2.r).split("\n")[0].slice(0, 90))}`)
+
+	// A118 — A CHIEF OPENS A PAIR FOR ITS OWN EXPERT, THE OTHER MAY BE ANOTHER CHIEF'S, AND EACH AGENT IS TOLD WHAT IS ITS OWN. The real stub, fired.
+	clear()
+	const expertTries = pair("e1", "e1", "e2", "--for", "1h", "--ref", "R.md")
+	const notItsExperts = pair("chiefB", "e1", "sub", "--for", "1h", "--ref", "R.md")
+	writeFileSync(join(r116, "e1", "WHY.md"), "why this pair\n")
+	const opened = pair("chiefA", "e1", "e2", "--for", "1h", "--ref", "WHY.md")
+	const toldE1 = box("e1").find((m) => m.from === "chiefA"), toldE2 = box("e2").find((m) => m.from === "chiefA")
+	const canNow = can("e1", "e2") && can("e2", "e1")
+	// while the pair is a minute old its opener reaches both, one of them another chief's; never a third, and never later
+	const openerPositive = comm("chiefA", "send", "e2", "--kind", "fyi", "--ref", "R.md").status === 0 && box("e2").some((m) => m.from === "chiefA" && m.ref === "R.md")
+	const openerNotAThird = hub("chiefA", "sub")
+	const pjNow = JSON.parse(readFileSync(join(r116, ".comm", "pairs.json"), "utf8"))
+	writeFileSync(join(r116, ".comm", "pairs.json"), JSON.stringify({ ...pjNow, "e1+e2": { ...pjNow["e1+e2"], opened_at: new Date(Date.now() - 61_000).toISOString() } }))
+	const openerEnds = hub("chiefA", "e2") && can("e1", "e2")
+	writeFileSync(join(r116, ".comm", "pairs.json"), JSON.stringify(pjNow))
+	setCfg({ ...cfg116, teams: { chiefA: ["nobody"] } })
+	const openerNeedsTeams = hub("chiefA", "e2")
+	setCfg(cfg116)
+	const notOpener = hub("chiefB", "e1")
+	const closeByOther = pair("chiefB", "e1", "e2", "--close")      // chiefB leads e2: its own expert's pair
+	const shutAgain = hub("e1", "e2")
+	const pj = (() => { try { return JSON.parse(readFileSync(join(r116, ".comm", "pairs.json"), "utf8"))["e1+e2"] } catch { return null } })()
+	clear()
+	const badRefRollsBack = pair("chiefA", "e1", "e2", "--for", "1h", "--ref", "NOPE.md")
+	const rolled = !existsSync(join(r116, ".comm", "pairs.json")) && hub("e1", "e2")
+	const leaderStillOpens = pair("boss", "e1", "e2", "--for", "1h", "--ref", "WHY.md").status === 0
+	// what the leader opened, a chief of either expert neither closes nor replaces
+	const pairOf = () => { try { return JSON.parse(readFileSync(join(r116, ".comm", "pairs.json"), "utf8"))["e1+e2"] } catch { return null } }
+	const chiefCloses = pair("chiefB", "e1", "e2", "--close"), chiefReopens = pair("chiefA", "e1", "e2", "--for", "1m", "--ref", "WHY.md")
+	const leadersStands = chiefCloses.status !== 0 && chiefReopens.status !== 0 && /only 'boss'/.test(said(chiefCloses)) && pairOf().opened_by === "boss" && Date.parse(pairOf().until) - Date.now() > 50 * 60_000
+	clear()
+	// TWO CHIEFS AT ONCE, each round: both told open, both open afterwards, no file left locked
+	let raced = 0
+	writeFileSync(join(r116, "shared", "WHY.md"), "why\n")
+	for (let i = 0; i < 4; i++) {
+		rmSync(join(r116, ".comm", "pairs.json"), { force: true })
+		const run = (who, ...args) => new Promise((res) => { const c = spawn(process.execPath, [bin("pair.mjs"), ...args], { cwd: dirOf(who), stdio: "ignore", env: { ...process.env, CLAUDE_COMM_AGENT: "" } }); c.on("exit", res) })
+		const codes = await Promise.all([run("chiefA", "e1", "e2", "--for", "1h", "--ref", "WHY.md"), run("chiefB", "shared", "e2", "--for", "1h", "--ref", "WHY.md")])
+		let f = {}
+		try { f = JSON.parse(readFileSync(join(r116, ".comm", "pairs.json"), "utf8")) } catch {}
+		if (codes.every((c) => c === 0) && f["e1+e2"] && f["e2+shared"] && !existsSync(join(r116, ".comm", "pairs.json.lock"))) raced++
+	}
+	clear()
+	// DELIVERY TO A CHIEF, and from one: the real Stop stub, and a path the reader can open
+	comm("e1", "send", "chiefA", "--ref", "R.md")
+	comm("chiefA", "send", "shared", "--ref", "SPEC.md")
+	const stopOf = (who) => { const r = spawnSync(process.execPath, [join(dirOf(who), ".claude", "comm-hook.mjs"), "stop"], { cwd: dirOf(who), encoding: "utf8", env: { ...process.env, CLAUDE_COMM_AGENT: "", CLAUDE_PROJECT_DIR: dirOf(who) },
+		input: JSON.stringify({ cwd: dirOf(who), hook_event_name: "Stop", stop_hook_active: false, transcript_path: join(r116, `${who}.jsonl`) }) }); try { return JSON.parse(r.stdout).reason || "" } catch { return r.stdout } }
+	const toChief = stopOf("chiefA"), toExpert = stopOf("shared")
+	const delivered = /e1/.test(toChief) && /\.\.\/e1\/R\.md/.test(toChief) && /chiefA/.test(toExpert) && /SPEC\.md/.test(toExpert) && !/\.\.\/[a-zA-Z0-9]+\/SPEC\.md/.test(toExpert)
+	clear()
+	const start = (who) => {
+		const r = spawnSync(process.execPath, [join(dirOf(who), ".claude", "comm-hook.mjs"), "session-start"], { cwd: dirOf(who), encoding: "utf8", env: { ...process.env, CLAUDE_COMM_AGENT: "", CLAUDE_PROJECT_DIR: dirOf(who) },
+			input: JSON.stringify({ cwd: dirOf(who), hook_event_name: "SessionStart", source: "startup", session_id: `a118-${who}`, transcript_path: join(r116, `${who}.jsonl`) }) })
+		return `${r.stdout}${r.stderr}`
+	}
+	const sE1 = start("e1"), sChief = start("chiefA"), sShared = start("shared"), sBoss = start("boss"), sLoner = start("loner"), sLead4 = start("lead4")
+	const line = spawnSync(process.execPath, [bin("team.mjs")], { cwd: dirOf("e1"), encoding: "utf8" })
+	setCfg({ ...cfg116, teams: { chiefA: ["nobody"] } })
+	const faultLine = spawnSync(process.execPath, [bin("team.mjs")], { cwd: dirOf("e1"), encoding: "utf8" }), faultStart = start("e1")
+	setCfg(cfg116)
+	const ok118 = {
+		expertCannotOpen: expertTries.status !== 0 && /only 'boss', or a chief/.test(said(expertTries)),
+		notItsExpertsCannot: notItsExperts.status !== 0,
+		chiefOpens: opened.status === 0 && !!toldE1 && !!toldE2 && toldE1.refPath === "e1/WHY.md" && toldE2.refPath === "e1/WHY.md",
+		pairWorks: canNow,
+		openerReachesBoth: openerPositive && openerNotAThird,
+		openerClauseEnds: openerEnds,
+		openerClauseIsNotForAStar: openerNeedsTeams,
+		anotherChiefNot: notOpener === true,
+		itsOtherChiefCloses: closeByOther.status === 0 && shutAgain && !!pj && pj.closed_by === "chiefB",
+		badRefOpensNothing: badRefRollsBack.status !== 0 && rolled,
+		leaderStillOpens,
+		leadersPairStands: leadersStands,
+		twoChiefsAtOnce: raced === 4,
+		deliveredToAChief: delivered,
+		startExpert: /You work for 'chiefA'/.test(sE1) && /shared/.test(sE1) && /send @asker/.test(sE1) && !/never to another expert/.test(sE1),
+		startChief: /You LEAD a team: e1, shared, lead4/.test(sChief) && /other chiefs \(chiefB, lead4\)/.test(sChief),
+		startShared: /You work for 'chiefA' and 'chiefB'/.test(sShared),
+		startLeader: /This project has teams/.test(sBoss) && !/Experts write only to you/.test(sBoss),
+		startLevel4: /You LEAD a team: sub/.test(sLead4) && /You work for 'chiefA'/.test(sLead4),
+		startLonerAsBefore: /never to another expert/.test(sLoner) && !/LEAD|work for/.test(sLoner),
+		toolSaysIt: /You work for 'chiefA'/.test(line.stdout),
+		faultSaid: /"teams" is IGNORED/.test(faultLine.stdout) && /never to another expert/.test(faultStart) && /"teams\\?" is IGNORED/.test(faultStart),
+		startSaysAsker: /send @asker/.test(sE1) && !/send boss/.test(sE1) && /send boss/.test(sLoner),
+	}
+	check("A118 a chief opens a pair for its own expert and rings both, and each agent is told at its start exactly what is its own",
+		Object.values(ok118).every(Boolean), Object.entries(ok118).map(([k, v]) => `${k}=${!!v}`).join("; ") + `; raced ${raced}/4; to a chief: ${JSON.stringify(toChief.slice(0, 160))}; opened: "${said(opened).split("\n")[0].slice(0, 80)}"; e1 starts: ${JSON.stringify(sE1.slice(0, 200))}`)
+}
+
 // A103 — PAST ITS "at", AN AGENT'S TURN END IS HELD ONCE PER 25 k UNTIL IT ARMS ITS RELAY - NEVER OVER MAIL, NEVER TWICE IN
 // A TURN, NEVER WHILE A RELAY IS ARMED FOR ITS SESSION. work's leader for the owner (11-02 21h52, `…-14-declencheur-du-
 // relais.md`): two projects carried copies of the same Stop hook, and theirs cancelled a relay armed 3 s earlier (10-30).
@@ -2664,7 +2920,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	const front = (t) => /^---\nname: claude-comm\ndescription: .{80,}\n---\n/.test(t)
 	const absInstall = /node (\/\S+\/install\.mjs)/.exec(sLead)
 	const roles = /## Your experts/.test(sLead) && !/## Your experts/.test(sWeb) && /your leader is \*\*`leader`\*\*/.test(sWeb) &&
-		/send leader --ref <report> --kind done/.test(sWeb)
+		/send @asker --ref <report> --kind done/.test(sWeb) && /else `leader`/.test(sWeb)
 	const skillPaths = allExist(sLead, r74) && allExist(sWeb, webDir) && !!absInstall && existsSync(absInstall[1])
 	// Review #12 C1: exchange/ is leader-to-leader; an expert writes to its leader only. And the pointer first.
 	const star = /exchange\/field\/in/.test(sLead) && !/exchange/.test(sWeb) && /Tell your leader, by the bus/.test(sWeb) &&

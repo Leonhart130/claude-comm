@@ -15,7 +15,7 @@
  */
 import {
 	readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync,
-	readdirSync, renameSync, statSync, lstatSync, readlinkSync,
+	readdirSync, renameSync, rmSync, statSync, lstatSync, readlinkSync,
 } from "node:fs"
 import { join, dirname, resolve, relative, sep, basename, normalize, isAbsolute } from "node:path"
 // A21 permits a relative import of a BUS file and checks it transitively; see
@@ -139,7 +139,8 @@ const safeRef = (s) => String(s ?? "").replace(/[\u0000-\u001f\u007f-\u009f]+/g,
 // The SUBJECT is whichever end is not the leader (hub enforcement guarantees
 // exactly one is). A ref is relative to the SUBJECT's repo, because that is what
 // both sides mean by `docs/REVIEW.md`.
-const subjectOf = (cfg, from, to) => (from === cfg.leader ? to : from)
+// A chief is its team's leader here: `SPEC.md` from a chief means its expert's.
+const subjectOf = (cfg, from, to) => (from === cfg.leader || leads(cfg, from, to) ? to : from)
 
 // The BASE a --ref resolves against: the SPOKE's directory, whoever sends. Not sayable as
 // "relative to X" - both ends of one bus wrote opposite rules from it - so the TOOL says it,
@@ -222,6 +223,40 @@ const PAIRS = (root) => join(root, ".comm", "pairs.json"), pairKey = (a, b) => [
 function readPairs(root) { try { const p = JSON.parse(readFileSync(PAIRS(root), "utf8")); return p && typeof p === "object" ? p : {} } catch { return {} } }
 const isOpen = (p) => !!p && Date.parse(p.until) > Date.now()
 
+// ── teams, declared in the config: a link only where declared; one fault and it is NO team, a star, and said. FINDINGS.md#teams ──
+const own = (o, k) => !!o && Object.prototype.hasOwnProperty.call(o, k)
+export function teamFaults(cfg) {
+	const t = cfg && cfg.teams, out = []
+	if (t === undefined) return out
+	if (!t || typeof t !== "object" || Array.isArray(t)) return ['"teams" is not an object']
+	for (const [h, m] of Object.entries(t)) {
+		if (!own(cfg.agents, h) || h === cfg.leader) out.push(`'${h}' cannot lead a team: ${h === cfg.leader ? "the leader already writes to everyone" : "not on the roster"}`)
+		if (!Array.isArray(m) || !m.length) { out.push(`the team of '${h}' is not a list of agents`); continue }
+		for (const a of m) if (typeof a !== "string" || !own(cfg.agents, a) || a === cfg.leader || a === h) out.push(`'${a}' cannot be in the team of '${h}'`)
+	}
+	return out
+}
+export const teams = (cfg) => (cfg && cfg.teams && !teamFaults(cfg).length ? cfg.teams : null)
+export const headsOf = (cfg, a) => { const t = teams(cfg); return t ? Object.keys(t).filter((h) => t[h].includes(a)) : [] }
+export const leads = (cfg, h, a) => { const t = teams(cfg); return !!t && own(t, h) && t[h].includes(a) }
+/** A chief and its expert, two chiefs, two experts of one team. */
+export function linked(cfg, a, b) {
+	const t = teams(cfg)
+	return !!t && (leads(cfg, a, b) || leads(cfg, b, a) || (own(t, a) && own(t, b)) || headsOf(cfg, a).some((h) => t[h].includes(b)))
+}
+const ASKED = (root, a) => join(root, ".comm", "asked", a)
+/** Who waits on this agent's work: its leader or a chief of it, nudge not yet answered by a `done`. */
+export function askersOf(root, cfg, a) {
+	let n = []
+	try { n = readdirSync(ASKED(root, a)) } catch {}
+	return n.filter((f) => f === cfg.leader || leads(cfg, f, a))
+}
+/** `send @asker`: the ONE who waits, else its only chief, else the leader. Null when several wait: not the bus's to guess. */
+export function askerOf(root, cfg, a) {
+	const w = askersOf(root, cfg, a), h = headsOf(cfg, a)
+	return w.length > 1 ? null : w[0] || (h.length === 1 ? h[0] : cfg.leader)
+}
+
 // When did `from` last message `to`? The inbox AND the log: the log is written only at delivery, so mail
 // pending for an agent not running would make every second message look like a first.
 function lastSentTs(root, from, to) {
@@ -262,14 +297,17 @@ function send(root, cfg, { from, to, kind, ref, note, force = false, toState = n
 	// HUB ENFORCEMENT (README.md "Topology is enforced, not documented"): the leader is at one end of
 	// every message. A peer send is refused, never rerouted - a reroute lets two experts coordinate off-board.
 	// The one way round it is the leader's own: a pair it opened, still open (above).
+	// So is a declared link, and a chief ringing the two of the pair it opened this minute.
 	let pair
-	if (from !== cfg.leader && to !== cfg.leader) {
-		const all = readPairs(root), k = pairKey(from, to), p = Object.prototype.hasOwnProperty.call(all, k) ? all[k] : null
-		if (!isOpen(p)) throw new Error(
+	if (from !== cfg.leader && to !== cfg.leader && !linked(cfg, from, to)) {
+		const all = readPairs(root), k = pairKey(from, to), p = own(all, k) ? all[k] : null
+		const opener = !!teams(cfg) && Object.values(all).some((x) => isOpen(x) && x.opened_by === from && (x.a === to || x.b === to) && Date.now() - Date.parse(x.opened_at) < 60_000)
+		const via = headsOf(cfg, from).join("' or '") || cfg.leader
+		if (!isOpen(p) && !opener) throw new Error(
 			`hub-enforced: '${from}' may not message '${to}' directly${p ? ` - their pair closed at ${clock(p.until)}` : ""}.\n` +
-			`Every message has '${cfg.leader}' at one end. Send to '${cfg.leader}' and ask them to relay - or, for a tight loop\n` +
+			`${teams(cfg) ? "No team links you two." : `Every message has '${cfg.leader}' at one end.${cfg.teams ? ` "teams" is IGNORED: ${teamFaults(cfg)[0]}.` : ""}`} Send to '${via}' and ask them to relay - or, for a tight loop\n` +
 			`between you two, to open a pair: node .comm/bin/pair.mjs ${from} ${to} --for 2h --ref <the file saying why>`)
-		pair = k
+		if (isOpen(p)) pair = k
 	}
 	if (from === to) throw new Error(`'${from}' cannot message itself`)
 
@@ -297,6 +335,11 @@ function send(root, cfg, { from, to, kind, ref, note, force = false, toState = n
 	const tmp = join(dir, `.${id}.tmp`)
 	writeFileSync(tmp, JSON.stringify(msg, null, 2))
 	renameSync(tmp, join(dir, `${id}.json`))
+	// WHO WAITS, for `send @asker`: one file per request, no read-modify-write.
+	if (teams(cfg) && own(cfg.agents, from)) try {
+		if (kind === "nudge" && (from === cfg.leader || leads(cfg, from, to))) { mkdirSync(ASKED(root, to), { recursive: true }); writeFileSync(join(ASKED(root, to), from), msg.ts) }
+		if (kind === "done") rmSync(join(ASKED(root, from), to), { force: true })
+	} catch { /* never costs a message */ }
 	// Attached AFTER the queue write (A45): the SENDER's warning never travels into the recipient's file.
 	// 🔴 COMPUTED BEFORE it: computed here, lastSentTs finds this very message and warns on every send
 	// forever. FINDINGS.md#bus-notes
@@ -590,8 +633,8 @@ function dispatch(root, cfg, me, cmd, rest) {
 			return
 		}
 		case "send": {
-			const to = firstPositional(rest)
-			if (!to) throw new Error("usage: comm send <to> --ref <file> [--note <text>] [--kind nudge|done|blocked|fyi]")
+			let to = firstPositional(rest)
+			if (!to) throw new Error("usage: comm send <to|@asker> --ref <file> [--note <text>] [--kind nudge|done|blocked|fyi]")
 			// Sender identity comes from cwd, not from a flag: `--from` was free
 			// text, so any expert could have signed a message as any other agent.
 			// Only the leader may override it (to relay, or to drive a test).
@@ -601,13 +644,21 @@ function dispatch(root, cfg, me, cmd, rest) {
 			}
 			const from = me === cfg.leader ? (claimed || cfg.leader) : me
 			if (!from) throw new Error(`cannot tell which agent you are: cwd is not inside a known agent directory`)
+			if (/^@(asker|demandeur)$/.test(to)) {
+				if (from === cfg.leader) throw new Error(`'${to}' is who asked an agent to work: the leader has no asker`)
+				to = askerOf(root, cfg, from)
+				if (!to) throw new Error(`several wait on your work: ${askersOf(root, cfg, from).join(", ")}. The bus does not guess: name the one this answers, send <name>.`)
+			}
 
 			// Busy if any session is, idle only if all are, else CANNOT SAY. `FINDINGS.md#idle-send`
 			const live = liveAgents(root, cfg)[to], t = (live || []).map((l) => l.turn)
 			const turn = !live?.length ? null : t.some((x) => x.state === "busy") ? "busy" : t.every((x) => x.state === "idle") ? "idle" : null
-			const m = send(root, cfg, { from, to, kind: arg(rest, "kind", from === cfg.leader || to !== cfg.leader ? "nudge" : "done"), ref: arg(rest, "ref"), note: arg(rest, "note"), force: rest.includes("--force"),
+			const m = send(root, cfg, { from, to, kind: arg(rest, "kind", from === cfg.leader || (to !== cfg.leader && !leads(cfg, to, from) && !askersOf(root, cfg, from).includes(to)) ? "nudge" : "done"), ref: arg(rest, "ref"), note: arg(rest, "note"), force: rest.includes("--force"),
 				toState: !live?.length ? "not-running" : turn === "idle" ? "idle" : "running" })
 			console.log(`✓ ${m.from} → ${m.to}  [${m.kind}]  they will read: ${refForRecipient(root, cfg, m)}`)
+			// NEVER REROUTED, and said.
+			const waits = to === cfg.leader && from !== cfg.leader ? askersOf(root, cfg, from).filter((x) => x !== to) : []
+			if (waits.length) console.log(`  ⚠ '${waits.join("', '")}' still waits on your work: this went to '${to}'.`)
 			// The SILENT case: `LEAD.md` at the root and in the spoke, and the send succeeds on the spoke's
 			// copy (A9 fixed it for the recipient only). Printed only when the path differs from what was typed.
 			if (m.refPath !== m.ref) {
@@ -743,7 +794,7 @@ function dispatch(root, cfg, me, cmd, rest) {
 			console.log(`claude-comm — hub-and-spoke message bus for Claude Code agents
 
   comm who [--all] [--json]         roster · who runs, and what each is doing · pending counts
-  comm send <to> --ref <file>       ring the bell  [--note <text>] [--kind ${Object.keys(KINDS).join("|")}]
+  comm send <to|@asker> --ref <file>  ring the bell  [--note <text>] [--kind ${Object.keys(KINDS).join("|")}]
                                     [--force: the file is not there yet] [--from <you>: refused unless it is you]
   comm inbox [<agent>]              list pending mail (a PEEK — does not acknowledge)
   comm sent [<agent>] [--n 20]      what you sent, and whether it actually landed

@@ -39,6 +39,9 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 import { execFileSync, spawnSync, spawn } from "node:child_process"
 import { createHash } from "node:crypto"
 import { record as registryRecord, lookup as registryLookup, registryDir, sessionPid, startTimeOf, bootId } from "./session-registry.mjs"
+// NOT AT LINK TIME: boot is what diagnoses this file. A static import of a broken comm.mjs killed boot before its first row, and the session hook hides that.
+let teamFaults = () => []
+try { ({ teamFaults } = await import(new URL("comm.mjs", import.meta.url).href)) } catch {}
 
 const ARGV = process.argv.slice(2)
 const has = (f) => ARGV.includes(f)
@@ -1062,6 +1065,8 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 		const name = basename(p)
 		const chk = spawnSync("node", [join(ROOT, "install.mjs"), p, "--check"], { encoding: "utf8" })
 		const drift = chk.status !== 0
+		// One fault in "teams" is no team (comm.mjs): a project that believes it has them must not read green.
+		const teamsWrong = (() => { try { return teamFaults(JSON.parse(readFileSync(join(p, ".comm", "config.json"), "utf8"))) } catch { return [] } })()
 		// NAME WHAT DRIFTED. This row printed "HOOK DRIFT" for any non-zero exit, and on
 		// 2026-09-04 it said exactly that when what had actually changed was the field
 		// project's `.gitignore` - its owner had just put the repo under git and dropped the
@@ -1294,6 +1299,7 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 			// it means the installer refused for a reason this row has not read.
 			drift ? (drifted.length ? `DRIFT: ${drifted.join(", ")}` : `install --check refused (exit ${chk.status})`)
 				: "hooks in sync",
+			...(teamsWrong.length ? [`⚠ "teams" IGNORED, so a star: ${teamsWrong[0]}`] : []),
 			busStale === null ? `UNCOMPARED (this repo has no ${uncomparable.join(", ")} to compare against)`
 				: !installed.length ? "NOTHING INSTALLED in .comm/bin"
 				: busStale ? `STALE vs repo: ${staleFiles.join(", ")}`
@@ -1345,8 +1351,8 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 			unannouncedStranded.length > 0 && `stranded-untold:${about(newUntold)}`,
 			shared.length > 0 && `shared-inbox:${about(shared)}`,
 			claimsBad && `claim:${claimDirBad ? "unreadable" : about(claims.filter((c) => c.state !== "held" && !namedClaim(c)).map((c) => `${c.resource}=${c.state}`))}`,
-			notesBad && "note-unreadable", dormantBad && "fields-unreadable", awake && "dormant-awake"].filter(Boolean)
-		row(`field:${name}`, drift || busStale !== false ? RED : mailStuck || claimsBad || shared.length > 0 || notesBad || dormantBad || awake ? WARN : OK,
+			notesBad && "note-unreadable", dormantBad && "fields-unreadable", awake && "dormant-awake", teamsWrong.length > 0 && "teams-ignored"].filter(Boolean)
+		row(`field:${name}`, drift || busStale !== false ? RED : mailStuck || claimsBad || shared.length > 0 || notesBad || dormantBad || awake || teamsWrong.length ? WARN : OK,
 			bits.join(" - "), causes, { letters: busAnswered && !asleep ? [...untoldLetters, ...claims.filter((c) => c.state === "gone").map(claimId)] : null })
 	}
 }

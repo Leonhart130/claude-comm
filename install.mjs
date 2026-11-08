@@ -23,6 +23,7 @@ import { spawnSync } from "node:child_process"
 import { oursStatus, thresholdsFor, feeds } from "./bin/usage.mjs"
 import { thresholdOf } from "./bin/relay-due.mjs"
 import { faults as handoffFaults } from "./bin/relay-guard.mjs"
+import { teamFaults } from "./bin/comm.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const CHECK = process.argv.includes("--check")
@@ -268,12 +269,17 @@ const notices = [], marks = []
 // every start is a new reader; four lines, because it is paid on every boot. The commands are written to
 // run from THIS agent's folder: .comm/bin/comm.mjs does not exist in an expert's subdirectory. The name
 // is asked of the bus - the one place identity is resolved - and reused by the ledger below.
-let whoIs = ""
+let whoIs = "", teamLine = ""
 try {
 	const w = spawnSync(process.execPath, [bus, "whoami", "--agent-root", agentRoot],
 		{ cwd: agentRoot, encoding: "utf8", timeout: 5000 })
 	if (w.status === 0) whoIs = String(w.stdout).trim()
+	// The bus says who works with whom ("teams"), the one reader of that declaration; nothing when there is none.
+	const t = spawnSync(process.execPath, [join(dirname(bus), "team.mjs"), "--agent-root", agentRoot],
+		{ cwd: agentRoot, encoding: "utf8", timeout: 5000 })
+	if (t.status === 0) teamLine = String(t.stdout).trim()
 } catch {}
+const inTeam = !!teamLine && !teamLine.startsWith('"teams" is IGNORED')
 try {
 	const cf = JSON.parse(readFileSync(join(projectRoot, ".comm", "config.json"), "utf8"))
 	const agents = (cf && cf.agents) || {}, lead = cf && cf.leader
@@ -283,11 +289,12 @@ try {
 		const names = others.slice(0, 12).join(", ") + (others.length > 12 ? ", +" + (others.length - 12) : "")
 		const role = whoIs === lead
 			? "the LEADER of this project's message bus - " + (others.length ? "experts: " + names : "no expert on the roster yet") +
-				". Experts write only to you - or to each other inside a pair you open (.comm/bin/pair.mjs) - you are the bridge between them, and the one who answers the owner."
-			: "an EXPERT on this project's message bus. Your leader is '" + lead + "': you write to it, never to another expert unless your leader opened a pair between you (its bell says so)."
+				(inTeam ? ". You are the one who answers the owner." : ". Experts write only to you - or to each other inside a pair you open (.comm/bin/pair.mjs) - you are the bridge between them, and the one who answers the owner.")
+			: "an EXPERT on this project's message bus. Your leader is '" + lead + "'" + (inTeam ? "." : ": you write to it, never to another expert unless your leader opened a pair between you (its bell says so).")
 		notices.push([
 			"[claude-comm] You are '" + whoIs + "', " + role,
-			"A message is a doorbell that points at a FILE: " + cmd + " send " + (whoIs === lead ? "<agent>" : lead) +
+			...(teamLine ? [teamLine] : []),
+			"A message is a doorbell that points at a FILE: " + cmd + " send " + (whoIs === lead ? "<agent>" : inTeam ? "@asker" : lead) +
 				' --ref <file> --note "<where to read, then what is decided>". It reaches the other session at its turn boundary.',
 			"How to work with it - replying, launching an expert, restarting, the rules: the claude-comm skill, or " +
 				relative(agentRoot, join(projectRoot, ".comm", "README.md")) + ".",
@@ -679,7 +686,7 @@ const GITIGNORE_BLOCK = "# claude-comm live state (regenerate with install.mjs)\
 // drifted - wake.mjs documented none of its user flags, `who --all` and `comm log` were nowhere. So this section is
 // BUILT, at every install, from each tool's own usage lines (what its --help prints) and from `comm help`, read from
 // the very files written beside it: it cannot describe a version other than the one installed. A92 gates both ends.
-const CLI_TOOLS = ["launch", "close", "relay", "relay-due", "relay-guard", "wake", "claim", "pair", "restart", "handoff", "ledger", "usage"]
+const CLI_TOOLS = ["launch", "close", "relay", "relay-due", "relay-guard", "wake", "claim", "pair", "team", "restart", "handoff", "ledger", "usage"]
 const usageLines = (src) => src.split("\n").filter((l) => /^ \*\s{2,}node \S*bin\/[\w-]+\.mjs/.test(l))
 	.map((l) => l.replace(/^ \*\s+/, "").replace(/^node (\.comm\/)?bin\//, "node .comm/bin/"))
 // A SETTING IS DOCUMENTED WHERE IT IS READ (work 10-31: a project could learn that thresholds exist only from a CHANGELOG
@@ -868,7 +875,7 @@ const NOTICE = (here, root) => [
 	"node .comm/bin/comm.mjs send <agent> --ref <file> [--note \"one line, no substance\"]",
 	"```",
 	"",
-	"Every message must have this project's leader at one end — expert-to-expert is refused on purpose, so",
+	"Unless this project declares teams, every message has its leader at one end — expert-to-expert is refused on purpose, so",
 	"that no coordination happens off the board. Refs resolve **for the reader**: give the path as *you*",
 	"see it and the bus rewrites it for them.",
 	"",
@@ -1072,7 +1079,7 @@ function write(path, content, results) {
 // restarts happen HERE - 53 cold starts in one field tree against 5 declared reboots - and
 // the ledger verdict stays UNKNOWN until declared restarts exist to count. A tool only the
 // maintainer can run cannot fill an arm the field is the source of.
-const BUS_FILES = ["comm.mjs", "session-registry.mjs", "ledger.mjs", "wake.mjs", "restart-signal.mjs", "claim.mjs", "launch.mjs", "close.mjs", "handoff.mjs", "restart.mjs", "who.mjs", "usage.mjs", "relay.mjs", "pair.mjs", "relay-due.mjs", "relay-guard.mjs"]
+const BUS_FILES = ["comm.mjs", "session-registry.mjs", "ledger.mjs", "wake.mjs", "restart-signal.mjs", "claim.mjs", "launch.mjs", "close.mjs", "handoff.mjs", "restart.mjs", "who.mjs", "usage.mjs", "relay.mjs", "pair.mjs", "relay-due.mjs", "relay-guard.mjs", "team.mjs"]
 const CHANGELOG = join(HERE, "CHANGELOG.md")
 function busPrint() {
 	const h = createHash("sha256")
@@ -1303,7 +1310,7 @@ function SKILL(ids, agentRoot) {
 		"",
 		"## The one rule: the file is the artifact, the message is a doorbell", "",
 		"1. Write the brief, report or question to a **file** in your repo first.",
-		`2. Then ring: \`${C} send ${isLeader || shared ? "<agent>" : leader} --ref <file> --kind <kind> --note "<note>"\``,
+		`2. Then ring: \`${C} send ${isLeader || shared ? "<agent>" : "@asker"} --ref <file> --kind <kind> --note "<note>"\`${isLeader ? "" : " (`@asker`: the one who waits on your work, else your chief, else your leader)"}`,
 		"   - `--kind`: `nudge` a correction or brief landed · `done` round finished, ready for review · `blocked` needs a ruling · `fyi`.",
 		"   - The note is **cut at 240 characters, from the end**, so WHERE TO READ goes first (the section), then what is decided.",
 		"     Never the reasoning: a reason cut in half reads like the whole reason.",
@@ -1317,7 +1324,11 @@ function SKILL(ids, agentRoot) {
 		"`send` says whether the recipient is BUSY, IDLE",
 		"(with the command that rings it), or that it CANNOT SAY and why - e.g. *WAITING on permission prompt*: a person must",
 		"answer it, and no ring is offered (it would type into the dialog).", "",
-		"## Who talks to whom: a star", "",
+		"## Who talks to whom: a star, unless your project declares teams", "",
+		"- **With `\"teams\": {\"<chief>\": [\"<expert>\", ...]}` in `.comm/config.json`** a chief and its experts, the chiefs among themselves and the",
+		`  experts of one team write to each other with no pair and no end date. \`node ${B}/team.mjs\` says what is yours. Report with`,
+		"  `send @asker`: it reaches the one who waits on your work, else your chief, else the leader; if several wait it refuses and names them, and you name one. A `done` closes that request, so a question is `--kind blocked`. A send to the leader still goes to the leader. Experts of",
+		"  two teams go through their chiefs, or a pair that a chief of one of them opens. Everything is in `comm log`. Without `teams`:",
 		"- An expert writes to its leader only. Expert-to-expert is refused by the bus - unless the leader has opened a **pair**",
 		"  between those two (`pair.mjs <a> <b> --for 2h --ref <file>`): until it ends they may send to each other directly,",
 		"  each was rung pointing at the file saying why, and every message is in the leader's `comm log`. A pair coordinates",
@@ -1347,6 +1358,7 @@ function SKILL(ids, agentRoot) {
 		"  Opus for review, law, arbitration, and anything only checked by re-reading. `--effort high` by default, `xhigh` for",
 		"  adversarial review.",
 		"- The expert reports with `--kind done` and a file. Read the file, decide, answer with a file.",
+		`- **Teams**: \`"teams": {"<chief>": ["<expert>", ...]}\` in \`.comm/config.json\` links a chief, its experts and the other chiefs with no pair and no bell at the start; a project without it stays a star. One fault in it and it is ignored: the installer and boot say so.`,
 		`- **Two experts in a tight loop** (one writes a script, the other runs it on its cases): \`node ${B}/pair.mjs <a> <b> --for 2h --ref <file>\``,
 		"  lets them send to each other until then (24 h at most), so each round no longer costs you a turn. The file says why",
 		"  and on what; each is rung pointing at it. `comm log` shows every message, marked `(pair)`; `--close` ends it early.",
@@ -1355,7 +1367,8 @@ function SKILL(ids, agentRoot) {
 		"  `.claude/settings.json`: the installer replaces only its own command there.", "")
 	if (!isLeader && (!shared || hasExpert)) L.push(
 		shared ? "## If you are an expert: reporting to your leader" : "## Reporting to your leader", "",
-		`Write the report to a file, then \`${C} send ${leader} --ref <report> --kind done --note "<where to read, then the verdict>"\`.`,
+		`Write the report to a file, then \`${C} send @asker --ref <report> --kind done --note "<where to read, then the verdict>"\`: it reaches the one who waits on your work, else your chief, else \`${leader}\`. If several wait, it says so: name one.`,
+		"**If your start message says you LEAD a team**, you are its leader: give your experts their work (`send <expert>`, a file in their folder), judge what they return, and take to the leader only what is its own. Your start message and `team.mjs` say who is yours.",
 		"Stuck on a decision that is not yours: `--kind blocked`, same form, and wait for the ruling.",
 		`Your task done, the report sent, and you were launched for it: close your window (\`node ${B}/close.mjs\`, below).`, "")
 	L.push(
@@ -1582,6 +1595,9 @@ if (CHECK) {
 		const f = d === undefined ? [] : handoffFaults(d)
 		if (f.length) console.log(`  ⚠ "relay" "${a}" "handoff" cannot be checked, so that agent's relay will refuse: ${f.join("; ")}`)
 	}
+	// ONE FAULT IN "teams" IS NO TEAM: said now, not when a chief's send is refused.
+	const tf = teamFaults(cfg)
+	if (tf.length) console.log(`  ⚠ "teams" is IGNORED until it is fixed, so this project stays a star: ${tf.join("; ")}`)
 
 	// THE PATCH NOTES: every entry newer than what this project had, and nothing else. A
 	// changelog dumped in full at every install is a changelog nobody reads.

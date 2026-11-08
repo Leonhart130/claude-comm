@@ -40,6 +40,19 @@ already have.
 
 
 
+
+
+## 2026-11-08.2 — bus print `febd578f7dc5` — 2026-11-08
+
+- **Your project can declare teams**, in `.comm/config.json`: `"teams": {"<chief>": ["<expert>", ...]}`. A chief and its experts, the chiefs among
+  themselves and the experts of one team then write to each other with no pair and no end date, and nothing rings at the start. An expert may be in several teams; a
+  member who also leads is a fourth level. Without it, nothing changes: a star. One fault in it (a name not on the roster) and it is ignored, and you are told.
+- **`send @asker` reaches the one who waits on your work** (also `@demandeur`): a `nudge` from your leader or a chief of yours opens a request, your `done` to them closes it. Else your only chief, else
+  the leader. **If several wait it refuses and names them: name one.** So a question is `--kind blocked`: a `done` closes the request. A send to the leader still goes to the leader, with a warning if a chief waits.
+  `node .comm/bin/team.mjs` says what is yours; your start message says it too.
+- **A chief's `--ref SPEC.md` is its expert's**, as from a leader. A chief can open a pair for one of its own experts (`pair.mjs`); the other may be another chief's. It cannot close or change one the leader opened.
+- The default kind follows: to your chief or to who gave you the work, a send is a `done`.
+
 ## 2026-11-08.1 — bus print `714027775827` — 2026-11-08
 
 - **The bus's own text no longer stays in your input box, and no longer blocks you.** A bell whose Enter was lost, two bells at

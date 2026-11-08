@@ -166,6 +166,13 @@ between two experts - one writes a script, the other runs it on its cases - the 
 then (24 h at most), and every message is logged and marked `(pair)` in `comm log`. It ends by itself; an unreadable
 pairs file is no pair. A pair coordinates work: a decision still goes to the leader.
 
+**A project can declare teams** (since `2026-11-08.2`, `FINDINGS.md#teams`): `"teams": {"<chief>": ["<expert>", ...]}` in
+`.comm/config.json`. A chief and its experts, the chiefs among themselves and the experts of one team then write to each other with
+no pair and no end date; a chief opens a pair for one of its experts. It is a declaration, so it still cannot be a side channel: an
+agent's name comes from the config, all of it is in `comm log`, and one fault in it makes it no team at all. A leader's or a chief's `nudge` opens
+a request, the expert's `done` to it closes it: `send @asker` is the one who waits, else its only chief, else the leader, and it refuses when several
+wait rather than guess. A send to the leader still goes to the leader, with a warning: never rerouted.
+
 ## Refs resolve for the READER, not the writer
 
 A ref is written relative to the **subject** repo — whichever end is not the leader — because that is what

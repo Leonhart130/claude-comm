@@ -2,7 +2,7 @@
 /**
  * claude-comm PAIRS — two experts the LEADER lets write to each other directly, until a time it set.
  *
- *   node .comm/bin/pair.mjs <a> <b> --for 2h --ref <file>       LEADER ONLY: open it (--for <n>m or <n>h, at most 24h)
+ *   node .comm/bin/pair.mjs <a> <b> --for 2h --ref <file>       the LEADER or a CHIEF of one of them: open it (--for <n>m or <n>h, at most 24h)
  *   node .comm/bin/pair.mjs <a> <b> --close                      end it now; their next send to each other is refused
  *   node .comm/bin/pair.mjs                                      every pair, open or closed, and how many messages it logged
  *
@@ -25,10 +25,11 @@
  * send holds (the ref must exist, it is re-expressed for each reader, notes are cut at 240). Identity is `comm.mjs
  * whoami`'s. The ref is checked by the FIRST bell before anything is written; the pair is written after the second.
  */
-import { readFileSync, writeFileSync, renameSync, existsSync } from "node:fs"
+import { readFileSync, writeFileSync, renameSync, existsSync, unlinkSync, statSync } from "node:fs"
 import { join, dirname, resolve, relative } from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
+import { leads } from "./comm.mjs"
 
 // --help: this header's usage lines and NOTHING else - no write, no bell (A92). The field's .comm/README.md is generated
 // from the same lines, so the two cannot disagree.
@@ -52,6 +53,16 @@ while (!existsSync(join(root, ".comm", "config.json"))) { const up = dirname(roo
 const cfg = JSON.parse(readFileSync(join(root, ".comm", "config.json"), "utf8"))
 const agents = cfg.agents || {}, leader = cfg.leader
 const FILE = join(root, ".comm", "pairs.json")
+// MANY CHIEFS NOW WRITE THIS FILE: read, change and rename, under one lock, or two at once lose one (measured, 30 rounds: 0 clean). A list takes none.
+const LOCK = `${FILE}.lock`, napMs = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+if (names.length) {
+	for (const t0 = Date.now(); ; napMs(40)) {
+		try { writeFileSync(LOCK, String(process.pid), { flag: "wx" }); process.on("exit", () => { try { unlinkSync(LOCK) } catch {} }); break }
+		catch (e) { if (e.code !== "EEXIST") break }   // a directory that cannot take it: as before, unguarded
+		try { if (Date.now() - statSync(LOCK).mtimeMs > 15_000) unlinkSync(LOCK) } catch {}   // a killed holder
+		if (Date.now() - t0 > 12_000) die("another pair is being opened or closed right now, for 12 s - nothing was done, try again")
+	}
+}
 let all = {}
 try { const p = JSON.parse(readFileSync(FILE, "utf8")); if (p && typeof p === "object") all = p } catch {}
 const isOpen = (p) => !!p && Date.parse(p.until) > Date.now()
@@ -61,18 +72,21 @@ if (!names.length) {
 	let log = ""
 	try { log = readFileSync(join(root, ".comm", "log.jsonl"), "utf8") } catch {}
 	const keys = Object.keys(all)
-	if (!keys.length) console.log(`no pair: every message has '${leader}' at one end`)
+	if (!keys.length) console.log(`no pair is open`)
 	for (const k of keys) console.log(`  ${k}  ${isOpen(all[k]) ? "OPEN until" : "closed at"} ${hm(all[k].until)}  ${log.split(`"pair":"${k}"`).length - 1} message(s) logged  ref: ${String(all[k].ref).slice(0, 200)}`)
 	process.exit(0)
 }
 
 const me = spawnSync(process.execPath, [BUS, "whoami"], { cwd: process.cwd(), encoding: "utf8" }).stdout.trim()
-if (me !== leader) die(`only '${leader}' opens or closes a pair - you are '${me || "(no agent here)"}'. Ask it, with a file: node .comm/bin/comm.mjs send ${leader} --ref <file>`)
+// a chief, for one of its own experts ("teams" in the config, FINDINGS.md#teams): the other may be another chief's
+if (me !== leader && !names.slice(0, 2).some((x) => leads(cfg, me, x))) die(`only '${leader}', or a chief of one of the two, opens or closes a pair - you are '${me || "(no agent here)"}'. Ask it, with a file: node .comm/bin/comm.mjs send ${leader} --ref <file>`)
 const [a, b] = names
 for (const x of [a, b]) if (!x || x === leader || !Object.prototype.hasOwnProperty.call(agents, x))
 	die(`a pair is two EXPERTS of this roster, not '${x ?? ""}': pair.mjs <expert> <expert> --for <n>m|<n>h --ref <file>`)
 if (a === b || names.length > 2) die(a === b ? `'${a}' cannot pair with itself` : `a pair is TWO experts, not ${names.length}`)
 const k = [a, b].sort().join("+")
+// What the leader opened, a chief does not touch: nor close, nor replace by a shorter one (a pair stays under the leader's own word).
+if (me !== leader && isOpen(all[k]) && all[k].opened_by === leader) die(`'${leader}' opened this pair, until ${hm(all[k].until)}: only '${leader}' closes or changes it`)
 const save = () => { const tmp = `${FILE}.${process.pid}.tmp`; writeFileSync(tmp, JSON.stringify(all, null, 1) + "\n"); renameSync(tmp, FILE) }
 
 if (ARGV.includes("--close")) {
@@ -88,15 +102,21 @@ if (!ms || ms > 24 * 3600_000) die(`--for is how long the pair stays open, at mo
 const ref = opt("--ref")
 if (!ref) die(`--ref is required: the file saying why the pair is open and on what, read from '${a}''s folder`)
 const until = new Date(Date.now() + ms).toISOString()
-const note = (o) => `pair with '${o}' open until ${hm(until)}: send to each other directly; a decision, a spec change or a question for the owner still comes to ${leader}`
-const bell = (to, r, force) => spawnSync(process.execPath, [BUS, "send", to, "--ref", r, "--kind", "nudge", "--note", note(to === a ? b : a), ...(force ? ["--force"] : [])], { cwd: process.cwd(), encoding: "utf8" })
-// the ref as `send <b>` must be given it to name the SAME file: from b's folder
+const note = (o) => `pair with '${o}' open until ${hm(until)}: send to each other directly; a decision, a spec change or a question for the owner still goes to whoever gave you the work`
+// `fyi`, not a request: a pair is not work, and must not make its opener the one this expert reports to (`send @asker`)
+const bell = (to, r, force) => spawnSync(process.execPath, [BUS, "send", to, "--ref", r, "--kind", "fyi", "--note", note(to === a ? b : a), ...(force ? ["--force"] : [])], { cwd: process.cwd(), encoding: "utf8" })
+// THE SAME FILE, whoever is rung: a ref is read from the leader's or a chief's own expert's folder, or else from the sender's (comm.mjs subjectOf)
 const refPath = relative(root, resolve(root, agents[a], ref))
-const r1 = bell(a, ref, ARGV.includes("--force"))
-if (r1.status !== 0) die(`nothing opened - the bell to '${a}' was refused:\n${(r1.stderr || r1.stdout).trim()}`, 1)
-const r2 = bell(b, relative(resolve(root, agents[b]), resolve(root, refPath)), true)
-if (r2.status !== 0) die(`'${a}' was rung but the bell to '${b}' was refused, so nothing is open - tell '${a}':\n${(r2.stderr || r2.stdout).trim()}`, 1)
+const baseOf = (x) => resolve(root, me === leader || leads(cfg, me, x) ? agents[x] : agents[me])
+const refFor = (x) => relative(baseOf(x), resolve(root, refPath))
+// WRITTEN BEFORE THE BELLS: the bus lets the chief who opened a pair ring its two experts while it is open, one of them perhaps not its own.
+const was = all[k], hadFile = existsSync(FILE)
+const undo = () => { if (was) { all[k] = was; save() } else if (hadFile) { delete all[k]; save() } else { try { unlinkSync(FILE) } catch {} } }
 all[k] = { a, b, until, ref: refPath, opened_by: me, opened_at: new Date().toISOString() }
 save()
+const r1 = bell(a, refFor(a), ARGV.includes("--force"))
+if (r1.status !== 0) { undo(); die(`nothing opened - the bell to '${a}' was refused:\n${(r1.stderr || r1.stdout).trim()}`, 1) }
+const r2 = bell(b, refFor(b), true)
+if (r2.status !== 0) { undo(); die(`'${a}' was rung but the bell to '${b}' was refused, so nothing is open - tell '${a}':\n${(r2.stderr || r2.stdout).trim()}`, 1) }
 console.log(`✓ pair ${k} open until ${hm(until)} - '${a}' and '${b}' each rung, pointing at ${refPath}\n` +
 	`  every message between them: node .comm/bin/comm.mjs log (marked "(pair)") · end it early: pair.mjs ${a} ${b} --close`)
