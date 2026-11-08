@@ -42,6 +42,8 @@ import { record as registryRecord, lookup as registryLookup, registryDir, sessio
 // NOT AT LINK TIME: boot is what diagnoses this file. A static import of a broken comm.mjs killed boot before its first row, and the session hook hides that.
 let teamFaults = () => []
 try { ({ teamFaults } = await import(new URL("comm.mjs", import.meta.url).href)) } catch {}
+let configFaults = () => []
+try { ({ configFaults } = await import(new URL("team.mjs", import.meta.url).href)) } catch {}
 
 const ARGV = process.argv.slice(2)
 const has = (f) => ARGV.includes(f)
@@ -124,7 +126,9 @@ const OK = 0, UNKNOWN = 1, WARN = 2, RED = 3
 const MARK = ["✓", "?", "⚠", "✗"]
 // The gate's ceiling on `attack` (section 6), at module scope because a control that WAITS for a gate must wait at
 // least this long - F2's 90 s wait read a suite grown to 94 s as "nothing wrote" (2026-10-25).
-const GATE_CEILING_MS = 300_000
+// 🔴 A HANG DETECTOR, NOT A BUDGET: past it the row says "attack HUNG". Measured 2026-11-08 with A119-A123: 349 s, the owner at work on the machine, 300 s would have
+// called a healthy suite hung. So it sits well above the honest run. That the suite is slow is STATUS's item C, and a ceiling hides nothing about it: the row prints the seconds.
+const GATE_CEILING_MS = 480_000
 let worst = OK
 const rows = []
 // `causes`: the codes a row DECLARES for what made it non-green, where it computed them.
@@ -1067,6 +1071,8 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 		const drift = chk.status !== 0
 		// One fault in "teams" is no team (comm.mjs): a project that believes it has them must not read green.
 		const teamsWrong = (() => { try { return teamFaults(JSON.parse(readFileSync(join(p, ".comm", "config.json"), "utf8"))) } catch { return [] } })()
+		// A misspelt "caps" refuses every launch there, a misspelt "reopen" is a Monday lost: said here too, before the night finds it.
+		const configWrong = (() => { try { return configFaults(JSON.parse(readFileSync(join(p, ".comm", "config.json"), "utf8"))) } catch { return [] } })()
 		// NAME WHAT DRIFTED. This row printed "HOOK DRIFT" for any non-zero exit, and on
 		// 2026-09-04 it said exactly that when what had actually changed was the field
 		// project's `.gitignore` - its owner had just put the repo under git and dropped the
@@ -1300,6 +1306,7 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 			drift ? (drifted.length ? `DRIFT: ${drifted.join(", ")}` : `install --check refused (exit ${chk.status})`)
 				: "hooks in sync",
 			...(teamsWrong.length ? [`⚠ "teams" IGNORED, so a star: ${teamsWrong[0]}`] : []),
+			...(configWrong.length ? [`⚠ ${configWrong[0]}`] : []),
 			busStale === null ? `UNCOMPARED (this repo has no ${uncomparable.join(", ")} to compare against)`
 				: !installed.length ? "NOTHING INSTALLED in .comm/bin"
 				: busStale ? `STALE vs repo: ${staleFiles.join(", ")}`
@@ -1351,8 +1358,8 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 			unannouncedStranded.length > 0 && `stranded-untold:${about(newUntold)}`,
 			shared.length > 0 && `shared-inbox:${about(shared)}`,
 			claimsBad && `claim:${claimDirBad ? "unreadable" : about(claims.filter((c) => c.state !== "held" && !namedClaim(c)).map((c) => `${c.resource}=${c.state}`))}`,
-			notesBad && "note-unreadable", dormantBad && "fields-unreadable", awake && "dormant-awake", teamsWrong.length > 0 && "teams-ignored"].filter(Boolean)
-		row(`field:${name}`, drift || busStale !== false ? RED : mailStuck || claimsBad || shared.length > 0 || notesBad || dormantBad || awake || teamsWrong.length ? WARN : OK,
+			notesBad && "note-unreadable", dormantBad && "fields-unreadable", awake && "dormant-awake", teamsWrong.length > 0 && "teams-ignored", configWrong.length > 0 && "config-fault"].filter(Boolean)
+		row(`field:${name}`, drift || busStale !== false ? RED : mailStuck || claimsBad || shared.length > 0 || notesBad || dormantBad || awake || teamsWrong.length || configWrong.length ? WARN : OK,
 			bits.join(" - "), causes, { letters: busAnswered && !asleep ? [...untoldLetters, ...claims.filter((c) => c.state === "gone").map(claimId)] : null })
 	}
 }

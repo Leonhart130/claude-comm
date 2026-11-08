@@ -5,6 +5,10 @@
  *   node bin/launch.mjs <agent> --model <m> --effort <e> [--prompt "<first turn>"]     a pane beside YOUR window; refused if none
  *   node bin/launch.mjs <agent> --model <m> --effort <e> ... --print                   the launch it would make; nothing launched
  *   node bin/launch.mjs <agent> --model <m> --effort <e> ... --os-window [--minimized]  a separate OS window (minimized: out of view)
+ *   node bin/launch.mjs <agent> --reopen --model <m> --effort <e> --prompt "<say>" --os-window --minimized   what reopen.mjs runs: exactly a "reopen" entry, for mail that asks
+ *
+ *   With "teams" in .comm/config.json only the leader or a chief of <agent> may launch it (a plain shell, with no session: as without).
+ *   With "caps" it refuses past any of them, and the refusal gives the numbers (bin/team.mjs). A --prompt opens a request: the agent's `done` to you closes it.
  *
  *   .comm/config.json  "launch": {"<agent>": {"args": ["--channels", "plugin:telegram@claude-plugins-official"],
  *                                             "env": {"TELEGRAM_STATE_DIR": "/a/folder/of/its/own"}}}
@@ -43,8 +47,8 @@
  *   - Only a name in .comm/config.json may be launched. A name from message text
  *     would be command injection wearing the bus's clothes.
  *   - Refuse to launch what is already alive (A17: two sessions, one identity).
- *   - An agent may close ITSELF, never a sibling. This tool therefore only opens.
- *     The closing verb is `bin/close.mjs`, and the CHILD invokes it.
+ *   - This tool only opens. The closing verb is `bin/close.mjs`: an agent closes ITSELF, and
+ *     the leader or a chief of it may close it at rest (--agent, FINDINGS.md#teams-b); never a sibling.
  *
  * ── THE SPLIT (owner, 2026-09-10) ──────────────────────────────────────────────────
  *
@@ -88,6 +92,8 @@ if (process.argv.includes("--help")) {
 }
 
 const die = (msg) => { console.error(`✗ ${msg}`); process.exit(1) }
+// who may act on whom, the caps, the tier's rules: one reader of the declarations, launch.mjs cannot be imported itself
+const team = await import(new URL("team.mjs", import.meta.url))
 
 // ── the runtime, resolved rather than hoped for ──────────────────────────────
 const isExec = (p) => { try { accessSync(p, constants.X_OK); return true } catch { return false } }
@@ -164,6 +170,22 @@ if (!cfg.agents[agent]) {
 	    `  A launchable name comes from .comm/config.json, never from message text.`)
 }
 
+// ── WHO MAY LAUNCH: with "teams", the leader or a chief of this agent ─────────────────────────
+// Work's leader, 11-08: nothing checked the caller, only its instructions forbade it. An expert launching a colleague is
+// a window, a boot and a place under the caps nobody chose. A plain shell has no session to ask (a person, a timer): as
+// before. No "teams": as before, and one fault in it is no team. --reopen has its own authority: the declaration, below.
+const reopening = process.argv.includes("--reopen")
+let caller = null
+if (cfg.teams && !team.teams(cfg)) console.error(`  ⚠ "teams" is IGNORED, so anyone may launch: ${team.teamFaults(cfg)[0]}`)
+if (!reopening && team.teams(cfg)) {
+	const c = team.callerOf(team.liveState(root))
+	if (c.session) {
+		const j = team.judge(cfg, c, agent)
+		if (!j.ok) die(`REFUSING to launch '${agent}': ${j.why}`)
+		caller = j.by
+	}
+}
+
 // ── THE TIER: which model, at which effort — chosen by the CALLER, on every launch ──
 //
 // Asked by the owner 2026-09-13: *"j'ai bossé avec des agents sous opus 5 avec l'effort en xhigh, les
@@ -185,8 +207,7 @@ if (!cfg.agents[agent]) {
 //
 // Both values become argv elements of the child, so they are VALIDATED, never passed through: an
 // unchecked `--model --dangerously-skip-permissions` would ride into claude as a flag of its own. A57.
-const EFFORTS = ["low", "medium", "high", "xhigh", "max"]   // `claude --help`, 2026-09-13
-const MODEL_RE = /^(opus|sonnet|haiku|fable|claude-[a-z0-9][a-z0-9.-]*)(\[1m\])?$/
+const { EFFORTS, MODEL_RE } = team   // team.mjs: a "reopen" entry is judged by the same two rules
 const flagValue = (flag) => { const i = process.argv.indexOf(flag); return i > -1 ? (process.argv[i + 1] ?? "") : null }
 const model = flagValue("--model"), effort = flagValue("--effort")
 const TIER_HELP =
@@ -241,6 +262,34 @@ if (extra !== null) {
 	extraEnv = Object.entries(e).map(([k, v]) => `--env=${k}=${v}`)
 }
 
+// ── --reopen: THE DECLARATION IS THE AUTHORITY, not the caller ────────────────────────────────
+// A sender's hook runs this, and the sender may be anybody who can write to the agent: writing to it already asks for it.
+// So it opens exactly what the project declared, for mail that asks, and nothing a flag could add: this is no way round "teams". A122
+if (reopening) {
+	const faults = team.reopenFaults(cfg, agent), d = cfg.reopen && Object.prototype.hasOwnProperty.call(cfg.reopen, agent) ? cfg.reopen[agent] : null
+	if (!d) die(`REFUSING --reopen: '${agent}' is not declared in "reopen" of .comm/config.json.`)
+	if (faults.length) die(`REFUSING --reopen: ${faults.join("; ")}`)
+	if (model !== d.model || effort !== d.effort || prompt !== d.say || !osWindow || !minimized)
+		die(`REFUSING --reopen: it opens exactly the "reopen" entry, in a minimized OS window. Without --reopen, this is an ordinary launch.`)
+	const asks = team.asksFor(root, agent)
+	if (asks === null) die(`REFUSING --reopen: the inbox of '${agent}' could not be read. Not knowing is not mail.`)
+	if (!asks.length) die(`REFUSING --reopen: nothing waiting for '${agent}' asks for anything (an fyi asks nothing).`)
+}
+
+// ── ONE LAUNCH AT A TIME, under caps: what they count and the window they refuse are one step ─
+// Measured reasoning, not a measurement: a Monday's mail reaches several closed chiefs in ONE hook, and each read of the
+// same free room would pass. reopen.mjs holds this lock past the launch and lends it here, so the next one reads the room
+// after this session has taken its share. Only a project with "caps" pays for it. FINDINGS.md#teams-b
+const capFaults = team.capFaults(cfg)
+if (capFaults.length) die(`REFUSING to launch '${agent}': ${capFaults.join("; ")}.\n  Fix .comm/config.json: a cap that cannot be read is no cap, and silence would open the window.`)
+// A project that declares "reopen" pays for it too, caps or not: a plain launch racing a reopening is two sessions of one agent (a reviewer's fixture, 6 of 6).
+if ((cfg.caps || cfg.reopen) && !printOnly) {
+	const lock = team.takeLock(join(root, ".comm", "launch.lock"))
+	if (!lock.ok) die(`another launch has held this project's lock for 30 s${lock.holder ? ` (pid ${lock.holder.pid})` : ""}, so the caps cannot be read as one step. Nothing was opened: try again.`)
+	// reopen.mjs is what keeps "once" and "a forced close stands"; only --print may be asked without it
+	if (reopening && !lock.lent) die(`REFUSING --reopen: it is reopen.mjs's own step, under its lock, and that is where "once" and "a forced close stands" are kept. Run: node ${relative(process.cwd(), new URL("reopen.mjs", import.meta.url).pathname)} ${agent}`)
+}
+
 // ── refuse to launch what is already alive (A17) ─────────────────────────────
 // comm.mjs is resolved RELATIVE TO THIS FILE, never rebuilt from the project root:
 // the field layout is .comm/bin/, the dev layout is bin/, and a path guessed from the
@@ -259,6 +308,17 @@ if (new RegExp(`^\\s*●\\s+${agent}\\s`, "m").test(who.stdout)) {
 	die(`'${agent}' is already running — refusing to give one identity two sessions (A17).`)
 }
 
+// ── THE CAPS (work's point 3, letter 48: an idle window keeps its memory, 258 to 591 MB measured there) ──
+// Before the placement refusals and --print's exit, so a check refuses exactly as the launch does (A53).
+let capsLine = ""
+if (cfg.caps) {
+	const st = team.liveState(root)
+	if (!st) die(`cannot ask 'comm who' who is running, so the caps cannot be read — REFUSING. Not knowing is not room.`)
+	const c = team.capsCheck(cfg, st)
+	if (c.over.length) die(`REFUSING to launch '${agent}', past this project's "caps": ${c.over.join("; ")}.\n  Nothing was opened. Close a window that has finished (node ${relative(process.cwd(), new URL("close.mjs", import.meta.url).pathname)} --agent <x>), or wait.`)
+	capsLine = c.line
+}
+
 // ── the refusal this file exists for ─────────────────────────────────────────
 const nodeBin = process.execPath
 const claudeBin = resolveClaude()
@@ -274,6 +334,10 @@ if (!claudeBin) {
 const childPath = [dirname(nodeBin), dirname(claudeBin), ...(process.env.PATH || "").split(delimiter).filter(Boolean)]
 	.filter((d, i, a) => a.indexOf(d) === i).join(delimiter)
 const cwd = join(root, cfg.agents[agent] ?? ".")
+// 🔴 NO FOLDER, NO WINDOW. kitty opens a window whose --cwd does not exist in its own folder, the session starts THERE, outside
+// the project, with no bus: an agent on the roster with no folder is a real shape (work's, 11-08, boot's red row), and a "reopen" entry
+// would type its first prompt into a session in somebody's home. Before --print, as every refusal.
+if (!existsSync(cwd)) die(`the folder of '${agent}' does not exist: ${cwd} — REFUSING. Fix "agents" in .comm/config.json, or: node <claude-comm>/install.mjs ${root} --add-agent ${agent}`)
 const argv = ["@", "launch", `--type=${osWindow ? "os-window" : "window"}`, ...(minimized ? ["--os-window-state=minimized"] : []), "--keep-focus", `--cwd=${cwd}`,
 	...extraEnv, `--env=PATH=${childPath}`, `--env=CLAUDE_COMM_AGENT=${agent}`, claudeBin,
 	...extraArgs, "--model", model, "--effort", effort,
@@ -346,8 +410,9 @@ if (printOnly) {
 // $KITTY_LISTEN_ON — `set-user-vars` two lines below passes --to, so does close.mjs, so does
 // wake.mjs. When the two disagree, `--match window_id:` names a window the target instance
 // has never heard of.
-const r = spawnSync("kitten", argv, { encoding: "utf8" })
-if (r.status !== 0) die(`kitten @ launch failed (exit ${r.status}): ${(r.stderr || "").trim()}`)
+// A TIMEOUT, under the project's lock: a kitty that hangs must not hold every other launch of this project behind it (a reviewer's fixture: 30 s, 10 min for a reopening).
+const r = spawnSync("kitten", argv, { encoding: "utf8", timeout: 15_000 })
+if (r.status !== 0) die(`kitten @ launch failed (${r.error ? r.error.code : `exit ${r.status}`}): ${(r.stderr || "").trim()}${r.error && r.error.code === "ETIMEDOUT" ? ` The window may open all the same, with no mark: look at 'comm who' before trying again.` : ""}`)
 
 // 🔴 THE ID, OR A REFUSAL. `kitten @ launch` answers with the new window's id on stdout
 // and nothing else. An unparseable answer means the launch went somewhere this process
@@ -362,7 +427,9 @@ if (!Number.isInteger(winId) || winId <= 0)
 // THE EFFECT, NOT THE EXIT CODE. Re-read the tree and find the id we were handed; a
 // launch that reported an id for a window that is not there is the silent no-op this
 // project keeps paying for, and the exit status above would not have shown it.
-const after = wake.windows()
+// Read more than once: one `ls` failing right after a launch left a live session with no mark, which nothing but a person can then close (a reviewer's fixture).
+let after = wake.windows()
+for (let i = 0; i < 6 && !after.some((w) => w.id === winId); i++) { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 300); after = wake.windows() }
 // WHICH INSTANCE. Window ids are per kitty PROCESS, and `windows()` deliberately scans
 // every socket (wake.mjs rule 3), so an id alone can match a window in a DIFFERENT kitty —
 // and the next line would then mark a stranger's window as ours. The caller's socket is
@@ -405,6 +472,10 @@ console.log(marked
 	? `  marked CLAUDE_COMM_LAUNCHED=${agent} on the window — this is what lets it close ITSELF (bin/close.mjs)`
 	: `  ⚠ NOT marked (${markWhy}) — the session is up and fine, but it will REFUSE to close itself`)
 console.log(`  tier:   --model ${model} --effort ${effort} — the caller's choice; the child's transcript records what it actually ran on`)
+if (capsLine) console.log(`  caps:   ${capsLine}, before this one`)
+// A FIRST TURN IS WORK ASKED FOR, as a nudge is: `send @asker` reaches this caller, and its `done` closes it. After the
+// window exists: a refused launch asked nobody. A launch by its declaration asked nothing, the mail did.
+if (prompt && caller && team.openRequest(root, cfg, agent, caller)) console.log(`  request: '${agent}' now owes '${caller}' its \`done\` (send @asker reaches you)`)
 // SAY THE CONSEQUENCE, EVERY TIME. A launch with no first turn is the failure that does not
 // look like one, so the launcher that created it is the one place a reader is certain to be
 // looking. This is deliberately not a refusal: an interactive session a human will type into

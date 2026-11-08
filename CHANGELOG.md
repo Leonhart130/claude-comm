@@ -42,6 +42,16 @@ already have.
 
 
 
+
+## 2026-11-08.3 — bus print `015cc1d4391f` — 2026-11-08
+
+- **With `teams`, only your leader or a chief of an agent may launch it**, proved from the session's own process (a Bash that moved changes nothing). The refusal says who may and what to type. A plain shell, and a project with no `teams`: as before. A sub-session (`claude -p`) is refused: the session above runs it. **A `--prompt` opens a request**: the agent's `done` to you closes it, and its `send @asker` reaches you.
+- **`close.mjs --agent <x>`: the leader or a chief of x closes its window**, one `launch.mjs` opened, at rest only, and says when it is verified gone. Mail, a claim or another's open request refuse, `--force` lifts them and is noted in `.comm/close/<x>.json` with `by`. A turn under way, a sub-agent at work, a dialog or somebody's words on its box refuse for good; a box holding only the bus's bell or its relay's sentence counts as at rest. Who closes withdraws its own request.
+- **`"caps": {"working": 5, "availableMb": 2500, "windows": 12}`**: a launch past any of them is refused, with the numbers. `windows` counts every live session on the roster, the leader's too; `availableMb` is the machine's. A misspelt one refuses.
+- **`"reopen": {"<agent>": {"model": "...", "effort": "...", "say": "<first prompt, one line>"}}`: mail that asks (not an `fyi`) for a closed agent opens it**, from the next hook in the project, once for that mail, in a minimized window, inside the caps, which must then hold `windows` or `availableMb`. Its own start hands it its mail. A refusal tells the owner and the leader, once per mail waiting, and a burst is one alarm; a close that frees room looks again at once. `.comm/reopen/<agent>.json` says what happened; `node .comm/bin/reopen.mjs <agent> --dry-run` says what it would do. `"reopenTiming"` adjusts its delays.
+- **`node .comm/bin/team.mjs --board`**: by chief, each member's state, its open requests with their date, its `done` and `blocked` since your last look. Pointers only.
+- `launch.mjs` refuses an agent whose folder does not exist: kitty would have started it elsewhere, off the bus.
+
 ## 2026-11-08.2 — bus print `febd578f7dc5` — 2026-11-08
 
 - **Your project can declare teams**, in `.comm/config.json`: `"teams": {"<chief>": ["<expert>", ...]}`. A chief and its experts, the chiefs among

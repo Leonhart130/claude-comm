@@ -173,6 +173,11 @@ agent's name comes from the config, all of it is in `comm log`, and one fault in
 a request, the expert's `done` to it closes it: `send @asker` is the one who waits, else its only chief, else the leader, and it refuses when several
 wait rather than guess. A send to the leader still goes to the leader, with a warning: never rerouted.
 
+**What runs under a declaration** (since `2026-11-08.3`, `FINDINGS.md#teams-b`). With `teams`, only the leader or a chief of an agent launches it, proved from the
+session's own process, and a first turn opens a request. `close.mjs --agent <x>`: the same two close a window `launch.mjs` opened, at rest, verified gone, by name in its record. `"caps"` refuses
+a launch past `working`, `windows` or `availableMb`, with the numbers. `"reopen"` opens a closed agent when mail that asks reaches it, from the sender's hook, once, minimized, inside the caps, and a refusal
+tells the owner and the leader. `team.mjs --board`: by chief, each member's state, open requests, `done` and `blocked` since your last look, pointers only.
+
 ## Refs resolve for the READER, not the writer
 
 A ref is written relative to the **subject** repo — whichever end is not the leader — because that is what

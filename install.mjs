@@ -24,6 +24,7 @@ import { oursStatus, thresholdsFor, feeds } from "./bin/usage.mjs"
 import { thresholdOf } from "./bin/relay-due.mjs"
 import { faults as handoffFaults } from "./bin/relay-guard.mjs"
 import { teamFaults } from "./bin/comm.mjs"
+import { configFaults } from "./bin/team.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const CHECK = process.argv.includes("--check")
@@ -279,7 +280,7 @@ try {
 		{ cwd: agentRoot, encoding: "utf8", timeout: 5000 })
 	if (t.status === 0) teamLine = String(t.stdout).trim()
 } catch {}
-const inTeam = !!teamLine && !teamLine.startsWith('"teams" is IGNORED')
+const inTeam = !!teamLine && !teamLine.startsWith('"teams" is IGNORED') && !teamLine.startsWith("⚠")
 try {
 	const cf = JSON.parse(readFileSync(join(projectRoot, ".comm", "config.json"), "utf8"))
 	const agents = (cf && cf.agents) || {}, lead = cf && cf.leader
@@ -686,7 +687,7 @@ const GITIGNORE_BLOCK = "# claude-comm live state (regenerate with install.mjs)\
 // drifted - wake.mjs documented none of its user flags, `who --all` and `comm log` were nowhere. So this section is
 // BUILT, at every install, from each tool's own usage lines (what its --help prints) and from `comm help`, read from
 // the very files written beside it: it cannot describe a version other than the one installed. A92 gates both ends.
-const CLI_TOOLS = ["launch", "close", "relay", "relay-due", "relay-guard", "wake", "claim", "pair", "team", "restart", "handoff", "ledger", "usage"]
+const CLI_TOOLS = ["launch", "close", "reopen", "relay", "relay-due", "relay-guard", "wake", "claim", "pair", "team", "restart", "handoff", "ledger", "usage"]
 const usageLines = (src) => src.split("\n").filter((l) => /^ \*\s{2,}node \S*bin\/[\w-]+\.mjs/.test(l))
 	.map((l) => l.replace(/^ \*\s+/, "").replace(/^node (\.comm\/)?bin\//, "node .comm/bin/"))
 // A SETTING IS DOCUMENTED WHERE IT IS READ (work 10-31: a project could learn that thresholds exist only from a CHANGELOG
@@ -1079,7 +1080,7 @@ function write(path, content, results) {
 // restarts happen HERE - 53 cold starts in one field tree against 5 declared reboots - and
 // the ledger verdict stays UNKNOWN until declared restarts exist to count. A tool only the
 // maintainer can run cannot fill an arm the field is the source of.
-const BUS_FILES = ["comm.mjs", "session-registry.mjs", "ledger.mjs", "wake.mjs", "restart-signal.mjs", "claim.mjs", "launch.mjs", "close.mjs", "handoff.mjs", "restart.mjs", "who.mjs", "usage.mjs", "relay.mjs", "pair.mjs", "relay-due.mjs", "relay-guard.mjs", "team.mjs"]
+const BUS_FILES = ["comm.mjs", "session-registry.mjs", "ledger.mjs", "wake.mjs", "restart-signal.mjs", "claim.mjs", "launch.mjs", "close.mjs", "handoff.mjs", "restart.mjs", "who.mjs", "usage.mjs", "relay.mjs", "pair.mjs", "relay-due.mjs", "relay-guard.mjs", "team.mjs", "reopen.mjs"]
 const CHANGELOG = join(HERE, "CHANGELOG.md")
 function busPrint() {
 	const h = createHash("sha256")
@@ -1359,6 +1360,10 @@ function SKILL(ids, agentRoot) {
 		"  adversarial review.",
 		"- The expert reports with `--kind done` and a file. Read the file, decide, answer with a file.",
 		`- **Teams**: \`"teams": {"<chief>": ["<expert>", ...]}\` in \`.comm/config.json\` links a chief, its experts and the other chiefs with no pair and no bell at the start; a project without it stays a star. One fault in it and it is ignored: the installer and boot say so.`,
+		`  With it, only you or a chief of an expert may launch it, and a \`--prompt\` opens a request. \`node ${B}/team.mjs --board\`: by chief, each member's state, its open requests, its \`done\` and \`blocked\` since your last look.`,
+		`- **Close an expert's window** (at rest, one \`launch.mjs\` opened; you, or a chief of it): \`node ${B}/close.mjs --agent <x>\`. Mail, a claim or another's open request refuse, \`--force\` lifts them and is noted; a turn under way or somebody's words on its box refuse for good.`,
+		`- **Room:** \`"caps": {"working": 5, "availableMb": 2500, "windows": 12}\`: a launch past any of them is refused, with the numbers.`,
+		`- **A closed agent reopened by its mail:** \`"reopen": {"<agent>": {"model": "...", "effort": "...", "say": "<first prompt>"}}\`: mail that asks (not an \`fyi\`) opens it from the sender's hook, once, minimized, inside the caps; a refusal tells the owner and you. \`node ${B}/reopen.mjs <agent> --dry-run\` says what it would do.`,
 		`- **Two experts in a tight loop** (one writes a script, the other runs it on its cases): \`node ${B}/pair.mjs <a> <b> --for 2h --ref <file>\``,
 		"  lets them send to each other until then (24 h at most), so each round no longer costs you a turn. The file says why",
 		"  and on what; each is rung pointing at it. `comm log` shows every message, marked `(pair)`; `--close` ends it early.",
@@ -1369,6 +1374,7 @@ function SKILL(ids, agentRoot) {
 		shared ? "## If you are an expert: reporting to your leader" : "## Reporting to your leader", "",
 		`Write the report to a file, then \`${C} send @asker --ref <report> --kind done --note "<where to read, then the verdict>"\`: it reaches the one who waits on your work, else your chief, else \`${leader}\`. If several wait, it says so: name one.`,
 		"**If your start message says you LEAD a team**, you are its leader: give your experts their work (`send <expert>`, a file in their folder), judge what they return, and take to the leader only what is its own. Your start message and `team.mjs` say who is yours.",
+		`You launch your experts as a leader does (\`launch.mjs <expert> --model <m> --effort <e> --prompt "..."\`), close one at rest with \`node ${B}/close.mjs --agent <x>\`, and read them with \`node ${B}/team.mjs --board\`. Launching anyone else is refused.`,
 		"Stuck on a decision that is not yours: `--kind blocked`, same form, and wait for the ruling.",
 		`Your task done, the report sent, and you were launched for it: close your window (\`node ${B}/close.mjs\`, below).`, "")
 	L.push(
@@ -1598,6 +1604,8 @@ if (CHECK) {
 	// ONE FAULT IN "teams" IS NO TEAM: said now, not when a chief's send is refused.
 	const tf = teamFaults(cfg)
 	if (tf.length) console.log(`  ⚠ "teams" is IGNORED until it is fixed, so this project stays a star: ${tf.join("; ")}`)
+	const cf = configFaults(cfg)
+	if (cf.length) console.log(`  ⚠ .comm/config.json: ${cf.join("; ")}`)
 
 	// THE PATCH NOTES: every entry newer than what this project had, and nothing else. A
 	// changelog dumped in full at every install is a changelog nobody reads.

@@ -244,7 +244,7 @@ export function linked(cfg, a, b) {
 	const t = teams(cfg)
 	return !!t && (leads(cfg, a, b) || leads(cfg, b, a) || (own(t, a) && own(t, b)) || headsOf(cfg, a).some((h) => t[h].includes(b)))
 }
-const ASKED = (root, a) => join(root, ".comm", "asked", a)
+export const ASKED = (root, a) => join(root, ".comm", "asked", a)
 /** Who waits on this agent's work: its leader or a chief of it, nudge not yet answered by a `done`. */
 export function askersOf(root, cfg, a) {
 	let n = []
@@ -672,7 +672,7 @@ function dispatch(root, cfg, me, cmd, rest) {
 			if (m.note !== sanitizeNote(arg(rest, "note"))) console.log(`  note was flattened/truncated to ${MAX_NOTE} chars — the substance belongs in ${m.ref}`)
 			const ring = `node "${join(dirname(fileURLToPath(import.meta.url)), "wake.mjs")}" --root "${root}" --agent ${to}`, run = `'${to}' is running (pid ${live?.map((l) => l.pid).join(", ")})`
 			const at = Math.max(0, ...t.map((x) => x.at || 0)), ago = at ? `${Math.round((Date.now() - at) / 60000)} min ago` : "when unknown"
-			console.log(!live?.length ? `  '${to}' is NOT running — held in inbox, delivered when you next launch it.`
+			console.log(!live?.length ? `  '${to}' is NOT running — held in inbox, ${own(cfg.reopen, to) && m.kind !== "fyi" ? `"reopen" opens it at this project's next hook` : "delivered when you next launch it"}.`
 				: turn === "busy" ? `  ${run} and BUSY — delivered when its current turn ends.`
 				: turn === "idle" ? `  ${run} but IDLE (its runtime's status, set ${ago}) — no turn is in progress, so none ends.\n` +
 					`  The doorbell only tries at a turn END in this project, yours included, and only in a kitty window it can find: wait for its answer INSIDE this turn and it never comes.\n` +

@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 /**
- * claude-comm CLOSE — an agent closes its OWN window, and REFUSES to close any other.
+ * claude-comm CLOSE — an agent closes its OWN window; the leader or a chief may close an expert's at rest; nothing else.
  *
  *   node .comm/bin/close.mjs                 close the window this session is running in
  *   node .comm/bin/close.mjs --dry-run       resolve and check everything, close nothing
  *   node .comm/bin/close.mjs --force         close over waiting mail / held claims
  *   node .comm/bin/close.mjs --now           close at once, inside this turn (the old default)
  *   node .comm/bin/close.mjs --cancel        disarm a close armed in this window: it stays open
+ *   node .comm/bin/close.mjs --agent <x> [--dry-run] [--force]   the leader or a chief of <x> closes its window, at rest only: FINDINGS.md#teams-b
  *
  * WHY THIS EXISTS. The owner, 2026-09-10: *"c'est super d'ouvrir une fenetre et lancer un
  * agent, mais ce serait aussi super de pouvoir fermer celle-ci lorsqu'il a fini, sinon dans
@@ -65,7 +66,7 @@
  * leaving nothing at all. `--dry-run` is what the arms use to gate the decision; the file
  * is what gates the effect.
  */
-import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from "node:fs"
+import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync, rmSync, readdirSync } from "node:fs"
 import { join, dirname } from "node:path"
 import { spawnSync, spawn } from "node:child_process"
 import { fileURLToPath } from "node:url"
@@ -133,6 +134,19 @@ if (ARGV[0] === "--verify") {
 		writeFileSync(statePath, JSON.stringify({ ...prev, verified_at: new Date().toISOString(), gone,
 			...(gone === null ? { could_not_look: why } : {}), blind_looks: blind }, null, 1) + "\n")
 	} catch {}
+	// ROOM WAS JUST FREED: nothing else would look. At the cap an expert's `done` to a closed chief is refused, the expert closes, the leader is idle, and no hook
+	// fires until a person comes (a reviewer's fixture). The session goes a moment after its window, and it counts until then. A project with no "reopen" reads one file.
+	if (gone === true) try {
+		const root = dirname(dirname(dirname(statePath))), cfg = JSON.parse(readFileSync(join(root, ".comm", "config.json"), "utf8"))
+		if (cfg.reopen && typeof cfg.reopen === "object") {
+			for (const u = Date.now() + 5000; prev && prev.session && Date.now() < u && existsSync(`/proc/${prev.session}`); spawnSync(process.execPath, ["-e", "setTimeout(()=>{},150)"])) {}
+			for (const a of Object.keys(cfg.reopen)) {
+				let waiting = false
+				try { waiting = readdirSync(join(root, ".comm", "inbox", a)).some((f) => f.endsWith(".json")) } catch {}
+				if (waiting) spawn(process.execPath, [fileURLToPath(new URL("reopen.mjs", import.meta.url)), a, "--root", root, "--now"], { detached: true, stdio: "ignore" }).unref()
+			}
+		}
+	} catch { /* a look at what the close freed must never change what the close says */ }
 	process.exit(gone === true ? 0 : gone === false ? 1 : 2)
 }
 
@@ -189,6 +203,128 @@ if (ARGV[0] === "--after-turn") {
 	const out = spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { encoding: "utf8", timeout: 5000 })
 	if (out.status !== 0) note({ close_failed: `kitten @ close-window exit ${out.status}: ${(out.stderr || "").trim()}` })
 	process.exit(out.status === 0 ? 0 : 4)
+}
+
+// 🔴 REVIEW #10 C1: THIS REFUSAL HAD NEVER RUN. `claim list --json` answers an OBJECT,
+// `{ root, claims: [...] }`, and this loop iterated it directly: `for…of` on an object throws,
+// a bare `catch {}` ate it, and `blocks` stayed empty for a claim this very session held —
+// measured by the reviewer end to end. Behind it sat a second mismatch: `pid` and `by` live in
+// `c.rec`, not on `c`. The header promised two housekeeping guards and shipped one.
+// NOT KNOWING IS NOT "NONE HELD" — the rule the inbox probe above already follows: a list that
+// fails or does not parse is a block of its own, never a silent pass. A58.
+function claimBlocks(root, pid, agent) {
+	const out = []
+	const claimBin = fileURLToPath(new URL("claim.mjs", import.meta.url))
+	const cl = spawnSync(process.execPath, [claimBin, "list", "--json"], { cwd: root, encoding: "utf8", timeout: 5000 })
+	let claims = null
+	if (cl.status === 0) {
+		try { const j = JSON.parse(cl.stdout); if (j && Array.isArray(j.claims)) claims = j.claims } catch {}
+	}
+	if (claims === null)
+		out.push(`could not read the claims (claim list exit ${cl.status}) — not the same as holding none`)
+	else for (const c of claims) {
+		if (c.state === "gone" || c.state === "free") continue
+		const rec = c.rec || {}
+		if (String(rec.pid) === String(pid) || rec.by === agent)
+			out.push(`still holding ${c.resource} (${rec.purpose || "no purpose recorded"}) — release it or --force; a claim outliving its holder reads as a crash to the next agent`)
+	}
+	return out
+}
+
+// ── ANOTHER AGENT'S WINDOW: the leader, or a chief of it (work's letter 38, the owner's own question) ───────────
+// A chief's relay sentence sat unsent in its box, 329 MB and a place under the caps until the owner closed it by hand at
+// 00h50: "pourquoi le bus ne laisse pas fermer la fenêtre d'un autre? T'es le leader expert, tu devrais être en mesure de
+// les fermer". The header's trap stands, and is answered otherwise here: a sub-session is told by the session above it
+// (team.mjs, callerOf), because a hand-started leader is not its window's process. Who the target is comes from THIS
+// project's `who`, never a window's mark alone: every project has its own `review`, and the mark is only the second proof.
+// --force lifts what is unfinished (mail, a claim, a request) and is noted. It never lifts identity or "at rest": a turn
+// under way or somebody's words on the box are not this tool's to end, and a person can still close the window by hand.
+if (has("--agent")) {
+	const x = ARGV[ARGV.indexOf("--agent") + 1]
+	if (!x || x.startsWith("--")) die(`--agent needs the agent's name: close.mjs --agent <x> [--dry-run] [--force]`)
+	if (has("--now") || has("--cancel")) die(`--now and --cancel are about YOUR window; --agent closes at once, an agent already at rest.`)
+	let root = process.cwd()
+	while (!existsSync(join(root, ".comm", "config.json"))) { const up = dirname(root); if (up === root) die(`no .comm/ found above this folder`); root = up }
+	const cfg = JSON.parse(readFileSync(join(root, ".comm", "config.json"), "utf8"))
+	if (!Object.prototype.hasOwnProperty.call(cfg.agents || {}, x))
+		die(`unknown agent '${x}'. Known: ${Object.keys(cfg.agents || {}).join(", ")}. A name comes from .comm/config.json, never from message text.`)
+	const team = await import(new URL("team.mjs", import.meta.url))
+	const wake = await import(new URL("wake.mjs", import.meta.url))
+	const { lookup } = await import(new URL("session-registry.mjs", import.meta.url))
+	const st = team.liveState(root)
+	if (!st) die(`cannot ask 'comm who' who is running — REFUSING. Not knowing is not permission.`)
+	const c = team.callerOf(st)
+	if (!c.session) die(`REFUSING: no session here to prove who asks (no 'claude' above pid ${process.pid}). A person closes a window with kitty's own keys.`)
+	if (c.agent === x && !c.nested) die(`'${x}' is you: close yourself with plain close.mjs, which waits for your last answer.`)
+	const j = team.judge(cfg, c, x)
+	if (!j.ok) die(`REFUSING to close '${x}': ${j.why}`)
+	const pids = st.agents[x].pids
+	if (!pids.length) die(`'${x}' is not running: there is no window to close.`, 1)
+	if (pids.length > 1) die(`REFUSING: '${x}' has ${pids.length} live sessions (${pids.join(", ")}). Two answers about one identity is the state where guessing is worst.`)
+	const pid = pids[0]
+	const r = wake.resolveWindow(pid, wake.windows())
+	if (!r.ok) die(`REFUSING: '${x}' (pid ${pid}) is in no kitty window this user can see: ${r.why}`)
+	if (r.how !== "foreground process" || r.win.shellPid !== pid || r.win.vars.CLAUDE_COMM_LAUNCHED !== x)
+		die(`REFUSING: window ${r.win.id} is not one bin/launch.mjs opened for '${x}' (its process ${r.win.shellPid}, the session ${pid}, its mark ${JSON.stringify(r.win.vars.CLAUDE_COMM_LAUNCHED || null)}). Closing a window we did not open is the one thing this must never do. A person closes it.`)
+
+	// AT REST, three witnesses, and NOT KNOWING is not at rest: the transcript (a turn under way), the runtime (busy, a sub-agent
+	// included; a dialog a person must answer), the box. A box holding only the bus's own text is at rest (work's case): an
+	// Enter lost, a bell or the relay's sentence, nobody's words. Anything else in it is somebody's, and closing would lose it.
+	const notRest = []
+	const turn = wake.readTurn(pid, lookup)
+	if (turn.state !== "idle") notRest.push(`its turn is ${turn.state} (${turn.why})`)
+	const rt = team.turnNow(pid)
+	if (rt.state === "busy") notRest.push(`its runtime says busy: a turn, or a sub-agent at work`)
+	if (rt.waiting) notRest.push(rt.why)
+	const box = wake.screenAtRest(r.win)
+	let held = null
+	if (!box.ok) {
+		let say = null
+		try { say = JSON.parse(readFileSync(join(root, ".comm", "relay", `${x}.json`), "utf8")).say } catch {}
+		if (box.typed && wake.busText(box.text)) held = "the bus's own bell"
+		else if (box.typed && ((typeof say === "string" && wake.sameText(box.text, say)) || wake.sameText(box.text, "/clear"))) held = "its relay's own sentence"
+		else notRest.push(box.typed ? "text is on its input line, somebody's words as far as this can tell" : box.why)
+	}
+	if (notRest.length) {
+		console.error(`close: REFUSING to close '${x}' (window ${r.win.id}), it is not at rest: ${notRest.join("; ")}.`)
+		console.error(`  --force does not lift this. Wait for its turn to end, or a person closes the window.`)
+		process.exit(3)
+	}
+
+	const blocks = []
+	const mail = mailWaiting(root, x)
+	if (mail) blocks.push(mail)
+	blocks.push(...claimBlocks(root, pid, x))
+	// WORK ASKED OF IT BY ANOTHER (decision 2, work's letter 48): its report is owed to them, this caller may not take it away
+	for (const a of team.askersOf(root, cfg, x).filter((w) => w !== j.by)) {
+		let since = ""
+		try { since = ` since ${readFileSync(join(root, ".comm", "asked", x, a), "utf8").trim()}` } catch {}
+		blocks.push(`'${a}' waits on its work${since}: its \`done\` to '${a}' closes that request`)
+	}
+	if (blocks.length && !has("--force")) {
+		console.error(`close: REFUSING to close '${x}' (window ${r.win.id}) — ${blocks.length} thing(s) unfinished:`)
+		for (const b of blocks) console.error(`  · ${b}`)
+		console.error(`  --force closes anyway and records that it was forced, and by whom.`)
+		process.exit(3)
+	}
+	const state = { agent: x, by: j.by, window: r.win.id, sock: r.win.sock, tab: r.win.tab, session: pid, at: new Date().toISOString(), blocks, forced: has("--force"), ...(held ? { box_held: held } : {}) }
+	if (has("--dry-run")) { console.log(JSON.stringify({ ...state, would_close: true }, null, 1)); process.exit(0) }
+
+	const statePath = join(root, ".comm", "close", `${x}.json`)
+	mkdirSync(dirname(statePath), { recursive: true })
+	writeFileSync(statePath, JSON.stringify({ ...state, verified_at: null, gone: null }, null, 1) + "\n")
+	spawn(process.execPath, [fileURLToPath(import.meta.url), "--verify", r.win.sock, String(r.win.id), statePath], { detached: true, stdio: "ignore" }).unref()
+	const out = spawnSync("kitten", ["@", "--to", `unix:${r.win.sock}`, "close-window", "--match", `id:${r.win.id}`], { encoding: "utf8", timeout: 5000 })
+	if (out.status !== 0) die(`kitten @ close-window failed (exit ${out.status}): ${(out.stderr || "").trim()}. '${x}' is still there.`, 4)
+	// THE EFFECT, NOT THE EXIT CODE: this process outlives that window, so unlike a self-close it can read the probe's answer
+	let gone = null
+	for (const t = Date.now(); Date.now() - t < 10_000 && gone === null; nap(100)) try { gone = JSON.parse(readFileSync(statePath, "utf8")).gone } catch {}
+	if (gone !== true) die(`asked kitty to close window ${r.win.id} and the probe says ${gone === false ? "it is still there" : "it could not look"}: ${statePath}.`, 4)
+	// WHO CLOSES IT WITHDRAWS WHAT IT ASKED: nobody will answer that request now, and left open it would make `send @asker` refuse at the next launch.
+	// Another's request stays, forced over or not: it is theirs, and the board shows it.
+	rmSync(join(root, ".comm", "asked", x, j.by), { force: true })
+	console.log(`close: '${x}' closed (window ${r.win.id}), by '${j.by}'${state.forced ? ", FORCED" : ""}${blocks.length ? ` over: ${blocks.join(" · ")}` : ""}. Verified gone. The record: ${statePath}`)
+	process.exit(0)
 }
 
 // ── who am I, and which window is mine ───────────────────────────────────────────────
@@ -279,27 +415,7 @@ if (root) {
 	const mail = mailWaiting(root, launchedFor)
 	if (mail) blocks.push(mail)
 
-	// 🔴 REVIEW #10 C1: THIS REFUSAL HAD NEVER RUN. `claim list --json` answers an OBJECT,
-	// `{ root, claims: [...] }`, and this loop iterated it directly: `for…of` on an object throws,
-	// a bare `catch {}` ate it, and `blocks` stayed empty for a claim this very session held —
-	// measured by the reviewer end to end. Behind it sat a second mismatch: `pid` and `by` live in
-	// `c.rec`, not on `c`. The header promised two housekeeping guards and shipped one.
-	// NOT KNOWING IS NOT "NONE HELD" — the rule the inbox probe above already follows: a list that
-	// fails or does not parse is a block of its own, never a silent pass. A58.
-	const claimBin = fileURLToPath(new URL("claim.mjs", import.meta.url))
-	const cl = spawnSync(process.execPath, [claimBin, "list", "--json"], { cwd: root, encoding: "utf8", timeout: 5000 })
-	let claims = null
-	if (cl.status === 0) {
-		try { const j = JSON.parse(cl.stdout); if (j && Array.isArray(j.claims)) claims = j.claims } catch {}
-	}
-	if (claims === null)
-		blocks.push(`could not read the claims (claim list exit ${cl.status}) — not the same as holding none`)
-	else for (const c of claims) {
-		if (c.state === "gone" || c.state === "free") continue
-		const rec = c.rec || {}
-		if (String(rec.pid) === String(me) || rec.by === launchedFor)
-			blocks.push(`still holding ${c.resource} (${rec.purpose || "no purpose recorded"}) — release it or --force; a claim outliving its holder reads as a crash to the next agent`)
-	}
+	blocks.push(...claimBlocks(root, me, launchedFor))
 }
 
 const state = { agent: launchedFor, window: win.id, sock: win.sock, tab: win.tab, session: me,

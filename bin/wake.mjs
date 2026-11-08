@@ -1078,7 +1078,14 @@ async function main() {
 	for (const [agent, a] of Object.entries(state.agents)) {
 		if (only && agent !== only) continue
 		if (!a.pending) continue
-		if (!a.pids.length) { results.push({ agent, sent: false, why: "not running — its mail waits for its next start, which is correct" }); continue }
+		if (!a.pids.length) {
+			// A CLOSED AGENT ITS PROJECT DECLARED: opened from the sender's hook, detached, because a hook is killed at 10 s and a
+			// reopening waits its turn behind others. reopen.mjs decides everything else, and says what it did. FINDINGS.md#teams-b
+			const declared = !!cfg && !!cfg.reopen && Object.prototype.hasOwnProperty.call(cfg.reopen, agent)
+			if (declared && !has("--dry-run")) try { spawn(process.execPath, [fileURLToPath(new URL("reopen.mjs", import.meta.url)), agent, "--root", root], { detached: true, stdio: "ignore" }).unref() } catch {}
+			results.push({ agent, sent: false, why: declared ? `not running, and declared in "reopen": reopen.mjs takes it from here, .comm/reopen/${agent}.json says what it did` : "not running — its mail waits for its next start, which is correct" })
+			continue
+		}
 		for (const pid of a.pids) {
 			if (pid === self) continue          // never ring your own session
 			// Nobody else looks again if everyone is asleep. It claims per agent, so a second one ends at once.

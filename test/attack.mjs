@@ -4367,7 +4367,7 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	// `--print` resolves the caller's kitty window since review #10 A2, so it now needs
 	// wake.mjs and session-registry.mjs beside it. That is a REAL new dependency of the
 	// checking mode, and this arm going red is how it announced itself.
-	for (const f of ["comm.mjs", "who.mjs", "launch.mjs", "wake.mjs", "session-registry.mjs"])
+	for (const f of ["comm.mjs", "who.mjs", "launch.mjs", "team.mjs", "wake.mjs", "session-registry.mjs"])
 		cpSync(join(PKG, "bin", f), join(r46, ".comm", "bin", f))
 	const L = join(r46, ".comm", "bin", "launch.mjs")
 	// Every call carries a tier: since 2026-09-13 a launch without one REFUSES (A57), and without the
@@ -4504,7 +4504,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 	mkdirSync(join(r50, "db"), { recursive: true })
 	writeFileSync(join(r50, ".comm", "config.json"),
 		JSON.stringify({ leader: "leader", agents: { leader: ".", db: "db" } }))
-	for (const f of ["comm.mjs", "who.mjs", "launch.mjs", "wake.mjs", "session-registry.mjs", "close.mjs", "claim.mjs"])
+	for (const f of ["comm.mjs", "who.mjs", "launch.mjs", "team.mjs", "wake.mjs", "session-registry.mjs", "close.mjs", "claim.mjs"])
 		cpSync(join(PKG, "bin", f), join(r50, ".comm", "bin", f))
 	const L50 = join(r50, ".comm", "bin", "launch.mjs")
 	// the tier every launch must now carry (A57) — without it each case below refuses for the missing tier
@@ -4651,7 +4651,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 	mkdirSync(join(r51, "db"), { recursive: true })
 	writeFileSync(join(r51, ".comm", "config.json"),
 		JSON.stringify({ leader: "leader", agents: { leader: ".", db: "db" } }))
-	for (const f of ["comm.mjs", "who.mjs", "launch.mjs", "wake.mjs", "session-registry.mjs", "close.mjs", "claim.mjs"])
+	for (const f of ["comm.mjs", "who.mjs", "launch.mjs", "team.mjs", "wake.mjs", "session-registry.mjs", "close.mjs", "claim.mjs"])
 		cpSync(join(PKG, "bin", f), join(r51, ".comm", "bin", f))
 	const C51 = join(r51, ".comm", "bin", "close.mjs")
 
@@ -4793,7 +4793,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 	mkdirSync(join(r87, ".comm", "bin"), { recursive: true })
 	mkdirSync(join(r87, "db"), { recursive: true })
 	writeFileSync(join(r87, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", db: "db" } }))
-	for (const f of ["comm.mjs", "who.mjs", "launch.mjs", "wake.mjs", "session-registry.mjs", "close.mjs", "claim.mjs"])
+	for (const f of ["comm.mjs", "who.mjs", "launch.mjs", "team.mjs", "wake.mjs", "session-registry.mjs", "close.mjs", "claim.mjs"])
 		cpSync(join(PKG, "bin", f), join(r87, ".comm", "bin", f))
 	const C87 = join(r87, ".comm", "bin", "close.mjs"), B87 = join(r87, ".comm", "bin", "comm.mjs")
 	writeFileSync(join(r87, "db", "DONE.md"), "done\n")
@@ -4956,7 +4956,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 	mkdirSync(join(r89, ".comm", "bin"), { recursive: true })
 	for (const k of SC) mkdirSync(join(r89, k), { recursive: true })
 	writeFileSync(join(r89, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", ...Object.fromEntries(SC.map((k) => [k, k])) } }))
-	for (const f of ["comm.mjs", "who.mjs", "launch.mjs", "wake.mjs", "session-registry.mjs", "close.mjs", "claim.mjs"])
+	for (const f of ["comm.mjs", "who.mjs", "launch.mjs", "team.mjs", "wake.mjs", "session-registry.mjs", "close.mjs", "claim.mjs"])
 		cpSync(join(PKG, "bin", f), join(r89, ".comm", "bin", f))
 	const C89 = join(r89, ".comm", "bin", "close.mjs"), rt89 = join(r89, "runtime")
 	const fake89 = join(r89, "claude")
@@ -6115,6 +6115,647 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		Object.entries({ ...ok115, ...wording }).map(([k, v]) => `${k}=${v}`).join("; "))
 }
 
+// A119 - A123: WHO MAY OPEN AND CLOSE, UNDER WHAT ROOM, AND A CLOSED AGENT REOPENED BY ITS MAIL. Work's leader, 11-08 (letters 38, 44, 48): nothing checked who launches,
+// a stuck expert held 329 MB until the owner closed it by hand, 13 chiefs reopened by hand for one Monday. The sessions here are what a session is to these tools: a process
+// named `claude`, in the agent's folder, with NO `claude` above it (an orphan, or a suite run from a session would make every one a sub-session), running jobs like the bench.
+// No window for what needs none; a fake kitten for the reopenings, which would otherwise open minimized OS windows by the dozen; real panes in the bench for the closes,
+// whose effect is a window gone. Each refusal is read for its reason, each has its positive control one variable away. FINDINGS.md#teams-b
+{
+	const rB = mkdtempSync(join(tmpdir(), "comm-attack-teamsb-"))
+	const panes = [], kids = new Set()
+	const killAll = () => { for (const p of kids) try { process.kill(p, "SIGKILL") } catch {} ; kids.clear() }
+	atExit(() => {
+		for (const [sock, id] of panes) try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
+		killAll()
+		try { rmSync(rB, { recursive: true, force: true }) } catch {}
+	})
+	const reg = await import(pathToFileURL(join(PKG, "bin", "session-registry.mjs")).href)
+	const wkB = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
+	const HOME_B = join(rB, "home"), RT_B = join(rB, "runtime"), FAKE = join(rB, "claude"), FAKEBIN = join(rB, "fakebin")
+	mkdirSync(join(HOME_B, ".claude", "sessions"), { recursive: true }); mkdirSync(join(RT_B, "claude-comm", "sessions"), { recursive: true }); mkdirSync(FAKEBIN, { recursive: true })
+	symlinkSync(process.execPath, FAKE)
+	writeFileSync(join(FAKEBIN, "claude"), "#!/bin/sh\nexec sleep 120\n", { mode: 0o755 })
+	const baseEnv = { ...process.env, HOME: HOME_B, CLAUDE_COMM_RUNTIME: RT_B, CLAUDE_COMM_AGENT: "", PATH: `${FAKEBIN}${delimiter}${process.env.PATH}` }
+	const said = (r) => `${r.stdout || ""}${r.stderr || ""}`
+	const project = (name, cfg) => {
+		const r = join(rB, name)
+		mkdirSync(join(r, ".comm"), { recursive: true })
+		for (const [a, d] of Object.entries(cfg.agents)) if (d !== ".") { mkdirSync(join(r, d), { recursive: true }); writeFileSync(join(r, d, "R.md"), `report of ${a}\n`) }
+		writeFileSync(join(r, "R.md"), "the leader's\n")
+		const set = (o) => writeFileSync(join(r, ".comm", "config.json"), JSON.stringify(o, null, 1))
+		set(cfg)
+		const inst = spawnSync(process.execPath, [join(PKG, "install.mjs"), r], { encoding: "utf8" })
+		return { r, set, cfg, inst, dirOf: (w) => join(r, cfg.agents[w] === "." ? "" : cfg.agents[w]), bin: (t) => join(r, ".comm", "bin", t) }
+	}
+	const setRuntime = (pid, status) => writeFileSync(join(HOME_B, ".claude", "sessions", `${pid}.json`), JSON.stringify({ status, procStart: reg.startTimeOf(pid), statusUpdatedAt: Date.now() }))
+	/** A live session: an orphan named claude in `cwd`, running the bench's job loop. Its parent is no session, whoever runs this suite. */
+	const session = (cwd, { status = "idle", agent = "" } = {}) => {
+		const d = mkdtempSync(join(rB, "s-"))
+		writeFileSync(join(d, "runner.cjs"), BENCH_RUNNER)
+		spawnSync("sh", ["-c", '"$0" "$@" >/dev/null 2>&1 &', FAKE, join(d, "runner.cjs"), d, String(process.pid)], { cwd, env: { ...baseEnv, CLAUDE_COMM_AGENT: agent }, stdio: "ignore" })
+		let pid = 0
+		for (const u = Date.now() + 8000; Date.now() < u && !pid; nap(20)) try { pid = Number(readFileSync(join(d, "ready"), "utf8")) } catch {}
+		kids.add(pid)
+		if (status) setRuntime(pid, status)
+		return { dir: d, pid, cwd, stop() { try { process.kill(pid, "SIGKILL") } catch {} ; kids.delete(pid); for (const u = Date.now() + 2000; Date.now() < u && existsSync(`/proc/${pid}/cmdline`) && readFileSync(`/proc/${pid}/cmdline`, "utf8"); nap(10)) {} } }
+	}
+	/** Run with NO session above: the double fork that leaves a person's shell or a timer's shape. */
+	const noSession = (argv, { cwd, env = baseEnv } = {}) => {
+		const d = mkdtempSync(join(rB, "n-")), o = join(d, "o"), e = join(d, "e"), c = join(d, "c")
+		spawnSync("sh", ["-c", `( "$@" >${o} 2>${e}; echo $? >${c} ) &`, "sh", ...argv], { cwd, env, stdio: "ignore" })
+		for (const u = Date.now() + 30000; Date.now() < u && !existsSync(c); nap(20)) {}
+		nap(20)
+		const rd = (f) => { try { return readFileSync(f, "utf8") } catch { return "" } }
+		return { status: Number(rd(c).trim() || -1), stdout: rd(o), stderr: rd(e) }
+	}
+	const T = ["--model", "sonnet", "--effort", "low"]
+	const benchFree = (s, argv, env = baseEnv) => benchRun(s, argv, { cwd: s.cwd, env })
+
+	// ── A119: WHO MAY LAUNCH ─────────────────────────────────────────────────────────────────────────────────
+	const TEAMS = { chiefA: ["e1", "shared", "lead4"], chiefB: ["e2", "shared"], lead4: ["sub"] }
+	const NAMES = ["chiefA", "chiefB", "shared", "e1", "e2", "lead4", "sub", "loner"]
+	const P1 = project("p1", { leader: "boss", agents: { boss: ".", ...Object.fromEntries(NAMES.map((a) => [a, a])) }, teams: TEAMS })
+	mkdirSync(join(P1.r, "docs"), { recursive: true })
+	const S1 = { boss: session(P1.r), chiefA: session(P1.dirOf("chiefA")), chiefB: session(P1.dirOf("chiefB")), lead4: session(P1.dirOf("lead4")), shared: session(P1.dirOf("shared")), docs: session(join(P1.r, "docs")) }
+	const print1 = (s, target, ...more) => benchFree(s, [process.execPath, P1.bin("launch.mjs"), target, ...T, "--os-window", "--print", ...more])
+	const passes = (r, target) => r.status === 0 && r.stdout.includes(`"agent": "${target}"`)
+	const refused = (r, re) => r.status !== 0 && re.test(r.stderr || "") && !/"agent":/.test(r.stdout || "")
+	const notChief = /neither the leader nor a chief/
+	const nestedRun = (s, argv) => { // a `claude` a session started, running a tool: same folder, same environment, one session above
+		const code = `const r=require("node:child_process").spawnSync(${JSON.stringify(process.execPath)},${JSON.stringify(argv)},{encoding:"utf8"});process.stdout.write(r.stdout||"");process.stderr.write(r.stderr||"");process.exit(r.status===null?9:r.status)`
+		return benchFree(s, [FAKE, "-e", code])
+	}
+	const shellProbe = noSession([process.execPath, "--input-type=module", "-e", `import(${JSON.stringify(pathToFileURL(join(PKG, "bin", "session-registry.mjs")).href)}).then((m)=>console.log(m.sessionPid()))`], { cwd: P1.r })
+	const ok119 = {
+		leader: passes(print1(S1.boss, "e1"), "e1"),
+		itsChief: passes(print1(S1.chiefA, "e1"), "e1"),
+		aLevel4OverItsOwn: passes(print1(S1.lead4, "sub"), "sub"),
+		twoLevelsDown: refused(print1(S1.chiefA, "sub"), notChief),
+		anotherChiefsExpert: refused(print1(S1.chiefA, "e2"), notChief),
+		aPeerChief: refused(print1(S1.chiefB, "chiefA"), notChief),
+		aColleague: refused(print1(S1.shared, "e1"), notChief),
+		sharedExpertItself: refused(print1(S1.shared, "e2"), notChief),
+		saysWhoMay: (() => { const e = print1(S1.shared, "e1").stderr; return /'boss' or 'chiefA'/.test(e) && /--kind blocked/.test(e) && e.includes("node ../.comm/bin/comm.mjs send") })(),
+		aSubSession: (() => { const r = nestedRun(S1.boss, [P1.bin("launch.mjs"), "e1", ...T, "--os-window", "--print"]); return refused(r, /started by another session/) })(),
+		offRoster: refused(print1(S1.docs, "e1"), /no agent of this project/),
+		shellProbeIsNoSession: shellProbe.stdout.trim() === "0",
+		aPlainShell: passes(noSession([process.execPath, P1.bin("launch.mjs"), "e1", ...T, "--os-window", "--print"], { cwd: P1.dirOf("shared") }), "e1"),
+	}
+	// an agent on the roster with no folder: no window, or kitty starts the session somewhere else, off the bus (work's own roster, 11-08)
+	renameSync(P1.dirOf("loner"), `${P1.dirOf("loner")}.away`)
+	ok119.noFolderNoWindow = refused(print1(S1.boss, "loner"), /does not exist/)
+	renameSync(`${P1.dirOf("loner")}.away`, P1.dirOf("loner"))
+	ok119.andBackItPasses = passes(print1(S1.boss, "loner"), "loner")
+	P1.set({ leader: "boss", agents: P1.cfg.agents })
+	ok119.noTeamsAsBefore = passes(print1(S1.shared, "e1"), "e1")
+	P1.set({ ...P1.cfg, teams: { chiefA: ["nobody"] } })
+	const fault119 = print1(S1.shared, "e1")
+	ok119.aFaultIsAStarAndSaid = passes(fault119, "e1") && /"teams" is IGNORED/.test(fault119.stderr)
+	P1.set(P1.cfg)
+
+	// a real launch, through a fake kitten: the request a first turn opens, and what a refusal leaves
+	const FK = join(rB, "fk"), FKBIN = join(FK, "bin")
+	mkdirSync(FKBIN, { recursive: true })
+	writeFileSync(join(FK, "child.cjs"), `const fs=require("fs"),{join,dirname}=require("path"),D=${JSON.stringify(FK)},a=process.env.CLAUDE_COMM_AGENT,pid=process.pid;let mode="";try{mode=fs.readFileSync(D+"/mode-"+a,"utf8").trim()}catch{}
+if(mode==="die")process.exit(0);
+setInterval(()=>{try{process.kill(${process.pid},0)}catch{process.exit(0)}},200);setTimeout(()=>process.exit(0),180000);
+if(mode!=="dialog"){const st=fs.readFileSync("/proc/self/stat","utf8"),tick=Number(st.slice(st.lastIndexOf(") ")+2).split(" ")[19]),boot=fs.readFileSync("/proc/sys/kernel/random/boot_id","utf8").trim();
+fs.writeFileSync(join(process.env.CLAUDE_COMM_RUNTIME,"claude-comm","sessions",pid+".json"),JSON.stringify({v:1,pid,start:tick,boot,transcript:D+"/none.jsonl",agent:a,source:"startup",at:new Date().toISOString()}));
+const rt=(status)=>fs.writeFileSync(join(process.env.HOME,".claude","sessions",pid+".json"),JSON.stringify({status,procStart:tick,statusUpdatedAt:Date.now()}));rt(mode==="slowbusy"?"idle":"busy");if(mode==="slowbusy")setTimeout(()=>rt("busy"),1200);
+let r=process.cwd();while(!fs.existsSync(join(r,".comm","config.json")))r=dirname(r);if(mode!=="keep")fs.rmSync(join(r,".comm","inbox",a),{recursive:true,force:true})}`)
+	writeFileSync(join(FKBIN, "kitten"), `#!${process.execPath}
+const fs=require("fs"),{spawn}=require("child_process"),D=${JSON.stringify(FK)},T=D+"/tree.json",a=process.argv.slice(2);fs.appendFileSync(D+"/calls",JSON.stringify(a)+"\\n");
+const read=()=>{try{return JSON.parse(fs.readFileSync(T,"utf8"))}catch{return[]}},write=(w)=>{const t=T+".t"+process.pid;fs.writeFileSync(t,JSON.stringify(w));fs.renameSync(t,T)};
+const live=(w)=>w.filter((x)=>{try{process.kill(x.pid,0);return true}catch{return false}});
+if(a.includes("ls")&&fs.existsSync(D+"/lsfail")&&Date.now()<Number(fs.readFileSync(D+"/lsfail","utf8")))process.exit(1);
+if(a.includes("ls"))process.stdout.write(JSON.stringify([{id:1,tabs:[{id:1,windows:live(read()).map((w)=>({id:w.id,pid:w.pid,foreground_processes:[{pid:w.pid}],user_vars:w.vars||{}}))}]}]));
+else if(a.includes("launch")){if(fs.existsSync(D+"/fail")){process.stderr.write("no kitty answers\\n");process.exit(1)}
+const cwd=(a.find((x)=>x.startsWith("--cwd="))||"=").slice(6),env={...process.env};for(const x of a)if(x.startsWith("--env=")){const k=x.slice(6).split("=")[0];env[k]=x.slice(7+k.length)}
+const c=spawn(${JSON.stringify(FAKE)},[D+"/child.cjs"],{cwd,env,detached:true,stdio:"ignore"});c.unref();fs.appendFileSync(D+"/children",c.pid+"\\n");if(fs.existsSync(D+"/flaky"))fs.writeFileSync(D+"/lsfail",String(Date.now()+600));const w=read(),id=2000+w.length+Math.floor(Math.random()*1e5);w.push({id,pid:c.pid,vars:{}});write(w);process.stdout.write(String(id))}
+else if(a.includes("set-user-vars")){if(fs.existsSync(D+"/nomark"))process.exit(1);if(fs.existsSync(D+"/nomark1")){fs.rmSync(D+"/nomark1");process.exit(1)}const id=Number(a[a.indexOf("--match")+1].slice(3)),[k,v]=a[a.length-1].split("=");const w=read();for(const x of w)if(x.id===id)(x.vars=x.vars||{})[k]=v;write(w)}
+`, { mode: 0o755 })
+	const envK = (() => { const e = { ...baseEnv, PATH: `${FKBIN}${delimiter}${baseEnv.PATH}` }; delete e.KITTY_LISTEN_ON; return e })()
+	const fkCalls = () => { try { return readFileSync(join(FK, "calls"), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)) } catch { return [] } }
+	const fkLaunches = () => fkCalls().filter((a) => a.includes("launch"))
+	const fkKids = () => { try { return readFileSync(join(FK, "children"), "utf8").split("\n").filter(Boolean).map(Number) } catch { return [] } }
+	const fkReset = () => { for (const p of fkKids()) try { process.kill(p, "SIGKILL") } catch {} ; for (const f of ["calls", "children", "tree.json", "fail", "nomark", "nomark1", "flaky", "lsfail"]) rmSync(join(FK, f), { force: true }); for (const f of readdirSync(FK).filter((n) => n.startsWith("mode-"))) rmSync(join(FK, f), { force: true }) }
+	atExit(fkReset)
+	const askedOf = (P, a) => { try { return readdirSync(join(P.r, ".comm", "asked", a)) } catch { return [] } }
+	const realL = (s, target, ...more) => benchFree(s, [process.execPath, P1.bin("launch.mjs"), target, ...T, "--os-window", "--minimized", ...more], envK)
+	const r119a = realL(S1.chiefA, "e1", "--prompt", "start")
+	const asked119 = askedOf(P1, "e1")
+	const reports119 = spawnSync(process.execPath, [P1.bin("comm.mjs"), "send", "@asker", "--ref", "R.md"], { cwd: P1.dirOf("e1"), encoding: "utf8", env: baseEnv })
+	fkReset()
+	for (const u = Date.now() + 3000; Date.now() < u && JSON.parse(spawnSync(process.execPath, [P1.bin("comm.mjs"), "who", "--json"], { cwd: P1.r, encoding: "utf8" }).stdout).agents.e1.pids.length; nap(30)) {}
+	const callsBefore = fkLaunches().length
+	const r119b = realL(S1.shared, "e1", "--prompt", "start")
+	ok119.aRefusalOpensNothing = refused(r119b, notChief) && fkLaunches().length === callsBefore && !askedOf(P1, "e1").includes("shared")
+	ok119.aFirstTurnOpensARequest = r119a.status === 0 && /request: 'e1' now owes 'chiefA'/.test(r119a.stdout) && asked119.includes("chiefA")
+	ok119.andItsReportReachesTheAsker = reports119.status === 0 && /→ chiefA/.test(reports119.stdout)
+	rmSync(join(P1.r, ".comm", "asked"), { recursive: true, force: true })
+	writeFileSync(join(FK, "flaky"), "")
+	const r119c = realL(S1.chiefA, "e1")
+	ok119.noFirstTurnNoRequest = r119c.status === 0 && !askedOf(P1, "e1").length
+	// `ls` failing just after kitty answered: the window is read again, and marked, by the launch itself (reopen.mjs's own look would hide this one)
+	ok119.anLsLostAfterTheLaunchIsReadAgain = r119c.status === 0 && /marked CLAUDE_COMM_LAUNCHED=e1/.test(r119c.stdout)
+	fkReset()
+	for (const u = Date.now() + 3000; Date.now() < u && JSON.parse(spawnSync(process.execPath, [P1.bin("comm.mjs"), "who", "--json"], { cwd: P1.r, encoding: "utf8" }).stdout).agents.e1.pids.length; nap(30)) {}
+	check("A119 with teams only the leader or a chief of an agent launches it, a plain shell and a star as before; a first turn opens a request, a refusal opens nothing",
+		Object.values(ok119).every(Boolean), Object.entries(ok119).map(([k, v]) => `${k}=${!!v}`).join("; "))
+
+	// ── A120: THE CAPS ───────────────────────────────────────────────────────────────────────────────────────
+	const P2agents = ["chiefA", "chiefB", "e1", "e2", "x1", "x2", "x3", "x4"]
+	const told2 = join(rB, "told2.txt")
+	const P2 = project("p2", { leader: "boss", agents: { boss: ".", ...Object.fromEntries(P2agents.map((a) => [a, a])) }, teams: { chiefA: ["e1"], chiefB: ["e2"] }, notify: ["sh", "-c", 'printf "%s\\n" "$1" >> "$0"', told2] })
+	const S2 = { boss: session(P2.r), chiefA: session(P2.dirOf("chiefA")) }
+	const withCaps = (caps) => P2.set({ ...P2.cfg, caps })
+	const print2 = () => benchFree(S2.boss, [process.execPath, P2.bin("launch.mjs"), "e1", ...T, "--os-window", "--print"])
+	const capsSay = /past this project's "caps"/
+	const ok120 = {}
+	withCaps({ windows: 2 }); const w2 = print2(); ok120.windowsAtTheCap = refused(w2, capsSay) && /2 windows are live in this project \(boss, chiefA\) and the cap is 2/.test(w2.stderr)
+	withCaps({ windows: 3 }); ok120.windowsOneBelow = passes(print2(), "e1")
+	// a session a session started is not a window: alive under boss for the length of one read, and the count does not move
+	writeFileSync(join(S2.boss.dir, "99999.job.tmp"), JSON.stringify({ argv: [FAKE, "-e", "setTimeout(()=>{},2500)"], cwd: S2.boss.cwd, env: baseEnv }))
+	renameSync(join(S2.boss.dir, "99999.job.tmp"), join(S2.boss.dir, "99999.job"))
+	let saw2 = false
+	for (const u = Date.now() + 2000; Date.now() < u && !saw2; nap(30)) saw2 = JSON.parse(spawnSync(process.execPath, [P2.bin("comm.mjs"), "who", "--json"], { cwd: P2.r, encoding: "utf8" }).stdout).agents.boss.pids.length === 2
+	const whileNested = noSession([process.execPath, P2.bin("launch.mjs"), "e1", ...T, "--os-window", "--print"], { cwd: P2.r })
+	ok120.aSubSessionIsNoWindow = saw2 && passes(whileNested, "e1")
+	for (const u = Date.now() + 5000; Date.now() < u && !existsSync(join(S2.boss.dir, "99999.out")); nap(30)) {}
+	setRuntime(S2.boss.pid, "busy"); setRuntime(S2.chiefA.pid, "busy")
+	withCaps({ working: 2 }); const w3 = print2(); ok120.workingAtTheCap = refused(w3, capsSay) && /2 sessions are working \(boss, chiefA\) and the cap is 2/.test(w3.stderr)
+	withCaps({ working: 3 }); ok120.workingOneBelow = passes(print2(), "e1")
+	setRuntime(S2.boss.pid, "idle"); setRuntime(S2.chiefA.pid, "idle")
+	withCaps({ working: 1 }); ok120.idleIsNotWorking = passes(print2(), "e1")
+	rmSync(join(HOME_B, ".claude", "sessions", `${S2.chiefA.pid}.json`), { force: true })
+	const w4 = print2(); ok120.noRecordYetIsStarting = refused(w4, capsSay) && /1 sessions are working \(chiefA\)/.test(w4.stderr)
+	setRuntime(S2.chiefA.pid, "idle")
+	const memNow = Math.floor(Number(readFileSync("/proc/meminfo", "utf8").match(/^MemAvailable:\s+(\d+) kB/m)[1]) / 1024)
+	withCaps({ availableMb: 9_999_999 }); const w5 = print2(); const mem5 = Number((w5.stderr.match(/(\d+) MB are available/) || [])[1])
+	ok120.availableBelowTheFloor = refused(w5, capsSay) && /the floor is 9999999 MB/.test(w5.stderr) && Math.abs(mem5 - memNow) < memNow * 0.25
+	withCaps({ availableMb: 1 }); ok120.availableAboveTheFloor = passes(print2(), "e1")
+	const faulty = { misspelt: { windos: 3 }, aString: { working: "5" }, zero: { working: 0 }, aList: [5] }
+	ok120.aFaultRefusesAndNamesIt = Object.values(faulty).every((c) => { withCaps(c); return refused(print2(), /caps/) && !/past this project/.test(print2().stderr) })
+	P2.set(P2.cfg); ok120.noCapsAsBefore = passes(print2(), "e1")
+	// a real launch under caps: the numbers said, the lock released, and a holder that died is no holder
+	withCaps({ windows: 9 })
+	mkdirSync(join(P2.r, ".comm"), { recursive: true })
+	writeFileSync(join(P2.r, ".comm", "launch.lock"), JSON.stringify({ pid: 999999, start: 1, boot: reg.bootId() }))
+	const real2 = benchFree(S2.boss, [process.execPath, P2.bin("launch.mjs"), "e1", ...T, "--os-window", "--minimized"], envK)
+	ok120.aDeadHolderIsNoHolder = real2.status === 0 && /caps:\s+windows 2\/9, before this one/.test(real2.stdout)
+	ok120.theLockIsReleased = !existsSync(join(P2.r, ".comm", "launch.lock"))
+	const whoP2 = () => JSON.parse(spawnSync(process.execPath, [P2.bin("comm.mjs"), "who", "--json"], { cwd: P2.r, encoding: "utf8" }).stdout).agents
+	ok120.andTheWindowCounts = (() => { let n = 0; for (const u = Date.now() + 2000; Date.now() < u && n !== 3; nap(30)) n = Object.values(whoP2()).flatMap((a) => a.pids).length; return n === 3 })()
+	fkReset()
+	// the lock itself, each way, and six takers after a holder died: one at a time, every round (it was two at once, 9 rounds of 25)
+	const teamB = await import(pathToFileURL(join(PKG, "bin", "team.mjs")).href)
+	const STALE0 = () => JSON.stringify({ pid: 999999, start: 1, boot: reg.bootId() })
+	const lp = join(rB, "a.lock"), holderOf = (pid) => JSON.stringify({ pid, start: reg.startTimeOf(pid) ?? 1, boot: reg.bootId() })
+	writeFileSync(lp, holderOf(S2.boss.pid))
+	const liveHeld = teamB.takeLock(lp, { waitMs: 120 })
+	ok120.aLiveHolderHolds = liveHeld.ok === false && liveHeld.holder.pid === S2.boss.pid && JSON.parse(readFileSync(lp, "utf8")).pid === S2.boss.pid
+	writeFileSync(lp, JSON.stringify({ pid: 999999, start: 1, boot: reg.bootId() }))
+	const deadHeld = teamB.takeLock(lp, { waitMs: 120 })
+	ok120.aDeadHolderIsTakenOver = deadHeld.ok === true && JSON.parse(readFileSync(lp, "utf8")).pid === process.pid
+	writeFileSync(lp, holderOf(S2.boss.pid)); deadHeld.release()
+	ok120.aReleaseRemovesOnlyItsOwn = JSON.parse(readFileSync(lp, "utf8")).pid === S2.boss.pid
+	rmSync(lp, { force: true })
+	// THE TAKEOVER IS ITS OWN LOCK, one variable and no timing: somebody is taking over, so this one leaves the dead holder's file alone and waits; the steal file of a taker killed goes by age.
+	writeFileSync(lp, STALE0()); writeFileSync(`${lp}.steal`, "1")
+	const whileStolen = teamB.takeLock(lp, { waitMs: 150 })
+	ok120.aTakeoverIsItsOwnLock = whileStolen.ok === false && JSON.parse(readFileSync(lp, "utf8")).pid === 999999
+	try { utimesSync(`${lp}.steal`, new Date(Date.now() - 6000), new Date(Date.now() - 6000)) } catch {}   // gone already is this arm's red above, by name: no abort
+	const afterKilled = teamB.takeLock(lp, { waitMs: 400 })
+	ok120.aKilledTakeoverGoesByAge = afterKilled.ok === true && !existsSync(`${lp}.steal`)
+	if (afterKilled.release) afterKilled.release()
+	rmSync(lp, { force: true }); rmSync(`${lp}.steal`, { force: true })
+	// a folder that cannot take the steal file: it refuses, past its wait, and does not spin for ever
+	const roDir = join(rB, "ro"); mkdirSync(roDir, { recursive: true }); writeFileSync(join(roDir, "x.lock"), STALE0()); chmodSync(roDir, 0o500)
+	// in its own process, with a ceiling: what this arm forbids is a spin for ever, and in this one it would hang the suite instead of reddening
+	const roRun = spawnSync(process.execPath, ["-e", `import(${JSON.stringify(pathToFileURL(join(PKG, "bin", "team.mjs")).href)}).then((t)=>{process.stdout.write(String(t.takeLock(${JSON.stringify(join(roDir, "x.lock"))},{waitMs:150}).ok));process.exit(0)})`], { encoding: "utf8", timeout: 4000, cwd: rB })
+	ok120.aFolderThatCannotTakeItRefuses = roRun.status === 0 && roRun.stdout === "false"
+	chmodSync(roDir, 0o755)
+	// ALL AT ONE INSTANT, many rounds in one process each, and each holder holding past a loser's next try (50 ms): only then can a second holder exist while the first still holds.
+	// Its first form (a process per round, 15 ms held) stayed green with no steal guard, 15 of 15, and again at 40 ms: a mutant said so, twice.
+	const stamp = join(rB, "stamps"), STALE = JSON.stringify({ pid: 999999, start: 1, boot: reg.bootId() }), ROUNDS = 20, PERIOD = 220
+	const taker = (me, t0) => `const fs=require("fs"),z=new Int32Array(new SharedArrayBuffer(4)),to=(x)=>{const d=x-Date.now()-2;if(d>0)Atomics.wait(z,0,0,d);while(Date.now()<x){}};process.setMaxListeners(0);` +
+		`import(${JSON.stringify(pathToFileURL(join(PKG, "bin", "team.mjs")).href)}).then((t)=>{for(let r=0;r<${ROUNDS};r++){const at=${t0}+r*${PERIOD};` +
+		(me === 0 ? `to(at-15);try{fs.writeFileSync(${JSON.stringify(lp)},${JSON.stringify(STALE)},{flag:"wx"})}catch{}` : "") +
+		`to(at);const l=t.takeLock(${JSON.stringify(lp)},{waitMs:0});if(l.ok){fs.appendFileSync(${JSON.stringify(stamp)},"in\\n");Atomics.wait(z,0,0,80);fs.appendFileSync(${JSON.stringify(stamp)},"out\\n");l.release()}}})`
+	rmSync(stamp, { force: true })
+	const t0Takers = Date.now() + 700
+	await Promise.all(Array.from({ length: 8 }, (_, i) => new Promise((res) => spawn(process.execPath, ["-e", taker(i, t0Takers)], { stdio: "ignore", cwd: rB }).on("exit", res))))
+	const stamps = (() => { try { return readFileSync(stamp, "utf8").trim().split("\n") } catch { return [] } })()
+	const oneAtATime = stamps.length >= ROUNDS * 2 && stamps.every((x, i) => x === (i % 2 ? "out" : "in"))
+	rmSync(lp, { force: true })
+	ok120.sixTakersOneAtATime = oneAtATime
+	check("A120 caps refuse past working, windows and available memory with the numbers, a fault refuses and names it, and the count is of sessions, not of what they started",
+		Object.values(ok120).every(Boolean), Object.entries(ok120).map(([k, v]) => `${k}=${!!v}`).join("; "))
+
+	// ── A122: A CLOSED AGENT REOPENED BY ITS MAIL (A121 is the closes, below, in real windows) ───────────────
+	const DECL = (say = "Read your mail.") => ({ model: "sonnet", effort: "low", say })
+	const reopenAll = Object.fromEntries(["chiefA", "chiefB", "x1", "x2", "x3", "x4"].map((a) => [a, DECL()]))
+	const cfg122 = { ...P2.cfg, reopen: reopenAll, caps: { availableMb: 1 }, reopenTiming: { startMs: 1500, settleMs: 100, retryMs: 0, tellMs: 100 } }
+	// `drain` reads the fact: a hook's wake has returned by then, so any reopening it spawned is already in /proc until it ends. No sleep to guess at.
+	const reopensAlive = () => { let n = 0; for (const p of readdirSync("/proc").filter((x) => /^\d+$/.test(x))) { try { if (readFileSync(`/proc/${p}/cmdline`, "utf8").includes(`${P2.r}/.comm/bin/reopen.mjs`)) n++ } catch {} } return n }
+	const drain = () => { nap(30); for (const u = Date.now() + 20000; Date.now() < u && reopensAlive(); nap(30)) {} }
+	const fire = (who, ev = "stop") => { const d = P2.dirOf(who); return spawnSync(process.execPath, [join(d, ".claude", "comm-hook.mjs"), ev], { cwd: d, encoding: "utf8", env: { ...envK, CLAUDE_PROJECT_DIR: d },
+		input: JSON.stringify({ cwd: d, hook_event_name: ev === "stop" ? "Stop" : "PostToolUse", session_id: `a122-${who}`, transcript_path: join(P2.r, `${who}.jsonl`), tool_name: "Bash", tool_input: { command: "x" } }) }) }
+	const send2 = (from, to, kind = "nudge") => { const r = spawnSync(process.execPath, [P2.bin("comm.mjs"), "send", to, "--ref", "R.md", "--kind", kind, "--note", "a122"], { cwd: P2.dirOf(from), encoding: "utf8", env: baseEnv }); nap(5); return r }
+	const box2 = (a) => { try { return readdirSync(join(P2.r, ".comm", "inbox", a)).filter((f) => f.endsWith(".json")).map((f) => JSON.parse(readFileSync(join(P2.r, ".comm", "inbox", a, f), "utf8"))) } catch { return [] } }
+	const rec2 = (a) => { try { return JSON.parse(readFileSync(join(P2.r, ".comm", "reopen", `${a}.json`), "utf8")) } catch { return {} } }
+	const told = () => { try { return readFileSync(told2, "utf8").split("\n").filter(Boolean) } catch { return [] } }
+	S2.chiefA.stop()
+	const reset2 = (cfg = cfg122) => {
+		drain(); fkReset()
+		for (const u = Date.now() + 2000; Date.now() < u && Object.entries(whoP2()).some(([a, s]) => a !== "boss" && s.pids.length); nap(20)) {}
+		for (const d of ["inbox", "reopen", "close", "wake", "asked"]) rmSync(join(P2.r, ".comm", d), { recursive: true, force: true })
+		rmSync(join(P2.r, ".comm", "log.jsonl"), { force: true }); rmSync(told2, { force: true }); P2.set(cfg)
+	}
+	const ok122 = {}
+	// it opens: from the sender's Stop stub, once, exactly the declaration, minimized, and it gates on the session having started
+	reset2(); const sentA = send2("boss", "chiefA"); fire("e1"); drain()
+	const la = fkLaunches(), argA = la[0] || []
+	ok122.senderIsTold = /"reopen" opens it at this project's next hook/.test(sentA.stdout)
+	ok122.opensFromAStopHook = la.length === 1 && argA.includes("--type=os-window") && argA.includes("--os-window-state=minimized") && argA.includes("--env=CLAUDE_COMM_AGENT=chiefA") && argA.includes("sonnet") && argA.includes("low") && argA.includes("Read your mail.")
+	ok122.andRecordsTheEffect = rec2("chiefA").started === true && !!rec2("chiefA").tried && !told().length
+	fire("e1"); send2("boss", "chiefA"); fire("e1"); drain()
+	ok122.notAgainWhileItRuns = fkLaunches().length === 1
+	// the other hook: a sender's PostToolUse, right after its send
+	reset2(); send2("boss", "chiefB"); fire("e2", "post-tool"); drain()
+	ok122.opensFromAToolHook = fkLaunches().length === 1 && fkLaunches()[0].includes("--env=CLAUDE_COMM_AGENT=chiefB")
+	// what asks nothing, and what is not declared: the same fire, and no launch
+	reset2(); const fyiSent = send2("boss", "chiefA", "fyi"); fire("e1"); drain()
+	ok122.anFyiOpensNothing = fkLaunches().length === 0 && box2("chiefA").length === 1 && !/"reopen" opens it/.test(fyiSent.stdout)
+	send2("boss", "chiefA"); fire("e1"); drain()
+	ok122.butANudgeBesideItDoes = fkLaunches().length === 1
+	reset2(); send2("boss", "e1"); fire("e2"); drain()
+	ok122.notDeclaredStaysClosed = fkLaunches().length === 0 && box2("e1").length === 1 && !existsSync(join(P2.r, ".comm", "reopen", "e1.json"))
+	// the caps refuse: told once, owner and leader, with the numbers; room comes back, and it opens
+	reset2({ ...cfg122, caps: { windows: 1 } }); send2("boss", "chiefA"); fire("e1"); drain(); fire("e1"); drain(); fire("e2"); drain()
+	const msgs = box2("boss").filter((m) => m.from === "chiefA")
+	ok122.refusedOpensNothing = fkLaunches().length === 0 && /1 windows are live/.test(rec2("chiefA").refused || "")
+	ok122.ownerToldOnce = told().length === 1 && /réouverture/.test(told()[0]) && /1 windows are live/.test(told()[0])
+	ok122.leaderToldOnceAtAFile = msgs.length === 1 && msgs[0].kind === "blocked" && /1 windows are live/.test(readFileSync(join(P2.r, msgs[0].refPath), "utf8"))
+	P2.set({ ...cfg122, caps: { windows: 5 } }); fire("e1"); drain()
+	ok122.roomComesBackItOpens = fkLaunches().length === 1 && rec2("chiefA").started === true && !rec2("chiefA").refused && told().length === 1
+	// once per mail waiting, not once for ever: a person opened it meanwhile and it read its mail, the next refusal is told too (a flag cleared only on an opening HERE went silent for good)
+	reset2({ ...cfg122, caps: { windows: 1 } }); send2("boss", "chiefA"); fire("e1"); drain()
+	rmSync(join(P2.r, ".comm", "inbox", "chiefA"), { recursive: true, force: true }); nap(5); send2("boss", "chiefA"); fire("e1"); drain()
+	ok122.theNextMailIsToldAgain = told().length === 2 && box2("boss").filter((m) => m.from === "chiefA").length === 2
+	// more mail behind the same first one: silent
+	send2("boss", "chiefA"); fire("e1"); drain()
+	ok122.moreMailBehindItIsSilent = told().length === 2
+	// no bound, no reopening: nothing in "caps" that holds the machine. Told, said, and nothing opened
+	reset2({ ...cfg122, caps: undefined }); send2("boss", "chiefA"); fire("e1"); drain()
+	ok122.noCapsNoReopening = fkLaunches().length === 0 && told().length === 1 && /needs "caps"/.test(told()[0])
+	reset2({ ...cfg122, caps: { working: 9 } }); send2("boss", "chiefA"); fire("e1"); drain()
+	ok122.workingAloneIsNoBound = fkLaunches().length === 0 && told().length === 1 && /needs "caps"/.test(told()[0])
+	// the folder gone: the owner AND the leader hear it (the send ran nowhere, from that folder)
+	reset2(); renameSync(P2.dirOf("x4"), `${P2.dirOf("x4")}.away`)
+	spawnSync(process.execPath, [P2.bin("comm.mjs"), "send", "x4", "--ref", "R.md", "--force", "--note", "a122"], { cwd: P2.r, encoding: "utf8", env: baseEnv }); fire("e1"); drain()
+	const lostFolder = { noOpening: fkLaunches().length === 0, owner: told().length === 1 && /does not exist/.test(told()[0]), leader: box2("boss").filter((m) => m.from === "x4").length === 1, record: rec2("x4").leader_told === true }
+	ok122.aMissingFolderReachesBoth = Object.values(lostFolder).every(Boolean)
+	renameSync(`${P2.dirOf("x4")}.away`, P2.dirOf("x4"))
+	// a session nothing can close: opened, up, and no mark on its window
+	reset2(); writeFileSync(join(FK, "nomark"), ""); send2("boss", "chiefA"); fire("e1"); drain()
+	ok122.anUnmarkedWindowIsTold = fkLaunches().length === 1 && rec2("chiefA").marked === false && told().length === 1 && /sans sa marque/.test(told()[0])
+	// its mark lost once, at the launch: this opened it and it is its window's own process, so the look marks it, and nobody is told
+	reset2(); writeFileSync(join(FK, "nomark1"), ""); send2("boss", "chiefA"); fire("e1"); drain()
+	const tree1 = (() => { try { return JSON.parse(readFileSync(join(FK, "tree.json"), "utf8")) } catch { return [] } })()
+	ok122.aMarkLostOnceIsMarkedByTheLook = fkLaunches().length === 1 && rec2("chiefA").marked !== false && !told().length && tree1.some((w) => (w.vars || {}).CLAUDE_COMM_LAUNCHED === "chiefA")
+	// room freed by a close: looked at by the close itself, past the retry's wait, no hook needed
+	reset2({ ...cfg122, caps: { windows: 2 }, reopenTiming: { ...cfg122.reopenTiming, retryMs: 600000 } })
+	const inTheWay = session(P2.dirOf("e1"))
+	send2("boss", "x1"); fire("e2"); drain()
+	const fullAtFirst = /windows are live/.test(rec2("x1").refused || "") && fkLaunches().length === 0
+	fire("e2"); drain()
+	const heldByTheRetry = fkLaunches().length === 0
+	mkdirSync(join(P2.r, ".comm", "close"), { recursive: true })
+	const closedRec = join(P2.r, ".comm", "close", "e1.json")
+	writeFileSync(closedRec, JSON.stringify({ agent: "e1", session: inTheWay.pid, at: new Date().toISOString() }))
+	// the window goes first and its session a moment later (370 ms, measured): the look must wait for it, or it counts itself out of the room it just freed
+	const verifying = new Promise((res) => spawn(process.execPath, [P2.bin("close.mjs"), "--verify", join(rB, "no-such-socket"), "1", closedRec], { cwd: P2.r, env: envK, stdio: "ignore" }).on("exit", res))
+	nap(450); inTheWay.stop(); await verifying; drain()
+	ok122.aCloseLooksAtWhatItFreed = fullAtFirst && heldByTheRetry && fkLaunches().length === 1 && rec2("x1").started === true
+	// while the refused one's process still gathers its alarm: its own lock is free, or the close's look finds "under way" and nothing looks again
+	reset2({ ...cfg122, caps: { windows: 2 }, reopenTiming: { ...cfg122.reopenTiming, retryMs: 600000, tellMs: 1500 } })
+	const inTheWay2 = session(P2.dirOf("e1"))
+	send2("boss", "x2"); fire("e2")
+	for (const u = Date.now() + 4000; Date.now() < u && !rec2("x2").pending_tell; nap(30)) {}
+	const gathering = !!rec2("x2").pending_tell && reopensAlive() === 1
+	inTheWay2.stop()
+	const nowRun = spawnSync(process.execPath, [P2.bin("reopen.mjs"), "x2", "--root", P2.r, "--now"], { cwd: P2.r, encoding: "utf8", env: envK }); drain()
+	ok122.aCloseFindsItFreeWhileTheAlarmGathers = gathering && !/under way/.test(nowRun.stdout) && fkLaunches().length === 1 && rec2("x2").started === true
+	// a refusal already over a cap does not queue: a waiter is 53 MB, and a held lock would keep it for 10 min
+	const heldLock = () => writeFileSync(join(P2.r, ".comm", "launch.lock"), JSON.stringify({ pid: S2.boss.pid, start: reg.startTimeOf(S2.boss.pid), boot: reg.bootId() }))
+	reset2({ ...cfg122, caps: { windows: 1 } }); heldLock(); send2("boss", "x3")
+	const noQueue = spawnSync(process.execPath, [P2.bin("reopen.mjs"), "x3", "--root", P2.r], { cwd: P2.r, encoding: "utf8", env: envK, timeout: 8000 })
+	ok122.overACapItDoesNotQueue = noQueue.status === 1 && /windows are live/.test(rec2("x3").refused || "")
+	// a lock held too long is told, and the mail waits: it crashed on the very line that tells (the second review)
+	rmSync(join(P2.r, ".comm", "launch.lock"), { force: true })
+	reset2({ ...cfg122, reopenTiming: { ...cfg122.reopenTiming, lockMs: 200 } }); heldLock(); send2("boss", "x3")
+	const lockTold = spawnSync(process.execPath, [P2.bin("reopen.mjs"), "x3", "--root", P2.r], { cwd: P2.r, encoding: "utf8", env: envK, timeout: 8000 })
+	ok122.aLockHeldTooLongIsTold = lockTold.status === 0 && told().length === 1 && /verrou/.test(told()[0]) && fkLaunches().length === 0
+	rmSync(join(P2.r, ".comm", "launch.lock"), { force: true })
+	// the leader's bell failed: the owner has heard, and is not alarmed again; the leader is, at the next try
+	reset2({ ...cfg122, caps: { windows: 1 } }); send2("boss", "chiefA")
+	const bossBox = join(P2.r, ".comm", "inbox", "boss")
+	mkdirSync(bossBox, { recursive: true }); chmodSync(bossBox, 0o500)
+	fire("e1"); drain()
+	const noBell = told().length === 1 && rec2("chiefA").leader_told === false && !rec2("chiefA").told_for
+	chmodSync(bossBox, 0o755)
+	fire("e1"); drain()
+	ok122.aFailedBellIsRetriedAlone = noBell && told().length === 1 && box2("boss").filter((m) => m.from === "chiefA").length === 1 && rec2("chiefA").leader_told === true
+	// a refusal while the teller is sending, slowly: it is not lost, and no process is left holding it
+	reset2({ ...cfg122, caps: { windows: 1 }, notify: ["sh", "-c", 'sleep 1.5; printf "%s\\n" "$1" >> "$0"', told2] }); send2("boss", "x1"); fire("e1")
+	for (const u = Date.now() + 5000; Date.now() < u && !rec2("x1").pending_tell; nap(30)) {}
+	nap(250); send2("boss", "x2"); fire("e1"); drain()
+	ok122.aRefusalDuringTheSendIsNotLost = told().length === 2 && !rec2("x1").pending_tell && !rec2("x2").pending_tell && told().some((l) => l.includes("x2"))
+	// `ls` lost just after the launch: the window is found on a later read, and marked
+	reset2(); writeFileSync(join(FK, "flaky"), ""); send2("boss", "chiefA"); fire("e1"); drain()
+	const treeB = (() => { try { return JSON.parse(readFileSync(join(FK, "tree.json"), "utf8")) } catch { return [] } })()
+	ok122.anLsLostAfterTheLaunchStillMarks = fkLaunches().length === 1 && rec2("chiefA").started === true && rec2("chiefA").marked !== false && !told().length && treeB.some((w) => (w.vars || {}).CLAUDE_COMM_LAUNCHED === "chiefA")
+	// a typo in the timing: a delay, not who opens. Said, and it opens
+	reset2({ ...cfg122, reopenTiming: { ...cfg122.reopenTiming, startMz: 1 } }); send2("boss", "chiefA"); fire("e1"); drain()
+	const lineT = spawnSync(process.execPath, [P2.bin("team.mjs"), "--agent-root", P2.dirOf("e1")], { cwd: P2.dirOf("e1"), encoding: "utf8", env: baseEnv }).stdout || ""
+	ok122.aTimingTypoIsSaidAndOpensAllTheSame = fkLaunches().length === 1 && /"reopenTiming" "startMz"/.test(lineT)
+	// a project deleted while it waits: nothing re-created, nobody told (it did both, 60 s later, in my own real run)
+	reset2()
+	const P4 = project("p4", { leader: "boss", agents: { boss: ".", a1: "a1" }, reopen: { a1: DECL() }, caps: { availableMb: 1 }, notify: P2.cfg.notify, reopenTiming: { startMs: 4000, settleMs: 50, retryMs: 0, tellMs: 50 } })
+	writeFileSync(join(FK, "mode-a1"), "dialog")
+	spawnSync(process.execPath, [P4.bin("comm.mjs"), "send", "a1", "--ref", "R.md"], { cwd: P4.r, encoding: "utf8", env: baseEnv })
+	const p4run = new Promise((res) => spawn(process.execPath, [P4.bin("reopen.mjs"), "a1", "--root", P4.r], { cwd: rB, env: envK, stdio: "ignore" }).on("exit", res))
+	for (const u = Date.now() + 5000; Date.now() < u && !fkLaunches().length; nap(30)) {}
+	const p4opened = fkLaunches().length === 1
+	fkReset(); rmSync(P4.r, { recursive: true, force: true }); await p4run
+	ok122.aProjectDeletedSaysNothing = p4opened && !existsSync(P4.r) && !told().length
+	// the retry waits, by the project's word
+	reset2({ ...cfg122, caps: { windows: 1 }, reopenTiming: { ...cfg122.reopenTiming, retryMs: 60000 } }); send2("boss", "chiefA"); fire("e1"); drain()
+	const refusedAt = rec2("chiefA").refused_at; nap(15); fire("e1"); drain()
+	ok122.aRefusalWaitsItsRetry = !!refusedAt && rec2("chiefA").refused_at === refusedAt
+	// ONCE: dead at its start, then every later hook; newer mail, and only that, opens it again
+	reset2({ ...cfg122, reopenTiming: { ...cfg122.reopenTiming, startMs: 300 } }); writeFileSync(join(FK, "mode-chiefA"), "die"); send2("boss", "chiefA"); fire("e1"); drain(); fire("e1"); drain(); fire("e2"); drain()
+	ok122.diesAtStartOpensOnce = fkLaunches().length === 1 && told().length === 1 && /morte/.test(told()[0]) && box2("chiefA").length === 1
+	send2("boss", "chiefA"); fire("e1"); drain()
+	ok122.newerMailOpensAgain = fkLaunches().length === 2
+	// the effect, not the window: a session that never starts is told, and is not opened again for this mail
+	reset2(); writeFileSync(join(FK, "mode-chiefA"), "dialog"); send2("boss", "chiefA"); fire("e1"); drain()
+	ok122.aWindowIsNotASession = fkLaunches().length === 1 && rec2("chiefA").started === false && told().length === 1 && /n'a pas démarré/.test(told()[0])
+	// a close forced over this mail stands; newer mail asks anew
+	reset2(); send2("boss", "chiefA"); nap(5); mkdirSync(join(P2.r, ".comm", "close"), { recursive: true })
+	writeFileSync(join(P2.r, ".comm", "close", "chiefA.json"), JSON.stringify({ agent: "chiefA", by: "boss", forced: true, at: new Date().toISOString() })); fire("e1"); drain()
+	ok122.aForcedCloseStands = fkLaunches().length === 0
+	nap(5); send2("boss", "chiefA"); fire("e1"); drain()
+	ok122.newerMailAsksAnew = fkLaunches().length === 1
+	// kitty refuses: told, and a later hook tries again
+	reset2(); writeFileSync(join(FK, "fail"), ""); send2("boss", "chiefA"); fire("e1"); drain()
+	ok122.kittyRefusingIsTold = fkLaunches().length === 1 && told().length === 1 && /no kitty answers/.test(told()[0])
+	rmSync(join(FK, "fail"), { force: true }); fire("e1"); drain()
+	ok122.andRetried = fkLaunches().length === 2 && rec2("chiefA").started === true
+	// one per agent when three hooks race, and a burst inside the caps: exactly the room there is
+	// behind a lock held by a live session: of three hooks' reopenings one stays to wait, the others have left (each waiter is 53 MB); it opens when the lock goes
+	reset2(); send2("boss", "chiefA")
+	const lockB = join(P2.r, ".comm", "launch.lock")
+	writeFileSync(lockB, JSON.stringify({ pid: S2.boss.pid, start: reg.startTimeOf(S2.boss.pid), boot: reg.bootId() }))
+	const three = [0, 1, 2].map(() => spawn(process.execPath, [P2.bin("reopen.mjs"), "chiefA", "--root", P2.r], { cwd: P2.r, env: envK, stdio: "ignore" }))
+	let oneWaits = false
+	for (const u = Date.now() + 5000; Date.now() < u && !oneWaits; nap(40)) oneWaits = reopensAlive() === 1 && three.filter((c) => c.exitCode === null).length <= 3 && existsSync(join(P2.r, ".comm", "reopen", "chiefA.lock"))
+	nap(250); oneWaits = oneWaits && reopensAlive() === 1 && fkLaunches().length === 0
+	rmSync(lockB, { force: true }); drain()
+	ok122.oneWaiterPerAgent = oneWaits
+	ok122.threeRacesOpenOne = fkLaunches().length === 1
+	const burst = ["x1", "x2", "x3", "x4"]
+	reset2({ ...cfg122, caps: { windows: 3 }, reopenTiming: { ...cfg122.reopenTiming, tellMs: 500 } })
+	for (const a of burst) send2("boss", a)
+	fire("e1"); drain()
+	const opened4 = burst.filter((a) => rec2(a).started === true), refused4 = burst.filter((a) => /windows are live/.test(rec2(a).refused || ""))
+	const liveAfter = Object.values(whoP2()).flatMap((a) => a.pids).length
+	ok122.aBurstFillsTheCapsAndNoMore = opened4.length === 2 && refused4.length === 2 && liveAfter === 3 && fkLaunches().length === 2
+	// ONE ALARM for a burst, naming them all; one bell at one file (it was 6 critical notifications and 6 bells in 6 s)
+	ok122.aBurstIsOneAlarm = told().length === 1 && refused4.every((a) => told()[0].includes(a)) && box2("boss").filter((m) => m.kind === "blocked").length === 1 && refused4.every((a) => readFileSync(join(P2.r, ".comm", "reopen", "refused.md"), "utf8").includes(`## ${a}`))
+	// THE LOCK IS HELD PAST THE LAUNCH: sessions that go busy only after half a second, under `working`. Each read before the last one's share is taken would pass, and all four would open.
+	reset2({ ...cfg122, caps: { availableMb: 1, working: 2 }, reopenTiming: { ...cfg122.reopenTiming, settleMs: 2000, tellMs: 500 } })
+	for (const a of burst) writeFileSync(join(FK, `mode-${a}`), "slowbusy")
+	for (const a of burst) send2("boss", a)
+	fire("e1"); drain()
+	ok122.theNextReadsTheRoomAfterTheShare = burst.filter((a) => rec2(a).started === true).length === 2 && fkLaunches().length === 2
+	ok122.theLocksAreGone = !existsSync(join(P2.r, ".comm", "launch.lock")) && !readdirSync(join(P2.r, ".comm", "reopen")).some((f) => f.endsWith(".lock"))
+	// --reopen has one authority, the declaration: anybody may ask for exactly it, for mail that asks, and for nothing else
+	reset2(); send2("boss", "chiefA")
+	const asE1 = session(P2.dirOf("e1"))
+	const re = (agent, ...more) => benchFree(asE1, [process.execPath, P2.bin("launch.mjs"), agent, "--reopen", ...more, "--print"])
+	const decl = ["--model", "sonnet", "--effort", "low", "--prompt", "Read your mail.", "--os-window", "--minimized"]
+	ok122.aCheckOfTheDeclarationPasses = passes(re("chiefA", ...decl), "chiefA")
+	// the real thing is reopen.mjs's own step: run by hand it would skip "once" and "a forced close stands"
+	const byHand = benchFree(asE1, [process.execPath, P2.bin("launch.mjs"), "chiefA", "--reopen", ...decl], envK)
+	ok122.notByHand = refused(byHand, /reopen\.mjs's own step/) && byHand.stderr.includes("node ../.comm/bin/reopen.mjs chiefA") && fkLaunches().length === 0
+	ok122.notAnotherTier = refused(re("chiefA", "--model", "opus", "--effort", "low", "--prompt", "Read your mail.", "--os-window", "--minimized"), /opens exactly/)
+	ok122.notAnotherEffort = refused(re("chiefA", "--model", "sonnet", "--effort", "high", "--prompt", "Read your mail.", "--os-window", "--minimized"), /opens exactly/)
+	ok122.notAnotherPrompt = refused(re("chiefA", "--model", "sonnet", "--effort", "low", "--prompt", "do something else", "--os-window", "--minimized"), /opens exactly/)
+	ok122.notInView = refused(re("chiefA", "--model", "sonnet", "--effort", "low", "--prompt", "Read your mail.", "--os-window"), /opens exactly/)
+	ok122.notWithoutMail = refused(re("chiefB", ...decl), /asks for anything/)
+	ok122.notUndeclared = refused(re("e2", ...decl), /not declared/)
+	ok122.andAPlainLaunchIsStillRefused = refused(benchFree(asE1, [process.execPath, P2.bin("launch.mjs"), "chiefA", ...T, "--os-window", "--print"]), notChief)
+	asE1.stop()
+	// a fault in the declaration: told at use, said at every start and by the installer, and nothing opened
+	reset2({ ...cfg122, reopen: { chiefA: { model: "sonnet", effort: "hgih", say: "x" } } }); send2("boss", "chiefA"); fire("e1"); drain()
+	ok122.aFaultIsToldNotOpened = fkLaunches().length === 0 && told().length === 1 && /hgih/.test(told()[0])
+	const startLine = spawnSync(process.execPath, [P2.bin("team.mjs"), "--agent-root", P2.dirOf("e1")], { cwd: P2.dirOf("e1"), encoding: "utf8", env: baseEnv }).stdout || ""
+	ok122.saidAtStart = /⚠ \.comm\/config\.json: "reopen" "chiefA" "effort"/.test(startLine)
+	ok122.saidByTheInstaller = /"reopen" "chiefA" "effort"/.test(said(spawnSync(process.execPath, [join(PKG, "install.mjs"), P2.r], { encoding: "utf8" })))
+	// the dry run does nothing, and says what it would
+	reset2(); send2("boss", "chiefA")
+	const dry = spawnSync(process.execPath, [P2.bin("reopen.mjs"), "chiefA", "--root", P2.r, "--dry-run"], { cwd: P2.r, encoding: "utf8", env: envK })
+	ok122.aDryRunOpensNothing = /would open it now/.test(dry.stdout) && fkLaunches().length === 0 && !told().length && !existsSync(join(P2.r, ".comm", "reopen", "chiefA.json"))
+	spawnSync(process.execPath, [P2.bin("wake.mjs"), "--root", P2.r, "--dry-run"], { cwd: P2.r, encoding: "utf8", env: envK }); nap(60); drain()
+	ok122.aWakeDryRunOpensNothing = fkLaunches().length === 0 && !existsSync(join(P2.r, ".comm", "reopen", "chiefA.json"))
+	// an inbox that cannot be read: not knowing is not mail, and it is said (a real run, and the launch's own refusal)
+	reset2(); send2("boss", "chiefA")
+	const boxDir = join(P2.r, ".comm", "inbox", "chiefA")
+	chmodSync(boxDir, 0)
+	const blind = spawnSync(process.execPath, [P2.bin("reopen.mjs"), "chiefA", "--root", P2.r], { cwd: P2.r, encoding: "utf8", env: envK })
+	const blindLaunch = refused(benchFree(S2.boss, [process.execPath, P2.bin("launch.mjs"), "chiefA", "--reopen", ...decl]), /could not be read/)
+	chmodSync(boxDir, 0o755)
+	ok122.anUnreadableInboxIsSaid = /could not be read/.test(blind.stdout) && blindLaunch && fkLaunches().length === 0 && told().length === 1 && /n'a pas pu être lue/.test(told()[0])
+	// a fault in "caps" says so at a start without moving the star's sentence: the stub tells a role from a warning
+	reset2({ leader: "boss", agents: P2.cfg.agents, caps: { windos: 1 } })
+	const startStar = spawnSync(process.execPath, [join(P2.dirOf("e1"), ".claude", "comm-hook.mjs"), "session-start"], { cwd: P2.dirOf("e1"), encoding: "utf8", env: { ...baseEnv, CLAUDE_PROJECT_DIR: P2.dirOf("e1") },
+		input: JSON.stringify({ cwd: P2.dirOf("e1"), hook_event_name: "SessionStart", source: "startup", session_id: "a122-star", transcript_path: join(P2.r, "star.jsonl") }) })
+	ok122.aWarningIsNotARole = /never to another expert/.test(said(startStar)) && /⚠ \.comm\/config\.json: \\"caps\\" has \\"windos/.test(said(startStar))
+	reset2(P2.cfg)
+	check("A122 mail that asks reopens a declared closed agent from the sender's hook, once, minimized, inside the caps, exactly as declared; a refusal is told once; a burst takes the room there is and no more",
+		Object.values(ok122).every(Boolean), Object.entries(ok122).map(([k, v]) => `${k}=${!!v}`).join("; "))
+
+	// ── A121: ANOTHER AGENT'S WINDOW, in real panes of the bench ─────────────────────────────────────────────
+	const TGT = ["t_ok", "t_force", "t_dry", "t_busy", "t_sub", "t_words", "t_null", "t_nobox", "t_bell", "t_relay", "t_mail", "t_claim", "t_other", "t_unmarked", "t_shell", "t_far", "t_two"]
+	const P3 = project("p3", { leader: "boss", agents: { boss: ".", chiefA: "chiefA", chiefB: "chiefB", e1: "e1", ...Object.fromEntries(TGT.map((a) => [a, a])) },
+		teams: { chiefA: [...TGT, "e1"], chiefB: ["t_other", "t_mail"] } })
+	const b3 = await bench()
+	const S3 = { boss: session(P3.r), chiefA: session(P3.dirOf("chiefA")), chiefB: session(P3.dirOf("chiefB")), e1: session(P3.dirOf("e1")) }
+	const C3 = (s, x, ...more) => benchFree(s, [process.execPath, P3.bin("close.mjs"), "--agent", x, ...more])
+	const rule = "─".repeat(60), ts3 = () => new Date().toISOString()
+	const tx3 = (a) => join(rB, `${a}.jsonl`)
+	const rows3 = (a, ...rows) => { for (const r of rows) appendFileSync(tx3(a), JSON.stringify({ timestamp: ts3(), ...r }) + "\n") }
+	const endTurn3 = (a) => rows3(a, { type: "user", message: { role: "user", content: "x" } }, { type: "assistant", message: { role: "assistant", model: "claude-opus-5", stop_reason: "end_turn", content: [{ type: "text", text: "report" }] } }, { type: "system", subtype: "stop_hook_summary" }, { type: "system", subtype: "turn_duration" })
+	const midTurn3 = (a) => rows3(a, { type: "user", message: { role: "user", content: "x" } }, { type: "assistant", message: { role: "assistant", model: "claude-opus-5", stop_reason: "tool_use", content: [{ type: "tool_use", id: "t1", name: "Bash", input: {} }] } })
+	/** A pane in the bench: the session as launch.mjs opens one, the window's own process, a registry entry, a transcript, an empty box or `box` in it. */
+	const pane3 = (a, { box = "", mark = true, viaShell = false, cwd = P3.dirOf(a), turn = endTurn3, status = "idle" } = {}) => {
+		const pidFile = join(rB, `${a}.pid`), js = join(rB, `${a}.cjs`)
+		writeFileSync(js, `require("fs").writeFileSync(${JSON.stringify(pidFile)},String(process.pid));${box === null ? "" : `process.stdout.write("\\r\\n"+${JSON.stringify(rule)}+"\\r\\n❯ "+${JSON.stringify(box)}+"\\r\\n"+${JSON.stringify(rule)}+"\\r\\n");`}setTimeout(()=>{},120000)`)
+		const argv = viaShell ? ["sh", "-c", `"${FAKE}" "${js}"; :`] : [FAKE, js]
+		const id = Number(spawnSync("kitten", ["@", "--to", `unix:${b3.sock}`, "launch", "--type=window", "--keep-focus", ...besideMe(b3), `--cwd=${cwd}`, `--env=CLAUDE_COMM_AGENT=${a}`, `--env=CLAUDE_COMM_RUNTIME=${RT_B}`, `--env=HOME=${HOME_B}`, ...argv], { encoding: "utf8", timeout: 10000 }).stdout)
+		panes.push([b3.sock, id])
+		let pid = 0
+		for (const u = Date.now() + 8000; Date.now() < u && !pid; nap(30)) try { pid = Number(readFileSync(pidFile, "utf8")) } catch {}
+		writeFileSync(join(RT_B, "claude-comm", "sessions", `${pid}.json`), JSON.stringify({ v: 1, pid, start: reg.startTimeOf(pid), boot: reg.bootId(), transcript: tx3(a), agent: a, source: "startup", at: ts3() }))
+		turn(a); setRuntime(pid, status)
+		if (mark) spawnSync("kitten", ["@", "--to", `unix:${b3.sock}`, "set-user-vars", "--match", `id:${id}`, `CLAUDE_COMM_LAUNCHED=${a}`], { timeout: 5000 })
+		return { id, pid }
+	}
+	const there3 = (id) => wkB.windows().some((w) => w.sock === b3.sock && w.id === id)
+	const ok121 = {}
+	let couldRun = !!b3
+	if (b3) {
+		const W = {}
+		for (const a of ["t_ok", "t_force", "t_dry", "t_mail", "t_claim", "t_other"]) W[a] = pane3(a)
+		W.t_busy = pane3("t_busy", { turn: midTurn3 })
+		W.t_sub = pane3("t_sub", { status: "busy" })
+		W.t_words = pane3("t_words", { box: "bonjour je voul" })
+		W.t_null = pane3("t_null", { box: "null" })
+		W.t_nobox = pane3("t_nobox", { box: null })
+		W.t_bell = pane3("t_bell", { box: wkB.NUDGE })
+		W.t_relay = pane3("t_relay", { box: "hey leader expert" })
+		mkdirSync(join(P3.r, ".comm", "relay"), { recursive: true })
+		writeFileSync(join(P3.r, ".comm", "relay", "t_relay.json"), JSON.stringify({ say: "hey leader expert" }))
+		W.t_unmarked = pane3("t_unmarked", { mark: false })
+		W.t_shell = pane3("t_shell", { viaShell: true })
+		// a window marked for a name on THIS roster, from ANOTHER project: every project has its own `review`
+		const elsewhere = join(rB, "elsewhere"); mkdirSync(elsewhere, { recursive: true })
+		W.t_far = pane3("t_far", { cwd: elsewhere })
+		nap(300)
+		// identity
+		const dryOk = (r, a) => r.status === 0 && /"would_close": true/.test(r.stdout) && there3(W[a].id)
+		ok121.itsChief = dryOk(C3(S3.chiefA, "t_dry", "--dry-run"), "t_dry")
+		ok121.theLeader = dryOk(C3(S3.boss, "t_dry", "--dry-run"), "t_dry")
+		ok121.notAColleague = (() => { const r = C3(S3.e1, "t_dry", "--dry-run"); return r.status === 2 && notChief.test(r.stderr) })()
+		ok121.notAnotherChief = C3(S3.chiefB, "t_dry", "--dry-run").status === 2
+		ok121.notASubSession = /started by another session/.test(nestedRun(S3.boss, [P3.bin("close.mjs"), "--agent", "t_dry", "--dry-run"]).stderr)
+		ok121.notAPlainShell = /no session here to prove/.test(noSession([process.execPath, P3.bin("close.mjs"), "--agent", "t_dry", "--dry-run"], { cwd: P3.r }).stderr)
+		ok121.notUnknown = /unknown agent 'nobody'/.test(C3(S3.boss, "nobody").stderr)
+		ok121.notItself = /is you/.test(C3(S3.chiefA, "chiefA").stderr)
+		// the second proof: the window, each shape with everything else passing
+		ok121.notAnUnmarkedWindow = /is not one bin\/launch\.mjs opened/.test(C3(S3.chiefA, "t_unmarked").stderr) && there3(W.t_unmarked.id)
+		ok121.notASessionUnderAShell = /is not one bin\/launch\.mjs opened/.test(C3(S3.chiefA, "t_shell").stderr) && there3(W.t_shell.id)
+		ok121.notAnotherProjectsWindow = (() => { const r = C3(S3.chiefA, "t_far"); return r.status === 1 && /is not running/.test(r.stderr) && there3(W.t_far.id) })()
+		const two = [session(P3.dirOf("t_two")), session(P3.dirOf("t_two"))]
+		ok121.notTwoSessionsOfOneName = /has 2 live sessions/.test(C3(S3.chiefA, "t_two").stderr)
+		for (const x of two) x.stop()
+		// at rest, and --force does not lift it
+		const notRest = (a, re) => { const r = C3(S3.chiefA, a), f = C3(S3.chiefA, a, "--force"); return r.status === 3 && re.test(r.stderr) && /--force does not lift/.test(r.stderr) && f.status === 3 && there3(W[a].id) }
+		ok121.notMidTurn = notRest("t_busy", /its turn is busy/)
+		ok121.notWithASubAgentAtWork = notRest("t_sub", /its runtime says busy/)
+		ok121.notOverSomebodysWords = notRest("t_words", /somebody's words/)
+		ok121.nullInABoxIsSomebodysWords = notRest("t_null", /somebody's words/)
+		ok121.notWithNoBoxToRead = notRest("t_nobox", /no input box/)
+		setRuntime(W.t_sub.pid, "waiting")
+		ok121.notAtADialog = notRest("t_sub", /WAITING/)
+		setRuntime(W.t_sub.pid, "busy")
+		const bell = C3(S3.chiefA, "t_bell", "--dry-run"), relay = C3(S3.chiefA, "t_relay", "--dry-run")
+		ok121.theBusOwnBellIsAtRest = bell.status === 0 && /"box_held": "the bus's own bell"/.test(bell.stdout)
+		ok121.itsRelaySentenceIsAtRest = relay.status === 0 && /"box_held": "its relay's own sentence"/.test(relay.stdout)
+		// unfinished: refused with its name, lifted by --force and noted
+		writeFileSync(join(P3.dirOf("t_mail"), "M.md"), "m\n")
+		spawnSync(process.execPath, [P3.bin("comm.mjs"), "send", "t_mail", "--ref", "M.md"], { cwd: P3.r, encoding: "utf8", env: baseEnv })
+		const mailR = C3(S3.chiefA, "t_mail", "--dry-run"), mailF = C3(S3.chiefA, "t_mail", "--dry-run", "--force")
+		ok121.mailRefuses = mailR.status === 3 && /mail is waiting/.test(mailR.stderr)
+		ok121.forceLiftsMail = mailF.status === 0 && /"forced": true/.test(mailF.stdout) && /mail is waiting/.test(mailF.stdout)
+		spawnSync(process.execPath, [P3.bin("claim.mjs"), "take", "port:3100", "--purpose", "a121", "--agent", "t_claim", "--pid", String(W.t_claim.pid), "--quiet"], { cwd: P3.dirOf("t_claim"), encoding: "utf8", env: baseEnv })
+		const claimR = C3(S3.chiefA, "t_claim", "--dry-run")
+		ok121.aClaimRefuses = claimR.status === 3 && /still holding port:3100/.test(claimR.stderr)
+		// decision 2: a request open for another
+		mkdirSync(join(P3.r, ".comm", "asked", "t_other"), { recursive: true }); writeFileSync(join(P3.r, ".comm", "asked", "t_other", "chiefB"), ts3())
+		const reqA = C3(S3.chiefA, "t_other", "--dry-run"), reqLeader = C3(S3.boss, "t_other", "--dry-run")
+		ok121.anotherChiefsRequestRefuses = reqA.status === 3 && /'chiefB' waits on its work/.test(reqA.stderr) && reqLeader.status === 3
+		ok121.forceLiftsIt = C3(S3.chiefA, "t_other", "--dry-run", "--force").status === 0
+		ok121.itsOwnRequestDoesNot = C3(S3.chiefB, "t_other", "--dry-run").status === 0
+		// a star: the leader only
+		P3.set({ leader: "boss", agents: P3.cfg.agents })
+		ok121.aStarTheLeaderCloses = C3(S3.boss, "t_dry", "--dry-run").status === 0 && C3(S3.chiefA, "t_dry", "--dry-run").status === 2
+		P3.set(P3.cfg)
+		// THE EFFECT: a real close, a window really gone, the record says by whom; and forced, noted
+		mkdirSync(join(P3.r, ".comm", "asked", "t_ok"), { recursive: true }); writeFileSync(join(P3.r, ".comm", "asked", "t_ok", "chiefA"), ts3())
+		const realOk = C3(S3.chiefA, "t_ok")
+		const recOk = (() => { try { return JSON.parse(readFileSync(join(P3.r, ".comm", "close", "t_ok.json"), "utf8")) } catch { return {} } })()
+		ok121.aRealCloseGoes = realOk.status === 0 && !there3(W.t_ok.id) && recOk.gone === true && recOk.by === "chiefA" && recOk.forced === false && /Verified gone/.test(realOk.stdout)
+		ok121.whoClosesWithdrawsItsOwnRequest = !existsSync(join(P3.r, ".comm", "asked", "t_ok", "chiefA"))
+		writeFileSync(join(P3.dirOf("t_force"), "M.md"), "m\n")
+		spawnSync(process.execPath, [P3.bin("comm.mjs"), "send", "t_force", "--ref", "M.md"], { cwd: P3.r, encoding: "utf8", env: baseEnv })
+		mkdirSync(join(P3.r, ".comm", "asked", "t_force"), { recursive: true }); for (const a of ["chiefA", "boss"]) writeFileSync(join(P3.r, ".comm", "asked", "t_force", a), ts3())
+		const noForce = C3(S3.boss, "t_force"), withForce = C3(S3.boss, "t_force", "--force")
+		const recF = (() => { try { return JSON.parse(readFileSync(join(P3.r, ".comm", "close", "t_force.json"), "utf8")) } catch { return {} } })()
+		ok121.aForcedCloseIsNoted = noForce.status === 3 && withForce.status === 0 && !there3(W.t_force.id) && recF.forced === true && recF.by === "boss" && recF.blocks.length === 2
+		ok121.anothersRequestStaysOpen = existsSync(join(P3.r, ".comm", "asked", "t_force", "chiefA")) && !existsSync(join(P3.r, ".comm", "asked", "t_force", "boss"))
+		ok121.theOthersStayed = ["t_busy", "t_sub", "t_words", "t_unmarked", "t_shell", "t_far", "t_dry"].every((a) => there3(W[a].id))
+	}
+	check("A121 the leader or a chief closes an expert's window at rest, verified gone, by-name in its record; identity and rest are never forced, unfinished work only with --force",
+		couldRun && Object.values(ok121).every(Boolean), `${couldRun ? "" : "THE ARM COULD NOT RUN: no kitty bench; "}` + Object.entries(ok121).map(([k, v]) => `${k}=${!!v}`).join("; "))
+
+	// ── A123: THE BOARD ──────────────────────────────────────────────────────────────────────────────────────
+	const CANARY = "UNE-NOTE-CANARI"
+	for (const d of ["inbox", "asked", "board"]) rmSync(join(P1.r, ".comm", d), { recursive: true, force: true })
+	rmSync(join(P1.r, ".comm", "log.jsonl"), { force: true })
+	const c1 = (who, ...args) => spawnSync(process.execPath, [P1.bin("comm.mjs"), ...args], { cwd: P1.dirOf(who), encoding: "utf8", env: baseEnv })
+	const board1 = (s) => benchFree(s, [process.execPath, P1.bin("team.mjs"), "--board"])
+	setRuntime(S1.chiefA.pid, "busy"); setRuntime(S1.chiefB.pid, "idle")
+	c1("chiefA", "send", "e1", "--ref", "R.md", "--note", CANARY)
+	c1("chiefB", "send", "shared", "--ref", "R.md", "--note", CANARY)
+	c1("e1", "send", "chiefA", "--kind", "blocked", "--ref", "R.md", "--note", CANARY)
+	c1("shared", "send", "chiefB", "--kind", "done", "--ref", "R.md", "--note", CANARY)
+	const first = board1(S1.boss), outF = first.stdout
+	const ok123 = {
+		byChief: /^chiefA · working$/m.test(outF) && /^chiefB · IDLE/m.test(outF) && /^  e1 · not running$/m.test(outF),
+		aRequestOpenAndItsDate: /e1 · not running\n\s+asked by chiefA since \d\d-\d\d \d\d:\d\d/.test(outF),
+		doneClosedItsRequest: !/shared[^\n]*\n\s+asked by chiefB/.test(outF.split("chiefB ·")[1] || "x"),
+		pointersOfBoth: /blocked \d\d-\d\d \d\d:\d\d → chiefA: e1\/R\.md/.test(outF) && /done \d\d-\d\d \d\d:\d\d → chiefB: shared\/R\.md/.test(outF),
+		noContent: !outF.includes(CANARY),
+		anExpertInTwoTeamsInBoth: (outF.match(/^  shared · /gm) || []).length === 2,
+		aLevel4IsAChiefToo: /^lead4 · /m.test(outF) && /^  lead4 · /m.test(outF) && /^  sub · /m.test(outF),
+		theRestWithoutAChief: /^\(no chief\)\n  loner · /m.test(outF),
+		saysFirstLook: /your first look/.test(outF),
+	}
+	const second = board1(S1.boss).stdout
+	ok123.secondLookOnlyWhatIsNew = /since your last look/.test(second) && !/→ chief/.test(second)
+	nap(5)
+	c1("e1", "send", "chiefA", "--kind", "done", "--ref", "R.md")
+	// delivered meanwhile: the log, not the inbox, holds it; once
+	spawnSync(process.execPath, [join(P1.dirOf("chiefA"), ".claude", "comm-hook.mjs"), "stop"], { cwd: P1.dirOf("chiefA"), encoding: "utf8", env: { ...baseEnv, CLAUDE_PROJECT_DIR: P1.dirOf("chiefA") }, input: JSON.stringify({ cwd: P1.dirOf("chiefA"), hook_event_name: "Stop", session_id: "a123", transcript_path: join(P1.r, "chiefA.jsonl") }) })
+	const third = board1(S1.boss).stdout
+	ok123.aDeliveredReportStillShows = (third.match(/done \S+ \S+ → chiefA: e1\/R\.md/g) || []).length === 1 && !/blocked/.test(third)
+	const chiefView = board1(S1.chiefB).stdout
+	ok123.aChiefSeesItsTeam = /^chiefB · /m.test(chiefView) && /^  e2 · /m.test(chiefView) && !/chiefA ·/.test(chiefView) && !/ e1 ·/.test(chiefView)
+	ok123.eachReaderItsOwnLook = /your first look/.test(chiefView) && /done \S+ \S+ → chiefB: shared\/R\.md/.test(chiefView)
+	// a person at a shell, at the leader's own folder: its own look, not the leader's
+	const markBoss = () => readFileSync(join(P1.r, ".comm", "board", "boss"), "utf8")
+	const m0 = markBoss(), asPerson = noSession([process.execPath, P1.bin("team.mjs"), "--board"], { cwd: P1.r })
+	ok123.aShellIsNotTheLeader = /board for 'a person at a shell'/.test(asPerson.stdout) && markBoss() === m0
+	const asSub = nestedRun(S1.boss, [P1.bin("team.mjs"), "--board"])
+	ok123.aSubSessionIsNotTheLeader = /board for 'a sub-session'/.test(asSub.stdout) && markBoss() === m0
+	rmSync(join(P1.r, ".comm", "log.jsonl"), { force: true }); mkdirSync(join(P1.r, ".comm", "log.jsonl"))
+	nap(5)
+	const blindLook = board1(S1.boss).stdout
+	ok123.anUnreadableLogIsSaid = /⚠ \.comm\/log\.jsonl could not be read/.test(blindLook)
+	ok123.andTheLookDoesNotMove = /last look was not moved/.test(blindLook) && markBoss() === m0
+	rmSync(join(P1.r, ".comm", "log.jsonl"), { recursive: true, force: true })
+	P1.set({ leader: "boss", agents: P1.cfg.agents })
+	const star = board1(S1.chiefA).stdout
+	ok123.aStarListsEveryone = /^e1 · /m.test(star) && /^chiefA · /m.test(star) && !/\(no chief\)/.test(star) && !/^boss · /m.test(star)
+	P1.set(P1.cfg)
+	check("A123 the board says by chief each member's state, open requests with their date, done and blocked since this reader's last look, pointers only, and says when it cannot read",
+		Object.values(ok123).every(Boolean), Object.entries(ok123).map(([k, v]) => `${k}=${!!v}`).join("; "))
+	for (const s of [...Object.values(S1), ...Object.values(S3), S2.boss]) s.stop()
+}
+
 // A92 — EVERY COMMAND IS DOCUMENTED BY THE CODE ITSELF, AND --help DOES NOTHING ELSE. The owner, 2026-10-24: "tu
 // t'assures également que les experts et leaders, et enfin tous les utilisateurs du projet aient facilement accès à une
 // documentation constamment à jour". Measured that evening: the hand-written docs had drifted - wake.mjs documented none
@@ -6130,7 +6771,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 	// claude's own permission flags, which launch names only to REFUSE them in a "launch" entry (A106)
 	const FOREIGN = { launch: ["--keep-focus", "--match", "--next-to", "--to", "--dangerously-skip-permissions", "--allow-dangerously-skip-permissions", "--permission-mode"], close: ["--match", "--to", "--root", "--json", "--after-turn", "--verify"],
 		wake: ["--match", "--to", "--ansi"], claim: ["--agent-root"], restart: ["--by"], handoff: ["--porcelain", "--short", "--stdin"], ledger: [], usage: ["--ref", "--kind", "--note"],
-		pair: ["--kind", "--note"], "relay-due": ["--agent-root"] }
+		pair: ["--kind", "--note"], "relay-due": ["--agent-root"], team: ["--json"], reopen: ["--to", "--match", "--kind", "--ref", "--note", "--from", "--agent", "--model", "--effort", "--prompt", "--os-window", "--minimized", "--reopen", "--print"] }
 	const undocumented = (src, foreign) => { const head = src.slice(0, src.indexOf("*/"))
 		return [...new Set([...src.matchAll(/["'](--[a-z][a-z0-9-]+)["']/g)].map((m) => m[1]))].filter((f) => f !== "--help" && !head.includes(f) && !foreign.includes(f)) }
 	const gaps = {}
@@ -6948,7 +7589,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 	mkdirSync(join(r53, "db"), { recursive: true })
 	writeFileSync(join(r53, ".comm", "config.json"),
 		JSON.stringify({ leader: "leader", agents: { leader: ".", db: "db" } }))
-	for (const f of ["comm.mjs", "who.mjs", "launch.mjs", "wake.mjs", "session-registry.mjs", "close.mjs", "claim.mjs"])
+	for (const f of ["comm.mjs", "who.mjs", "launch.mjs", "team.mjs", "wake.mjs", "session-registry.mjs", "close.mjs", "claim.mjs"])
 		cpSync(join(PKG, "bin", f), join(r53, ".comm", "bin", f))
 	const L53 = join(r53, ".comm", "bin", "launch.mjs")
 	// the tier every launch must now carry (A57) — without it each case below refuses for the missing tier
@@ -7058,7 +7699,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 	mkdirSync(join(r57, "db"), { recursive: true })
 	writeFileSync(join(r57, ".comm", "config.json"),
 		JSON.stringify({ leader: "leader", agents: { leader: ".", db: "db" } }))
-	for (const f of ["comm.mjs", "who.mjs", "launch.mjs", "wake.mjs", "session-registry.mjs", "close.mjs", "claim.mjs"])
+	for (const f of ["comm.mjs", "who.mjs", "launch.mjs", "team.mjs", "wake.mjs", "session-registry.mjs", "close.mjs", "claim.mjs"])
 		cpSync(join(PKG, "bin", f), join(r57, ".comm", "bin", f))
 	const L57 = join(r57, ".comm", "bin", "launch.mjs")
 	const bin57 = join(r57, "fakebin")
@@ -7138,7 +7779,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 	const GOOD106 = { args: ["--channels", "plugin:t@x"], env: { T_STATE_DIR: "/a b/c" } }
 	const cfg106 = (db) => writeFileSync(join(r106, ".comm", "config.json"),
 		JSON.stringify({ leader: "leader", agents: { leader: ".", db: "db", app: "app" }, launch: { db } }))
-	for (const f of ["comm.mjs", "who.mjs", "launch.mjs", "wake.mjs", "session-registry.mjs", "close.mjs", "claim.mjs"])
+	for (const f of ["comm.mjs", "who.mjs", "launch.mjs", "team.mjs", "wake.mjs", "session-registry.mjs", "close.mjs", "claim.mjs"])
 		cpSync(join(PKG, "bin", f), join(r106, ".comm", "bin", f))
 	const L106 = join(r106, ".comm", "bin", "launch.mjs"), bin106 = join(r106, "fakebin"), argv106 = join(r106, "argv.txt"), envf106 = join(r106, "env.txt")
 	mkdirSync(bin106, { recursive: true })
