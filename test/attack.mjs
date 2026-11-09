@@ -6592,6 +6592,152 @@ else if(a.includes("set-user-vars")){if(fs.existsSync(D+"/nomark"))process.exit(
 	check("A122 mail that asks reopens a declared closed agent from the sender's hook, once, minimized, inside the caps, exactly as declared; a refusal is told once; a burst takes the room there is and no more",
 		Object.values(ok122).every(Boolean), Object.entries(ok122).map(([k, v]) => `${k}=${!!v}`).join("; "))
 
+	// ── A124: THE USAGE THRESHOLD: a reopening always, a launch where the project says so ────────────────────
+	// Work's leader, 11-09 (letters 55, 57): D opened a chief at 98 % of the week, against its owner's rule. Every edge of the reading is the pure function, table below;
+	// the flows are real stubs and a fake kitten. One positive control per side: under the threshold it opens, and a threshold alone leaves a launch as it was.
+	{
+		const ok124 = {}
+		const um = await import(pathToFileURL(P2.bin("usage.mjs")).href)
+		const NOW = Date.now(), inH = (h) => Math.floor(NOW / 1000) + h * 3600, MIN = 60_000
+		const R = (week, o = {}) => ({ v: 1, at: NOW, five_hour: null, seven_day: { pct: week, resets_at: inH(48) }, session: "a124", ...o })
+		const uc = { agents: { a: "a", b: "b", c: "c" }, usage: { week: 98, session: 98, agents: { a: { week: 10 }, b: { week: 99 } }, statusLine: true } }
+		const g = (r, agent = "c", cfg = uc) => um.gate(cfg, agent, NOW, r)
+		ok124.underIsOk = g(R(97.9)).ok === true && /week 98 % \(threshold 98 %\), read 0 s ago/.test(g(R(97.9)).line)
+		ok124.reachedAtExactly = g(R(98)).ok === false && /the week is at 98 % and the threshold for 'c' is 98 %/.test(g(R(98)).why) && /resets at .*No flag passes/.test(g(R(98)).next) && g(R(98)).key === `seven_day-${inH(48)}-98`
+		ok124.itsOwnBelowTheProjects = g(R(50), "a").ok === false && /for 'a' is 10 %/.test(g(R(50), "a").why) && g(R(50), "a").key !== g(R(98)).key
+		ok124.itsOwnAboveTheProjects = g(R(98.5), "b").ok === true
+		ok124.noReadingRefuses = g(null).ok === false && /no usage reading/.test(g(null).why) && g(null).key.startsWith("unknown-")
+		ok124.youngEnough = g(R(5, { at: NOW - 29 * MIN })).ok === true
+		ok124.tooOld = g(R(5, { at: NOW - 31 * MIN })).ok === false && /31 min old/.test(g(R(5, { at: NOW - 31 * MIN })).why)
+		ok124.aClockAheadRefuses = g(R(5, { at: NOW + 2 * MIN })).ok === false && g(R(5, { at: NOW + 30_000 })).ok === true
+		ok124.beforeItsResetRefuses = g(R(5, { seven_day: { pct: 5, resets_at: inH(-1) } })).ok === false && /before its reset/.test(g(R(5, { seven_day: { pct: 5, resets_at: inH(-1) } })).why)
+		ok124.overOutranksAResetSession = g(R(98, { five_hour: { pct: 1, resets_at: inH(-1) } })).key === `seven_day-${inH(48)}-98`
+		ok124.anAbsentWindowComparesNothing = g(R(50)).ok === true && !/session/.test(g(R(50)).line)
+		ok124.theSessionWindowRefusesToo = /5-hour session is at 98 %/.test(g(R(50, { five_hour: { pct: 98, resets_at: inH(2) } })).why || "")
+		const onlySession = { agents: { c: "c" }, usage: { session: 98, statusLine: true } }
+		ok124.onlyAnAbsentWindowRefuses = g(R(50), "c", onlySession).ok === false && /does not hold session/.test(g(R(50), "c", onlySession).why)
+		const weekOnly = { agents: { c: "c" }, usage: { week: 98 } }
+		ok124.aPctThatIsNoNumberIsAbsent = g(R(98, { seven_day: { pct: "98", resets_at: inH(48) } }), "c", weekOnly).ok === false && /does not hold week/.test(g(R(98, { seven_day: { pct: "98", resets_at: inH(48) } }), "c", weekOnly).why)
+		ok124.aWeekAbsentIsNotKnowing = g(R(0, { seven_day: null, five_hour: { pct: 10, resets_at: inH(2) } })).ok === false && /does not hold week/.test(g(R(0, { seven_day: null, five_hour: { pct: 10, resets_at: inH(2) } })).why)
+		ok124.noThresholdNeedsNoReading = g(null, "c", { agents: { c: "c" }, usage: { statusLine: true } }).ok === true && g(null, "c", { agents: { c: "c" } }).ok === true
+		const envCron = { ...process.env }; delete envCron.XDG_RUNTIME_DIR; delete envCron.CLAUDE_COMM_RUNTIME
+		const uidNow = process.getuid(), cronPath = spawnSync(process.execPath, ["--input-type=module", "-e", `import(${JSON.stringify(pathToFileURL(P2.bin("usage.mjs")).href)}).then((m) => console.log(m.usagePath()))`], { encoding: "utf8", env: envCron }).stdout.trim()
+		ok124.aCronReadsTheFileASessionWrites = cronPath === (existsSync(`/run/user/${uidNow}`) ? `/run/user/${uidNow}/claude-comm/usage.json` : `/tmp/claude-comm-${uidNow}/usage.json`)
+		// the flows. The reading is the file a statusLine writes, in this suite's own runtime, and a child reads this very one or the arm is unarmed
+		const usageFile = join(RT_B, "claude-comm", "usage.json")
+		const reading = (week = 50, o = {}) => { mkdirSync(dirname(usageFile), { recursive: true }); writeFileSync(usageFile, JSON.stringify({ ...R(week), at: Date.now(), project: P2.r, ...o }) + "\n") }
+		reading(1); ok124.aChildReadsThisReading = (() => { try { return JSON.parse(spawnSync(process.execPath, [P2.bin("usage.mjs"), "--json"], { cwd: P2.r, encoding: "utf8", env: envK }).stdout).project === P2.r } catch { return false } })()
+		const cfg124 = (usage) => ({ ...cfg122, usage: { statusLine: true, ...usage } })
+		const bells = () => box2("boss").filter((m) => m.kind === "fyi" && /reopen\/usage\.md$/.test(m.refPath || ""))
+		const usageMd = () => { try { return readFileSync(join(P2.r, ".comm", "reopen", "usage.md"), "utf8") } catch { return "" } }
+		const mail = (a = "chiefA", by = "e1") => { send2("boss", a); fire(by); drain() }
+		reset2(cfg124({ week: 98 })); reading(97); mail()
+		ok124.underItOpens = fkLaunches().length === 1 && rec2("chiefA").started === true && !bells().length
+		reset2(cfg124({ week: 98 })); reading(98); mail()
+		ok124.atItNothingOpens = fkLaunches().length === 0 && /the week is at 98 %/.test(rec2("chiefA").refused || "") && box2("chiefA").length === 1
+		ok124.theLeaderHasOneFyiAtAFile = bells().length === 1 && bells()[0].from === "chiefA" && /chiefA.*the week is at 98 %/.test(usageMd())
+		ok124.theOwnerIsNotAlarmed = !told().length
+		mail(); mail("chiefB", "e2")
+		ok124.oncePerWindow = bells().length === 1 && /chiefA[\s\S]*chiefB/.test(usageMd()) && fkLaunches().length === 0
+		reading(99, { seven_day: { pct: 99, resets_at: inH(200) } }); mail()
+		ok124.aNewWindowIsToldAnew = bells().length === 2
+		reading(5); fire("e1"); drain()
+		ok124.belowAgainTheWaitingMailOpens = fkLaunches().some((a) => a.includes("--env=CLAUDE_COMM_AGENT=chiefA")) && !rec2("chiefA").usage_refused && !rec2("chiefA").refused
+		reset2(cfg124({ week: 98 })); reading(5, { at: Date.now() - 31 * MIN }); mail(); mail()
+		ok124.anOldReadingOpensNothingAndIsToldOnce = fkLaunches().length === 0 && /31 min old/.test(rec2("chiefA").refused || "") && bells().length === 1 && !told().length
+		// a burst: three at once, each its own agent's lock, and one fyi. Sequential mail cannot tell an exclusive create from a look-then-write
+		reset2(cfg124({ week: 98 })); reading(98); for (const a of ["chiefA", "chiefB", "x1"]) send2("boss", a)
+		await Promise.all(["chiefA", "chiefB", "x1"].map((a) => new Promise((res) => spawn(process.execPath, [P2.bin("reopen.mjs"), a, "--root", P2.r], { cwd: P2.r, env: envK, stdio: "ignore" }).on("exit", res))))
+		ok124.aBurstIsToldOnce = bells().length === 1 && fkLaunches().length === 0
+		// a send that failed is owed: the leader's box cannot be written, so no mark is left, and the next refusal tells
+		reset2(cfg124({ week: 98 })); reading(98); send2("boss", "chiefA")
+		const bossBox = join(P2.r, ".comm", "inbox", "boss"), try124 = () => spawnSync(process.execPath, [P2.bin("reopen.mjs"), "chiefA", "--root", P2.r], { cwd: P2.r, encoding: "utf8", env: envK })
+		mkdirSync(bossBox, { recursive: true }); spawnSync("chmod", ["555", bossBox])
+		try { try124() } finally { spawnSync("chmod", ["755", bossBox]) }
+		const owed = !bells().length && !readdirSync(join(P2.r, ".comm", "reopen")).some((f) => f.startsWith(".told-usage-"))
+		try124(); ok124.aFailedSendIsTriedAgain = owed && bells().length === 1
+		// its list is of mail still waiting: a chief whose mail was read, by hand or by anyone, is no longer refused for anything
+		reset2(cfg124({ week: 98 })); reading(98); mail(); const hadA = /chiefA/.test(usageMd())
+		rmSync(join(P2.r, ".comm", "inbox", "chiefA"), { recursive: true, force: true }); mail("chiefB", "e2")
+		ok124.theListIsOfMailStillWaiting = hadA && /chiefB/.test(usageMd()) && !/chiefA/.test(usageMd())
+		// launch.mjs looks for itself on a reopening: the reading may move between reopen's look and the launch. Then it is still this refusal, not the owner's alarm
+		const held124 = () => writeFileSync(join(P2.r, ".comm", "launch.lock"), JSON.stringify({ pid: S2.boss.pid, start: reg.startTimeOf(S2.boss.pid), boot: reg.bootId() }))
+		const decl124 = ["--model", "sonnet", "--effort", "low", "--prompt", "Read your mail.", "--os-window", "--minimized"]
+		reset2(cfg124({ week: 98 })); reading(99); send2("boss", "chiefA")
+		ok124.theLaunchLooksOnAReopeningToo = refused(benchFree(S2.boss, [process.execPath, P2.bin("launch.mjs"), "chiefA", "--reopen", ...decl124, "--print"], envK), /REFUSING to launch 'chiefA': the week is at 99 %/)
+		reset2(cfg124({ week: 98 })); reading(5); held124(); send2("boss", "chiefA")
+		const moved = new Promise((res) => spawn(process.execPath, [P2.bin("reopen.mjs"), "chiefA", "--root", P2.r], { cwd: P2.r, env: envK, stdio: "ignore" }).on("exit", res))
+		for (const u = Date.now() + 5000; Date.now() < u && !existsSync(join(P2.r, ".comm", "reopen", "chiefA.lock")); nap(20)) {}
+		nap(1500)   // past reopen's look and launch's --print, in the queue for the lock it now holds off
+		reading(99); rmSync(join(P2.r, ".comm", "launch.lock"), { force: true }); await moved
+		ok124.aReadingThatMovesStaysTheLeaders = fkLaunches().length === 0 && /the week is at 99 %/.test(rec2("chiefA").refused || "") && bells().length === 1 && !told().length
+		// a declared leader has nobody but its owner, told once the same way
+		rmSync(told2, { force: true })
+		const P5u = project("p5u", { leader: "boss", agents: { boss: ".", e: "e" }, notify: P2.cfg.notify, reopen: { boss: DECL() }, caps: { availableMb: 1 }, reopenTiming: { retryMs: 0 }, usage: { week: 98, statusLine: true } })
+		spawnSync(process.execPath, [P5u.bin("comm.mjs"), "send", "boss", "--ref", "R.md", "--note", "a124"], { cwd: P5u.dirOf("e"), encoding: "utf8", env: baseEnv })
+		reading(98)
+		for (let i = 0; i < 2; i++) spawnSync(process.execPath, [P5u.bin("reopen.mjs"), "boss", "--root", P5u.r], { cwd: P5u.r, encoding: "utf8", env: envK })
+		ok124.aDeclaredLeaderToldItsOwnerOnce = told().length === 1 && /the week is at 98 %/.test(told()[0])
+		// the caps refuse with the threshold clear: the old alarm, not this one. And a fault in the threshold is a fault, said to both
+		reset2({ ...cfg124({ week: 98 }), caps: { windows: 1 } }); reading(5); mail()
+		ok124.aCapStillAlarms = fkLaunches().length === 0 && told().length === 1 && !bells().length && rec2("chiefA").usage_refused === false
+		reset2({ ...cfg122, usage: { week: "98", statusLine: true } }); reading(5); mail()
+		ok124.aFaultyThresholdRefusesAReopening = fkLaunches().length === 0 && /must be a number/.test(rec2("chiefA").refused || "") && told().length === 1
+		reset2({ ...cfg122, usage: { week: 98 } }); reading(5); mail()
+		ok124.aThresholdNoSessionFeedsSaysSo = fkLaunches().length === 0 && /no "statusLine": true/.test(rec2("chiefA").refused || "")
+		// --dry-run: work's witness, its own threshold lowered, no mail at all: says the refusal, takes no lock, tells nobody
+		reset2(cfg124({ week: 98, agents: { chiefA: { week: 10 } } })); reading(50)
+		const dry124 = spawnSync(process.execPath, [P2.bin("reopen.mjs"), "chiefA", "--root", P2.r, "--dry-run"], { cwd: P2.r, encoding: "utf8", env: envK })
+		ok124.theWitnessSaysItWithNoMail = /would be refused: the week is at 50 % and the threshold for 'chiefA' is 10 %/.test(dry124.stdout)
+		ok124.theWitnessTouchesNothing = !existsSync(join(P2.r, ".comm", "reopen")) && !bells().length && !told().length && !fkLaunches().length
+		// no lock: both held by a live holder, and it answers at once, with the refusal. One lock taken would say "under way", or sit out 30 s
+		held124(); mkdirSync(join(P2.r, ".comm", "reopen"), { recursive: true }); writeFileSync(join(P2.r, ".comm", "reopen", "chiefA.lock"), readFileSync(join(P2.r, ".comm", "launch.lock"), "utf8"))
+		const t124 = Date.now(), dryHeld = spawnSync(process.execPath, [P2.bin("reopen.mjs"), "chiefA", "--root", P2.r, "--dry-run"], { cwd: P2.r, encoding: "utf8", env: envK, timeout: 8000 })
+		ok124.theWitnessTakesNoLock = /would be refused: the week is at 50 %/.test(dryHeld.stdout) && Date.now() - t124 < 5000
+		// under it, past the line that takes the agent's lock on a real run: the locks still held, and it goes on to say what waits
+		P2.set(cfg124({ week: 98 }))
+		const dryOk124 = spawnSync(process.execPath, [P2.bin("reopen.mjs"), "chiefA", "--root", P2.r, "--dry-run"], { cwd: P2.r, encoding: "utf8", env: envK, timeout: 8000 })
+		ok124.underItTheWitnessSaysTheReading = /usage: week 50 % \(threshold 98 %\)/.test(dryOk124.stdout) && /nothing waiting/.test(dryOk124.stdout)
+		rmSync(join(P2.r, ".comm", "launch.lock"), { force: true }); rmSync(join(P2.r, ".comm", "reopen"), { recursive: true, force: true })
+		// an ordinary launch: the positive control first, a threshold alone is advice, then "refuse"
+		const usage2 = (usage) => P2.set({ ...P2.cfg, usage: { statusLine: true, ...usage } })
+		const laun = (target = "e1", ...more) => benchFree(S2.boss, [process.execPath, P2.bin("launch.mjs"), target, ...T, "--os-window", ...more], envK)
+		const says = /REFUSING to launch 'e1': the week is at 99 % and the threshold for 'e1' is 98 %/
+		usage2({ week: 98 }); reading(99)
+		ok124.aThresholdAloneIsAdvice = passes(laun("e1", "--print"), "e1")
+		rmSync(usageFile, { force: true }); ok124.andNeedsNoReading = passes(laun("e1", "--print"), "e1")
+		usage2({ week: 98, refuse: false }); reading(99); ok124.refuseFalseIsNoRefusal = passes(laun("e1", "--print"), "e1")
+		usage2({ week: 98, refuse: true }); reading(99)
+		fkReset()
+		const noWin = laun("e1", "--minimized")
+		ok124.refuseStopsTheLaunchWithNoWindow = refused(noWin, says) && /Nothing was opened/.test(noWin.stderr) && fkLaunches().length === 0
+		ok124.andItsPrintAlike = refused(laun("e1", "--print"), says)
+		ok124.noFlagPassesIt = refused(laun("e1", "--print", "--force"), says)
+		ok124.aPlainShellToo = refused(noSession([process.execPath, P2.bin("launch.mjs"), "e1", ...T, "--os-window", "--print"], { cwd: P2.r }), says)
+		usage2({ week: 98, refuse: true, agents: { e1: { week: 10 } } }); reading(50)
+		ok124.itIsTheLaunchedAgentsThreshold = refused(laun("e1", "--print"), /threshold for 'e1' is 10 %/) && passes(laun("x1", "--print"), "x1")
+		usage2({ week: 98, refuse: true }); reading(5, { at: Date.now() - 31 * MIN })
+		ok124.anOldReadingRefusesALaunch = refused(laun("e1", "--print"), /31 min old[\s\S]*statusLine writes a reading/)
+		reading(5); fkReset()
+		const yesWin = laun("e1", "--minimized")
+		ok124.underItTheLaunchSaysTheReading = yesWin.status === 0 && /usage: {2}week 5 % \(threshold 98 %\)/.test(yesWin.stdout) && fkLaunches().length === 1
+		for (const [name, usage, re] of [["refuseNotABoolean", { week: 98, refuse: "yes" }, /"refuse" must be true or false/], ["thresholdNotANumber", { week: "98", refuse: true }, /"week" must be a number/],
+			["refuseWithNoThreshold", { refuse: true }, /with no threshold refuses nothing/], ["aMisspeltKey", { wek: 98, refuse: true }, /has "wek": only/]]) {
+			usage2(usage); reading(5); ok124[name] = refused(laun("x1", "--print"), re)   // x1: e1 runs now, and "already running" comes first
+		}
+		// a typo in one entry costs that agent, and a retired name costs nobody: said, and the project goes on launching
+		usage2({ week: 98, refuse: true, agents: { e2: { week: "x" } } }); reading(5)
+		ok124.aTypoCostsThatAgentAlone = refused(laun("e2", "--print"), /"e2" "week" must be a number/) && passes(laun("x1", "--print"), "x1")
+		usage2({ week: 98, refuse: true, agents: { ghost: { week: 1 } } }); reading(5)
+		ok124.aRetiredNameStopsNobodyAndIsSaid = passes(laun("x1", "--print"), "x1") && /names 'ghost'/.test(spawnSync(process.execPath, [P2.bin("team.mjs")], { cwd: P2.r, encoding: "utf8", env: envK }).stdout)
+		P2.set({ ...P2.cfg, usage: { week: 98, refuse: true } }); reading(5); ok124.refuseWithNoFeedSaysSo = refused(laun("x1", "--print"), /no "statusLine": true/)
+		usage2({ wek: 98 })
+		ok124.aMisspeltThresholdIsSaidAtTheStart = /"usage" has "wek"/.test(spawnSync(process.execPath, [P2.bin("team.mjs")], { cwd: P2.r, encoding: "utf8", env: envK }).stdout)
+		rmSync(usageFile, { force: true }); reset2(P2.cfg)
+		check("A124 at its usage threshold, or with no reading under 30 min old, a reopening is refused and its leader told once per window, the owner not; \"refuse\" holds a launch to the same, with no flag past it; a threshold alone stays advice",
+			Object.values(ok124).every(Boolean), Object.entries(ok124).map(([k, v]) => `${k}=${!!v}`).join("; "))
+	}
+
 	// ── A121: ANOTHER AGENT'S WINDOW, in real panes of the bench ─────────────────────────────────────────────
 	const TGT = ["t_ok", "t_force", "t_dry", "t_busy", "t_sub", "t_words", "t_null", "t_nobox", "t_bell", "t_relay", "t_mail", "t_claim", "t_other", "t_unmarked", "t_shell", "t_far", "t_two"]
 	const P3 = project("p3", { leader: "boss", agents: { boss: ".", chiefA: "chiefA", chiefB: "chiefB", e1: "e1", ...Object.fromEntries(TGT.map((a) => [a, a])) },

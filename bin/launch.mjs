@@ -9,6 +9,7 @@
  *
  *   With "teams" in .comm/config.json only the leader or a chief of <agent> may launch it (a plain shell, with no session: as without).
  *   With "caps" it refuses past any of them, and the refusal gives the numbers (bin/team.mjs). A --prompt opens a request: the agent's `done` to you closes it.
+ *   With "usage": {"refuse": true} it refuses an agent at its threshold, or with no reading under 30 min old (bin/usage.mjs). No flag passes it: change the threshold.
  *
  *   .comm/config.json  "launch": {"<agent>": {"args": ["--channels", "plugin:telegram@claude-plugins-official"],
  *                                             "env": {"TELEGRAM_STATE_DIR": "/a/folder/of/its/own"}}}
@@ -318,6 +319,16 @@ if (cfg.caps) {
 	if (c.over.length) die(`REFUSING to launch '${agent}', past this project's "caps": ${c.over.join("; ")}.\n  Nothing was opened. Close a window that has finished (node ${relative(process.cwd(), new URL("close.mjs", import.meta.url).pathname)} --agent <x>), or wait.`)
 	capsLine = c.line
 }
+// THE THRESHOLD: a reopening always, an ordinary launch where the project says so. Asked of a project, not assumed of one with a threshold: two fields hold one
+// as advice, and a reading gone stale would have started refusing their launches. No flag: a person changes the threshold (work's R759, 11-09).
+let usageLine = ""
+if (reopening || (cfg.usage && cfg.usage.refuse !== undefined && cfg.usage.refuse !== false)) {
+	const faults = team.usageFaults(cfg, agent)
+	if (faults.length) die(`REFUSING to launch '${agent}': ${faults.join("; ")}.\n  Fix .comm/config.json: a threshold that cannot be read is no threshold, and silence would open the window.`)
+	const u = (await import(new URL("usage.mjs", import.meta.url))).gate(cfg, agent)
+	if (!u.ok) die(`REFUSING to launch '${agent}': ${u.why}.\n  Nothing was opened. ${u.next}`)
+	usageLine = u.line
+}
 
 // ── the refusal this file exists for ─────────────────────────────────────────
 const nodeBin = process.execPath
@@ -473,6 +484,7 @@ console.log(marked
 	: `  ⚠ NOT marked (${markWhy}) — the session is up and fine, but it will REFUSE to close itself`)
 console.log(`  tier:   --model ${model} --effort ${effort} — the caller's choice; the child's transcript records what it actually ran on`)
 if (capsLine) console.log(`  caps:   ${capsLine}, before this one`)
+if (usageLine) console.log(`  usage:  ${usageLine}`)
 // A FIRST TURN IS WORK ASKED FOR, as a nudge is: `send @asker` reaches this caller, and its `done` closes it. After the
 // window exists: a refused launch asked nobody. A launch by its declaration asked nothing, the mail did.
 if (prompt && caller && team.openRequest(root, cfg, agent, caller)) console.log(`  request: '${agent}' now owes '${caller}' its \`done\` (send @asker reaches you)`)

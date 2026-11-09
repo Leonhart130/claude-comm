@@ -207,8 +207,38 @@ export function asksFor(root, agent) {
 	}
 	return out.sort((a, b) => (a.ts < b.ts ? -1 : 1))
 }
-/** What is wrong with this project's "caps" and "reopen", for the start message, the installer and boot. */
-export const configFaults = (cfg) => [...capFaults(cfg), ...reopenFaults(cfg), ...timingFaults(cfg)]
+/**
+ * A threshold that refuses and cannot be read would open the window in silence, as a misspelt cap would. And one no session here feeds refuses for want of a reading: said, not discovered.
+ * `only`: what stops THIS agent, as reopenFaults. A typo in another's entry costs that agent; a retired name on the list costs nobody, and is only said (review, 11-09).
+ */
+const USAGE_KEYS = ["week", "session", "agents", "statusLine", "refuse"], USAGE_WINDOWS = ["week", "session"]
+export function usageFaults(cfg, only = null) {
+	const u = cfg && cfg.usage
+	if (u === undefined) return []
+	if (!u || typeof u !== "object" || Array.isArray(u)) return ['"usage" is not an object']
+	const out = Object.keys(u).filter((k) => !USAGE_KEYS.includes(k)).map((k) => `"usage" has ${JSON.stringify(k)}: only ${USAGE_KEYS.join(", ")} are read`)
+	let any = false
+	const windows = (where, o, mine = true) => { for (const k of USAGE_WINDOWS) if (own(o, k)) { if (Number.isFinite(o[k])) any = true; else if (mine) out.push(`${where} "${k}" must be a number, it is ${JSON.stringify(o[k])}`) } }
+	windows('"usage"', u)
+	if (own(u, "agents")) {
+		if (!u.agents || typeof u.agents !== "object" || Array.isArray(u.agents)) out.push('"usage" "agents" is not an object')
+		else for (const [a, o] of Object.entries(u.agents)) {
+			const mine = only === null || a === only
+			if (!own(cfg.agents, a)) { if (only === null) out.push(`"usage" "agents" names '${a}', who is not on this project's roster`) }
+			else if (!o || typeof o !== "object" || Array.isArray(o)) { if (mine) out.push(`"usage" "agents" "${a}" is not an object`) }
+			else {
+				if (mine) out.push(...Object.keys(o).filter((k) => !USAGE_WINDOWS.includes(k)).map((k) => `"usage" "agents" "${a}" has ${JSON.stringify(k)}: only ${USAGE_WINDOWS.join(", ")} are read`))
+				windows(`"usage" "agents" "${a}"`, o, mine)
+			}
+		}
+	}
+	if (own(u, "refuse") && typeof u.refuse !== "boolean") out.push(`"usage" "refuse" must be true or false, it is ${JSON.stringify(u.refuse)}`)
+	if (u.refuse === true && !any) out.push('"usage" "refuse" with no threshold refuses nothing')
+	if (any && u.statusLine !== true && (u.refuse === true || cfg.reopen)) out.push(`"usage" has thresholds that refuse and no "statusLine": true: no session here writes a reading, so they refuse for want of one`)
+	return out
+}
+/** What is wrong with this project's "caps", "reopen" and "usage", for the start message, the installer and boot. */
+export const configFaults = (cfg) => [...capFaults(cfg), ...reopenFaults(cfg), ...timingFaults(cfg), ...usageFaults(cfg)]
 
 // ── THE BOARD ──────────────────────────────────────────────────────────────────────────────────────────────────
 const when = (iso) => { const d = new Date(iso); if (isNaN(d)) return String(iso); const p = (n) => String(n).padStart(2, "0"); return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}` }

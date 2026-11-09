@@ -9,7 +9,8 @@
  *   .comm/config.json  "reopen": {"<agent>": {"model": "<m>", "effort": "<e>", "say": "<its first prompt, one line>"}}
  *                      mail that asks (not an fyi) for this agent when it is closed: the next hook in the project opens it, in a minimized
  *                      OS window, inside "caps", which must then bound it ("windows" or "availableMb"). A refusal tells the owner and the leader
- *                      once per mail waiting. .comm/reopen/<agent>.json says what happened.
+ *                      once per mail waiting. .comm/reopen/<agent>.json says what happened. At its "usage" threshold, or with no reading under
+ *                      30 min old, it is refused too: the leader alone is told, an fyi at .comm/reopen/usage.md, once per window of usage.
  *   .comm/config.json  "reopenTiming": {"startMs": 60000, "settleMs": 8000, "retryMs": 60000, "tellMs": 5000, "lockMs": 600000}   how long a start may take, how long the next one waits for it, between two tries after a refusal, how long a burst's refusals gather into one alarm, how long the project's launch lock may stay held before somebody is told
  *
  * WHY. Work's leader, 11-08, its review of the hierarchy: 13 chiefs reopened by hand for one Monday, because a chief closed
@@ -32,7 +33,7 @@
  *
  * Every path of a hook exits 0 on internal error; this one is detached from it, and still has nothing to break.
  */
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, renameSync } from "node:fs"
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync } from "node:fs"
 import { join, dirname, relative, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
@@ -59,6 +60,15 @@ const { lookup } = await import(new URL("session-registry.mjs", import.meta.url)
 const cfg = JSON.parse(readFileSync(join(root, ".comm", "config.json"), "utf8"))
 const own = (o, k) => !!o && Object.prototype.hasOwnProperty.call(o, k)
 if (!own(cfg.agents, agent) || !own(cfg.reopen, agent)) { say(`not declared in "reopen": nothing to do`); process.exit(0) }
+
+const usage = cfg.usage ? await import(new URL("usage.mjs", import.meta.url)) : null
+const usageNow = () => usage ? usage.gate(cfg, agent) : { ok: true, line: "" }
+// Said whatever else is true, mail or no mail, running or not: a project lowers a threshold, looks, and has its witness (work's letter 57).
+if (dryRun) {
+	const faults = team.usageFaults(cfg, agent), u = usageNow()
+	if (faults.length || !u.ok) { say(`would be refused: ${faults.length ? faults.join("; ") : u.why}`); process.exit(0) }
+	if (u.line) say(`usage: ${u.line}`)
+}
 
 const num = (k, d) => { const v = cfg.reopenTiming && cfg.reopenTiming[k]; return Number.isFinite(v) && v >= 0 ? v : d }
 const START_MS = num("startMs", 60_000), SETTLE_MS = num("settleMs", 8000), RETRY_MS = num("retryMs", 60_000), TELL_MS = num("tellMs", 5000), LOCK_MS = num("lockMs", 10 * 60_000)
@@ -158,14 +168,44 @@ if (!env.KITTY_LISTEN_ON) { const w = wake.windows()[0]; if (w) env.KITTY_LISTEN
 // The project's lock goes before anybody is told: a teller gathers for seconds, and the next in the queue is what it is gathering.
 let lock = null
 const letGo = () => { if (lock && lock.release) lock.release(); lock = null }
-const refuse = (why) => {
+/**
+ * AT ITS THRESHOLD, OR NO READING TO SAY: the leader's box alone, an fyi at a file, once per `key` (usage.mjs gate). Not the owner, not an alarm: nothing is broken, the next hook
+ * after the reset opens it, and in a project what reaches its owner may go through its leader (work, 11-09). NOT RUNG: waking an idle leader is a turn, spent at its threshold of all
+ * moments; the fyi is there at its next turn. By an exclusive create, as usage.mjs: two hooks ending together must not both tell, and a send that failed is tried again at the next
+ * refusal. The file lists every agent refused for this whose mail still waits, so one fyi covers the others. A declared leader has nobody above it but its owner, told the same way.
+ */
+function refuseUsage(u) {
 	letGo()
-	note({ refused: why, refused_at: new Date().toISOString() })
+	note({ refused: u.why, refused_at: new Date().toISOString(), usage_refused: true })
+	say(`refused: ${u.why}`)
+	if (agentLock.release) agentLock.release()
+	const file = join(dir, "usage.md"), told = join(dir, `.told-usage-${u.key}`)
+	try {
+		let names = []
+		try { names = readdirSync(dir).filter((f) => f.endsWith(".json")) } catch {}
+		const recs = names.map((f) => readRec(f.slice(0, -5))).filter((r) => r.usage_refused && (team.asksFor(root, r.agent) || []).length)
+		writeFileSync(file, `# Not reopened: usage (${new Date().toISOString()})\n\n${recs.map((r) => `- **${r.agent}**: ${r.refused} (${r.refused_at})`).join("\n")}\n\n${u.next}\n\nThe mail waits in each inbox. Later hooks try again, and open it once this no longer holds.\n`)
+		writeFileSync(told, "", { flag: "wx" })
+		if (agent === cfg.leader) wake.notifyOwner(root, cfg, agent, `réouverture : ${u.why}`)
+		else {
+			const s = spawnSync(process.execPath, [join(HERE, "comm.mjs"), "send", cfg.leader, "--from", agent, "--kind", "fyi", "--ref", relative(join(root, cfg.agents[agent] ?? "."), file), "--note", `reopen of ${agent}: ${u.why}`.slice(0, 200)],
+				{ cwd: root, encoding: "utf8", timeout: 5000, env: { ...process.env, CLAUDE_COMM_AGENT: cfg.leader } })
+			if (s.status !== 0) rmSync(told, { force: true })
+		}
+	} catch {}
+	process.exit(1)
+}
+const refuse = (why) => {
+	const u = usageNow()
+	if (!u.ok) refuseUsage(u)   // launch.mjs read it after the look below, and it had moved
+	letGo()
+	note({ refused: why, refused_at: new Date().toISOString(), usage_refused: false })
 	tell(why.split("\n")[0].slice(0, 300), why)
 	say(`refused: ${why}`)
 	process.exit(1)
 }
 const clean = (r) => String(r.stderr || "").replace(/^✗ /, "").trim() || (r.error ? r.error.code : `launch.mjs exit ${r.status}`)
+if (!dryRun) { const u = usageNow(); if (!u.ok) refuseUsage(u) }
 // launch.mjs's own refusals, every one of them, before queueing: --print refuses exactly as the launch does (A53). A17 is the mechanism working: whoever opened it first has it.
 const checked = spawnSync(process.execPath, [...argv, "--print"], { cwd: root, encoding: "utf8", timeout: 30_000, env })
 if (dryRun) { say(checked.status === 0 ? `would open it now, for ${asks.length} message(s), the newest ${newest}` : `would be refused: ${clean(checked)}`); process.exit(0) }
@@ -200,7 +240,7 @@ if (r.status !== 0 && !wentOut) {
 	refuse(why)
 }
 const window = Number((`${r.stdout}${r.stderr}`.match(/window:? (\d+)/) || [])[1]) || null
-note({ tried: covers, opened_at: new Date().toISOString(), window, refused: null, refused_at: null, told_for: null, owner_for: null, leader_for: null, told_at: null, told: null, pending_tell: null, started: null })
+note({ tried: covers, opened_at: new Date().toISOString(), window, refused: null, refused_at: null, usage_refused: false, told_for: null, owner_for: null, leader_for: null, told_at: null, told: null, pending_tell: null, started: null })
 
 // THE EFFECT: its own start ran (the registry has it) or its mail has left the box. Not the window: `kitten @ launch` has answered
 // for a session at its trust dialog, whose default is "No, exit" (A88). Then the room it takes, before the lock goes on to the next.

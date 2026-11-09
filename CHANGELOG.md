@@ -44,6 +44,15 @@ already have.
 
 
 
+
+## 2026-11-09.1 — bus print `360b66cddb5e` — 2026-11-09
+
+- **A reopening is refused at the agent's `"usage"` threshold** (its own over the project's, week and 5-hour session), or with no reading under 30 min old, or one from before its reset. Its leader gets one `fyi` at `.comm/reopen/usage.md` per window of usage, not rung, and the owner is not told. The next hook after that stops holding opens it. The 5-hour window may be absent from a reading (`node .comm/bin/usage.mjs` shows it): a `"session"` threshold then compares nothing.
+- **`"usage": {"refuse": true}` holds an ordinary launch to the same**, from any caller, a person's shell too. No flag passes it: a person changes the threshold. If no session has answered for 30 min, the first launch is refused until one started by hand has. A threshold without it stays advice, as before.
+- **`reopen.mjs <agent> --dry-run` says the usage verdict first**, with or without mail, and takes no lock: lower a threshold, look, put it back.
+- **`"usage"` is checked at the start, at install and by boot**: a misspelt key or a threshold that is no number is said. Where it would refuse, a project-level fault stops the launch, a typo in one agent's entry stops that agent, and a retired name on the list stops nobody.
+- **A cron now finds the usage reading** a session wrote, with no `XDG_RUNTIME_DIR`.
+
 ## 2026-11-08.4 — bus print `065a5b43d879` — 2026-11-08
 
 - **An expert of several chiefs is told to name the one it answers**, at its start and in its skill: `send <chief> --kind done`. `send @asker` follows open requests, and a chief who gave work some other way has none. An expert of one chief: `send @asker`, as before.

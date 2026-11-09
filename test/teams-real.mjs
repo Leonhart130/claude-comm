@@ -190,7 +190,32 @@ try {
 		if (np2) { const w = until(() => winOf(np2), 5000); if (w) opened.add(w.id) }
 		verdict("r7 the caps refuse a real reopening: told once, the leader's session hears it, room comes back and it opens", !!refused && stillClosed && t1Lines === 1 && leaderHeard && !!np2,
 			`refused=${refused && refused.refused.slice(0, 70)}; owner told ${t1Lines}x; the leader heard=${leaderHeard}; stayed closed=${stillClosed}; reopened after room came back=${!!np2}`)
-	} else for (const n of ["r5", "r6", "r7"]) verdict(`${n}`, null, "no chief")
+
+		// r8: the machine's REAL reading refuses a real reopening: no window, the leader's box alone, its owner not told; a threshold above the reading, and it opens
+		const r8Name = "r8 the real usage reading refuses a real reopening: the leader alone hears it, and a threshold above it opens"
+		const realReading = (await import(pathToFileURL(join(REPO, "bin", "usage.mjs")).href)).read()
+		if (!np2 || !realReading || !realReading.seven_day || Date.now() - realReading.at > 20 * 60_000) verdict(r8Name, null, `no chief to close, or no fresh reading on this machine: ${JSON.stringify(realReading)}`.slice(0, 160))
+		else {
+			idle(np2); idle(lp)
+			runIn(leaderId, lp, `node .comm/bin/close.mjs --agent chief`)
+			until(() => !pidOf("chief"), 45000)
+			idle(lp)
+			const withUsage = (week) => setCfg({ ...baseCfg, caps: { windows: 4 }, reopenTiming: { retryMs: 0 }, usage: { week, statusLine: true } })
+			withUsage(1)
+			rmSync(told, { force: true }); rmSync(join(root, ".comm", "reopen"), { recursive: true, force: true })
+			runIn(leaderId, lp, `node .comm/bin/comm.mjs send chief --ref NOTE.md --note r8`)
+			const refused8 = until(() => { const x = json(".comm", "reopen", "chief.json"); return x && x.refused ? x : null }, 60000)
+			nap(4000); idle(lp, 60000)
+			const heard8 = inbox("leader").some((m) => m.kind === "fyi" && /reopen\/usage\.md$/.test(m.refPath || "")) || /reopen of chief: the week/.test(transcriptsOf(root))
+			const closed8 = !pidOf("chief"), owner8 = toldLines().length
+			withUsage(100)
+			idle(lp); prompt(leaderId, "Answer with one word: ok")
+			const np3 = until(() => pidOf("chief"), 90000)
+			if (np3) { const w = until(() => winOf(np3), 5000); if (w) opened.add(w.id) }
+			verdict(r8Name, !!refused8 && /the week is at/.test(refused8.refused) && closed8 && owner8 === 0 && heard8 && !!np3,
+				`reading ${realReading.seven_day.pct} %; refused=${refused8 && refused8.refused}; stayed closed=${closed8}; owner told ${owner8}x; the leader heard=${heard8}; opened above it=${!!np3}`)
+		}
+	} else for (const n of ["r5", "r6", "r7", "r8"]) verdict(`${n}`, null, "no chief")
 
 	log(`\n${results.filter((x) => x.pass === true).length} passed, ${results.filter((x) => x.pass === false).length} failed, ${results.filter((x) => x.pass === null).length} unarmed - Claude Code ${rec(lp).version}, the bus of ${REPO}`)
 	code = results.every((x) => x.pass === true) ? 0 : 1

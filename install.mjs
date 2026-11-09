@@ -1364,6 +1364,7 @@ function SKILL(ids, agentRoot) {
 		`- **Close an expert's window** (at rest, one \`launch.mjs\` opened; you, or a chief of it): \`node ${B}/close.mjs --agent <x>\`. Mail, a claim or another's open request refuse, \`--force\` lifts them and is noted; a turn under way or somebody's words on its box refuse for good.`,
 		`- **Room:** \`"caps": {"working": 5, "availableMb": 2500, "windows": 12}\`: a launch past any of them is refused, with the numbers.`,
 		`- **A closed agent reopened by its mail:** \`"reopen": {"<agent>": {"model": "...", "effort": "...", "say": "<first prompt>"}}\`: mail that asks (not an \`fyi\`) opens it from the sender's hook, once, minimized, inside the caps; a refusal tells the owner and you. \`node ${B}/reopen.mjs <agent> --dry-run\` says what it would do.`,
+		`- **Usage:** at the agent's threshold in \`"usage"\`, or with no reading under 30 min old, a reopening is refused: you get one \`fyi\` per window of usage. \`"usage": {"refuse": true}\` holds an ordinary launch to the same: no flag passes it, change the threshold.`,
 		`- **Two experts in a tight loop** (one writes a script, the other runs it on its cases): \`node ${B}/pair.mjs <a> <b> --for 2h --ref <file>\``,
 		"  lets them send to each other until then (24 h at most), so each round no longer costs you a turn. The file says why",
 		"  and on what; each is rung pointing at it. `comm log` shows every message, marked `(pair)`; `--close` ends it early.",

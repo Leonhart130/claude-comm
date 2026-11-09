@@ -9,6 +9,7 @@
  *   .comm/config.json  "usage": {"agents": {"leader": {"week": 98}}}  one agent's own, over the project's
  *   .comm/config.json  "usage": {"statusLine": true}                  the bar that WRITES the reading: without it, no session of
  *                                                                     this project feeds its thresholds (re-run install.mjs)
+ *   .comm/config.json  "usage": {"refuse": true}                      launch.mjs refuses an agent at its threshold, or with no reading under 30 min old; no flag passes it, change the threshold. reopen.mjs always does
  *
  * WHY (`FINDINGS.md#usage-statusline`, asked by work 2026-10-24). Its experts stop at a threshold of the WEEK or of the
  * 5-hour SESSION, and the value came from a page a leader read by hand about once an hour - so it could be an hour old,
@@ -40,8 +41,10 @@ import { fileURLToPath } from "node:url"
 
 // The registry's formula (session-registry.mjs `registryDir`), so the test seam is the same: CLAUDE_COMM_RUNTIME.
 export function usagePath() {
-	const base = process.env.CLAUDE_COMM_RUNTIME || process.env.XDG_RUNTIME_DIR
-	return base ? join(base, "claude-comm", "usage.json") : `/tmp/claude-comm-${typeof process.getuid === "function" ? process.getuid() : "nouid"}/usage.json`
+	// the same file from a session and from a cron with no XDG_RUNTIME_DIR, as wake.mjs's lock: a timer's reopening read "no reading" beside one 49 s old (review, 11-09)
+	const uid = typeof process.getuid === "function" ? process.getuid() : "nouid"
+	const base = process.env.CLAUDE_COMM_RUNTIME || process.env.XDG_RUNTIME_DIR || (existsSync(`/run/user/${uid}`) ? `/run/user/${uid}` : null)
+	return base ? join(base, "claude-comm", "usage.json") : `/tmp/claude-comm-${uid}/usage.json`
 }
 const WINDOWS = [["session", "five_hour"], ["week", "seven_day"]]
 const pct = (n) => `${Math.round(n)} %`
@@ -77,6 +80,40 @@ const sess = (r) => typeof r.session === "string" ? ` (session ${r.session.slice
 
 export function read() {
 	try { const r = JSON.parse(readFileSync(usagePath(), "utf8")); return r && r.v === 1 && Number.isFinite(r.at) ? r : null } catch { return null }
+}
+
+/**
+ * MAY THIS AGENT BE OPENED NOW? A window is a boot, and here a threshold stops being advice: reopen.mjs always, launch.mjs where the project says "refuse": true.
+ * THE SAME CALCULATION AS check(): its own threshold over the project's, reached at >=.
+ * NOT KNOWING REFUSES: no reading, one over 30 min old, one from before its window's reset, one without the week. A frozen reading has lied by 20 points, on the comfortable side (work, 10-31).
+ * The 5-hour window alone may be absent, and then compares nothing: measured so on this account, 11-09, with sessions running. A week absent was never measured.
+ * 30 min is a choice, not a measurement: work and I kept it, 11-09. Its price: at night with nothing running the agent waits for a person, and the first launch by hand after 30 idle minutes is refused until a session has answered.
+ * `key` is what a refusal is told once per: a window of usage and the threshold reached (another agent's own threshold is news), or a local day of not knowing.
+ */
+const MAX_AGE_MS = 30 * 60_000
+export function gate(cfg, agent, now = Date.now(), r = read()) {
+	const Ts = thresholdsFor(cfg && cfg.usage, agent)
+	if (!Object.keys(Ts).length) return { ok: true, line: "" }
+	const unknown = (why) => ({ ok: false, why, key: `unknown-${ymd(new Date(now))}`,
+		next: `Not knowing is not room. Only a session's statusLine writes a reading: if none is running, start one by hand in this project (claude), let it answer once, then try again. To look: node .comm/bin/usage.mjs` })
+	if (!r) return unknown("there is no usage reading on this machine")
+	const age = now - r.at
+	if (age < -60_000) return unknown(`the usage reading is dated ${ago(-age)} ahead of this clock`)
+	if (age > MAX_AGE_MS) return unknown(`the usage reading is ${ago(age)} old, and one over ${MAX_AGE_MS / 60_000} min says nothing`)
+	const seen = [], late = [], absent = []
+	for (const [key, w] of WINDOWS) {
+		const T = Ts[key], x = r[w]
+		if (!Number.isFinite(T)) continue
+		if (!x || !Number.isFinite(x.pct)) { absent.push(key); continue }
+		if (x.resets_at && x.resets_at * 1000 <= now) { late.push(`${key}: ${when(x.resets_at)}`); continue }
+		if (x.pct >= T) return { ok: false, key: `${w}-${x.resets_at}-${T}`,
+			why: `the ${key === "week" ? "week" : "5-hour session"} is at ${pct(x.pct)} and the threshold for '${agent}' is ${pct(T)}`,
+			next: `${x.resets_at ? `It resets at ${when(x.resets_at)}. ` : ""}No flag passes this: a person changes the threshold in .comm/config.json "usage".` }
+		seen.push(`${key} ${pct(x.pct)} (threshold ${pct(T)})`)
+	}
+	if (late.length) return unknown(`the usage reading is from before its reset (${late.join(", ")})`)
+	if (!seen.length || absent.includes("week")) return unknown(`the usage reading does not hold ${absent.join(" or ")}, and '${agent}' has a threshold there`)
+	return { ok: true, line: `${seen.join(", ")}, read ${ago(age)} ago` }
 }
 
 // `project` is the stub's own root, passed by it - never the session's cwd (an identity comes from the stub's location).

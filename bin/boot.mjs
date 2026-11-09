@@ -127,8 +127,8 @@ const MARK = ["✓", "?", "⚠", "✗"]
 // The gate's ceiling on `attack` (section 6), at module scope because a control that WAITS for a gate must wait at
 // least this long - F2's 90 s wait read a suite grown to 94 s as "nothing wrote" (2026-10-25).
 // 🔴 A HANG DETECTOR, NOT A BUDGET: past it the row says "attack HUNG". Measured 2026-11-08 with A119-A123: 349 s, the owner at work on the machine, 300 s would have
-// called a healthy suite hung. So it sits well above the honest run. That the suite is slow is STATUS's item C, and a ceiling hides nothing about it: the row prints the seconds.
-const GATE_CEILING_MS = 480_000
+// called a healthy suite hung. So it sits well above the honest run. That the suite is slow is STATUS's item C, and a ceiling hides nothing about it: the row prints the seconds. 2026-11-09: 410 s on a loaded machine before A124, so 480 s went too (FINDINGS.md#usage-gate).
+const GATE_CEILING_MS = 600_000
 let worst = OK
 const rows = []
 // `causes`: the codes a row DECLARES for what made it non-green, where it computed them.

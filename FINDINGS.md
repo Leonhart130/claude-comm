@@ -5068,3 +5068,37 @@ the opener's minute, the leader's pair, two chiefs at once, delivery to a chief 
 - **`relay` armed and `close --agent`**: read only, the relay sees the session gone. **The gap between the at-rest read and the close**: under 100 ms, a mail there closes over it, and a declared agent reopens.
 - **The mutants of A119-A123 are not run:** the owner's word, an evening he is inactive.
 
+
+## `#usage-gate` — a reopening and a launch under the usage threshold (2026-11-09)
+
+**Work's leader, its review 6 (letters 55, 57):** with `"reopen"` declared, a bell that asks would open a closed chief at 98 % of the week, against its owner's rule. `reopen.mjs` read no threshold. D was bounded in windows and in memory and not in usage, though work's `"usage"` was already declared: neither I nor my two reviews of `#teams-b` looked.
+
+**One function, `usage.mjs` `gate(cfg, agent, now, reading)`, read by `launch.mjs` and `reopen.mjs`.** The calculation is `check()`'s: the agent's own threshold over the project's, reached at `>=`. **Not knowing refuses:** no reading, one over 30 min old, one dated more than a minute ahead of this clock, one from before its window's reset, one without the week. 30 min is a choice, kept by work and me, not a measurement.
+
+**The 5-hour window alone may be absent, and then compares nothing.** Measured 11-09 01h51: `five_hour: null` on this account with sessions running. So work's `"session": 98` compares nothing while that lasts; it was told. A week absent was never measured, and refuses. A reading with neither refuses.
+
+**A threshold alone stays advice for an ordinary launch: `"usage": {"refuse": true}` asks for the refusal.** Work asked for it unconditionally. Measured before building: two other fields hold `{"week": 100}` as advice, and a stale reading would have started refusing their launches, from a plain shell, without their asking. A reopening refuses whenever a threshold exists: no project needed that to stay advice, since `reopen` is declared nowhere yet. No flag passes it: a person changes the threshold.
+
+**A refusal for usage goes to the leader alone**, an `fyi` at `.comm/reopen/usage.md`, once per `key` (a window and the threshold reached; or a local day of not knowing), by an exclusive create; a send that failed removes the mark. **Not rung:** waking an idle leader is a turn, spent at its threshold of all moments. A declared leader has only its owner, told the same way. A cap's refusal keeps the old alarm to both.
+
+**`--dry-run` says the verdict first**, with or without mail, and takes no lock: it is work's witness, a threshold lowered and put back.
+
+**`usageFaults(cfg, only)`:** a misspelt key, or a threshold that is no number, would open the window in silence. As `reopenFaults`, a typo in one agent's entry costs that agent and a retired name on the list costs nobody; both are said at the start, at install and by boot. A threshold that refuses with no `"statusLine": true` is a fault too: no session here feeds it.
+
+**`usagePath()` now finds `/run/user/<uid>` with no `XDG_RUNTIME_DIR`**, as `wake.mjs`'s lock already did: from a cron, a fresh reading read as "no reading" (the review measured it at 49 s old) and spent the day's `fyi` on a false statement.
+
+**Measured.** A124, 57 checks. Mutants: 31 of 31 red by name, one at a time on copies, no window, while the owner worked; one had survived (`--dry-run` taking a lock, unreachable on a refusal) and made the arm hold the locks under the threshold too. A positive control caught the arm itself: `aChildReadsThisReading` was false because the team arms' children read their own runtime dir. `test/teams-real.mjs` 8 of 8 on real Haiku sessions, r8 on the machine's real reading: 26 %, threshold 1 refused, stayed closed, owner told 0 times, the leader heard, threshold 100 opened. One read-only review: 7 findings, 0 high, 6 fixed, 1 decided (not rung); it also listed the arm's gaps, each armed since.
+
+**The first reading of this suite's time per arm** (one run, 410.6 s on a loaded machine, before A124): A122 97 s, A112 29 s, A95 29 s, A121 21 s, A113 16 s, A89 15 s, A120 14 s, A114 11 s, A119 10 s; 14 arms are 70 % of it, and 65 arms take under a second each. The boot's hang detector `GATE_CEILING_MS` goes from 480 s to 600 s: that run plus A124 came within a minute of it, and a loaded machine would have read as a hung suite.
+
+### Named, not fixed
+
+- **A leader idle over 30 min, woken, that launches in its first turn**: its statusLine may not have written before its Bash runs, so the launch can be refused once, and passes when tried again. Reasoned, not measured.
+- **Every first launch by hand after 30 idle minutes** is refused where `"refuse": true`, until a session has answered: the price of the rule, told to the owner.
+- **A fault in a threshold still reaches the owner**, per mail, by the old alarm: it is a broken config, not a usage refusal.
+- **`usage.md` can miss an agent** when two refusals write within a millisecond of each other; the next refusal rewrites it. The `fyi` is still one.
+- **`.told-usage-*` marks are never cleaned**: one empty file per window reached.
+- **`relay` and `restart` do not pass through `launch.mjs`** (read: `restart.mjs` only prints a launch line), so a relay at the threshold is not refused. Deliberate: a relay continues work, it starts none.
+- **r8 has no control on the old code**: A124's mutants are the proof it can go red; `test/teams-real.mjs --repo` on `2026-11-08.4` was not run.
+- **The fake-kitten flows of A124 stop before a window**, except the positive controls; a real window under a real threshold is r8 alone.
+- **Whether this holds on work's real teams**: its witness and its trial, after the install.
