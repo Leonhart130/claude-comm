@@ -53,8 +53,7 @@ tests use his RAM and fill his desktop with kitty windows - run them when he say
    "closed" vs "crashed" from `.comm/close/`. **Arm LESSONS §8** (a letter's written time AHEAD of its file's by over 2 min: twice now, 10-25 and 11-08). **The generated
    SKILL names every tool**: unarmed, A92 gates the README only. **`boot --prove-red` is 1-1.6 h**: make the one-block
    harness of 10-30 (`#stranded-named`) be `--only` itself (C).
-7. **`/tmp/comm-attack-*`, 449 folders, 164 MB of tmpfs (11-09, 255 from the batch stopped 11-05): my sweep was refused by the permission check, the owner decides.** 61 from a suite I started by mistake and stopped (11-02, LESSONS §9); the
-   classifier refused my sweep of shared `/tmp` - the owner's to delete, or leave.
+7. **`/tmp/comm-attack-*`: the owner deleted 449 folders, 164 MB of tmpfs, 11-09.** A stopped batch leaves them (255 on 11-05), so say so when stopping one. The permission check refuses my sweep of shared `/tmp`: it is his to run.
 
 **Done**: 11-04 `.1` (A105), `.2` (A106); 11-05 `.1` (`#relay-guard`, A107, mutants 15/15); **11-08 `.1`** (`#left-in-the-box`, A111-A115), **`.2`** (`#teams`, A116-A118), **`.3`** (`#teams-b`, A119-A123), **`.4`** (work's 51: three sentences, A118); the parked branch keeps A108-A110, and its own `.2` label must change. A33 reddened once in two runs of the same bus bytes (0 winners, barrier fine): not triaged. Each in the 12 trees.
 
