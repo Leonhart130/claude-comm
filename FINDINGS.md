@@ -5205,10 +5205,28 @@ Round 5 swept every width (30-200 columns, cut by characters and by words) and f
   letter, and the letter's own tail is free, since 90 of the sentence's words follow it;
 - the seam of two bells, each piece under 40, is now read whole when the two together reach 40;
 - a reading that crosses a path, the sentence's words on both sides, needs 16 of them;
-- three fixes had no arm (`own`, the read after the idle Ctrl+E, the relay's): the first two now have one.
+- three fixes had no arm (`own`, the read after the idle Ctrl+E, the relay's).
+
+**Round 6 (after `2026-11-14.1` was delivered; fixed in `.2`)** found:
+- the letter path's tail, freed in round 5, let a draft quoting 40 of the sentence's words after plain words read as the bus's,
+  and lines of it were erased. Round 6 held the tail to a path's shape and removed `crossed`. **Round 7 measured that as a loss
+  and both were put back**: exchange bells never erased in capped boxes rose from 714 to 1983 configurations, 848 above 47
+  columns, 362 of them never starting an erase (the field's loop), while drafts quoting the sentence passed about as often
+  (". Je cite" squashes to an "extension");
+- after a dialog over its box, the relay left its prompt there for good. It now waits up to 20 s for the box to come back and
+  runs its start check again, so the handoff still goes. Round 6's first version erased the prompt instead, which lost the
+  handoff with a refusal pointing at an empty box (round 7);
+- the `own` leg ran at one width (the box model had none). It now runs at five, and through the relay's own predicate, and
+  turns red without `own`;
+- the dialog leg did not check that no key followed;
+- a letter name with decomposed accents was no path.
+
+Round 7 also found that the exchange bell's liveness had no arm. It now has one: five letter names (no extension, accents,
+long, `.txt`, `.md`), every 7 columns from 51 to 160, cut by characters and by words, with the blank cursor line. Every one
+is erased. The measured edge: clean from 51 columns; at 44-50 some still stop.
 
 What stays named from that sweep:
-- **the exchange bell erased in a box 47 columns wide or less** still stops at some widths (a reading mostly of path);
+- **the exchange bell erased in a box 50 columns wide or less** still stops at some widths (measured: clean from 51);
 - **a person's head equal to the bell's own closing words** ("tells you and consumes nothing.") is partly erased under a box model
   where every press leaves a blank cursor line. That model is the reviewer's own; one blank after the FIRST press is what was measured.
 
@@ -5221,7 +5239,7 @@ line).
 - panes drawing the capped box: rung on its end after Ctrl+A; a bell left in it erased line by line, then one clean bell; words
   hidden above a whole bell never sent; the exchange bell rung on its end; an uncapped pane as the positive control.
 
-A121 refuses the close of a capped box. A98's "hard lines" leg is now two lines, a box that cannot hide. **Mutants: 47 written,
+A121 refuses the close of a capped box. A98's "hard lines" leg is now two lines, a box that cannot hide. **Mutants: 50 written,
 each applying once (`exchange/WIP-hidden-head-mutants.json`), NOT RUN at the delivery**: ~5 h one at a time, the owner's rule.
 A survivor is an arm to strengthen. The relay's mutants are expected to survive: no pane drives relay into a capped box.
 
@@ -5232,12 +5250,15 @@ A survivor is an arm to strengthen. The relay's mutants are expected to survive:
   go with the bell, as in any box.
 - **The relay's prompt and `close.mjs` in a real capped box**: armed by the readers and by A121's pane, not on a real session.
   The relay's own changes (its Ctrl+A check, its second Enter, its last Ctrl+E) have NO arm.
-- **The exchange bell in a box 47 columns wide or less**: some erases stop (above). Its windows are leaders', wide.
-- **A sixth review was not run before the delivery.** Five rounds each found something in the previous patch; round 5's fixes are
-  the least reviewed code here.
+- **The exchange bell in a box 50 columns wide or less**: some erases stop (above). Its windows are leaders', wide.
+- **The exchange bell after a dialog over the box**, in the exchange-bell tool itself (no ring keeps looking there): its text
+  stays until another bell reaches that agent.
 - **The relay presses its first Enter even when its prompt was never seen** (as before this fix). In a capped box it now checks the start.
-- **A person quoting the sentence**: any word, then 90 of the exchange bell's own words verbatim, reads as the bus's (the letter
-  path's tail is free since round 5); the closing words alone need the reply folder's `/in` before them.
+- **A person quoting the bus's own sentences**: in a box that may hide its start, any words then 40 characters or more of the
+  exchange bell's sentence (16 around a path) read as the bus's, and lines of that draft can be erased. Chosen, measured
+  (round 7): the alternative left exchange bells in boxes for good. Under 40 is the person's (A125).
+- **A person typing a bell's own words during an erase**: what stays under needs 16 characters (`KEPT`), so a pasted piece of the
+  bell's top line can pass for it.
 - **A loose end of a person's own**: text that is exactly a bell's start (`[`, `[c` ...) typed after the bus's text reads as the bus's.
 - **The field's `rows`**: the reading counts box rows. A box whose cursor cell wraps onto its own blank line counts one more: more
   cautious, never less.

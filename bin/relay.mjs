@@ -87,6 +87,7 @@ const CLEAR_CONFIRM_MS = 10_000, READY_MS = 15_000, TAKEN_MS = 15_000, GUARD_MS 
 // after its Enter (10-25). 5 s for the first: a loaded kitty answered a screen read in ~1.5 s (11-02, six suites at
 // once). An Enter still not taken after 3 s, with the prompt whole in the box, was lost.
 const SHOWN_MS = 5000, ENTER_LOST_MS = 3000
+const BOX_BACK_MS = 20_000   // a dialog over the box after its Ctrl+A: how long the relay waits for the box, to take its prompt back out
 
 const wake = await import(new URL("wake.mjs", import.meta.url))
 const { sessionPid, lookup } = await import(new URL("session-registry.mjs", import.meta.url))
@@ -265,7 +266,16 @@ if (ARGV[0] === "--after-turn") {
 	if (capped) {
 		send("\x01")
 		atStart = true
-		const h = wake.startInView(read, st.say)
+		let h = wake.startInView(read, st.say)
+		// NO BOX after the Ctrl+A (a dialog): no key into it. The prompt is behind it, the handoff with it: the box back within
+		// BOX_BACK_MS and showing the prompt (its start, or its end if the dialog took the Ctrl+A), the start check again, as if no
+		// dialog had come. Erasing it instead lost the handoff with a refusal pointing at an empty box (the seventh review).
+		if (h === "nobox") {
+			let back = null
+			for (const until = Date.now() + BOX_BACK_MS; Date.now() < until; nap(500)) { const s = read(); if (s.typed || s.ok) { back = s; break } }
+			if (back && (wake.startOf(back, st.say) || wake.shows(back, st.say))) { send("\x01"); h = wake.startInView(read, st.say) }
+			note({ prompt_box_back: { at: now(), back: !!back, check: h } })
+		}
 		if (h === "theirs" || h === "gone" || h === "nobox") { if (h === "theirs") send("\x05"); stop({ refused: `cleared and the first prompt typed, but its box hides its start and ${h === "theirs" ? "somebody's words are in front of it" : h === "gone" ? "it left the box when its start was asked for" : "the box went away when its start was asked for (a dialog?)"} - no Enter pressed; look at window ${st.window}`, typed: ["/clear", "prompt"] }) }
 		note({ prompt_start: { at: now(), seen: h === "start" } })
 	}

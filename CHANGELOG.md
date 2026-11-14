@@ -46,6 +46,12 @@ already have.
 
 
 
+
+## 2026-11-14.2 — bus print `d7fc7bfcacab` — 2026-11-14
+
+- **A relay whose box a dialog covered right after its first prompt waits for the box** (up to 20 s), then runs its check of the prompt's start again, so the handoff still goes. It used to stop there: its prompt stayed in the box, and every later bell refused it as somebody's text.
+- **A letter name with decomposed accents** (NFD) is read as a path, so an exchange bell with such a name left in a box is erased.
+
 ## 2026-11-14.1 — bus print `248eac50be24` — 2026-11-14
 
 - **A bell in a short window is rung.** Claude Code shows at most `max(3, rows/2 − the rows around it)` lines of its input box, the LAST ones. In a window of about 20 rows or fewer, a bell of 4 lines has its first line hidden above the box, with no mark. The bus took the end it could see for somebody's words and pressed no Enter, and every erase stopped when the hidden line came back into view: two experts waited 2 h on 11-13. Now a box that shows 3 lines or more may hide its start. The bell's end in view is followed by **Ctrl+A, which brings its start into view** (measured on 2.1.323). The Enter waits until that start is seen, so words a person typed in front of the bell still stop it. `.comm/wake/rings.jsonl` says `"headHidden": true, "headSeen": true`. If a version's Ctrl+A shows nothing, the bell still rings, with `"headSeen": false`.

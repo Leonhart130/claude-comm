@@ -650,7 +650,7 @@ const CROSS = ["[claude-comm]cross-projectdoorbell.Afileiswaitingforyouandthefil
 // A path slot holds an ABSOLUTE path (exchange-bell.mjs resolves both), or nothing: once whitespace is squashed, "stop please"
 // typed where a path goes was a path to a looser pattern, and erased (the review of #hidden-head). Begun INSIDE a path - a box
 // whose hidden start cut it - any run of those characters, and only when the sentence's own words follow it.
-const PATHLIKE = /^(?:[/~][\p{L}\p{N}_./~@+-]*)?/u, PATH_TAIL = /^[\p{L}\p{N}_./~@+-]*/u
+const PATHLIKE = /^(?:[/~][\p{L}\p{M}\p{N}_./~@+-]*)?/u, PATH_TAIL = /^[\p{L}\p{M}\p{N}_./~@+-]*/u
 const crossWhole = (x) => {
 	let n = 0
 	for (let i = 0; i < CROSS.length; i++) {
@@ -678,7 +678,8 @@ const crossCut = (x) => {
  */
 const crossSlice = (x) => {
 	// `crossed`: the reading went THROUGH a path, the sentence's words on both sides of it - proof enough with KEPT of them, in a box
-	// 30-47 wide where a path fills a line (the fifth review of #hidden-head: `bell: /home/…/LETTER.md — nothing in this message`)
+	// where a path fills a line (the fifth review of #hidden-head: `bell: /home/…/LETTER.md — nothing in this message`; removed in
+	// round 6, put back after the seventh: without it 10 more `.md` boxes were never erased)
 	const walk = (i, part, n, fixed, crossed = false) => {
 		const enough = () => fixed >= CUT_MIN || (crossed && fixed >= KEPT)
 		for (;;) {
@@ -705,7 +706,10 @@ const crossSlice = (x) => {
 		// A PATH'S TAIL looks like that path's: the reply folder's ends with `/in` (exchange-bell joins it so), the letter's carries a
 		// `/` or a file's extension. A draft quoting the closing words after plain words, then after `and/or`, was taken for the bell's
 		// end (the second and third reviews of #hidden-head): squashed, any words are a run of path characters.
-		// (the letter's own tail is free: 90 of the sentence's words follow it - a cut inside `.md` or a name with no extension, the fifth review)
+		// The letter's tail is FREE: 40 of the sentence's words follow it. Round 6 held it to a path's shape and it was a loss, measured
+		// (the seventh review): exchange bells never erased in capped boxes from 714 to 1983 configurations, 848 above 47 columns, while
+		// a draft quoting the sentence passed as often (". Je cite" squashes to an "extension"). A person pasting 40 characters of the
+		// bus's own sentence is the limit named in #hidden-head; a bell that is never erased is the field's loop.
 		const tail = x.slice(0, p), tailOk = i + 1 === CROSS.length - 1 ? /(^|\/)in$|^n$/.test(tail) : true
 		if (p && p < x.length && tailOk) best = Math.max(best, walk(i + 1, CROSS[i + 1], p, 0))
 	}
@@ -948,7 +952,7 @@ export function typeAndProve(read, send, text, { shownMs = SHOWN_MS, takenMs = T
 // A file per WINDOW, in the user's runtime dir: wake from this project, wake from a timer, a peer project's exchange bell and
 // a relay all type into the same box. link(2) publishes it whole or not at all. A holder that is dead, or whose pid now
 // names another process, or that has held longer than any typist can (a relay's /clear and first prompt are bounded by
-// 45 s), holds nothing: a hook killed at its 10 s leaves a file and no typist. A dir that cannot be made does not silence the
+// 45 s, and 20 s more if a dialog covers its box - relay.mjs's BOX_BACK_MS), holds nothing: a hook killed at its 10 s leaves a file and no typist. A dir that cannot be made does not silence the
 // bell: it types unguarded, as it did before this existed.
 const HOLD_MAX_MS = 120_000
 const startTick = (pid) => { try { const st = readFileSync(`/proc/${pid}/stat`, "utf8"); return st.slice(st.lastIndexOf(") ") + 2).split(" ")[19] } catch { return null } }

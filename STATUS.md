@@ -10,13 +10,12 @@ delivery docs, settings and skills current (measured in work's tree) and a lette
 works (11-05); **an adversarial review after EVERY implementation or fix, and anything over 1 GB only through `borne` at
 `free -m` ≥ 2 500 MB, arranged with work (11-13, its letter 66, my 68; `LESSONS.md` §10)**.)*
 
-000. **`2026-11-14.1` delivered: a box that hides its start (`#hidden-head`, A125, letters 64-69).** Work's experts sat 2 h with
-   only the bell's end in a 17-row box: Claude Code shows its last 3 lines; Ctrl+A brings the start. Measured on real 102×13
-   boxes, 2.1.323 and 2.1.325. Five adversarial reviews, each found defects in the previous patch (round 3: the field loop
-   again). **Next, in order:** (a) review 6 on round 5's fixes, the least reviewed code; (b) the 47 mutants
-   `exchange/WIP-hidden-head-mutants.json` (untracked), `node test/mutate.mjs <it> --jobs 1` under `borne`, ~5 h: the relay ones
-   should survive (no arm, named); (c) the exchange bell under 48 columns, named in `#hidden-head`.
-
+000. **`2026-11-14.1` and `.2` delivered: a box that hides its start (`#hidden-head`, A125, letters 64-71).** Work's experts sat
+   2 h with only the bell's end in a 17-row box: Claude Code shows its last 3 lines; Ctrl+A brings the start. Measured on real
+   102×13 boxes, 2.1.323 and 2.1.325. Seven adversarial reviews, each found defects in the previous patch (round 3: the field
+   loop again; round 7 reversed round 6). **Next, in order:** (a) review 8 on `.2` (the relay's dialog branch, unarmed); (b) the
+   50 mutants `exchange/WIP-hidden-head-mutants.json` (untracked), `node test/mutate.mjs <it> --jobs 1`, memory-capped, ~6 h: the
+   relay ones should survive (named); (c) the exchange bell in boxes 50 columns wide or less, named in `#hidden-head`.
 00. **`2026-11-09.1` (`#usage-gate`, its named gaps there).** Work declared `"reopen"` + `"refuse": true` 11-09, then took
    `"reopen"` out for the owner's pause (its 63), to put it back as is: no real reopening yet. `test/teams-real.mjs` 8/8 before
    changing launch, close or reopen. Suite ~410 s, `GATE_CEILING_MS` 600 s.
@@ -65,7 +64,7 @@ works (11-05); **an adversarial review after EVERY implementation or fix, and an
    harness of 10-30 (`#stranded-named`) be `--only` itself (C).
 7. **`/tmp/comm-attack-*`: the owner deleted 449 folders, 164 MB of tmpfs, 11-09.** A stopped batch leaves them (255 on 11-05), so say so when stopping one. The permission check refuses my sweep of shared `/tmp`: it is his to run.
 
-**Done**: 11-04 `.1` (A105), `.2` (A106); 11-05 `.1` (`#relay-guard`, A107, mutants 15/15); **11-08 `.1`** (`#left-in-the-box`, A111-A115), **`.2`** (`#teams`, A116-A118), **`.3`** (`#teams-b`, A119-A123), **`.4`** (work's 51: three sentences, A118); **11-14 `.1`** (`#hidden-head`, A125); the parked branch keeps A108-A110, and its own `.2` label must change. A33 reddened once in two runs of the same bus bytes (0 winners, barrier fine): not triaged. Each in the 12 trees.
+**Done**: 11-04 `.1` (A105), `.2` (A106); 11-05 `.1` (`#relay-guard`, A107, mutants 15/15); **11-08 `.1`** (`#left-in-the-box`, A111-A115), **`.2`** (`#teams`, A116-A118), **`.3`** (`#teams-b`, A119-A123), **`.4`** (work's 51: three sentences, A118); **11-14 `.1`, `.2`** (`#hidden-head`, A125); the parked branch keeps A108-A110, and its own `.2` label must change. A33 reddened once in two runs of the same bus bytes (0 winners, barrier fine): not triaged. Each in the 12 trees.
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a
 codename here; the mapping is in no repo. The boot report prints the REAL directory names: **never copy a `field:` row

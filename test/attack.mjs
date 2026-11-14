@@ -6142,14 +6142,14 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 	// A box as Claude Code draws it, measured on 2.1.323: `cap` lines shown of what it holds, the cursor's end in view; Ctrl+A shows
 	// the start, Ctrl+E the end; Ctrl+U takes the line before the cursor; a text typed is wrapped at 80; Enter submits all of it,
 	// wherever the cursor is, unless `lose` Enters are lost first
-	const capBox = (lines, { cap = 3, lose = 0, cursorLine = false } = {}) => ({ lines, keys: [], atStart: false, submitted: [], lose, cursorLine, pressed: 0,
+	const capBox = (lines, { cap = 3, lose = 0, cursorLine = false, width = 80 } = {}) => ({ lines, keys: [], atStart: false, submitted: [], lose, cursorLine, pressed: 0,
 		read() { return this.lines.length ? drawn(this.atStart ? this.lines.slice(0, cap) : this.lines.slice(-cap)) : { ok: true } },
 		send(t) {
 			this.keys.push(t)
 			if (t === "\x15") { if (!this.atStart) { const blank = this.lines.at(-1) === ""; this.lines.pop(); if (blank) this.lines.pop(); if (this.cursorLine && !this.pressed++ && this.lines.length) this.lines.push("") } }
 			else if (t === "\x01" || t === "\x05") this.atStart = t === "\x01"
 			else if (t === "\r") { if (this.lose > 0) this.lose--; else if (this.lines.length) { this.submitted.push(this.lines.join("")); this.lines = []; this.atStart = false } }
-			else this.lines = wrapAt(this.atStart ? t + this.lines.join("") : this.lines.join("") + t, 80)
+			else this.lines = wrapAt(this.atStart ? t + this.lines.join("") : this.lines.join("") + t, width)
 			return { status: 0, stderr: "" }
 		} })
 	const byWords = (t, w) => { const o = []; let l = ""; for (const wd of t.split(" ")) { if (l && `${l} ${wd}`.length > w) { o.push(l); l = wd } else l = l ? `${l} ${wd}` : wd } if (l) o.push(l); return o }
@@ -6215,11 +6215,30 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		// THE FIFTH REVIEW. A text that is no bell (a relay's prompt): its own start is what is left at the end, `own` says so
 		const SAY = "Ouvre ton tour : lis SPEC.md puis RAPPORT.md, fais la tache suivante, et ferme ton tour quand elle est faite, sans rien lancer d'autre. ".repeat(2)
 		const stuckSay = []
-		for (const w of [40, 67, 79, 88, 102]) { const b = capBox([], { lose: 9, cursorLine: true }); const rr = wkB.typeAndProve(() => b.read(), (t) => b.send(t), SAY, fast); if (!rr.erased || b.lines.length) stuckSay.push(w) }
+		for (const w of [40, 67, 79, 88, 102]) { const b = capBox([], { lose: 9, cursorLine: true, width: w }); const rr = wkB.typeAndProve(() => b.read(), (t) => b.send(t), SAY, fast); if (!rr.erased || b.lines.length) stuckSay.push(w) }
+		// and with the relay's own predicate (relay.mjs's final erase, as written there): at 2 lines nothing but `own` says it is its own
+		const relayOurs = (t, st) => wkB.shows(st, SAY) || (wkB.mayHide(st) && wkB.pieceOf(st, SAY))
+		for (const w of [40, 67, 79, 88, 102, 140]) { const b = capBox(wrapAt(SAY, w), { cursorLine: true }); const e = wkB.eraseOwn(() => b.read(), (t) => b.send(t), relayOurs, { pressMs: 1, own: SAY }); if (!e.erased || b.lines.length) stuckSay.push(`relay${w}`) }
 		hh.ownTextErasedWhole = stuckSay.length === 0
 		// no box on screen after the Ctrl+A (a dialog): no Enter into it
 		bx = capBox([]); const readN = bx.read; bx.read = function () { return this.atStart ? { ok: false, why: "a dialog" } : readN.call(this) }; r = ring(bx)
-		hh.noEnterIntoADialogAfterCtrlA = r.taken === false && r.unproved !== true && !bx.keys.includes("\r")
+		hh.noEnterIntoADialogAfterCtrlA = r.taken === false && r.unproved !== true && bx.keys.at(-1) === "\x01"
+		// A draft quoting UNDER 40 of the exchange bell's words is the person's (40 and more is the named limit, #hidden-head)
+		const quote = "Merci pour ta réponse je regarde ça demain matin avec toi — nothing in this message"
+		bx = capBox(byWords(quote, 40)); r = eraseIn(bx)
+		hh.aDraftQuotingUnderForty = wkB.busText(quote, { hidden: true }) === null && bx.keys.length === 0 && bx.lines.join(" ").includes("Merci pour ta")
+		// THE SEVENTH REVIEW: an exchange bell left in a capped box is erased whatever its letter's name (no extension, accents, long),
+		// from 51 columns: at 50 and under some erases stop, measured and named in #hidden-head
+		const names = ["LETTRE", "lettre-élève.md", "2026-11-14-01h30-69-livre-une-case-qui-cache-son-debut-et-qui-est-longue.md", "notes.txt", "L.md"], stuckX = []
+		for (const nm of names) for (let w = 51; w <= 160; w += 7) for (const [how, wrap] of [["c", wrapAt], ["w", byWords]]) {
+			const b = capBox(wrap(crossText.replace(/\/[^/ ]+\.md/, `/${nm}`), w), { cursorLine: true }); const e = eraseIn(b)
+			if (!e.erased || b.lines.length) stuckX.push(`${nm.slice(0, 8)}/${how}${w}`)
+		}
+		hh.crossEveryLetterName = stuckX.length === 0
+		// a reading that goes THROUGH a path, the sentence's words on both sides, under 40 of them (`crossed`)
+		hh.crossThroughAPath = JSON.stringify(wkB.busText("his is only the bell: /home/someone/Dev/exchange/peer/out/proposition.md — nothing in this messa", { hidden: true })) === '{"bells":0,"cut":true}'
+		// a letter name whose accents are decomposed (NFD) is still a path
+		hh.crossDecomposedName = JSON.stringify(wkB.busText(crossText.replace(/\/[^/ ]+\.md/, "/lettre-élève.md".normalize("NFD")))) === '{"bells":1,"cut":false}'
 		// the exchange bell with an accented letter name, whole and cut inside its `.md`
 		const accented = crossText.replace(/\/[^/ ]+\.md/, "/lettre-élève.md"), cutMd = accented.slice(accented.indexOf(".md") + 1)
 		hh.crossAnyLetterName = JSON.stringify(wkB.busText(accented)) === '{"bells":1,"cut":false}' && JSON.stringify(wkB.busText(cutMd, { hidden: true })) === '{"bells":0,"cut":true}'
