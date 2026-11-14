@@ -271,12 +271,20 @@ if (ARGV[0] === "--after-turn") {
 		// BOX_BACK_MS and showing the prompt (its start, or its end if the dialog took the Ctrl+A), the start check again, as if no
 		// dialog had come. Erasing it instead lost the handoff with a refusal pointing at an empty box (the seventh review).
 		if (h === "nobox") {
+			// blank rows are a frame between two (the dialog closing), not the box back: read on (the eighth review)
 			let back = null
-			for (const until = Date.now() + BOX_BACK_MS; Date.now() < until; nap(500)) { const s = read(); if (s.typed || s.ok) { back = s; break } }
-			if (back && (wake.startOf(back, st.say) || wake.shows(back, st.say))) { send("\x01"); h = wake.startInView(read, st.say) }
+			for (const until = Date.now() + BOX_BACK_MS; Date.now() < until; nap(500)) { const s = read(); if (s.ok || (s.typed && s.text)) { back = s; break } }
+			if (back && (wake.startOf(back, st.say) || wake.shows(back, st.say))) {
+				send("\x01")
+				h = wake.startInView(read, st.say)
+				// after a dialog that took a key, only a START SEEN goes on: "unseen" here is no other version's Ctrl+A, it may be the
+				// dialog again, and words typed in front would go with the handoff (the eighth review). The cursor back to the end,
+				// the prompt left in the box - a person submits or clears it, and the refusal says so.
+				if (h !== "start") { if (wake.startOf(read(), st.say)) send("\x05"); h = "nobox" }
+			}
 			note({ prompt_box_back: { at: now(), back: !!back, check: h } })
 		}
-		if (h === "theirs" || h === "gone" || h === "nobox") { if (h === "theirs") send("\x05"); stop({ refused: `cleared and the first prompt typed, but its box hides its start and ${h === "theirs" ? "somebody's words are in front of it" : h === "gone" ? "it left the box when its start was asked for" : "the box went away when its start was asked for (a dialog?)"} - no Enter pressed; look at window ${st.window}`, typed: ["/clear", "prompt"] }) }
+		if (h === "theirs" || h === "gone" || h === "nobox") { if (h === "theirs") send("\x05"); stop({ refused: `cleared and the first prompt typed, but its box hides its start and ${h === "theirs" ? "somebody's words are in front of it" : h === "gone" ? "it left the box when its start was asked for" : "the box went away when its start was asked for (a dialog?) - the prompt stays in it, a person submits or clears it"} - no Enter pressed; look at window ${st.window}`, typed: ["/clear", "prompt"] }) }
 		note({ prompt_start: { at: now(), seen: h === "start" } })
 	}
 	send("\r")

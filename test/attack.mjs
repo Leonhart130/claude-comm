@@ -6226,11 +6226,14 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		// A draft quoting UNDER 40 of the exchange bell's words is the person's (40 and more is the named limit, #hidden-head)
 		const quote = "Merci pour ta réponse je regarde ça demain matin avec toi — nothing in this message"
 		bx = capBox(byWords(quote, 40)); r = eraseIn(bx)
-		hh.aDraftQuotingUnderForty = wkB.busText(quote, { hidden: true }) === null && bx.keys.length === 0 && bx.lines.join(" ").includes("Merci pour ta")
+		// and 39 of them, the threshold's edge (the eighth review: 21 left a lowered threshold green)
+		const cut39 = "— nothing in this message is computed or curren", quote39 = `Merci pour ta réponse je regarde ça avec toi ${cut39}`
+		hh.aDraftQuotingUnderForty = wkB.busText(quote, { hidden: true }) === null && bx.keys.length === 0 && bx.lines.join(" ").includes("Merci pour ta") &&
+			cut39.replace(/\s+/g, "").length === 39 && wkB.busText(quote39, { hidden: true }) === null
 		// THE SEVENTH REVIEW: an exchange bell left in a capped box is erased whatever its letter's name (no extension, accents, long),
 		// from 51 columns: at 50 and under some erases stop, measured and named in #hidden-head
 		const names = ["LETTRE", "lettre-élève.md", "2026-11-14-01h30-69-livre-une-case-qui-cache-son-debut-et-qui-est-longue.md", "notes.txt", "L.md"], stuckX = []
-		for (const nm of names) for (let w = 51; w <= 160; w += 7) for (const [how, wrap] of [["c", wrapAt], ["w", byWords]]) {
+		for (const nm of names) for (let w = 51; w <= 160; w++) for (const [how, wrap] of [["c", wrapAt], ["w", byWords]]) {
 			const b = capBox(wrap(crossText.replace(/\/[^/ ]+\.md/, `/${nm}`), w), { cursorLine: true }); const e = eraseIn(b)
 			if (!e.erased || b.lines.length) stuckX.push(`${nm.slice(0, 8)}/${how}${w}`)
 		}

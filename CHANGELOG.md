@@ -47,6 +47,11 @@ already have.
 
 
 
+
+## 2026-11-14.3 — bus print `cc4f2387f329` — 2026-11-14
+
+- **A relay whose box a dialog covered** presses its Enter only once it has SEEN its prompt's start again. Otherwise it puts the cursor back at the end and leaves the prompt in the box for a person to submit or clear, and its refusal says so (`.2` could press it unseen, and words typed in front of the prompt would have gone with the handoff). Its 20 s wait for the box reads past blank frames.
+
 ## 2026-11-14.2 — bus print `d7fc7bfcacab` — 2026-11-14
 
 - **A relay whose box a dialog covered right after its first prompt waits for the box** (up to 20 s), then runs its check of the prompt's start again, so the handoff still goes. It used to stop there: its prompt stayed in the box, and every later bell refused it as somebody's text.

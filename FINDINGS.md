@@ -5225,6 +5225,12 @@ Round 7 also found that the exchange bell's liveness had no arm. It now has one:
 long, `.txt`, `.md`), every 7 columns from 51 to 160, cut by characters and by words, with the blank cursor line. Every one
 is erased. The measured edge: clean from 51 columns; at 44-50 some still stop.
 
+**Round 8 (on `.2`; fixed in `.3`)** found that the relay's dialog branch, new in `.2`, pressed Enter on an "unseen" start.
+A dialog that ate a key could make that true on the measured version, and words typed in front of the prompt would go with
+the handoff. After a dialog, only a start SEEN goes on. Otherwise the cursor goes back and the prompt stays for a person, and
+the refusal says so. The 20 s wait now reads past blank frames. Two legs were pinned: letter names at every width from 51 to
+160 (the step of 7 missed both reverts), and the 40-character threshold with a 39-character quote.
+
 What stays named from that sweep:
 - **the exchange bell erased in a box 50 columns wide or less** still stops at some widths (measured: clean from 51);
 - **a person's head equal to the bell's own closing words** ("tells you and consumes nothing.") is partly erased under a box model
@@ -5239,7 +5245,7 @@ line).
 - panes drawing the capped box: rung on its end after Ctrl+A; a bell left in it erased line by line, then one clean bell; words
   hidden above a whole bell never sent; the exchange bell rung on its end; an uncapped pane as the positive control.
 
-A121 refuses the close of a capped box. A98's "hard lines" leg is now two lines, a box that cannot hide. **Mutants: 50 written,
+A121 refuses the close of a capped box. A98's "hard lines" leg is now two lines, a box that cannot hide. **Mutants: 52 written,
 each applying once (`exchange/WIP-hidden-head-mutants.json`), NOT RUN at the delivery**: ~5 h one at a time, the owner's rule.
 A survivor is an arm to strengthen. The relay's mutants are expected to survive: no pane drives relay into a capped box.
 
@@ -5251,6 +5257,12 @@ A survivor is an arm to strengthen. The relay's mutants are expected to survive:
 - **The relay's prompt and `close.mjs` in a real capped box**: armed by the readers and by A121's pane, not on a real session.
   The relay's own changes (its Ctrl+A check, its second Enter, its last Ctrl+E) have NO arm.
 - **The exchange bell in a box 50 columns wide or less**: some erases stop (above). Its windows are leaders', wide.
+- **An exchange bell whose path holds `' ( ) , # : = & % [ ] ! ; $` or an emoji** is never recognised, whole or cut
+  (before tonight too): left in a box, it stays. The letter names agents write are kebab-case.
+- **A dialog over the relay's box for more than 20 s, or one that comes back with each key**: the relay's prompt stays in the
+  box for a person, said in its refusal. A box back EMPTY is refused without checking whether the person submitted the prompt.
+- **The relay's dialog branch has no arm, and no review ran on `.3`**: tonight's usage ceiling, 82 % of the week for work and
+  me together (the owner through work, its letter 71). The next session reviews `.3` first.
 - **The exchange bell after a dialog over the box**, in the exchange-bell tool itself (no ring keeps looking there): its text
   stays until another bell reaches that agent.
 - **The relay presses its first Enter even when its prompt was never seen** (as before this fix). In a capped box it now checks the start.
