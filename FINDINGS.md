@@ -5102,3 +5102,142 @@ the opener's minute, the leader's pair, two chiefs at once, delivery to a chief 
 - **r8 has no control on the old code**: A124's mutants are the proof it can go red; `test/teams-real.mjs --repo` on `2026-11-08.4` was not run.
 - **The fake-kitten flows of A124 stop before a window**, except the positive controls; a real window under a real threshold is r8 alone.
 - **Whether this holds on work's real teams**: its witness and its trial, after the install.
+
+
+## `#hidden-head` — the box showed the bell's last lines, and every reader took them for all of it (2026-11-13)
+
+**The field case** (work's letter 64, its `rings.jsonl` read here). Two experts, `commercial` from 20h51 and
+`recherche-commerciale` from 22h34, each in a kitty window of **17 rows**, 103 columns, Claude Code 2.1.323. Their boxes
+showed three lines, the end of the bell, from `than asking you for anything`. Work read it as the start erased. The ring
+that keeps looking alternated once a minute for two hours: `erasedOwn:false, presses:1, "somebody started typing"`, then
+`erasedOwn:true, presses:3, mixed`. None rang, until the owner pressed Enter at 23h19. Work called it a new form of letter 41's
+*"sous aucune forme"*, and it is one.
+
+**Measured before building.** (1) **Claude Code's own code** (the 2.1.323 binary, read with `grep -b` + `dd`, never `-o` with
+a wide context: `LESSONS.md` §10): the prompt's `maxVisibleLines` is `Math.max(3, Math.floor(rows/2) - rowsAroundInput)` while
+a mode `Wi()` holds. At 17 rows that is 3. The bell is 313 characters, **4 lines at 103 columns**. Its first line sits above the
+box, and no mark says so: `❯` stands on the first line SHOWN. (2) **The log, alone, rules out an erasure.** After `presses:3`
+emptied a box, a fresh bell typed into it read as "theirs", and the box had been seen EMPTY just before. (3) The two field
+screens, read with `get-text` (nothing typed), show the bell's last three lines exactly.
+
+**Measured on a real session** (`capped-probe`, `head-probe`: 2.1.323, Haiku, a minimized window split to a **102×13** pane, no
+plugin, no MCP). The bell typed shows 3 rows, its start hidden: the field, reproduced. **Ctrl+A brings the text's start into
+view, Ctrl+E its end; Home, End, Ctrl+Home and Ctrl+End do nothing; an Enter with the cursor at the start submits all of it**
+(the transcript's row is the bell, byte for byte). A Ctrl+U left a blank cursor line, and the next one dropped the box to 2
+rows with the start in view. **The final code, on that box:** the bell erased in 4 presses, then a ring taken, `headHidden`,
+`headSeen`.
+
+**The fix** (`bin/wake.mjs`, "A BOX THAT SHOWS ONLY ITS LAST LINES"). `promptAtRest` says how many `rows` the box shows,
+blank ones too. From 3 rows it **may** hide its start (`mayHide`), and nothing on the screen says whether it does.
+- **Typing** (`typeAndProve`): the text's end in view (`shows`, 40 characters at least) is followed by a **Ctrl+A**, and the
+  Enter waits until the box shows the text's START (`startInView`). Words a person typed in front of it, in the gap since the
+  box was read empty, are seen there and stop the Enter. The Enter is pressed with the cursor at the start. A lost one is
+  pressed again; before any erase the cursor goes back to the end (Ctrl+E), since Ctrl+U takes the line before the cursor. A
+  version where Ctrl+A shows nothing still rings, said as `headSeen: false`: a bell that never rings is the defect this fixes.
+- **Erasing** (`eraseOwn`): a press may bring a hidden line down. That is accepted only if the box before the press may have
+  hidden its start, only if what it showed is still there UNDER the new line (`keptUnder`), and only if the whole reading is the
+  bus's. A word typed meanwhile lands at the end and breaks the second test, whatever the words read as.
+- **Reading** (`busText(text, { hidden })`): once the text read as it stands is not the bus's, its first piece may begin
+  anywhere inside a bell. A head under 40 characters counts when the bus's text follows it, and the last piece may be any start
+  of a bell once the bus's text before it is proved. A path slot takes an absolute path only. The closing words alone (37
+  characters) count only after the reply folder's tail.
+- **Enter alone on bells left in a box** only when the box shows them whole. In a box that may hide its start they are erased
+  a line at a time and one clean bell follows; a box that hid nothing pays a retype.
+- **Blank lines that fill the box** (its `❯` line blank too) are a draft's: not at rest, and an erase stops on them.
+- The same readers in `relay.mjs` (its first prompt gets the same Ctrl+A check), `exchange-bell.mjs`, and `close.mjs`, which
+  now **refuses** a box that may hide ("may hide somebody's words above them"): a person closes it, or the next ring clears it.
+
+**Three adversarial reviews** (each given the code and the claim, not my reasoning). Round 1 found five defects, three of
+them regressions this fix had introduced:
+- a box of blank lines read EMPTY, so a bell typed under a draft took the draft with its Enter;
+- "stop please" typed in an exchange bell's path slot read as a path, and was erased;
+- `close.mjs` closed a window on a box that may hide;
+- two bells (the 11-08 box) stopped every erase at `nothing.[claude`, 106 widths of 117;
+- the exchange bell seen from inside its last path was never recognised.
+
+Round 2 found:
+- the erase re-read each line from scratch, so words typed during an erase that had reached a path were erased;
+- a draft quoting the bell's closing words was read as the bell;
+- **the hidden start's race was real**: words typed just before the bell went out with it. The Ctrl+A check closes it, back to
+  the one-read window an uncapped box always had;
+- the arm had no negative control for any widening rule;
+- the blank-line rule fired before reading the `❯` line.
+
+Round 3 found:
+- **the cursor left at the start**: a hook ring (it erases nothing), both Enters lost, returned with the cursor at the text's
+  start. Every later Ctrl+U took nothing, and the ring that keeps looking would have pressed 60 a minute for 12 h. That is the
+  field's loop again, inside round 2's patch. A dialog after the Enter, or one slow read after the Ctrl+A, left it the same way;
+- the path-tail rule was bypassed by one `/` in a person's words;
+- the `theirs` exit left the person's cursor at the start;
+- a second Enter took any 1-letter prefix;
+- a blank frame after an Enter would have read as somebody's words.
+
+Now:
+- a cursor sent to the start always comes back (Ctrl+E) before any return with text in a box the bus can read;
+- an erase whose presses take nothing twice sends Ctrl+E once;
+- a path's tail must look like that path;
+- a second Enter needs the text's start, 40 characters of it;
+- a blank frame is read as unknown.
+
+Round 3 also suspected that Ctrl+A goes only to the start of the current line, which would hide a person's line typed above the
+bell with a newline. Measured on the real box: Ctrl+A showed `hi [claude-comm] doorbell…`, so the person's line comes into
+view, the start check sees it, and no Enter is pressed.
+
+Round 4 found three more, each needing a person's text placed just so:
+- the Ctrl+E of an idle erase was followed by a Ctrl+U with no read in between, so words after the bell, never seen, went;
+- a draft starting with blank lines showed only blanks after Ctrl+A, read as "unseen", and got the Enter;
+- a person's word equal to a bell's ending (`nothing.` in front of a bell) was taken for a head and erased.
+
+Now:
+- the box is read and judged again after that Ctrl+E;
+- blanks still shown at the start are somebody's;
+- when an erase reaches a box that shows all it holds, what is left is read from its very top before its top line can go;
+- after a taken Enter, a letter a person typed is theirs, cursor included;
+- the relay reads its box before its last Ctrl+E.
+
+Round 5 swept every width (30-200 columns, cut by characters and by words) and found:
+- **the field loop once more.** A press that drops the blank cursor line AND brings a hidden line down goes straight to a box that
+  shows everything. That reading took the scroll branch, which still used the strict reading: two bells stuck at 157-200 columns,
+  a relay's prompt at the measured 102, every text under 52 columns. That branch now reads as round 4's check does, and what must
+  stay under the new line needs 16 characters (`KEPT`), not 40;
+- an Enter into a dialog when no box showed after Ctrl+A ("nobox": no Enter);
+- the exchange bell unrecognised with an accented or extension-less letter name, or cut inside its `.md`. Paths now take any
+  letter, and the letter's own tail is free, since 90 of the sentence's words follow it;
+- the seam of two bells, each piece under 40, is now read whole when the two together reach 40;
+- a reading that crosses a path, the sentence's words on both sides, needs 16 of them;
+- three fixes had no arm (`own`, the read after the idle Ctrl+E, the relay's): the first two now have one.
+
+What stays named from that sweep:
+- **the exchange bell erased in a box 47 columns wide or less** still stops at some widths (a reading mostly of path);
+- **a person's head equal to the bell's own closing words** ("tells you and consumes nothing.") is partly erased under a box model
+  where every press leaves a blank cursor line. That model is the reviewer's own; one blank after the FIRST press is what was measured.
+
+Every point is a leg of A125 or A121, and the real-box measurements above caught one the fakes had not drawn (the blank cursor
+line).
+
+**The arm.** A125:
+- the readers on drawn screens, each leg beside its control (the same text in a box that shows all it holds);
+- a box model with the measured keys (`capBox`), and negative controls for every widening rule;
+- panes drawing the capped box: rung on its end after Ctrl+A; a bell left in it erased line by line, then one clean bell; words
+  hidden above a whole bell never sent; the exchange bell rung on its end; an uncapped pane as the positive control.
+
+A121 refuses the close of a capped box. A98's "hard lines" leg is now two lines, a box that cannot hide. **Mutants: 47 written,
+each applying once (`exchange/WIP-hidden-head-mutants.json`), NOT RUN at the delivery**: ~5 h one at a time, the owner's rule.
+A survivor is an arm to strengthen. The relay's mutants are expected to survive: no pane drives relay into a capped box.
+
+**Not verified.**
+- **The cap above 3, and what `Wi()` is.** `mayHide` from 3 rows does not need either. The cost is a retype where an Enter would have done.
+- **Ctrl+A on another version, or in vim mode.** Measured on 2.1.323 only and 2.1.325 (the version sessions now start on): the same. Unseen, the bell rings, as said above, with the old race.
+- **The one-read window.** Words typed between the start's reading and the Enter, or between the end's reading and the Ctrl+A,
+  go with the bell, as in any box.
+- **The relay's prompt and `close.mjs` in a real capped box**: armed by the readers and by A121's pane, not on a real session.
+  The relay's own changes (its Ctrl+A check, its second Enter, its last Ctrl+E) have NO arm.
+- **The exchange bell in a box 47 columns wide or less**: some erases stop (above). Its windows are leaders', wide.
+- **A sixth review was not run before the delivery.** Five rounds each found something in the previous patch; round 5's fixes are
+  the least reviewed code here.
+- **The relay presses its first Enter even when its prompt was never seen** (as before this fix). In a capped box it now checks the start.
+- **A person quoting the sentence**: any word, then 90 of the exchange bell's own words verbatim, reads as the bus's (the letter
+  path's tail is free since round 5); the closing words alone need the reply folder's `/in` before them.
+- **A loose end of a person's own**: text that is exactly a bell's start (`[`, `[c` ...) typed after the bus's text reads as the bus's.
+- **The field's `rows`**: the reading counts box rows. A box whose cursor cell wraps onto its own blank line counts one more: more
+  cautious, never less.

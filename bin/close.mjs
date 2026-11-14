@@ -281,7 +281,10 @@ if (has("--agent")) {
 	if (!box.ok) {
 		let say = null
 		try { say = JSON.parse(readFileSync(join(root, ".comm", "relay", `${x}.json`), "utf8")).say } catch {}
-		if (box.typed && wake.busText(box.text)) held = "the bus's own bell"
+		// ONLY A BOX THAT SHOWS ALL IT HOLDS: one of 3 lines or more may hide somebody's words above the bus's (#hidden-head), and
+		// closing the window would lose them. Refused, and said; a person closes it, or the bus's next ring clears it.
+		if (box.typed && wake.mayHide(box)) notRest.push(`its box shows ${box.rows} lines and may hide somebody's words above them`)
+		else if (box.typed && wake.busText(box.text)) held = "the bus's own bell"
 		else if (box.typed && ((typeof say === "string" && wake.sameText(box.text, say)) || wake.sameText(box.text, "/clear"))) held = "its relay's own sentence"
 		else notRest.push(box.typed ? "text is on its input line, somebody's words as far as this can tell" : box.why)
 	}

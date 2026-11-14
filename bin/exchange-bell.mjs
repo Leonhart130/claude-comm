@@ -195,7 +195,7 @@ export async function bell(argv, { wins = null, lookup, send = null, who = null,
 		if (!kb.ok) return { code: 3, out: `○ ${agent} (pid ${target.pid}): not rung, ${kb.holder} is typing into its window right now. The file is written and waits: ${ref}\n`, err: "" }
 		try {
 		let rest = read()
-		if (!rest.ok && rest.typed && wake.busText(rest.text)) { wake.eraseOwn(read, typeInto, (t) => !!wake.busText(t)); rest = read() }
+		if (!rest.ok && rest.typed && wake.busText(rest.text, { hidden: wake.mayHide(rest) })) { wake.eraseOwn(read, typeInto, (t, s) => !!wake.busText(t, { hidden: wake.mayHide(s) })); rest = read() }
 		if (!rest.ok) return { code: 3, out: `○ ${agent} (pid ${target.pid}): not rung, its input is not at rest - ${rest.typed ? "text is on its input line (a person typing, or a draft left there)" : rest.why}. The file is written and waits: ${ref}\n`, err: "" }
 		const p = wake.typeAndProve(read, typeInto, TEXT)
 		if (!p.typed) die(p.why)

@@ -589,12 +589,17 @@ export function promptAtRest(screen) {
 	if (below > 6) return { ok: false, why: `the input box is not at the bottom of the screen (${below} lines below it): something is drawn under it` }
 	const rest = lines[top].replace(/^(\x1b\[[0-9;:]*m)*❯[  ]?/, "")
 	// `typed` + `text`, every line of the box: wake must tell its OWN unsent bell from a person's words (rule 8)
+	// `rows`: how many lines the box SHOWS between its edges, blank ones too - from 3 up it may hide its first ones (HIDES_FROM)
+	const rows = bottom - top
 	const text = [rest, ...lines.slice(top + 1, bottom)].map((l) => plain(l).trim()).filter(Boolean).join(" ")
-	for (let j = top + 1; j < bottom; j++) if (plain(lines[j]).trim()) return { ok: false, typed: true, text, why: "the input holds more than one line of text" }
+	for (let j = top + 1; j < bottom; j++) if (plain(lines[j]).trim()) return { ok: false, typed: true, text, rows, why: "the input holds more than one line of text" }
+	// An empty box is ONE line. Blank lines that fill it are a draft's (Shift+Enter), and in a box that hides its start the draft's
+	// words may be above them: the review of #hidden-head typed a bell under one and the bell's end, in view, took its Enter.
+	if (rows > 1 && !plain(rest).trim()) return { ok: false, typed: true, text: "", rows, why: "the input box shows only blank lines: a draft's, whose words may be above them" }
 	if (!plain(rest).trim()) return { ok: true }
 	// a placeholder: the text after the mark starts DIM (SGR parameter 2), and is the only text there
 	if (/^\x1b\[(?:[0-9:]*;)*2(?:;[0-9:]*)*m/.test(rest)) return { ok: true, placeholder: plain(rest).trim().slice(0, 60) }
-	return { ok: false, typed: true, text, why: `somebody's text is on the input line: "${plain(rest).trim().slice(0, 40)}"` }
+	return { ok: false, typed: true, text, rows, why: `somebody's text is on the input line: "${plain(rest).trim().slice(0, 40)}"` }
 }
 
 /** promptAtRest on the window's screen, read now. A screen that cannot be read is NOT at rest. */
@@ -609,6 +614,29 @@ const squash = (s) => String(s).replace(/\s+/g, "")
 /** Is the box's text (promptAtRest's `text`, every line joined) exactly `want`, however Claude Code wrapped it? relay.mjs's too. */
 export const sameText = (text, want) => typeof text === "string" && squash(text) === squash(want)
 
+// ── A BOX THAT SHOWS ONLY ITS LAST LINES ───────────────────────────────────────────────────────────────────
+// Claude Code draws at most max(3, rows/2 - the rows around it) lines of its input (`maxVisibleLines`, 3 its floor, read in
+// 2.1.323's own code 11-13) and keeps the cursor's line in view: a longer text shows its LAST lines, the first ones above the
+// box, with no mark that they are there - the `❯` stands on the first line SHOWN. A field's two experts, 11-13, windows of 17
+// rows: the bell, 4 lines at 103 columns, showed 3. Every reading here took them for all of it: a fresh bell read as somebody's
+// words in front of it (no Enter), each Ctrl+U as somebody typing when the hidden line came down into view - a ring a minute
+// for 2 h, none rung, until the owner pressed Enter (FINDINGS.md#hidden-head). A box showing under 3 lines shows all its text;
+// one showing 3 or more MAY hide its start, and nothing on the screen says which.
+const HIDES_FROM = 3
+/** May this reading (promptAtRest's) be the last lines of a longer text? */
+export const mayHide = (s) => !!s && s.typed === true && s.rows >= HIDES_FROM
+/** Does the reading show all of `want` - or, in a box that may hide its start, its end, CUT_MIN characters or more? relay.mjs's too. */
+export const shows = (s, want) => !!s && s.typed === true && (sameText(s.text, want) ||
+	(mayHide(s) && squash(s.text).length >= CUT_MIN && squash(want).endsWith(squash(s.text))))
+/** Does the reading show the START of `want` - CUT_MIN of it, or all of a shorter one? A box whose cursor was sent to the start. */
+export const startOf = (s, want) => { if (!s || s.typed !== true) return false; const q = squash(s.text), t = squash(want); return !!q && t.startsWith(q) && q.length >= Math.min(CUT_MIN, t.length) }
+/** Is all the reading shows a piece of `want`: its start, or - in a box that may hide its start - any slice of CUT_MIN or more? */
+export const pieceOf = (s, want) => {
+	if (!s || s.typed !== true) return false
+	const q = squash(s.text), t = squash(want)
+	return !!q && (t.startsWith(q) || (mayHide(s) && q.length >= CUT_MIN && t.includes(q)))
+}
+
 // ── THE BUS'S OWN WORDS IN A BOX ──────────────────────────────────────────────────────────────────────────
 // `sameText` on ONE bell answered "somebody's words" for two: a field's leader, 11-08, 01:43:06Z, two rings 6 ms apart, both
 // recorded as rung, neither Enter taken. wake then refused it at 04:02Z as "a person typing", relay.mjs at 03:00Z, and the
@@ -619,7 +647,10 @@ const BELLS = [NUDGE, FRESH_NUDGE].map(squash)
 // exchange-bell.mjs's sentence, its three fixed parts; between them, the two paths A35 checks there
 const CROSS = ["[claude-comm]cross-projectdoorbell.Afileiswaitingforyouandthefileistheartifact—thisisonlythebell:",
 	"—nothinginthismessageiscomputedorcurrentexceptthatpath,soreadthefile.Replyasafilein", "(thischannelisafileexchange,notabus)."]
-const PATHLIKE = /^[\w./~@+-]*/
+// A path slot holds an ABSOLUTE path (exchange-bell.mjs resolves both), or nothing: once whitespace is squashed, "stop please"
+// typed where a path goes was a path to a looser pattern, and erased (the review of #hidden-head). Begun INSIDE a path - a box
+// whose hidden start cut it - any run of those characters, and only when the sentence's own words follow it.
+const PATHLIKE = /^(?:[/~][\p{L}\p{N}_./~@+-]*)?/u, PATH_TAIL = /^[\p{L}\p{N}_./~@+-]*/u
 const crossWhole = (x) => {
 	let n = 0
 	for (let i = 0; i < CROSS.length; i++) {
@@ -642,17 +673,96 @@ const crossCut = (x) => {
 	return !rest
 }
 /**
+ * From where in the exchange bell's sentence could `x` begin? What of `x` that covers - to the sentence's end, or all of `x` -
+ * or 0. Only the sentence's own words count toward CUT_MIN: a path is something a person types.
+ */
+const crossSlice = (x) => {
+	// `crossed`: the reading went THROUGH a path, the sentence's words on both sides of it - proof enough with KEPT of them, in a box
+	// 30-47 wide where a path fills a line (the fifth review of #hidden-head: `bell: /home/…/LETTER.md — nothing in this message`)
+	const walk = (i, part, n, fixed, crossed = false) => {
+		const enough = () => fixed >= CUT_MIN || (crossed && fixed >= KEPT)
+		for (;;) {
+			const rest = x.slice(n)
+			if (!rest.startsWith(part)) {
+				if (!part.startsWith(rest)) return 0
+				fixed += rest.length; n = x.length; break                               // x ends inside this part
+			}
+			n += part.length; fixed += part.length
+			// the sentence's end, its last part WHOLE: proof enough, though a box that hid the rest leaves it 37 characters
+			if (++i === CROSS.length) return enough() || part === CROSS[i - 1] ? n : 0
+			const p = PATHLIKE.exec(x.slice(n))[0].length
+			n += p
+			if (n === x.length) break                                                 // x ends inside a path
+			if (p && part.length) crossed = true
+			part = CROSS[i]
+		}
+		return enough() ? n : 0
+	}
+	let best = 0
+	for (let i = 0; i < CROSS.length; i++) {
+		for (let j = 0; j < CROSS[i].length; j++) best = Math.max(best, walk(i, CROSS[i].slice(j), 0, 0))
+		const p = i < CROSS.length - 1 ? PATH_TAIL.exec(x)[0].length : 0               // begun inside the path after part i
+		// A PATH'S TAIL looks like that path's: the reply folder's ends with `/in` (exchange-bell joins it so), the letter's carries a
+		// `/` or a file's extension. A draft quoting the closing words after plain words, then after `and/or`, was taken for the bell's
+		// end (the second and third reviews of #hidden-head): squashed, any words are a run of path characters.
+		// (the letter's own tail is free: 90 of the sentence's words follow it - a cut inside `.md` or a name with no extension, the fifth review)
+		const tail = x.slice(0, p), tailOk = i + 1 === CROSS.length - 1 ? /(^|\/)in$|^n$/.test(tail) : true
+		if (p && p < x.length && tailOk) best = Math.max(best, walk(i + 1, CROSS[i + 1], p, 0))
+	}
+	return best
+}
+/** How much of `x`, from its start, is ONE bell begun anywhere in it: up to that bell's end, or all of `x`. 0: none. */
+const hiddenHead = (x) => {
+	let best = crossSlice(x)
+	for (const t of BELLS) {
+		if (x.length >= CUT_MIN && t.includes(x)) return x.length
+		for (let k = Math.min(t.length, x.length); k >= CUT_MIN && k > best; k--) if (x.startsWith(t.slice(-k))) { best = k; break }
+	}
+	return best
+}
+
+/**
  * Is ALL of the box's text the bus's? { bells: whole ones, cut: pieces among them } - or null, as soon as one character is
  * anybody else's. Whitespace-blind (Claude Code wraps), and a text a person typed around a bell is null: rule 8 stands.
  * A person who pastes a WHOLE bell and nothing else gets the same answer, and a bell states a fact: said, not guarded.
+ * `hidden`: the box may hide its start (`mayHide`), so what it shows may begin anywhere inside a bell - only its FIRST piece,
+ * and only once the text read as it stands is not the bus's. Anything after that piece is held to the same rule as ever.
  */
-export function busText(text) {
+export function busText(text, { hidden = false } = {}) {
 	if (typeof text !== "string") return null
-	let s = squash(text), bells = 0, cut = false
+	const s = squash(text)
 	if (!s) return null
+	const seen = ownWords(s)
+	if (seen || !hidden) return seen
+	// A BOX THAT MAY HIDE ITS START, erased a line at a time: its LAST piece may be any start of a bell once the bus's text before
+	// it is proved - the line a Ctrl+U left, `nothing.[claude` (the review of #hidden-head, 4 widths of 8 stopped there).
+	const whole = ownWords(s, { looseEnd: true })
+	if (whole) return { bells: whole.bells, cut: true }
+	const n = hiddenHead(s)
+	if (n === s.length) return { bells: 0, cut: true }
+	const rest = n ? ownWords(s.slice(n), { looseEnd: true, proven: true }) : null
+	if (rest) return { bells: rest.bells, cut: true }
+	// A HEAD UNDER CUT_MIN, the end of a bell, when what follows it is the bus's: the 11-08 box of two bells, a line starting
+	// `ing.[claude-comm] doorbell`, stopped every erase (the same review, 106 of 117 widths). Its proof is what follows it.
+	for (const t of [...BELLS, CROSS[CROSS.length - 1]]) for (let k = Math.min(t.length, s.length) - 1; k >= 1; k--) {
+		if (!s.startsWith(t.slice(-k))) continue
+		// a bell's start right after it, the two together CUT_MIN or more: the seam of two bells, `nothing.[claude-comm] doorbell. This`
+		// in a box 30 wide (the fifth review of #hidden-head)
+		const after = ownWords(s.slice(k), { looseEnd: true, proven: s.length >= CUT_MIN })
+		if (after) return { bells: after.bells, cut: true }
+	}
+	return null
+}
+/**
+ * busText's reading of a squashed, non-empty text, from its start. `looseEnd`: the last piece may be a start of a bell of any
+ * length, once something before it - here, or `proven` by the caller - is the bus's.
+ */
+function ownWords(s, { looseEnd = false, proven = false } = {}) {
+	let bells = 0, cut = false
 	while (s) {
 		const b = BELLS.find((t) => s.startsWith(t)), n = b ? b.length : crossWhole(s)
 		if (n) { s = s.slice(n); bells++; continue }
+		if (looseEnd && (proven || bells || cut) && (BELLS.some((t) => t.startsWith(s)) || crossCut(s))) { cut = true; break }
 		// a piece: the start of a bell (cut where the next text begins), or its end
 		let piece = 0
 		for (const t of BELLS) { let i = 0; while (i < t.length && i < s.length && t[i] === s[i]) i++; if (i >= CUT_MIN && i > piece) piece = i }
@@ -665,17 +775,27 @@ export function busText(text) {
 	return { bells, cut }
 }
 
+/** Does `after` end with the start of `before` - KEPT characters of it at least, or all of a shorter one - under something new?
+ * KEPT, not CUT_MIN: under 52 columns one line is under 40, and a box of 3 keeps one line (the fifth review of #hidden-head). */
+const KEPT = 16
+const keptUnder = (before, after) => {
+	for (let k = Math.min(before.length, after.length - 1); k >= Math.min(KEPT, before.length) && k > 0; k--) if (after.endsWith(before.slice(0, k))) return true
+	return false
+}
 /**
  * Erase text the bus has established as its own. Ctrl+U clears one VISUAL line, from the end - measured on a real session
  * (2.1.319): 12/12 emptied, no turn started, 626 -> 626 -> 600 -> 400 -> 198 -> empty. Asked again after every press: what
  * remains must be the START of what was there. Anything else is somebody typing, and it stops with their words untouched.
  * { erased, presses } or { erased: false, presses, why }.
  */
-export function eraseOwn(read, send, isOurs, { pressMs = 150, presses = 60 } = {}) {
+export function eraseOwn(read, send, isOurs, { pressMs = 150, presses = 60, own = "" } = {}) {
+	// what is left, all of it in view, may be any START of the bus's text: of a bell, or of `own`, the text the caller typed
+	// - or the bus's text read from its very top, its end any start of a bell (the line a press left: `…nothing.[`)
+	const startOwn = (q) => (!!own && squash(own).startsWith(q)) || BELLS.some((t) => t.startsWith(q)) || crossCut(q) || !!ownWords(q, { looseEnd: true })
 	const first = read()
 	if (first.ok) return { erased: true, presses: 0 }
-	if (!first.typed || !isOurs(first.text)) return { erased: false, presses: 0, why: "the box does not hold the bus's own text" }
-	let before = squash(first.text), n = 0
+	if (!first.typed || !isOurs(first.text, first)) return { erased: false, presses: 0, why: "the box does not hold the bus's own text" }
+	let before = squash(first.text), prev = first, n = 0, idle = 0, nudged = false
 	while (n < presses) {
 		send("\x15")
 		n++
@@ -684,8 +804,38 @@ export function eraseOwn(read, send, isOurs, { pressMs = 150, presses = 60 } = {
 		if (now.ok) return { erased: true, presses: n }
 		if (!now.typed) return { erased: false, presses: n, why: `the box went away while it was being erased: ${now.why}` }
 		const after = squash(now.text)
-		if (!before.startsWith(after)) return { erased: false, presses: n, why: "somebody started typing while it was being erased - their words were left alone" }
-		before = after
+		// blank lines are nobody's bell: a draft's, its words perhaps above them - and "" is the start of anything
+		if (!after) return { erased: false, presses: n, why: "the box shows only blank lines: a draft's, left alone" }
+		// TWO PRESSES THAT TOOK NOTHING: the cursor may be at the text's start - a ring killed between its Ctrl+A and its Ctrl+E, or a
+		// dialog that took the Ctrl+E (the third review of #hidden-head). Two: a first press that takes nothing was measured on its own
+		// (2.1.319, `#left-in-the-box`). Ctrl+E once - and the end it brings into view was never read: the box is read AGAIN and judged
+		// as from the start, before any press (the fourth review: a person's words after the bell went with the next Ctrl+U).
+		if (after === before) {
+			prev = now
+			if (++idle === 2 && !nudged) {
+				send("\x05"); nudged = true; idle = 0
+				sleepSync(pressMs)
+				const e = read()
+				if (e.ok) return { erased: true, presses: n }
+				if (!e.typed || !squash(e.text) || !isOurs(e.text, e)) return { erased: false, presses: n, why: "the box's end, brought into view, is not the bus's own text - left alone" }
+				before = squash(e.text); prev = e
+			}
+			continue
+		}
+		idle = 0
+		// A BOX THAT HID ITS START: the press took its last line and a hidden one came down at its top - so the box may now show fewer
+		// than 3 lines (measured, a real 102x13 box: a blank cursor line, then 2 lines). What it showed before must still be there,
+		// UNDER the line that came down, unchanged: a word typed meanwhile lands at the end and breaks that, whatever any reading of
+		// the words says (the second review of #hidden-head: "stop please" after a path). And the line that came down is the bus's.
+		// Once the box shows all it holds, the same reading as below: a press can drop the blank cursor line AND bring a hidden one
+		// down (the fifth review: two bells at widths 157-200, the relay's prompt at 102 columns, stopped there for good).
+		const oursNow = isOurs(now.text, now) || (!mayHide(now) && startOwn(after))
+		if (!before.startsWith(after) && !(mayHide(prev) && keptUnder(before, after) && oursNow)) return { erased: false, presses: n, why: "somebody started typing while it was being erased - their words were left alone" }
+		// THE BOX NOW SHOWS ALL IT HOLDS, after one that may have hidden its start: what is left is read whole before its top line
+		// can go. A short head taken for a bell's end on the way (`nothing.` in front of a bell) proves itself here, or the erase
+		// stops with it in the box (the fourth review of #hidden-head).
+		if (mayHide(prev) && !mayHide(now) && !oursNow) return { erased: false, presses: n, why: "what is left in the box, all of it in view, is not the bus's own text - left alone" }
+		before = after; prev = now
 	}
 	return { erased: false, presses: n, why: `still text in the box after ${n} presses` }
 }
@@ -694,18 +844,39 @@ export function eraseOwn(read, send, isOurs, { pressMs = 150, presses = 60 } = {
 // read took ~1.5 s on a loaded machine. Every wait here can run inside a hook's 10 s: a kill mid-way leaves the text, and the
 // ring that keeps looking, started before the first key, finds it (rule 10).
 const SHOWN_MS = 1500, TAKEN_MS = 1500
-/** One reading of the box against `text`: empty, whole, partial (still being drawn), theirs, or unknown (a dialog, an unreadable screen). */
+/**
+ * One reading of the box against `text`: empty, whole, partial (still being drawn), theirs, or unknown (a dialog, an unreadable
+ * screen) - and `tail`: whole as far as a box that hides its start can show, its end in view, its start never seen.
+ */
 function boxAgainst(s, text) {
 	if (s.ok) return "empty"
-	if (!s.typed) return "unknown"
+	if (!s.typed || !squash(s.text)) return "unknown"   // blank rows: a frame between two, never a reading of the text
 	if (sameText(s.text, text)) return "whole"
-	return squash(text).startsWith(squash(s.text)) ? "partial" : "theirs"
+	if (shows(s, text)) return "tail"
+	return pieceOf(s, text) ? "partial" : "theirs"
 }
-/** Read the box until it is `empty` or `theirs`, or `takenMs` have passed: the last reading. */
+/** After Ctrl+A in a box that hides its start: `start` once it shows the text's first lines, `theirs` if anything else shows, `gone`
+ * if the box empties, `unseen` after `ms`. */
+export function startInView(read, text, ms = SHOWN_MS, nap = 40) {
+	for (let n = 1, t = Date.now(); ; n++, sleepSync(nap)) {
+		const s = read()
+		if (s.ok) return "gone"
+		const noBox = !s.typed, blank = s.typed && !squash(s.text)
+		if (s.typed && !blank) {
+			if (startOf(s, text)) return "start"
+			if (!pieceOf(s, text)) return "theirs"
+		}
+		// two reads at least: one screen read can take 1.5 s on a loaded machine, and its picture may be from before the key. Blank
+		// rows still shown then are a draft's, in front of the text: somebody's (the fourth review of #hidden-head)
+		// and no box at all then - a dialog, a screen that cannot be read - gets no Enter (the fifth review)
+		if (n >= 2 && Date.now() - t >= ms) return blank ? "theirs" : noBox ? "nobox" : "unseen"
+	}
+}
+/** Read the box until it is `empty` or `theirs`, or `takenMs` have passed: [the last state, the last reading]. */
 function untilItLeaves(read, text, takenMs, nap) {
 	for (const t = Date.now(); ; sleepSync(nap)) {
-		const st = boxAgainst(read(), text)
-		if (st === "empty" || st === "theirs" || Date.now() - t >= takenMs) return st
+		const s = read(), st = boxAgainst(s, text)
+		if (st === "empty" || st === "theirs" || Date.now() - t >= takenMs) return [st, s]
 	}
 }
 /**
@@ -722,23 +893,54 @@ function untilItLeaves(read, text, takenMs, nap) {
 export function typeAndProve(read, send, text, { shownMs = SHOWN_MS, takenMs = TAKEN_MS, nap = 40, erase = true } = {}) {
 	const a = send(text)
 	if (a && a.status !== 0) return { typed: false, taken: false, why: `send-text failed: ${(a.stderr || "").trim().slice(0, 80)}` }
-	const mixed = (again) => ({ typed: true, taken: false, mixed: true, again, why: "somebody's words are in the box with the bell: both left alone, and no Enter pressed on them" })
-	let shown = null
+	// THE CURSOR SENT TO THE START GOES BACK TO THE END before this returns with text in the box. Left at the start, every later
+	// Ctrl+U takes nothing, and the ring that keeps looking is the field's loop again (the third review of #hidden-head: a hook ring,
+	// both Enters lost, then 60 presses a minute for 12 h). Not into a box it cannot read: a dialog gets no key.
+	let atStart = false
+	const back = () => { if (atStart) { send("\x05"); atStart = false } }
+	const mixed = (again) => { back(); return { typed: true, taken: false, mixed: true, again, why: "somebody's words are in the box with the bell: both left alone, and no Enter pressed on them" } }
+	let shown = null, head = {}
 	for (const t = Date.now(); Date.now() - t < shownMs; sleepSync(nap)) {
 		const st = boxAgainst(read(), text)
 		if (st === "theirs") return mixed(false)
 		if (st === "whole") { shown = Date.now() - t; break }
+		if (st === "tail") {
+			// A BOX THAT HIDES ITS START shows the text's end. Ctrl+A brings its start into view - measured on a real 102x13 box, 2.1.323:
+			// the start shown, Ctrl+E back to the end, Home/End nothing, and an Enter there submits it all. What a person typed in front
+			// of it, since the box was read empty, is seen there and stops the Enter (the second review of #hidden-head). Not brought
+			// into view (another version): rung as seen, its start unseen, and said - a bell that never rings is the defect this fixes.
+			shown = Date.now() - t
+			send("\x01")
+			atStart = true
+			const h = startInView(read, text, shownMs, nap)
+			head = { headHidden: true, headSeen: h === "start" }
+			if (h === "theirs") return { ...mixed(false), shownMs: shown, ...head }
+			// emptied by something else at that moment: not rung by this ring, and not claimed - the next look reads the session
+			if (h === "gone") { atStart = false; return { typed: true, taken: false, shownMs: shown, ...head, why: "the text left the box when its start was asked for - not rung by this ring" } }
+			// no box on screen after the Ctrl+A (a dialog, an unreadable screen): no Enter, and no key - the next look finds the cursor
+			if (h === "nobox") return { typed: true, taken: false, shownMs: shown, ...head, why: "its box went away when its start was asked for (a dialog?) - no Enter pressed" }
+			break
+		}
 	}
 	send("\r")
-	let state = untilItLeaves(read, text, takenMs, nap), again = false
-	if (state === "whole") { again = true; send("\r"); state = untilItLeaves(read, text, takenMs, nap) }
-	if (state === "theirs") return { ...mixed(again), shownMs: shown }
-	if (state === "empty" && shown !== null) return { typed: true, taken: true, shownMs: shown, again }
-	if (state === "empty" || state === "unknown") return { typed: true, taken: false, unproved: true, shownMs: shown, again,
+	// still in the box: whole, its end in view - or, the cursor at its start, its START (a person's first letter is not that)
+	const still = ([st, s]) => st === "whole" || st === "tail" || (atStart && startOf(s, text))
+	let last = untilItLeaves(read, text, takenMs, nap), again = false
+	if (still(last)) { again = true; send("\r"); last = untilItLeaves(read, text, takenMs, nap) }
+	const state = last[0]
+	// a piece of the text that is not its start, after an Enter: the text left, and that is somebody's (a letter typed at once) -
+	// and so is the cursor: no key for it (the fourth review of #hidden-head)
+	const notOurs = state === "partial" && !still(last)
+	if (notOurs) atStart = false
+	if (state === "theirs" || notOurs) return { ...mixed(again), shownMs: shown, ...head }
+	if (state === "empty" && shown !== null) return { typed: true, taken: true, shownMs: shown, again, ...head }
+	if (state === "empty" || state === "unknown") return { typed: true, taken: false, unproved: true, shownMs: shown, again, ...head,
 		why: state === "empty" ? "typed and Enter pressed, but the box was never seen to hold it" : "typed and Enter pressed, and the box could not be read afterwards" }
-	if (!erase) return { typed: true, taken: false, stays: true, shownMs: shown, again, why: "its Enter was not taken, twice: the text is still in the box, and the ring that keeps looking clears it" }
-	const e = eraseOwn(read, send, (t) => squash(text).startsWith(squash(t)))
-	return { typed: true, taken: false, shownMs: shown, again, erased: e.erased, presses: e.presses,
+	back()
+	if (!erase) return { typed: true, taken: false, stays: true, shownMs: shown, again, ...head, why: "its Enter was not taken, twice: the text is still in the box, and the ring that keeps looking clears it" }
+	// its own text, CUT_MIN of it at least: one letter a person typed after a taken Enter is the start of anything
+	const e = eraseOwn(read, send, (t, s) => pieceOf(s, text) && squash(t).length >= Math.min(CUT_MIN, squash(text).length), { own: text })
+	return { typed: true, taken: false, shownMs: shown, again, ...head, erased: e.erased, presses: e.presses,
 		why: e.erased ? "its Enter was not taken, twice: the text was erased and the mail stays in the inbox" : `its Enter was not taken, twice, and it could not be erased: ${e.why}` }
 }
 
@@ -887,8 +1089,10 @@ export function wakeAgent(root, agent, pid, { dryRun = false, wins, turn = null,
 	// over at that turn's Stop. The sender is never told WHAT is typed there - it is somebody else's unsent text.
 	const read = () => screen(r.win)
 	const rest = read()
-	const own = !rest.ok && rest.typed === true ? busText(rest.text) : null
-	const ownUnsent = !!own && !own.cut
+	const own = !rest.ok && rest.typed === true ? busText(rest.text, { hidden: mayHide(rest) }) : null
+	// The Enter alone only on bells the box shows WHOLE: one that may hide its start may hide somebody's words above them.
+	// Those are erased, a line at a time, each line read as the bus's before it goes, and one clean bell follows.
+	const ownUnsent = !!own && !own.cut && !mayHide(rest)
 	if (quiet && !own) return quiet
 	if (!rest.ok && !own) return { agent, pid, sent: false, notAtRest: true, ...seen, ...said,
 		why: `not rung, its input is not at rest: ${rest.typed ? "text is on its input line (a person typing, or a draft left there) - never typed into" : rest.why}` }
@@ -914,7 +1118,7 @@ export function wakeAgent(root, agent, pid, { dryRun = false, wins, turn = null,
 		let after = null
 		for (const t = Date.now(); ; sleepSync(40)) {
 			const s = read()
-			after = s.ok ? "empty" : !s.typed ? "unknown" : busText(s.text) ? "stays" : "theirs"
+			after = s.ok ? "empty" : !s.typed ? "unknown" : busText(s.text, { hidden: mayHide(s) }) ? "stays" : "theirs"
 			if (after === "empty" || after === "theirs" || Date.now() - t >= TAKEN_MS) break
 		}
 		if (after === "theirs") {
@@ -932,7 +1136,7 @@ export function wakeAgent(root, agent, pid, { dryRun = false, wins, turn = null,
 			done(false, { stays: true, bells: own.bells, cut: own.cut }, false)
 			return { agent, pid, sent: false, notAtRest: true, stays: true, why: "not rung: the bus's own text is in its box and the ring that keeps looking clears it", ...seen, ...said }
 		}
-		wiped = eraseOwn(read, send, (t) => !!busText(t))
+		wiped = eraseOwn(read, send, (t, s) => !!busText(t, { hidden: mayHide(s) }))
 		if (!wiped.erased) {
 			done(false, { erasedOwn: false, presses: wiped.presses, why: wiped.why }, false)
 			return { agent, pid, sent: false, notAtRest: true, ...seen, ...said, why: `not rung: the bus's own text is in its box and could not be erased (${wiped.why})` }
@@ -970,14 +1174,14 @@ export function wakeAgent(root, agent, pid, { dryRun = false, wins, turn = null,
 		if (clearTyped) done(false, { sendFailed: true })
 		return { agent, pid, sent: false, cleared: ring.cleared, clearTyped, clearWhy: ring.clearWhy, why: p.why, ...seen, ...said }
 	}
-	const what = { text: text === FRESH_NUDGE ? "fresh" : "nudge", shownMs: p.shownMs, ...(p.again ? { enterAgain: true } : {}), ...(wiped ? { erasedOwn: true, presses: wiped.presses } : {}), ...(p.unproved ? { unproved: true } : {}) }
+	const what = { text: text === FRESH_NUDGE ? "fresh" : "nudge", shownMs: p.shownMs, ...(p.again ? { enterAgain: true } : {}), ...(wiped ? { erasedOwn: true, presses: wiped.presses } : {}), ...(p.unproved ? { unproved: true } : {}), ...(p.headHidden ? { headHidden: true, headSeen: !!p.headSeen } : {}) }
 	if (!p.taken && !p.unproved) {
 		// Not quiet: nothing was rung. A bell is typed only into an empty box, so this cannot pile up.
 		done(false, { ...what, ...(p.stays ? { stays: true } : {}), ...(p.erased !== undefined ? { erased: p.erased } : {}), ...(p.mixed ? { mixed: true } : {}), why: p.why }, false)
 		return { agent, pid, sent: false, notAtRest: true, ...(p.stays ? { stays: true } : {}), ...(p.erased ? { erased: true } : {}), ...(p.mixed ? { mixed: true } : {}), cleared: ring.cleared, clearTyped, clearWhy: ring.clearWhy, why: `not rung: ${p.why}`, ...seen, ...said }
 	}
 	done(true, what)
-	return { agent, pid, sent: true, window: r.win.id, socket: r.win.sock, how: r.how, cleared: ring.cleared, clearTyped, clearWhy: ring.clearWhy, ...(wiped ? { erasedOwn: true } : {}), ...(p.again ? { enterAgain: true } : {}), ...(p.unproved ? { unproved: true, unprovedWhy: p.why } : {}), ...seen, ...said }
+	return { agent, pid, sent: true, window: r.win.id, socket: r.win.sock, how: r.how, cleared: ring.cleared, clearTyped, clearWhy: ring.clearWhy, ...(wiped ? { erasedOwn: true } : {}), ...(p.again ? { enterAgain: true } : {}), ...(p.unproved ? { unproved: true, unprovedWhy: p.why } : {}), ...(p.headHidden ? { headHidden: true, headSeen: !!p.headSeen } : {}), ...seen, ...said }
 	} finally { kb.release() }
 }
 
@@ -1108,7 +1312,7 @@ async function main() {
 				: r.turn === "ending" ? " · its reply had just ended" : ""
 			const fresh = r.cleared === true ? ` · ${r.clearWhy}` : r.cleared === false ? ` · ⚠ ${r.clearWhy}`
 				: r.wouldClear ? ` · would restart it fresh first (${r.freshWhy})` : r.freshWhy ? ` · no fresh restart: ${r.freshWhy}` : ""
-			console.log(r.sent ? `  ● woke ${r.agent} (pid ${r.pid}) in window ${r.window} — ${r.how}${note}${fresh}${r.resubmitted ? " · Enter only: an earlier bell sat unsent in its box" : ""}${r.erasedOwn ? " · the bus's own text was erased from its box first" : ""}${r.enterAgain ? " · its first Enter was lost, pressed again" : ""}${r.unproved ? " · NOT PROVED, it looks again" : ""}`
+			console.log(r.sent ? `  ● woke ${r.agent} (pid ${r.pid}) in window ${r.window} — ${r.how}${note}${fresh}${r.resubmitted ? " · Enter only: an earlier bell sat unsent in its box" : ""}${r.erasedOwn ? " · the bus's own text was erased from its box first" : ""}${r.enterAgain ? " · its first Enter was lost, pressed again" : ""}${r.unproved ? " · NOT PROVED, it looks again" : ""}${r.headHidden ? ` · its box showed only the bell's last lines, its start ${r.headSeen ? "brought into view and seen" : "NOT seen"} (FINDINGS.md#hidden-head)` : ""}`
 				: `  ○ ${r.agent}: ${r.dryRun ? `would wake in window ${r.window} (${r.how})${note}${fresh}` : r.why}${r.notAtRest ? " · it looks again every minute, and tells the owner if this lasts" : ""}`)
 		}
 		if (report.length) console.log("  fresh restart, for every agent in freshRestart (dry run — nothing typed):\n" +

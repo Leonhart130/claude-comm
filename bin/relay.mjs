@@ -191,9 +191,9 @@ if (ARGV[0] === "--after-turn") {
 		held = wake.holdKeyboard({ sock: st.sock, id: st.window }, `the relay of ${st.agent}`)
 		if (held.ok) {
 			scr = read()
-			const own = !scr.ok && scr.typed === true && wake.busText(scr.text)
+			const own = !scr.ok && scr.typed === true && wake.busText(scr.text, { hidden: wake.mayHide(scr) })
 			if (own) {
-				const e = wake.eraseOwn(read, send, (t) => !!wake.busText(t))
+				const e = wake.eraseOwn(read, send, (t, s) => !!wake.busText(t, { hidden: wake.mayHide(s) }))
 				note({ erased_own: { at: now(), bells: own.bells, cut: own.cut, erased: e.erased, presses: e.presses, ...(e.why ? { why: e.why } : {}) } })
 				scr = read()
 			}
@@ -256,7 +256,19 @@ if (ARGV[0] === "--after-turn") {
 	// them over as one (a field's relay, 11-02 03h16: its prompt whole in the box, the expert inert 15 h). Once the
 	// box draws the prompt, its bytes were read, and the Enter is a key of its own. Not shown in time: typed as before.
 	let shown = null
-	for (const t = Date.now(); Date.now() - t < SHOWN_MS; nap(40)) { const s = atRest(st.sock, st.window); if (s.typed && wake.sameText(s.text, st.say)) { shown = Date.now() - t; break } }
+	let capped = null
+	for (const t = Date.now(); Date.now() - t < SHOWN_MS; nap(40)) { const s = atRest(st.sock, st.window); if (wake.shows(s, st.say)) { shown = Date.now() - t; capped = !wake.sameText(s.text, st.say); break } }
+	// A BOX THAT HIDES ITS START shows the prompt's end: Ctrl+A brings its start into view, and words a person typed in front of it
+	// stop the Enter, as wake's bell does (FINDINGS.md#hidden-head). The cursor stays there: an Enter there submits it all.
+	// `atStart`: the cursor was SENT there, seen or not - it goes back to the end before any erase (the third review of #hidden-head)
+	let atStart = false
+	if (capped) {
+		send("\x01")
+		atStart = true
+		const h = wake.startInView(read, st.say)
+		if (h === "theirs" || h === "gone" || h === "nobox") { if (h === "theirs") send("\x05"); stop({ refused: `cleared and the first prompt typed, but its box hides its start and ${h === "theirs" ? "somebody's words are in front of it" : h === "gone" ? "it left the box when its start was asked for" : "the box went away when its start was asked for (a dialog?)"} - no Enter pressed; look at window ${st.window}`, typed: ["/clear", "prompt"] }) }
+		note({ prompt_start: { at: now(), seen: h === "start" } })
+	}
 	send("\r")
 	note({ prompt: { at: now(), shown_ms: shown } })
 	const t0 = Date.now()
@@ -272,11 +284,15 @@ if (ARGV[0] === "--after-turn") {
 		// nothing. The field's question, 11-02: a lone `\r` then submitted 3/3.
 		if (!again && Date.now() - t0 >= ENTER_LOST_MS) {
 			const s = atRest(st.sock, st.window)
-			if (s.typed && wake.sameText(s.text, st.say)) { send("\r"); again = now(); note({ enter_again_at: again }) }
+			if (wake.shows(s, st.say) || (atStart && wake.startOf(s, st.say))) { send("\r"); again = now(); note({ enter_again_at: again }) }
 		}
 	}
 	// Whatever it was, the prompt does not stay in the box: a fresh session at rest with an empty box can still be rung.
-	const left = wake.eraseOwn(read, send, (t) => wake.sameText(t, st.say))
+	// a box that hides its start shows the prompt's end, then slices of it as each press brings a hidden line down: `pieceOf`.
+	// The cursor at the prompt's start, Ctrl+U would take nothing: back to its end first - only into a box READ to show the prompt's
+	// start, never blind 15 s after an Enter that may have started a turn and a dialog (the fourth review of #hidden-head)
+	if (atStart && wake.startOf(read(), st.say)) send("\x05")
+	const left = wake.eraseOwn(read, send, (t, s) => wake.shows(s, st.say) || (wake.mayHide(s) && wake.pieceOf(s, st.say)), { own: st.say })
 	if (left.presses) note({ erased_own: { erased: left.erased, presses: left.presses } })
 	stop({ refused: `cleared and the first prompt typed${again ? `, its Enter pressed again at ${again} on the prompt left whole in the box,` : ","} but no user row carrying it reached the new transcript within ${TAKEN_MS / 1000} s - look at window ${st.window}` })
 }

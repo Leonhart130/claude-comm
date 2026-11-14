@@ -29,7 +29,7 @@ dépôt, aucune n'est une intuition. `FINDINGS.md` (25 défauts) est le gisement
 | 🔴 **C** | 🔴 **JE PARAPHRASE L'ÉTAT AU LIEU DE LE MESURER** | Le fichier d'état disait vert pendant qu'un bus 4 commits en retard tournait sur le terrain. **Même forme le 2026-09-10 : j'ai lu une tranche `sed` de `STATUS.md` et parlé d'après le résumé du boot** | `CLAUDE.md` · **§1** |
 | 🔴 **D** | 🔴 **UNE LIGNE NOMME AUTRE CHOSE QUE CE QU'ELLE A MESURÉ** | La ligne terrain affichait « HOOK DRIFT » alors que ce qui avait changé était un `.gitignore` : elle envoyait le lecteur inspecter des hooks parfaits | `bin/boot.mjs`, commentaire du 2026-09-04 : *« a row that names something other than what it measured is this project's signature defect »* |
 | 🔴 **E** | 🔴 **UN BALAYAGE QUI ÉCHOUE REND LE MÊME RÉSULTAT QU'UN BALAYAGE VIDE** | `catch {}` nu, retour `{at:0}` : un dossier illisible est indiscernable d'un dossier vide, et la ligne **disparaît** au lieu de crier | mesuré le 2026-09-10, `bin/boot.mjs:1011-1023` — à un appel de distance du même défaut corrigé le 09-08 |
-| 🔴 **F** | 🔴 **J'AJOUTE DE LA CONFIANCE LÀ OÙ IL FALLAIT DE LA PREUVE** | Un pair écrit noir sur blanc *« je ne l'ai pas couru avec deux sessions réelles, donc je ne l'écris pas comme mesuré »*. Je lui réponds que son trou est plus petit qu'il ne croit — **sans une mesure de plus.** ⚠️ **Ça se propage** : la question qu'il avait laissée ouverte à raison a été fermée chez lui, puis SUPPRIMÉE de mon propre fichier d'état | **§2** |
+| 🔴 **F** | 🔴 **J'AJOUTE DE LA CONFIANCE LÀ OÙ IL FALLAIT DE LA PREUVE** | Un pair écrit noir sur blanc *« je ne l'ai pas couru avec deux sessions réelles, donc je ne l'écris pas comme mesuré »*. Je lui réponds que son trou est plus petit qu'il ne croit — **sans une mesure de plus.** ⚠️ **Ça se propage** : la question qu'il avait laissée ouverte à raison a été fermée chez lui, puis SUPPRIMÉE de mon propre fichier d'état | **§2** · **§10** (2026-11-13 : un `grep` à 6,6 Go sur la machine du propriétaire, son coût jamais mesuré) |
 | 🔴 **G** | 🔴 **JE CITE UN NOM QUI N'EXISTE PAS, ET LE FOND EST JUSTE** | `stateOf` contre `holderState`. Comme la conclusion tenait, rien ne l'a contredite — **et le pair ne POUVAIT pas vérifier ce que je lui affirmais.** Une citation fausse dans un raisonnement juste est un cul-de-sac qu'on ne voit pas | **§2** |
 | 🔴 **K** | 🔴 **MA GARDE A RAISON ET SA SORTIE NE PORTE PAS DE QUOI AGIR** | Le refus du `--ref` donnait la chaîne fautive, jamais **la chaîne à taper** · `--pid` n était documenté que dans un message d erreur qu on voit **après** s être trompé · le refus de `claim` nommait le détenteur et **jamais le demandeur**, donc deux refus de deux agents différents étaient identiques au caractère près. **Trois en une soirée, tous signalés par un agent de terrain, aucun trouvé par moi** | **§6** |
 | 🔴 **J** | 🔴 **JE CONCLUS « NON REPRODUCTIBLE » D'UNE SONDE QUI NE POUVAIT PAS SE DÉCLENCHER** | Trois invocations du hook `Stop`, toutes sorties en 0 — **et toutes avec une boîte vide**, alors que le signal n'apparaît QUE lorsqu'un message est livré. J'ai mesuré une inbox vide et je l'ai écrit comme un mystère, dans `STATUS.md` et dans un message de commit | **§5** |
@@ -388,3 +388,36 @@ lot de mutants d'A102 était verte pendant que le titre manquait. Un pointeur ve
   lue juste avant ; une note nommée « 23h10 par `date` », écrite à 23h05 (renommée avant d'être lue, la première non : la
   réponse de work la cite par son nom). Cinq minutes d'avance, dans le même sens qu'en octobre. Le bras de §8 n'est
   toujours pas construit (▶ NEXT 6) : c'est lui qui l'aurait vu, pas moi.
+
+## §10 — J'ai lancé une commande à 6,6 Go sur la machine du propriétaire, moins de deux minutes après qu'il m'eut demandé de ménager sa RAM.
+
+**Le 2026-11-13 à 23h15:42** (l'heure de l'appel, lue dans la transcription). Pour lire la limite de hauteur de la case de saisie dans le binaire de Claude Code (365 Mo),
+j'ai lancé `grep -a -o '.\{0,20000\}maxVisibleLines:Wb'`. Le binaire n'a presque pas de fins de ligne : `-o` avec un contexte
+de 20 000 caractères garde en mémoire une « ligne » géante. Le processus a pris **6,6 Go**. La machine est tombée à 1,2 Go
+disponibles, avec le propriétaire au travail et cinq agents de work ouverts. Le harnais a passé la commande en fond au bout de
+120 s, et je l'ai arrêtée parce qu'elle était lente, pas parce que je la voyais grossir. **C'est work qui l'a vue** (sa
+veille mémoire, seuil 1 500 Mo, sa lettre 65). Le mode auto lui a refusé le `kill`, et le propriétaire a libéré la mémoire à la main.
+Il m'avait écrit à 23h13:58 : « évite de lancer des actions qui consomment de la RAM [...] ou échange avec Work ».
+
+### Le mécanisme
+
+Une sonde est une mesure, et je ne mesure jamais ce qu'elle coûte. J'avais compté la RAM d'une session de test (~500 Mo) et
+pas celle d'un `grep`, parce qu'un `grep` « ne coûte rien ». C'est la forme **F** tournée vers moi : la confiance là où il
+fallait une borne. Le coût d'une commande dépend de ses entrées (un binaire sans fins de ligne), pas de son nom.
+
+### Ce que ça a coûté
+
+Une alerte chez work, la RAM du propriétaire pendant qu'il travaillait, et sa main pour la rendre. Il m'avait prévenu cent
+quatre secondes plus tôt.
+
+### La règle
+
+Accordée avec work (sa lettre 66, ma 68), et c'est maintenant la règle de la machine : toute commande qui peut dépasser 1 Go
+passe par `borne <commande>` (le verrou lourd commun `borne-lourde.lock` et `agents.slice`, 6 Go pour tous), et seulement
+si `free -m` montre **2 500 Mo disponibles**. Dans un binaire : `grep -a -b -o` pour l'offset, puis `dd` autour.
+
+### Le contrôle
+
+**Pas encore armé, et je le nomme** (`STATUS.md` ▶ NEXT). La garde : le hook `PreToolUse` que la branche `2026-11-05.2` prévoit
+pour `heavy.mjs` (« une liste par outil », la lettre 32 de work) refuse une commande sans `borne` qui a la forme d'une commande
+lourde, et `heavy.mjs` prend le verrou de work avec son plancher de 2 500 Mo au lieu d'un verrou à lui.

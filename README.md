@@ -236,8 +236,11 @@ too — it is how a check gets disabled wholesale a week later.*
 - **Turn-boundary delivery, not interrupt** (above).
 - **The doorbell, the fresh restart and the relay type into the human's input line**, because Claude Code offers a
   process no other way in. The screen is read first and text that is not the bus's is never typed into (A98), one typist
-  at a time, and the bus's own text never stays there (A111-A114, `FINDINGS.md#left-in-the-box`). A key landing in
-  the milliseconds between a read and a key is the limit that cannot be closed from outside the terminal.
+  at a time, and the bus's own text never stays there (A111-A114, `FINDINGS.md#left-in-the-box`). Claude Code shows
+  only the last lines of a long input in a short window, with no mark: a box of 3 lines or more may hide its start, so
+  the bus brings it into view (Ctrl+A) before an Enter, and erases a line only after reading it as its own
+  (A125, `FINDINGS.md#hidden-head`). A key landing in the milliseconds between a read and a key is the limit that
+  cannot be closed from outside the terminal.
 - **`comm who` is Linux-only** — it reads `/proc`. Elsewhere it degrades to "not running" for everyone,
   which is safe but useless; `send` still queues correctly.
 - **Identity is not a security boundary.** Every agent runs as the same Unix user, so cwd-derived identity

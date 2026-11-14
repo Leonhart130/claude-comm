@@ -5684,9 +5684,10 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 	const ebOk = !!ebTyped && ebTyped.code === 3 && /not at rest/.test(ebTyped.out) && !ebTyped.recorded && keysOf("typed") === "" &&
 		!!ebEmpty && ebEmpty.code === 0 && ebEmpty.recorded && ebEmpty.arrived
 	// Claude Code draws a long input as HARD lines, which a terminal's soft wrap (the bench's) never shows: the unsent bell
-	// spread over three lines is still recognised whole. And a screen that cannot be read is not at rest.
+	// spread over two lines is still recognised whole. TWO: a box of three may hide its start, and its bells are then erased,
+	// not sent by an Enter alone (A125, #hidden-head). And a screen that cannot be read is not at rest.
 	const RULE98 = "─".repeat(60), N = wk98.NUDGE, typedW = []
-	const wrapped = ["", RULE98, `❯ ${N.slice(0, 100)}`, `  ${N.slice(100, 200)}`, `  ${N.slice(200)}`, RULE98, "  ? for shortcuts"].join("\n")
+	const wrapped = ["", RULE98, `❯ ${N.slice(0, 160)}`, `  ${N.slice(160)}`, RULE98, "  ? for shortcuts"].join("\n")
 	const rootW = mkdtempSync(join(tmpdir(), "comm-attack-wrapped-"))
 	const wrappedR = wk98.wakeAgent(rootW, "w", 5151, { wins: [{ sock: "/tmp/kitty-attack", id: 7, shellPid: 1, fg: [5151] }], turn: { state: "idle", why: "a98" },
 		sendText: (_w, t) => { typedW.push(t); return { status: 0, stderr: "" } }, screen: () => wk98.promptAtRest(typedW.includes("\r") ? ["", RULE98, "❯ ", RULE98, "  ? for shortcuts"].join("\n") : wrapped) })
@@ -5702,7 +5703,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		`EMPTY box (control) -> ${said("empty")}; HALF-TYPED -> ${said("typed")}, the text kept from the sender=${!/bonjour/.test(JSON.stringify(res("typed") || {}))}; ` +
 		`NO box -> ${said("nobox")}; its OWN unsent bell -> ${said("own")}; that bell + a person's words -> ${said("ownplus")}; ` +
 		`exchange bell into the half-typed box -> exit ${ebTyped ? ebTyped.code : null}, recorded=${ebTyped ? ebTyped.recorded : null}; into the empty one -> exit ${ebEmpty ? ebEmpty.code : null}, ARRIVED=${ebEmpty ? ebEmpty.arrived : null}; ` +
-		`the unsent bell drawn on three hard lines -> typed ${JSON.stringify(typedW.join(""))} (${wrappedR.why || "resubmitted"}); an unreadable screen -> ${unreadable.ok ? "AT REST" : unreadable.why}`)
+		`the unsent bell drawn on two hard lines -> typed ${JSON.stringify(typedW.join(""))} (${wrappedR.why || "resubmitted"}); an unreadable screen -> ${unreadable.ok ? "AT REST" : unreadable.why}`)
 }
 
 // A111 - A115: THE BUS'S TEXT NEVER STAYS IN A BOX. A field's leader, 2026-11-08: two rings 6 ms apart (01:43:06Z), both recorded
@@ -5729,7 +5730,12 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		fs.writeFileSync(`${c.sessions}/${process.pid}.json`, "{}")   // a STARTED session (A88)
 		const RULE = "─".repeat(60)
 		let line = c.line || "", lost = c.loseEnters || 0, late = false
-		const draw = () => process.stdout.write(`\x1b[2J\x1b[H\r\n${RULE}\r\n❯ ${line}\r\n${RULE}\r\n  ⏵⏵ fake session\r\n`)
+		// `cap`: the box Claude Code draws for a long text in a short window (A125) - `width` characters a line, only the LAST `cap`
+		// lines, the `❯` on the first one shown; Ctrl+U takes the last line
+		const W = c.width || 40, chunks = () => { const o = []; for (let i = 0; i < line.length; i += W) o.push(line.slice(i, i + W)); return o }
+		let atStart = false   // Ctrl+A: the start in view, as a real capped box does (#hidden-head); Ctrl+E: the end again
+		const boxRows = () => c.cap ? ((atStart ? chunks().slice(0, c.cap) : chunks().slice(-c.cap)).map((r, i) => (i ? "  " : "❯ ") + r).join("\r\n") || "❯ ") : `❯ ${line}`
+		const draw = () => process.stdout.write(`\x1b[2J\x1b[H\r\n${RULE}\r\n${boxRows()}\r\n${RULE}\r\n  ⏵⏵ fake session\r\n`)
 		draw()
 		if (process.stdin.setRawMode) process.stdin.setRawMode(true)
 		process.stdin.on("data", (d) => {
@@ -5737,12 +5743,13 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 			// `lateMs`: a long text is drawn that much later, and an Enter read before it is drawn joins it - lost (#enter-in-the-paste)
 			if (c.lateMs && d.toString().replace(/\r/g, "").length > 20) { line += d.toString().replace(/\r/g, ""); late = true; setTimeout(() => { late = false; draw() }, c.lateMs); return }
 			for (const ch of d.toString()) {
-				if (ch === "\x15") { line = line.slice(0, Math.max(0, line.length - 60)); draw(); continue }
+				if (ch === "\x15") { if (!atStart) line = c.cap ? line.slice(0, Math.max(0, (Math.ceil(line.length / W) - 1) * W)) : line.slice(0, Math.max(0, line.length - 60)); draw(); continue }
+				if (c.cap && (ch === "\x01" || ch === "\x05")) { atStart = ch === "\x01"; draw(); continue }
 				if (ch !== "\r") { line += ch; draw(); continue }
 				if (late || !line) continue
 				if (lost !== 0) { lost--; if (c.typesAfterLoss) { line += " hello"; draw() } continue }
 				fs.appendFileSync(c.rows, JSON.stringify(line) + "\n")
-				line = ""
+				line = ""; atStart = false
 				draw()
 			}
 		})
@@ -6118,6 +6125,217 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 	check("A115 a box at rest under the agents' footer is at rest, only that exact footer - and a background task's notice is not called somebody typing",
 		Object.values(ok115).every(Boolean) && Object.values(wording).every(Boolean),
 		Object.entries({ ...ok115, ...wording }).map(([k, v]) => `${k}=${v}`).join("; "))
+
+	// A125 — A BOX THAT SHOWS ONLY ITS LAST LINES. Work's letter 64, 11-13: two experts in windows of 17 rows, the bell 4 lines at 103
+	// columns; Claude Code showed 3 (`maxVisibleLines`, floor 3, read in 2.1.323's code), the first above the box with no mark. A fresh
+	// bell read as somebody's words in front of it, each Ctrl+U as somebody typing: a ring a minute for 2 h, none rung, until the owner
+	// pressed Enter. FINDINGS.md#hidden-head. The legs move the rows the box shows, the one variable `mayHide` reads - each beside its
+	// control, the same text in a box that shows all it holds - then panes draw that box.
+	const wrapAt = (t, w) => { const o = []; for (let i = 0; i < t.length; i += w) o.push(t.slice(i, i + w)); return o }
+	const drawn = (shownRows) => wkB.promptAtRest(["out", R, ...shownRows.map((x, i) => (i ? "  " : "❯ ") + x), R, "  ⏵⏵ auto mode on"].join("\n"))
+	const NL = wrapAt(N, 80)
+	const tail3 = drawn(NL.slice(-3)), head3 = drawn(NL.slice(0, 3)), head2 = drawn(NL.slice(0, 2)), head1 = drawn(NL.slice(0, 1))
+	const asAll = (s) => ({ ...s, rows: 2 })
+	const mid = N.slice(90, 260), midR = { ok: false, typed: true, text: mid, rows: 3 }
+	const ours = (t, s) => !!wkB.busText(t, { hidden: wkB.mayHide(s) })
+	const hh = {}
+	// A box as Claude Code draws it, measured on 2.1.323: `cap` lines shown of what it holds, the cursor's end in view; Ctrl+A shows
+	// the start, Ctrl+E the end; Ctrl+U takes the line before the cursor; a text typed is wrapped at 80; Enter submits all of it,
+	// wherever the cursor is, unless `lose` Enters are lost first
+	const capBox = (lines, { cap = 3, lose = 0, cursorLine = false } = {}) => ({ lines, keys: [], atStart: false, submitted: [], lose, cursorLine, pressed: 0,
+		read() { return this.lines.length ? drawn(this.atStart ? this.lines.slice(0, cap) : this.lines.slice(-cap)) : { ok: true } },
+		send(t) {
+			this.keys.push(t)
+			if (t === "\x15") { if (!this.atStart) { const blank = this.lines.at(-1) === ""; this.lines.pop(); if (blank) this.lines.pop(); if (this.cursorLine && !this.pressed++ && this.lines.length) this.lines.push("") } }
+			else if (t === "\x01" || t === "\x05") this.atStart = t === "\x01"
+			else if (t === "\r") { if (this.lose > 0) this.lose--; else if (this.lines.length) { this.submitted.push(this.lines.join("")); this.lines = []; this.atStart = false } }
+			else this.lines = wrapAt(this.atStart ? t + this.lines.join("") : this.lines.join("") + t, 80)
+			return { status: 0, stderr: "" }
+		} })
+	const byWords = (t, w) => { const o = []; let l = ""; for (const wd of t.split(" ")) { if (l && `${l} ${wd}`.length > w) { o.push(l); l = wd } else l = l ? `${l} ${wd}` : wd } if (l) o.push(l); return o }
+	const eraseIn = (b) => wkB.eraseOwn(() => b.read(), (t) => b.send(t), ours, { pressMs: 1 })
+	let hhThrew = null
+	// a guard of its own: on code without these readers the legs read false, and the suite goes on to the arms after this one
+	try {
+		hh.readsItsRows = NL.length === 4 && tail3.typed === true && tail3.rows === 3 && wkB.sameText(tail3.text, NL.slice(-3).join("")) && head2.rows === 2 && wkB.mayHide(tail3) && !wkB.mayHide(head2)
+		hh.middleOnlyWhenHidden = wkB.busText(mid) === null && JSON.stringify(wkB.busText(mid, { hidden: true })) === '{"bells":0,"cut":true}'
+		hh.middleThenWords = wkB.busText(`${mid} merci`, { hidden: true }) === null
+		hh.wordsThenTail = wkB.busText(`bonjour ${N.slice(120)}`, { hidden: true }) === null
+		hh.tooShortHidden = wkB.busText(N.slice(100, 130), { hidden: true }) === null
+		hh.crossOnlyWhenHidden = wkB.busText(crossText.slice(150)) === null && JSON.stringify(wkB.busText(crossText.slice(150), { hidden: true })) === '{"bells":0,"cut":true}' &&
+			JSON.stringify(wkB.busText(crossText.slice(100, 260), { hidden: true })) === '{"bells":0,"cut":true}'
+		hh.crossTailThenBell = JSON.stringify(wkB.busText(crossText.slice(150) + N, { hidden: true })) === '{"bells":1,"cut":true}' && wkB.busText(`${crossText.slice(150)} merci`, { hidden: true }) === null
+		const aPath = (crossText.match(/\/[\w./~@+-]{40,}/) || [""])[0]
+		hh.aPathIsNotTheBus = aPath.length >= 40 && wkB.busText(aPath, { hidden: true }) === null
+		hh.shows = wkB.shows(tail3, N) && !wkB.shows(asAll(tail3), N) && !wkB.shows(midR, N) && wkB.shows(drawn(NL), N)
+		hh.pieceOf = wkB.pieceOf(midR, N) && !wkB.pieceOf(asAll(midR), N) && wkB.pieceOf(head1, N) && !wkB.pieceOf({ ...midR, text: `${mid} x` }, N)
+		// typing: the bell's end in view, then its start brought into view (Ctrl+A), then the Enter; one character more is still somebody's
+		const ring = (b) => wkB.typeAndProve(() => b.read(), (t) => b.send(t), N, fast)
+		let bx = capBox([]), r = ring(bx)
+		hh.tailIsRung = r.taken === true && r.headHidden === true && r.headSeen === true && bx.keys.join("|") === `${N}|\x01|\r` && bx.submitted.length === 1 && bx.submitted[0] === N
+		// the second review of #hidden-head: words typed in the gap, in front of the bell, are hidden by its end and seen at its start
+		bx = capBox(["yes "]); r = ring(bx)
+		hh.wordsBeforeTheBellSeen = r.mixed === true && r.taken === false && !bx.keys.includes("\r") && bx.submitted.length === 0 && bx.keys.at(-1) === "\x05" && !bx.atStart
+		// THE THIRD REVIEW: the cursor sent to the start always comes back. A hook ring (no erase), both Enters lost:
+		bx = capBox([], { lose: 2 }); r = wkB.typeAndProve(() => bx.read(), (t) => bx.send(t), N, { ...fast, erase: false })
+		hh.hookLostRestoresCursor = r.stays === true && bx.keys.join("|") === `${N}|\x01|\r|\r|\x05` && !bx.atStart
+		// Ctrl+A shown nothing (a slow read, another version), then the Enter lost: the cursor was SENT there, so it comes back first
+		bx = capBox([], { lose: 9 }); bx.read = function () { return this.lines.length ? drawn(this.lines.slice(-3)) : { ok: true } }; r = ring(bx)
+		hh.unseenThenLostStillErases = r.erased === true && bx.lines.length === 0 && bx.keys.join("|").startsWith(`${N}|\x01|\r|\r|\x05|\x15`)
+		// the box emptied by something else when its start was asked for: not rung by this ring, and not claimed
+		bx = capBox([]); const sendG = bx.send; bx.send = function (t) { const o = sendG.call(this, t); if (t === "\x01") this.lines = []; return o }; r = ring(bx)
+		hh.goneIsNotRung = r.taken === false && r.unproved !== true && !bx.keys.includes("\r")
+		// a cursor stranded at the start (a ring killed between its two keys): two presses take nothing, then Ctrl+E, then the erase
+		bx = capBox(wrapAt(N, 80)); bx.atStart = true; r = eraseIn(bx)
+		hh.strandedStartErased = r.erased === true && bx.lines.length === 0 && bx.keys.join("|").startsWith("\x15|\x15|\x05|\x15")
+		// a blank frame between the Enter and the empty box is not somebody's words
+		bx = capBox([]); let blankOnce = false; const sendB = bx.send, readB = bx.read
+		bx.send = function (t) { const o = sendB.call(this, t); if (t === "\r") blankOnce = true; return o }
+		bx.read = function () { if (blankOnce) { blankOnce = false; return wkB.promptAtRest(["out", R, "❯\u00a0", "  ", "  ", R, "  x"].join("\n")) } return readB.call(this) }
+		r = ring(bx)
+		hh.blankFrameIsNotWords = r.taken === true && r.mixed !== true
+		// after a taken Enter a person types `[`: one letter is not the start, no second Enter, and it is not erased
+		bx = capBox([]); const sendL = bx.send; bx.send = function (t) { const o = sendL.call(this, t); if (t === "\r" && this.submitted.length === 1 && !this.lines.length) this.lines = ["["]; return o }; r = ring(bx)
+		hh.aLetterAfterIsNotTheStart = r.mixed === true && bx.keys.filter((k) => k === "\r").length === 1 && !bx.keys.includes("\x15") && bx.keys.at(-1) === "\r" && bx.lines.join("") === "["
+		// THE FOURTH REVIEW. The Ctrl+E an idle erase sends brings an end into view that was never read: read before any press
+		bx = capBox(wrapAt(`${N} merci, je regarde ce que tu dis`, 80)); bx.atStart = true; r = eraseIn(bx)
+		hh.idleNudgeReadsFirst = r.erased === false && bx.lines.join("").includes("merci, je regarde ce que tu dis")
+		// blank rows in front of the text, still there after Ctrl+A: a draft's, somebody's
+		bx = capBox([]); const readK = bx.read; bx.read = function () { return this.atStart ? wkB.promptAtRest(["out", R, "❯\u00a0", "  ", "  ", R, "  x"].join("\n")) : readK.call(this) }; r = ring(bx)
+		hh.blankStartIsTheirs = r.mixed === true && !bx.keys.includes("\r")
+		// a person's word that is a bell's ending, in front of a bell: taken for a head on the way, and kept once all is in view
+		bx = capBox(wrapAt(`nothing.${N}`, 80)); r = eraseIn(bx)
+		hh.shortHeadProvesItself = r.erased === false && bx.lines.join("").startsWith("nothing.")
+		// one stale, slow read after Ctrl+A does not make the start "unseen"
+		bx = capBox([]); let slowOnce = false; const sendS = bx.send, readS = bx.read
+		bx.send = function (t) { const o = sendS.call(this, t); if (t === "\x01") slowOnce = true; return o }
+		bx.read = function () { if (slowOnce) { slowOnce = false; Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, fast.shownMs + 30); return drawn(this.lines.slice(-3)) } return readS.call(this) }
+		r = ring(bx)
+		hh.oneStaleReadIsNotUnseen = r.taken === true && r.headSeen === true
+		// THE FIFTH REVIEW. A text that is no bell (a relay's prompt): its own start is what is left at the end, `own` says so
+		const SAY = "Ouvre ton tour : lis SPEC.md puis RAPPORT.md, fais la tache suivante, et ferme ton tour quand elle est faite, sans rien lancer d'autre. ".repeat(2)
+		const stuckSay = []
+		for (const w of [40, 67, 79, 88, 102]) { const b = capBox([], { lose: 9, cursorLine: true }); const rr = wkB.typeAndProve(() => b.read(), (t) => b.send(t), SAY, fast); if (!rr.erased || b.lines.length) stuckSay.push(w) }
+		hh.ownTextErasedWhole = stuckSay.length === 0
+		// no box on screen after the Ctrl+A (a dialog): no Enter into it
+		bx = capBox([]); const readN = bx.read; bx.read = function () { return this.atStart ? { ok: false, why: "a dialog" } : readN.call(this) }; r = ring(bx)
+		hh.noEnterIntoADialogAfterCtrlA = r.taken === false && r.unproved !== true && !bx.keys.includes("\r")
+		// the exchange bell with an accented letter name, whole and cut inside its `.md`
+		const accented = crossText.replace(/\/[^/ ]+\.md/, "/lettre-élève.md"), cutMd = accented.slice(accented.indexOf(".md") + 1)
+		hh.crossAnyLetterName = JSON.stringify(wkB.busText(accented)) === '{"bells":1,"cut":false}' && JSON.stringify(wkB.busText(cutMd, { hidden: true })) === '{"bells":0,"cut":true}'
+		// the seam of two bells, each piece under 40
+		hh.twoBellSeam = JSON.stringify(wkB.busText("you and consumes nothing.[claude-comm] doorbell. This line is from", { hidden: true })) === '{"bells":0,"cut":true}' && wkB.busText("and consumes nothing.[claude", { hidden: true }) === null
+		// a screen that cannot be read after the Enter (a dialog): no key goes into it
+		bx = capBox([], { lose: 1 }); let entered = false; const sendD = bx.send, readD = bx.read
+		bx.send = function (t) { const o = sendD.call(this, t); if (t === "\r") entered = true; return o }
+		bx.read = function () { return entered ? { ok: false, why: "a dialog" } : readD.call(this) }
+		r = ring(bx)
+		hh.noKeyIntoADialog = r.unproved === true && bx.keys.at(-1) === "\r" && !bx.keys.slice(bx.keys.indexOf("\r")).some((k) => k === "\x05" || k === "\x15")
+		// a version where Ctrl+A shows nothing new: rung, its start said unseen, never left in the box
+		bx = capBox([]); bx.read = function () { return this.lines.length ? drawn(this.lines.slice(-3)) : { ok: true } }; r = ring(bx)
+		hh.startUnseenIsSaid = r.taken === true && r.headHidden === true && r.headSeen === false && bx.submitted[0] === N
+		// a lost Enter with the cursor at the start: pressed again, then the cursor back to the end BEFORE any Ctrl+U
+		bx = capBox([], { lose: 9 }); r = ring(bx)
+		const ke = bx.keys.join("|")
+		hh.lostAtStartErasedFromTheEnd = r.taken === false && r.erased === true && bx.lines.length === 0 && bx.submitted.length === 0 && ke.startsWith(`${N}|\x01|\r|\r|\x05|\x15`)
+		let x = scripted([asAll(tail3), { ok: true }]); r = wkB.typeAndProve(x.read, x.send, N, fast)
+		hh.controlAllShownIsTheirs = r.mixed === true && !x.keys.includes("\r")
+		x = scripted([{ ...tail3, text: `${tail3.text} merci` }]); r = wkB.typeAndProve(x.read, x.send, N, fast)
+		hh.wordsAfterTailNoEnter = r.mixed === true && !x.keys.includes("\r")
+		x = scripted([midR, tail3, head3, { ok: true }]); r = wkB.typeAndProve(x.read, x.send, N, fast)
+		hh.middleWhileDrawn = r.taken === true && x.keys.filter((k) => k === "\r").length === 1
+		// NEGATIVE CONTROLS for every rule that widens what is the bus's (the second review: four widenings kept every leg green)
+		hh.noLooseEndWithoutProof = wkB.busText("[cl", { hidden: true }) === null
+		hh.noShortHeadWithoutBusAfter = wkB.busText(". merci beaucoup", { hidden: true }) === null
+		hh.noClosingWordsPiece = wkB.busText("a bus).", { hidden: true }) === null
+		hh.showsNeedsForty = !wkB.shows({ ok: false, typed: true, text: "nothing.", rows: 3 }, N)
+		hh.aDraftQuotingTheEnd = wkB.busText("i keep getting this bell and i do not know why it says (this channel is a file exchange, not a bus).", { hidden: true }) === null &&
+			wkB.busText("why does it say and/or (this channel is a file exchange, not a bus).", { hidden: true }) === null
+		// erasing: each press brings a hidden line down into view
+		x = scripted([tail3, head3, head2, head1, { ok: true }]); r = wkB.eraseOwn(x.read, x.send, ours, { pressMs: 1 })
+		hh.eraseScrolls = r.erased === true && r.presses === 4
+		// the control: the box BEFORE the press showed all it held, so nothing can come down - the old rule, unchanged
+		x = scripted([asAll(tail3), head3]); r = wkB.eraseOwn(x.read, x.send, ours, { pressMs: 1 })
+		hh.controlAllShownStops = r.erased === false && /somebody started typing/.test(r.why) && x.keys.length === 1
+		x = scripted([tail3, { ...head3, text: `${head3.text} x` }]); r = wkB.eraseOwn(x.read, x.send, ours, { pressMs: 1 })
+		hh.typedDuringErase = r.erased === false && x.keys.length === 1
+		// the second review: words typed during an erase that has reached a path were read as the path; what the box showed must stay
+		// under what comes down, so a word at the end stops it whatever the words read as. The box shows all it holds, 40 columns.
+		{
+			const P1 = wrapAt(crossText.slice(0, crossText.indexOf("bell: ") + 30), 40)
+			x = scripted([drawn(P1), drawn([...P1.slice(0, -1), "stop please"])]); r = wkB.eraseOwn(x.read, x.send, ours, { pressMs: 1 })
+			hh.wordsAfterAPathDuringErase = P1.length >= 3 && r.erased === false && x.keys.length === 1
+		}
+		// measured on a real box: a press left a blank cursor line, the next one dropped it under 3 lines with the start in view
+		x = scripted([tail3, drawn([NL[1], NL[2], ""]), head2, head1, { ok: true }]); r = wkB.eraseOwn(x.read, x.send, ours, { pressMs: 1 })
+		hh.realBoxErase = r.erased === true && r.presses === 4
+		// a person's words above the bell, hidden: the bell's lines go, each read as the bus's first; the words' line never does
+		const words = "bonjour je voulais te dire", hw = capBox(wrapAt(`${words} ${N}`, 80))
+		r = eraseIn(hw)
+		hh.hiddenWordsSurvive = r.erased === false && hw.lines.length > 0 && hw.lines.join("").startsWith(words) && !hw.keys.includes("\r")
+		// the review of #hidden-head, one leg each. (1) blank lines that fill a box are a draft's: not at rest, and an erase stops on them
+		const blanks = wkB.promptAtRest(["out", R, "❯\u00a0", "  ", "  ", R, "  ⏵⏵ auto mode on"].join("\n"))
+		hh.blankRowsAreNotRest = blanks.ok === false && blanks.typed === true && blanks.rows === 3 && wkB.busText(blanks.text, { hidden: true }) === null && drawn([""]).ok === true
+		const blankFirst = drawn(["", NL[2], NL[3]])
+		hh.aBlankRowCounts = blankFirst.rows === 3 && wkB.mayHide(blankFirst)
+		x = scripted([tail3, blanks]); r = wkB.eraseOwn(x.read, x.send, ours, { pressMs: 1 })
+		hh.eraseStopsOnBlankRows = r.erased === false && /blank/.test(r.why) && x.keys.length === 1
+		// (2) a path slot holds a path: words typed where one goes are somebody's, cut from the top or not
+		const i1 = crossText.indexOf("bell: ") + 5, i2 = crossText.indexOf("file in ") + 7
+		hh.wordsInAPathSlot = i1 > 5 && i2 > 7 && wkB.busText(`${crossText.slice(0, i1)} stop please`) === null && wkB.busText(`${crossText.slice(60, i2)} stop please`, { hidden: true }) === null &&
+			JSON.stringify(wkB.busText(`${crossText.slice(60, i2)} /tm`, { hidden: true })) === '{"bells":0,"cut":true}'
+		// (4) two bells (the 11-08 box) erased whole at every width, cut by characters or by words
+		const stuck = []
+		for (let w = 40; w <= 160; w += 3) for (const [how, wrap] of [["chars", wrapAt], ["words", byWords]]) { const b = capBox(wrap(N + N, w)); const e = eraseIn(b); if (!e.erased || b.lines.length) stuck.push(`${how}${w}`) }
+		// and with the measured blank cursor line (the fifth review: two bells stopped at 157-200 columns, the field loop again)
+		for (let w = 40; w <= 200; w += 3) for (const [how, wrap] of [["chars", wrapAt], ["words", byWords]]) { const b = capBox(wrap(N + N, w), { cursorLine: true }); const e = eraseIn(b); if (!e.erased || b.lines.length) stuck.push(`cl-${how}${w}`) }
+		hh.twoBellsEveryWidth = stuck.length === 0
+		// (5) the exchange bell seen from inside its last path: its closing words, whole, are enough
+		hh.crossEndAfterAHiddenPath = JSON.stringify(wkB.busText(crossText.slice(i2 + 6), { hidden: true })) === '{"bells":0,"cut":true}'
+	} catch (e) { hhThrew = e }
+	hh.ranWithoutThrowing = !hhThrew
+	// The box itself, drawn by panes 40 characters wide: rung on its end, a bell left in it erased line by line then one clean bell,
+	// words hidden above a whole bell never sent with it (the bell fills the 8 lines shown: the old reading pressed its Enter alone).
+	const rh = mkdtempSync(join(tmpdir(), "comm-attack-boxcap-"))
+	atExit(() => { try { rmSync(rh, { recursive: true, force: true }) } catch {} })
+	const W40 = "bonjour je voulais te dire quelque chose".padEnd(40, ".")
+	const Cap = project(rh, { capPlain: {}, capRing: { cap: 3 }, capLeft: { cap: 3, line: N }, capWords: { cap: 8, line: W40 + N }, capEb: { cap: 3 }, capLost: { cap: 3, loseEnters: 2 } },
+		{ retryMs: 250, notifyAfterMs: 3600_000, maxMs: 8000 })
+	const exchangeIn = async (Pj, root, k) => {
+		const ex = join(root, `ex-${k}`), tx = join(root, `idle-${k}.jsonl`), at = new Date(Date.now() - 5000).toISOString()
+		mkdirSync(join(ex, "peer", "out"), { recursive: true }); mkdirSync(join(ex, "peer", "in"), { recursive: true })
+		writeFileSync(join(ex, "peer", "out", "LETTER.md"), "# a letter\n")
+		writeFileSync(tx, [{ type: "user", timestamp: at, message: { role: "user", content: "x" } },
+			{ type: "assistant", timestamp: at, message: { role: "assistant", model: "claude-opus-5", stop_reason: "end_turn", content: [{ type: "text", text: "x" }] } },
+			{ type: "system", subtype: "stop_hook_summary", timestamp: at }, { type: "system", subtype: "turn_duration", timestamp: at }].map((l) => JSON.stringify(l)).join("\n") + "\n")
+		const r = await ebB.bell(["--exchange", ex, "--peer", "peer", "--ref", join(ex, "peer", "out", "LETTER.md"), "--project", root, "--agent", k],
+			{ who: () => ({ agents: { [k]: { pids: [Pj.P[k].pid] } } }), lookup: () => ({ ok: true, transcript: tx }) })
+		return { ...r, recorded: existsSync(join(ex, "peer", ".last-bell.json")) }
+	}
+	const r125 = {}
+	if (Cap.up) {
+		for (const k of ["capPlain", "capRing", "capLeft", "capWords", "capLost"]) r125[k] = Cap.ring(k)
+		r125.capEb = await exchangeIn(Cap, rh, "capEb")
+		for (const until = Date.now() + 15000; Date.now() < until && !(Cap.rows("capLeft").length && Cap.rows("capLost").length && Cap.rings("capWords").some((x) => x.erasedOwn === false)); nap(100)) {}
+		nap(400)
+	}
+	const rr125 = (k) => r125[k] || {}
+	const ok125 = Cap.up ? {
+		mailWaits: Object.values(Cap.P).every((p) => !p.mailFailed),
+		plainControl: rr125("capPlain").sent === true && Cap.keys("capPlain") === `${N}\r` && Cap.rows("capPlain").length === 1 && !rr125("capPlain").headHidden,
+		capRung: rr125("capRing").sent === true && rr125("capRing").headHidden === true && rr125("capRing").headSeen === true && Cap.keys("capRing") === `${N}\x01\r` && Cap.rows("capRing").length === 1 && Cap.rows("capRing")[0] === N &&
+			(Cap.rings("capRing").find((x) => x.rang !== undefined) || {}).headHidden === true,
+		capLeftHookLeaves: rr125("capLeft").sent === false && rr125("capLeft").stays === true,
+		capLeftErasedThenOneBell: /^\x15{8}\[claude-comm\] doorbell/.test(Cap.keys("capLeft")) && Cap.keys("capLeft").endsWith(`${N}\x01\r`) && Cap.rows("capLeft").length === 1 && Cap.rows("capLeft")[0] === N,
+		wordsAboveNeverSent: rr125("capWords").sent === false && /^\x15+$/.test(Cap.keys("capWords")) && Cap.rows("capWords").length === 0 && /bonjour/.test(Cap.screen("capWords").text || "") && Cap.pending("capWords") === 1,
+		// a hook ring whose two Enters were lost: the cursor brought back to the end, then the ring that keeps looking erases and rings
+		capLostThenRung: rr125("capLost").sent === false && rr125("capLost").stays === true && Cap.keys("capLost").startsWith(`${N}\x01\r\r\x05\x15`) && Cap.rows("capLost").length === 1 && Cap.rows("capLost")[0] === N,
+		exchangeRungOnItsEnd: !!r125.capEb && r125.capEb.code === 0 && r125.capEb.recorded && Cap.rows("capEb").length === 1 && /cross-project/.test(Cap.rows("capEb")[0]),
+	} : {}
+	check("A125 a box that shows only its last lines: the bell is rung on its end, the bus's text erased as hidden lines come into view, and words hidden above a bell are never sent",
+		Cap.up && Object.values(hh).every(Boolean) && Object.values(ok125).every(Boolean),
+		`${bB ? "" : "THE ARM COULD NOT RUN: no kitty bench for this suite; "}${hhThrew ? `ITS LEGS THREW: ${String(hhThrew.message).slice(0, 80)}; ` : ""}` + Object.entries({ ...hh, ...ok125 }).map(([k, v]) => `${k}=${v}`).join("; ") +
+		(Cap.up ? ["capRing", "capLeft", "capWords"].map((k) => `; ${k}: ${JSON.stringify(Cap.keys(k).replaceAll(N, "<bell>")).slice(0, 44)} (${(rr125(k).why || "rung").slice(0, 60)})`).join("") + `; capEb: exit ${r125.capEb && r125.capEb.code}, ${JSON.stringify((r125.capEb && r125.capEb.out) || "").slice(0, 80)}` : ""))
 }
 
 // A119 - A123: WHO MAY OPEN AND CLOSE, UNDER WHAT ROOM, AND A CLOSED AGENT REOPENED BY ITS MAIL. Work's leader, 11-08 (letters 38, 44, 48): nothing checked who launches,
@@ -6739,7 +6957,7 @@ else if(a.includes("set-user-vars")){if(fs.existsSync(D+"/nomark"))process.exit(
 	}
 
 	// ── A121: ANOTHER AGENT'S WINDOW, in real panes of the bench ─────────────────────────────────────────────
-	const TGT = ["t_ok", "t_force", "t_dry", "t_busy", "t_sub", "t_words", "t_null", "t_nobox", "t_bell", "t_relay", "t_mail", "t_claim", "t_other", "t_unmarked", "t_shell", "t_far", "t_two"]
+	const TGT = ["t_ok", "t_force", "t_dry", "t_busy", "t_sub", "t_words", "t_null", "t_nobox", "t_bell", "t_relay", "t_mail", "t_claim", "t_other", "t_unmarked", "t_shell", "t_far", "t_two", "t_capbell"]
 	const P3 = project("p3", { leader: "boss", agents: { boss: ".", chiefA: "chiefA", chiefB: "chiefB", e1: "e1", ...Object.fromEntries(TGT.map((a) => [a, a])) },
 		teams: { chiefA: [...TGT, "e1"], chiefB: ["t_other", "t_mail"] } })
 	const b3 = await bench()
@@ -6776,6 +6994,8 @@ else if(a.includes("set-user-vars")){if(fs.existsSync(D+"/nomark"))process.exit(
 		W.t_null = pane3("t_null", { box: "null" })
 		W.t_nobox = pane3("t_nobox", { box: null })
 		W.t_bell = pane3("t_bell", { box: wkB.NUDGE })
+		// the bell's last three lines in a box that may hide its start (#hidden-head): somebody's words may be above them
+		W.t_capbell = pane3("t_capbell", { box: [wkB.NUDGE.slice(-180, -120), wkB.NUDGE.slice(-120, -60), wkB.NUDGE.slice(-60)].join("\r\n  ") })
 		W.t_relay = pane3("t_relay", { box: "hey leader expert" })
 		mkdirSync(join(P3.r, ".comm", "relay"), { recursive: true })
 		writeFileSync(join(P3.r, ".comm", "relay", "t_relay.json"), JSON.stringify({ say: "hey leader expert" }))
@@ -6815,6 +7035,7 @@ else if(a.includes("set-user-vars")){if(fs.existsSync(D+"/nomark"))process.exit(
 		const bell = C3(S3.chiefA, "t_bell", "--dry-run"), relay = C3(S3.chiefA, "t_relay", "--dry-run")
 		ok121.theBusOwnBellIsAtRest = bell.status === 0 && /"box_held": "the bus's own bell"/.test(bell.stdout)
 		ok121.itsRelaySentenceIsAtRest = relay.status === 0 && /"box_held": "its relay's own sentence"/.test(relay.stdout)
+		ok121.aBoxThatMayHideIsNotAtRest = notRest("t_capbell", /may hide somebody's words/)
 		// unfinished: refused with its name, lifted by --force and noted
 		writeFileSync(join(P3.dirOf("t_mail"), "M.md"), "m\n")
 		spawnSync(process.execPath, [P3.bin("comm.mjs"), "send", "t_mail", "--ref", "M.md"], { cwd: P3.r, encoding: "utf8", env: baseEnv })

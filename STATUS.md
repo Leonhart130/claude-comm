@@ -1,15 +1,25 @@
-# STATUS — claude-comm, 2026-11-09 (sessions 4–29)
+# STATUS — claude-comm, 2026-11-14 (sessions 4–30)
 
 Design and gates are in `README.md`; **this file is only what is OPEN.** Keep it short — when it grows,
 fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-11-09, `2026-11-09.1` delivered. **WORK IS THE MAIN FIELD**; usage up to 100 %. 🔴 The owner's rule, 11-02: after
-EVERY delivery, docs AND settings AND skills current (measured in work's tree), and a letter to work. 🔴 **Owner 11-05: the
-tests use his RAM and fill his desktop with kitty windows - run them when he says, never wide while he works.**)*
+*(2026-11-14, `2026-11-14.1` delivered. **WORK IS THE MAIN FIELD**; usage up to 100 %. 🔴 The owner's rules: after EVERY
+delivery docs, settings and skills current (measured in work's tree) and a letter to work (11-02); tests never wide while he
+works (11-05); **an adversarial review after EVERY implementation or fix, and anything over 1 GB only through `borne` at
+`free -m` ≥ 2 500 MB, arranged with work (11-13, its letter 66, my 68; `LESSONS.md` §10)**.)*
 
-00. **`2026-11-09.1` delivered: a reopening, and a launch under `"refuse": true`, stop at the usage threshold (`#usage-gate`, letters 55-58). Before it `.3` and `.4`: B, D, C, work's three sentences (`#teams-b`).** **Work declared `"reopen"` for three chiefs and `"refuse": true`, 11-09 02h53 (the owner delegated launching chiefs to it, its R856 and R858), witness green, measured here read-only.** Its `"notify"` filter (letter 60) keeps reopening alarms off the owner's desktop: he was told, and may ask for them back. No real reopening yet: it writes what its first trial does, and its review. Nothing to do here before that. Its 24 h measure of A too. `test/teams-real.mjs` 8/8: not a gate, run it before changing launch, close or reopen. **The suite is 401 s (one run per arm, `#usage-gate`: A122 97 s, 14 arms are 70 %, 65 arms under 1 s), `GATE_CEILING_MS` 600 s, a hang detector and no budget: item C is dearer.** Named: a timer's send has no hook, a refusal at night with nothing running waits, a window the owner closes by hand over mail reopens if declared, `five_hour` absent from the reading so `"session"` compares nothing, boot's `config-fault` unrun.
+000. **`2026-11-14.1` delivered: a box that hides its start (`#hidden-head`, A125, letters 64-69).** Work's experts sat 2 h with
+   only the bell's end in a 17-row box: Claude Code shows its last 3 lines; Ctrl+A brings the start. Measured on real 102×13
+   boxes, 2.1.323 and 2.1.325. Five adversarial reviews, each found defects in the previous patch (round 3: the field loop
+   again). **Next, in order:** (a) review 6 on round 5's fixes, the least reviewed code; (b) the 47 mutants
+   `exchange/WIP-hidden-head-mutants.json` (untracked), `node test/mutate.mjs <it> --jobs 1` under `borne`, ~5 h: the relay ones
+   should survive (no arm, named); (c) the exchange bell under 48 columns, named in `#hidden-head`.
+
+00. **`2026-11-09.1` (`#usage-gate`, its named gaps there).** Work declared `"reopen"` + `"refuse": true` 11-09, then took
+   `"reopen"` out for the owner's pause (its 63), to put it back as is: no real reopening yet. `test/teams-real.mjs` 8/8 before
+   changing launch, close or reopen. Suite ~410 s, `GATE_CEILING_MS` 600 s.
 01. **`2026-11-08.1`'s MUTANTS NOT RUN: an evening when he is inactive, his word 11-08, never while he works.** `exchange/WIP-box-mutants.json` (45, each applied once when written, untracked): `node test/mutate.mjs exchange/WIP-box-mutants.json --jobs N`. 3 h 30 in series at ~4.5 min a suite; 2.7 GB free when last read, so measure a suite's peak before 4 wide. Add A119-A123 to that batch (15 targeted mutants of them were run, one at a time, 11-08; the rest not). A survivor is an arm to strengthen: nothing shipped depends on it. The fix stands on `test/box-real.mjs` (8/8, the code before 0/6) and an adversarial read: `#left-in-the-box`. Waiting from work: its recount of letter 43, `chef-ventes`'s needs. Later, in 44: `comm remind`, the relay carrying the last reply, `--from` limited to the roster (tell work first, its timer signs `minuteur`). **Nothing rings me when work writes to `in/`**: 55 sat 1 h 45, until the owner said so. Its `SendMessage` works (57): I asked it to ring at every letter (58).
 0. 🔴 **RESUME `2026-11-05.2`: built, reviewed, NEVER RUN - on the LOCAL branch `wip/2026-11-05.2`** (`3323160`, not
    pushed; main holds the last green bytes). Back as uncommitted changes: `git restore --source=wip/2026-11-05.2 -- bin
@@ -55,7 +65,7 @@ tests use his RAM and fill his desktop with kitty windows - run them when he say
    harness of 10-30 (`#stranded-named`) be `--only` itself (C).
 7. **`/tmp/comm-attack-*`: the owner deleted 449 folders, 164 MB of tmpfs, 11-09.** A stopped batch leaves them (255 on 11-05), so say so when stopping one. The permission check refuses my sweep of shared `/tmp`: it is his to run.
 
-**Done**: 11-04 `.1` (A105), `.2` (A106); 11-05 `.1` (`#relay-guard`, A107, mutants 15/15); **11-08 `.1`** (`#left-in-the-box`, A111-A115), **`.2`** (`#teams`, A116-A118), **`.3`** (`#teams-b`, A119-A123), **`.4`** (work's 51: three sentences, A118); the parked branch keeps A108-A110, and its own `.2` label must change. A33 reddened once in two runs of the same bus bytes (0 winners, barrier fine): not triaged. Each in the 12 trees.
+**Done**: 11-04 `.1` (A105), `.2` (A106); 11-05 `.1` (`#relay-guard`, A107, mutants 15/15); **11-08 `.1`** (`#left-in-the-box`, A111-A115), **`.2`** (`#teams`, A116-A118), **`.3`** (`#teams-b`, A119-A123), **`.4`** (work's 51: three sentences, A118); **11-14 `.1`** (`#hidden-head`, A125); the parked branch keeps A108-A110, and its own `.2` label must change. A33 reddened once in two runs of the same bus bytes (0 winners, barrier fine): not triaged. Each in the 12 trees.
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a
 codename here; the mapping is in no repo. The boot report prints the REAL directory names: **never copy a `field:` row

@@ -45,6 +45,15 @@ already have.
 
 
 
+
+## 2026-11-14.1 — bus print `248eac50be24` — 2026-11-14
+
+- **A bell in a short window is rung.** Claude Code shows at most `max(3, rows/2 − the rows around it)` lines of its input box, the LAST ones. In a window of about 20 rows or fewer, a bell of 4 lines has its first line hidden above the box, with no mark. The bus took the end it could see for somebody's words and pressed no Enter, and every erase stopped when the hidden line came back into view: two experts waited 2 h on 11-13. Now a box that shows 3 lines or more may hide its start. The bell's end in view is followed by **Ctrl+A, which brings its start into view** (measured on 2.1.323). The Enter waits until that start is seen, so words a person typed in front of the bell still stop it. `.comm/wake/rings.jsonl` says `"headHidden": true, "headSeen": true`. If a version's Ctrl+A shows nothing, the bell still rings, with `"headSeen": false`.
+- **The bus's own text left in such a box is erased a line at a time** as hidden lines come down. Each line is read as the bus's first, and what the box showed must still be there under it: a word typed meanwhile stops the erase. Two bells left in one box (the 11-08 case) are erased at every width.
+- **The Enter alone on bells left in a box is pressed only where the box shows them whole.** In a box of 3 lines or more they are erased and one clean bell follows: words hidden above them are never submitted with them.
+- **A box whose `❯` line and every other line are blank is not at rest**: those are a draft's blank lines, its words perhaps above them.
+- **`close.mjs` refuses to close a window whose box may hide** somebody's words above the bus's. A person closes it, or the bus's next ring clears it. The exchange bell and a relay's first prompt read the box the same way as wake.
+
 ## 2026-11-09.1 — bus print `360b66cddb5e` — 2026-11-09
 
 - **A reopening is refused at the agent's `"usage"` threshold** (its own over the project's, week and 5-hour session), or with no reading under 30 min old, or one from before its reset. Its leader gets one `fyi` at `.comm/reopen/usage.md` per window of usage, not rung, and the owner is not told. The next hook after that stops holding opens it. The 5-hour window may be absent from a reading (`node .comm/bin/usage.mjs` shows it): a `"session"` threshold then compares nothing.
