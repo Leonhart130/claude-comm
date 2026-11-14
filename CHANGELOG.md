@@ -48,6 +48,14 @@ already have.
 
 
 
+
+## 2026-11-14.4 — bus print `eaf7f863d8bf` — 2026-11-14
+
+- **A relay presses its first Enter only on a prompt it has SEEN in its box.** In a box of 3 lines or more, that means its START, brought into view with Ctrl+A, even when the prompt shows whole: lines a person typed above it would be hidden. Somebody's words in the box, no box at all within 20 s (a dialog), or a start never seen: no Enter. The prompt stays in the box for a person to submit or clear, the cursor goes back to its end, and the refusal says which. Before, a prompt not seen within 5 s still got its Enter.
+- **A relay whose box a dialog covers** waits up to 20 s for the box, then checks again. A box that comes back not at the prompt's start means the dialog ate the Ctrl+A, and it is asked again.
+- **A first prompt holding a backslash, or over 800 characters, is refused at the arming.** Kitten's send-text reads backslash escapes, and Claude Code shows a text over 800 characters as `[Pasted text #1]`.
+- **The bell gets no Enter when its last reading showed no box** (a dialog over it). It stays in the box, the bus's own, and the next look erases it and rings. In a box of 3 lines or more, a bell shown whole has its start checked too.
+
 ## 2026-11-14.3 — bus print `cc4f2387f329` — 2026-11-14
 
 - **A relay whose box a dialog covered** presses its Enter only once it has SEEN its prompt's start again. Otherwise it puts the cursor back at the end and leaves the prompt in the box for a person to submit or clear, and its refusal says so (`.2` could press it unseen, and words typed in front of the prompt would have gone with the handoff). Its 20 s wait for the box reads past blank frames.

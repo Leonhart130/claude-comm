@@ -5069,13 +5069,18 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 // FINDINGS.md#relay
 {
 	const r95 = mkdtempSync(join(tmpdir(), "comm-attack-relay-"))
-	const opened95 = [], ARMS = ["nominal", "typed", "dialog", "guard", "noclear", "untaken", "grace", "titled", "titledTyped", "pasted", "lostEnter", "lostEnterTyped", "declared", "twoBells", "cutBell", "overBell", "waitBox", "turnInWait", "keyboardHeld", "guardInWait", "movedInWait", "exitInWait", "rearmInWait", "clearStuck", "sayStuck"], REFUSED = ["nosay", "noguard", "nested", "mail", "selfcancel", "unregistered", "unregisteredOld", "flagguard", "declaredStale"], SC = [...ARMS, ...REFUSED]
+	const opened95 = [], ARMS = ["nominal", "typed", "dialog", "guard", "noclear", "untaken", "grace", "titled", "titledTyped", "pasted", "lostEnter", "lostEnterTyped", "declared", "twoBells", "cutBell", "overBell", "waitBox", "turnInWait", "keyboardHeld", "guardInWait", "movedInWait", "exitInWait", "rearmInWait", "clearStuck", "sayStuck", "capNominal", "capWordsInFront", "capLetterAfter", "capDialogShort", "capDialogForever", "capDialogUnseen", "capDialogBlank", "capLostDialog", "capUnseen", "capLostOnce", "capErase", "capDialogWords", "capDialogEats", "capWordsAtEnd", "capDialogFirst", "capDialogFirstLong", "capSlowRedraw", "capExactFill", "capExactFillClean", "capSay800"], REFUSED = ["nosay", "noguard", "nested", "mail", "selfcancel", "unregistered", "unregisteredOld", "flagguard", "declaredStale", "longsay", "backslashsay"], SC = [...ARMS, ...REFUSED]
 	atExit(() => {
 		for (const [sock, id] of opened95)
 			try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
 		try { rmSync(r95, { recursive: true, force: true }) } catch {}
 	})
-	const say = (k) => `resume ${k}: read HANDOFF.md, then the last brief`
+	// a `cap` scenario's prompt is long enough for a box of 3 lines at 40 columns to hide its start (A126)
+	// `longsay`: 801 characters exactly, one over the edge; `backslashsay`: one backslash
+	const say = (k) => k === "longsay" ? `resume longsay: ${"x".repeat(785)}` : k === "capSay800" ? `resume capSay800: ${"y".repeat(782)}`
+		: k === "capExactFill" ? `resume capExactFill: read HANDOFF.md, the brief, then go on with it, ${"z".repeat(51)}`
+		: k === "capExactFillClean" ? `resume capExactFillClean: read HANDOFF.md, the brief, then go on, ${"z".repeat(54)}` : k === "backslashsay" ? "resume backslashsay: read C:\\HANDOFF.md, then the last brief" : /^cap/.test(k) ? `resume ${k}: read HANDOFF.md, then the last brief. ${"Then go on with the work the brief describes, step by step, and report. ".repeat(3)}`.trim()
+		: `resume ${k}: read HANDOFF.md, then the last brief`
 	mkdirSync(join(r95, ".comm", "bin"), { recursive: true })
 	// `flagguard` alone has no HANDOFF.md: its config guard fails, and only that
 	for (const k of SC) { mkdirSync(join(r95, k), { recursive: true }); if (k !== "flagguard") writeFileSync(join(r95, k, "HANDOFF.md"), "written\n") }
@@ -5107,9 +5112,21 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		const RULE = "\x1b[38:2:136:136:136m" + "─".repeat(60) + "\x1b[39m"
 		const TOP = c.title ? "\x1b[38:2:136:136:136m" + "─".repeat(44) + ` ${c.title} ─` + "\x1b[39m" : RULE
 		let line = c.typed || "", tx = c.tx, pending = false, lost = false
-		const draw = () => process.stdout.write("\x1b[2J\x1b[H" + (c.dialog
+		// `cap` (A126): the box Claude Code draws for a long text in a short window - `width` a line, the LAST `cap` lines, or the first
+		// once Ctrl+A put the cursor at the start (measured, 2.1.323/325). `dialogOnCtrlA`: a dialog over it at the first Ctrl+A,
+		// for `ms`, eating that key or not, a blank frame as it closes, Ctrl+A doing nothing after it; `dialogAfterEnters`: one that
+		// comes at the Nth Enter on the prompt and stays. A dialog has the keys: none reaches the box.
+		let atStart = false, dialogNow = false, blankNow = false, dialogDone = false, enters = 0, cleared = false, wordsDone = false
+		const WD = c.width || 40, chunks = () => { const o = []; for (let i = 0; i < line.length; i += WD) o.push(line.slice(i, i + WD)); return o }
+		const boxText = () => {
+			if (blankNow) return "\x1b[m❯ \r\n  \r\n  "
+			if (!c.cap || !line) return "\x1b[m❯ " + (line || "\x1b[22;2mTry \"fake\"\x1b[22m")
+			const ch = chunks()
+			return (atStart ? ch.slice(0, c.cap) : ch.slice(-c.cap)).map((r, i) => (i ? "  " : "\x1b[m❯ ") + r).join("\r\n")
+		}
+		const draw = () => process.stdout.write("\x1b[2J\x1b[H" + (c.dialog || dialogNow
 			? " Quick safety check: Is this a project you created or one you trust?\r\n\r\n ❯ No, exit\r\n   Yes, I trust this folder\r\n\r\n Enter to confirm · Esc to cancel\r\n"
-			: "\r\n\r\n" + TOP + "\r\n\x1b[m❯ " + (line || "\x1b[22;2mTry \"fake\"\x1b[22m") + "\r\n" + RULE + "\r\n  ⏵⏵ fake session\r\n"))
+			: "\r\n\r\n" + TOP + "\r\n" + boxText() + "\r\n" + RULE + "\r\n  ⏵⏵ fake session\r\n"))
 		draw()
 		if (process.stdin.setRawMode) process.stdin.setRawMode(true)
 		process.stdin.on("data", (d) => {
@@ -5119,20 +5136,48 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 			// A loaded machine's reading of two writes as one, measured on a real session 11-02 (#enter-in-the-paste)
 			if (c.paste && s.replace(/\r/g, "").length > 20) { line += s.replace(/\r/g, ""); pending = true; setTimeout(() => { pending = false; draw() }, 1200); return }
 			for (const ch of s) {
+				if (dialogNow) continue
+				if (c.cap && ch === "\x01") {
+					if (c.ctrlAIgnored) continue   // a version where Ctrl+A shows nothing
+					const d = c.dialogOnCtrlA
+					if (d && !dialogDone) {
+						dialogDone = true; dialogNow = true; if (!d.eats) atStart = true; draw()
+						if (d.ms < 1e8) setTimeout(() => { dialogNow = false; if (d.blankMs) { blankNow = true; draw(); setTimeout(() => { blankNow = false; draw() }, d.blankMs) } else draw() }, d.ms)
+						continue
+					}
+					// `slowCtrlA`: the start drawn that much after the key, a loaded kitty (the eleventh review)
+					if (!(d && dialogDone && d.ignoreAfter)) { atStart = true; if (c.slowCtrlA) setTimeout(draw, c.slowCtrlA); else draw() }
+					continue
+				}
+				// `slowCtrlE`: the box redraws that much after a Ctrl+E - a reading taken sooner is from before the key (the ninth review)
+				if (c.cap && ch === "\x05") { atStart = false; if (c.slowCtrlE) setTimeout(draw, c.slowCtrlE); else draw(); continue }
 				// Ctrl+U clears one visual line from the end, as Claude Code's box does (2.1.319, FINDINGS.md#left-in-the-box)
-				if (ch === "\x15") { line = line.slice(0, Math.max(0, line.length - 60)); draw(); continue }
+				if (ch === "\x15") { if (!c.cap) line = line.slice(0, Math.max(0, line.length - 60)); else if (!atStart) line = line.slice(0, Math.max(0, (Math.ceil(line.length / WD) - 1) * WD)); draw(); continue }
+				// `wordsBefore`: somebody typed "yes " in the gap before the prompt, so it lands after their words
+				if (c.wordsBefore && cleared && !wordsDone && !line && ch !== "\r") { wordsDone = true; line = "yes " }
+				// `lineBefore`: somebody's line, then a newline, in the gap - one whole line of the box above the prompt (the thirteenth review)
+				if (c.lineBefore && cleared && !wordsDone && !line && ch !== "\r") { wordsDone = true; line = "hi".padEnd(WD, " ") }
 				if (ch !== "\r") { line += ch; draw(); continue }
 				if (pending) continue
 				// A113a: the Enter on /clear, or on the prompt every time, never reaches the box's owner
 				if (c.loseClearEnter && line === "/clear") continue
-				if (c.loseAllEnters && line && line !== "/clear") continue
+				if (c.loseAllEnters && line && line !== "/clear") { if (c.dialogAfterEnters && ++enters >= c.dialogAfterEnters) { dialogNow = true; draw() } continue }
 				// `loseEnter` (A101): the first Enter on a prompt is lost, whatever the cause; `appendOnLost`: then somebody types
 				if (c.loseEnter && line && line !== "/clear" && !lost) { lost = true; if (c.appendOnLost) { line += " hello"; draw() } continue }
 				const sub = line
-				line = ""
-				if (sub === "/clear") { if (c.clears) { tx = c.tx2; fs.copyFileSync(c.next, `${c.regDir}/${process.pid}.json`) } }
+				line = ""; atStart = false
+				if (sub === "/clear") { cleared = true; if (c.clears) { tx = c.tx2; fs.copyFileSync(c.next, `${c.regDir}/${process.pid}.json`) } }
 				else if (!c.swallows) fs.appendFileSync(tx, JSON.stringify({ type: "user", timestamp: new Date().toISOString(), message: { role: "user", content: sub } }) + "\n")
+				// `letterAfter`: the prompt went, then somebody typed a letter that starts it
+				if (sub !== "/clear" && c.letterAfter) line = "r"
 				draw()
+			}
+			// once the prompt is in (after /clear, a long text): `wordsAfter`, somebody types after it at once; `dialogOnPrompt`, a dialog
+			// comes over the box before its first reading (the tenth review)
+			if (cleared && !wordsDone && line.length >= 100 && (c.wordsAfter || c.dialogOnPrompt)) {
+				wordsDone = true
+				if (c.wordsAfter) { line += " no wait"; draw() }
+				if (c.dialogOnPrompt) { dialogNow = true; draw(); setTimeout(() => { dialogNow = false; draw() }, c.dialogOnPrompt) }
 			}
 		})
 		const t = setInterval(() => {
@@ -5178,9 +5223,14 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		mkdirSync(regDir95, { recursive: true })
 		for (const k of SC) {
 			const c = { keys: join(r95, `${k}.keys`), pidFile: join(r95, `${k}.pid`), go: join(r95, `${k}.go`), out: join(r95, `${k}.out`), cwd: join(r95, k),
-				tx: tx(k), tx2: tx2(k), next: join(r95, `${k}.next.json`), regDir: regDir95, clears: k !== "noclear", swallows: k === "untaken",
-				paste: k === "pasted", loseEnter: /^lostEnter/.test(k), appendOnLost: k === "lostEnterTyped",
-				loseClearEnter: k === "clearStuck", loseAllEnters: k === "sayStuck", go2: join(r95, `${k}.go2`), out2: join(r95, `${k}.out2`),
+				tx: tx(k), tx2: tx2(k), next: join(r95, `${k}.next.json`), regDir: regDir95, clears: k !== "noclear", swallows: k === "untaken" || k === "capLetterAfter",
+				paste: k === "pasted", loseEnter: /^lostEnter/.test(k) || k === "capLostOnce", appendOnLost: k === "lostEnterTyped",
+				loseClearEnter: k === "clearStuck", loseAllEnters: k === "sayStuck" || k === "capLostDialog" || k === "capErase", go2: join(r95, `${k}.go2`), out2: join(r95, `${k}.out2`),
+				cap: /^cap/.test(k) ? 3 : 0, width: 40, wordsBefore: k === "capWordsInFront" || k === "capDialogWords", letterAfter: k === "capLetterAfter", dialogAfterEnters: k === "capLostDialog" ? 1 : 0,
+				ctrlAIgnored: k === "capUnseen", lineBefore: k === "capExactFill", wordsAfter: k === "capWordsAtEnd", dialogOnPrompt: { capDialogFirst: 7000, capDialogFirstLong: 30000 }[k] || 0,
+				slowCtrlE: k === "capErase" ? 150 : 0, slowCtrlA: k === "capSlowRedraw" ? 2500 : 0,
+				// 6 s and 3 s: long enough that two readings 1.5 s apart, on a loaded machine, cannot step over them (the ninth review)
+				dialogOnCtrlA: { capDialogShort: { ms: 9000 }, capDialogForever: { ms: 1e9 }, capDialogUnseen: { ms: 9000, eats: true, ignoreAfter: true }, capDialogBlank: { ms: 2000, blankMs: 4000 }, capDialogWords: { ms: 9000 }, capDialogEats: { ms: 3000, eats: true } }[k] || null,
 				typed: k === "typed" || k === "titledTyped" || /^(waitBox|turnInWait|guardInWait|movedInWait|exitInWait|rearmInWait)$/.test(k) ? "hello"
 					: k === "twoBells" ? wk95.NUDGE + wk95.NUDGE : k === "cutBell" ? wk95.NUDGE.slice(0, 150) : k === "overBell" ? `${wk95.NUDGE} hello` : "", dialog: k === "dialog", title: /^titled/.test(k) ? "leader expert" : "", boot: reg.bootId(), relay: R95, txNested: join(r95, "nested-inner.jsonl"),
 				// "nested": relay.mjs run by ANOTHER `claude` under this one - node under that name, so it is a session of its own
@@ -5194,7 +5244,8 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 			// `mail` is refused before any screen is read: its own tab, so the panes that ARE read are not made smaller (A98).
 			// `declared` IS read, in a tab of its own: one more split narrowed every pane and `nominal`'s prompt was not
 			// seen whole in its box before the Enter (A101 nominalSawIt red, 11-05, the first run with it as a split)
-			const where = /^(mail|selfcancel|unregistered|flagguard|declared|twoBells|cutBell|overBell|waitBox|turnInWait|keyboardHeld|guardInWait|movedInWait|exitInWait|rearmInWait|clearStuck|sayStuck)/.test(k) ? ["--type=tab", "--match", `window_id:${b95.id}`] : ["--type=window", ...besideMe(b95)]
+			// (`longsay`, `backslashsay`: refused at the arming, a tab each - two more splits shrank `nominal`'s pane under its box, 11-14)
+			const where = /^(mail|selfcancel|unregistered|flagguard|declared|twoBells|cutBell|overBell|waitBox|turnInWait|keyboardHeld|guardInWait|movedInWait|exitInWait|rearmInWait|clearStuck|sayStuck|cap|longsay|backslashsay)/.test(k) ? ["--type=tab", "--match", `window_id:${b95.id}`] : ["--type=window", ...besideMe(b95)]
 			const id = Number(spawnSync("kitten", ["@", "--to", `unix:${b95.sock}`, "launch", "--keep-focus", ...where,
 				`--cwd=${join(r95, k)}`, `--env=CLAUDE_COMM_RUNTIME=${rt95}`, fake95, join(r95, "fake.cjs"), join(r95, `${k}.json`)], { encoding: "utf8", timeout: 10000 }).stdout)
 			if (Number.isInteger(id) && id > 0) opened95.push([b95.sock, id])
@@ -5243,7 +5294,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 			if (acted95.rearmInWait && !acted95.rearmEnd && existsSync(S95.rearmInWait.c.out2)) { acted95.rearmEnd = true; U("rearmInWait", [{ type: "tool_result", tool_use_id: "t1", content: "relay: armed" }]); endTurn("rearmInWait") }
 			if (acted95.rearmEnd && !acted95.rearmFree && (recOf("rearmInWait") || {}).waiting_for_the_box) { acted95.rearmFree = true; ctrlU("rearmInWait") }
 		}
-		for (const k of ["clearStuck", "sayStuck"]) if (S95[k].id) S95[k].boxAfter = wk95.screenAtRest({ sock: b95.sock, id: S95[k].id })
+		for (const k of ["clearStuck", "sayStuck", "capErase"]) if (S95[k].id) S95[k].boxAfter = wk95.screenAtRest({ sock: b95.sock, id: S95[k].id })
 		for (const k of SC) { S95[k].rec = recOf(k); S95[k].keys = keysOf(k) }
 	}
 	const rec = (k) => (S95[k] && S95[k].rec) || {}, keys = (k) => S95[k] && S95[k].keys, out = (k) => (S95[k] && S95[k].o) || {}
@@ -5282,6 +5333,10 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		// a declaration is a guard: relayed on it alone, the bus's check the only guard recorded; one the file does not meet refuses
 		declaredRelayed: rec("declared").relayed === true && keys("declared") === `/clear\r${say("declared")}\r` &&
 			(rec("declared").guards || []).length === 1 && /relay-guard\.mjs' --agent 'declared'$/.test((rec("declared").guards || [])[0] || ""),
+		// a first prompt over 800 characters: Claude Code pastes it as "[Pasted text]", the relay could never see it - refused at the arming
+		longsayRefused: say("longsay").length === 801 && out("longsay").s === 2 && /over 800/.test(out("longsay").e || "") && !S95.longsay.rec,
+		// kitten's send-text reads backslash escapes: a prompt holding one would not be typed as written (the twelfth review)
+		backslashRefused: say("backslashsay").includes("\\") && out("backslashsay").s === 2 && /backslash/.test(out("backslashsay").e || "") && !S95.backslashsay.rec,
 		declaredStaleRefused: out("declaredStale").s === 3 && /guard failed/.test(out("declaredStale").e || "") &&
 			/handoff not written: has - HANDOFF\.md does not contain/.test(out("declaredStale").e || "") && !S95.declaredStale.rec,
 	}
@@ -5290,6 +5345,47 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		`${b95 ? "" : "THE ARM COULD NOT RUN: no kitty bench for this suite; "}` + Object.entries(ok).map(([k, v]) => `${k}=${v}`).join("; ") +
 		ARMS.map((k) => `; ${k}: keys ${JSON.stringify((keys(k) || "").slice(0, 60))} "${(why(k) || (rec(k).relayed ? "relayed" : "-")).slice(0, 70)}"`).join("") +
 		REFUSED.map((k) => `; ${k}: exit ${out(k).s} "${(out(k).e || "").split("\n")[0].slice(0, 60)}"`).join(""))
+	// A126 — THE RELAY IN A BOX THAT HIDES ITS START (`#hidden-head`, its relay half). The 52 mutants of 11-14 left 9 of relay.mjs's
+	// alive: nothing drove a relay into such a box. Each scenario one variable against `capNominal`, the box 3 lines of 40 columns.
+	const k126 = (k, tail) => keys(k) === `/clear\r${say(k)}${tail}`
+	const ok126 = b95 ? {
+		startSeenThenRelayed: rec("capNominal").relayed === true && k126("capNominal", "\x01\r") && (rec("capNominal").prompt_start || {}).seen === true,
+		wordsInFrontRefused: rec("capWordsInFront").relayed === false && k126("capWordsInFront", "\x01\x05") && /in front of it/.test(why("capWordsInFront")),
+		aLetterAfterIsNotItsStart: rec("capLetterAfter").relayed === false && k126("capLetterAfter", "\x01\r"),
+		dialogThenRelayed: rec("capDialogShort").relayed === true && k126("capDialogShort", "\x01\x01\r") && (rec("capDialogShort").prompt_box_back || {}).check === "start",
+		blankFrameWaitedFor: rec("capDialogBlank").relayed === true && k126("capDialogBlank", "\x01\x01\r"),
+		dialogThatStaysGetsNoKey: rec("capDialogForever").relayed === false && k126("capDialogForever", "\x01") && /a dialog/.test(why("capDialogForever")),
+		unseenAfterADialogRefused: rec("capDialogUnseen").relayed === false && k126("capDialogUnseen", "\x01\x01\x05") && /could not be brought into view/.test(why("capDialogUnseen")),
+		// the dialog comes at the first lost Enter: the second Enter and the last Ctrl+E both face it, and neither goes
+		noKeyIntoALaterDialog: rec("capLostDialog").relayed === false && k126("capLostDialog", "\x01\r"),
+		// THE NINTH REVIEW: a Ctrl+A that shows nothing, no dialog anywhere - refused, the prompt left, the cursor put back
+		unseenRefused: rec("capUnseen").relayed === false && k126("capUnseen", "\x01\x05") && /could not be brought into view/.test(why("capUnseen")) && /stays in the box/.test(why("capUnseen")),
+		// the first Enter lost, the second (its start in view) taken
+		secondEnterTaken: rec("capLostOnce").relayed === true && k126("capLostOnce", "\x01\r\r"),
+		// every Enter lost: the cursor to the end, then its own prompt erased line by line, all of it (`own`)
+		// THE TENTH REVIEW. The likeliest dialog: it takes the Ctrl+A and goes, Ctrl+A works after it - the check again, then relayed
+		dialogAteTheKeyThenRelayed: rec("capDialogEats").relayed === true && k126("capDialogEats", "\x01\x01\r"),
+		// words typed after the prompt before its first reading: no Enter, nothing sent, said
+		wordsAtTheEndRefused: rec("capWordsAtEnd").relayed === false && k126("capWordsAtEnd", "") && /in the box with it/.test(why("capWordsAtEnd")),
+		// a dialog before the first reading: the box back within 20 s, relayed; past them, no Enter into it (the eleventh review)
+		dialogBeforeTheFirstReading: rec("capDialogFirst").relayed === true && k126("capDialogFirst", "\x01\r") &&
+			rec("capDialogFirstLong").relayed === false && k126("capDialogFirstLong", "") && /no box was seen within 20 s/.test(why("capDialogFirstLong")),
+		// THE THIRTEENTH REVIEW: the prompt exactly fills the box's 3 lines, a person's line hidden above it: its start asked for anyway, theirs
+		exactFillStillChecked: say("capExactFill").length === 120 && rec("capExactFill").relayed === false && k126("capExactFill", "\x01\x05") && /in front of it/.test(why("capExactFill")),
+		// its positive control: the same exact fill, nothing above - the start asked for, seen, relayed
+		exactFillCleanRelayed: say("capExactFillClean").length === 120 && rec("capExactFillClean").relayed === true && k126("capExactFillClean", "\x01\r"),
+		// 800 characters, the edge: armed and relayed (a lower limit would refuse it)
+		eightHundredRelayed: say("capSay800").length === 800 && rec("capSay800").relayed === true && k126("capSay800", "\x01\r"),
+		// the start drawn 2.5 s after the Ctrl+A: seen within the relay's own 5 s, relayed
+		aSlowRedrawIsSeen: rec("capSlowRedraw").relayed === true && k126("capSlowRedraw", "\x01\r") && (rec("capSlowRedraw").prompt_start || {}).seen === true,
+		// a dialog, then the box back with somebody's words where the prompt starts: theirs, said so
+		dialogThenWordsRefused: rec("capDialogWords").relayed === false && k126("capDialogWords", "\x01\x05") && /in front of it/.test(why("capDialogWords")),
+		finalEraseEmpties: rec("capErase").relayed === false && (keys("capErase") || "").startsWith(`/clear\r${say("capErase")}\x01\r\r\x05\x15`) && !!S95.capErase.boxAfter && S95.capErase.boxAfter.ok === true,
+	} : {}
+	check("A126 a relay in a box that hides its start: its start seen before the Enter, words in front refuse it, after a dialog only a start seen goes on, no key into a dialog",
+		!!b95 && Object.values(ok126).every(Boolean),
+		`${b95 ? "" : "THE ARM COULD NOT RUN: no kitty bench for this suite; "}` + Object.entries(ok126).map(([k, v]) => `${k}=${v}`).join("; ") +
+		ARMS.filter((k) => /^cap/.test(k)).map((k) => `; ${k}: keys ${JSON.stringify((keys(k) || "").replace(say(k), "<say>")).slice(0, 40)} "${(why(k) || (rec(k).relayed ? "relayed" : "-")).slice(0, 60)}"`).join(""))
 	// A113, the relay's half - THE BUS'S OWN TEXT IN THE BOX NEVER STOPS A RELAY, AND SOMEBODY'S WORDS STILL DO. A field's leader,
 	// 11-08: two bells in its box refused its relay twice (and rung nobody), and it slept until the owner came back. One variable
 	// each against `nominal`: the box holds two whole bells, or one cut. Erased, and only that, then the same /clear and prompt.
@@ -6250,6 +6346,55 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		hh.crossAnyLetterName = JSON.stringify(wkB.busText(accented)) === '{"bells":1,"cut":false}' && JSON.stringify(wkB.busText(cutMd, { hidden: true })) === '{"bells":0,"cut":true}'
 		// the seam of two bells, each piece under 40
 		hh.twoBellSeam = JSON.stringify(wkB.busText("you and consumes nothing.[claude-comm] doorbell. This line is from", { hidden: true })) === '{"bells":0,"cut":true}' && wkB.busText("and consumes nothing.[claude", { hidden: true }) === null
+		// a dialog over the box from the moment the bell is typed, never a box seen: no Enter into it (the tenth review)
+		bx = capBox([]); let typedYet = false; const sendF = bx.send, readF = bx.read
+		bx.send = function (t) { const o = sendF.call(this, t); if (t.length > 5) typedYet = true; return o }
+		bx.read = function () { return typedYet ? { ok: false, why: "a dialog" } : readF.call(this) }
+		r = ring(bx)
+		hh.noEnterWhenNoBoxSeen = r.taken === false && r.unproved !== true && bx.keys.length === 1 && /never seen/.test(r.why || "")
+		// one box read early, the dialog after it: the LAST reading decides (the eleventh review)
+		bx = capBox([]); let readsAfter = -1; const sendE = bx.send, readE = bx.read
+		bx.send = function (t) { const o = sendE.call(this, t); if (t.length > 5) readsAfter = 0; return o }
+		bx.read = function () { if (readsAfter >= 0 && readsAfter++ >= 1) return { ok: false, why: "a dialog" }; return readsAfter === 1 ? drawn([this.lines[0]]) : readE.call(this) }
+		r = ring(bx)
+		hh.noEnterAfterAnEarlyBox = r.taken === false && !bx.keys.includes("\r") && /never seen/.test(r.why || "")
+		// startInView on its own (wake's side, the twelfth to fourteenth reviews): an eaten key, a blank after a dialog, blank rows above
+		// the text, ONE no-box reading then the text's end (a dialog: "nobox"), and one then its start, twice (the start: "start")
+		const noBoxR = { ok: false, why: "a dialog" }, blankR = wkB.promptAtRest(["out", R, "❯\u00a0", "  ", "  ", R, "  x"].join("\n"))
+		const siv = (reads) => { const sc = scripted(reads); return wkB.startInView(sc.read, N, 30, 5) }
+		const firstBlankR = wkB.promptAtRest(["out", R, "❯\u00a0", "  ", `  ${NL[0]}`, R, "  x"].join("\n"))
+		hh.startInViewReadsDialogs = siv([noBoxR, noBoxR, tail3]) === "nobox" && siv([noBoxR, noBoxR, blankR]) === "nobox" && siv([blankR]) === "theirs" &&
+			firstBlankR.firstBlank === true && siv([firstBlankR]) === "theirs" && !wkB.startOf(firstBlankR, N) && siv([noBoxR, tail3, head3]) === "nobox" &&
+			siv([noBoxR, head3, head3]) === "start" && siv([head3, tail3, head3, head3]) === "start" &&
+			// one stale reading that looks like the start, then the truth - a line above: theirs, never "start" on the first
+			siv([head3, drawn(["hi", NL[0], NL[1]])]) === "theirs"
+		// the WHOLE text in a box of 4, a person's line hidden above it (typed with a newline in the gap): its start asked for, and
+		// seen to be theirs - no Enter (the thirteenth review)
+		{
+			const hidden = ["hi", ...NL], hb = { keys: [], atStart: false, typed: false,
+				read() { if (!this.typed) return { ok: true }; return drawn(this.atStart ? hidden.slice(0, 4) : hidden.slice(-4)) },
+				send(t) { this.keys.push(t); if (t.length > 5) this.typed = true; else if (t === "\x01" || t === "\x05") this.atStart = t === "\x01"; return { status: 0, stderr: "" } } }
+			r = wkB.typeAndProve(() => hb.read(), (t) => hb.send(t), N, fast)
+			hh.wholeTextMayHideALine = drawn(NL).rows === 4 && r.mixed === true && !hb.keys.includes("\r") && hb.keys.includes("\x01")
+			// its positive control: the same box with NOTHING above - the start asked for, seen, and rung (the fourteenth review)
+			const clean = { keys: [], atStart: false, typed: false, gone: false,
+				read() { if (!this.typed || this.gone) return { ok: true }; return drawn(NL) },
+				send(t) { this.keys.push(t); if (t.length > 5) this.typed = true; else if (t === "\r") this.gone = true; else if (t === "\x01" || t === "\x05") this.atStart = t === "\x01"; return { status: 0, stderr: "" } } }
+			r = wkB.typeAndProve(() => clean.read(), (t) => clean.send(t), N, fast)
+			hh.wholeTextNothingAboveRung = r.taken === true && r.headSeen === true && clean.keys.join("|") === `${N}|\x01|\r`
+			// a first reading slower than the whole wait, of a box not yet drawn: a second reading still comes, and sees the line above
+			const slow = { keys: [], atStart: false, typed: false, first: true,
+				read() { if (!this.typed) return { ok: true }; if (this.first) { this.first = false; Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, fast.shownMs + 30); return { ok: true } } return drawn(this.atStart ? hidden.slice(0, 4) : hidden.slice(-4)) },
+				send(t) { this.keys.push(t); if (t.length > 5) this.typed = true; else if (t === "\x01" || t === "\x05") this.atStart = t === "\x01"; return { status: 0, stderr: "" } } }
+			r = wkB.typeAndProve(() => slow.read(), (t) => slow.send(t), N, fast)
+			hh.oneSlowReadIsNotTheWait = r.mixed === true && !slow.keys.includes("\r")
+			// one no-box reading after the Ctrl+A, then the text's end (the key eaten): no Enter, and the cursor put back once the box is there
+			const eaten = { keys: [], atStart: false, typed: false, noise: false,
+				read() { if (!this.typed) return { ok: true }; if (this.noise) { this.noise = false; return { ok: false, why: "unreadable" } } return drawn(NL.slice(-3)) },
+				send(t) { this.keys.push(t); if (t.length > 5) this.typed = true; else if (t === "\x01") this.noise = true; return { status: 0, stderr: "" } } }
+			r = wkB.typeAndProve(() => eaten.read(), (t) => eaten.send(t), N, fast)
+			hh.noiseThenTheCursorBack = r.taken === false && !eaten.keys.includes("\r") && eaten.keys.at(-1) === "\x05"
+		}
 		// a screen that cannot be read after the Enter (a dialog): no key goes into it
 		bx = capBox([], { lose: 1 }); let entered = false; const sendD = bx.send, readD = bx.read
 		bx.send = function (t) { const o = sendD.call(this, t); if (t === "\r") entered = true; return o }
@@ -6267,7 +6412,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		hh.controlAllShownIsTheirs = r.mixed === true && !x.keys.includes("\r")
 		x = scripted([{ ...tail3, text: `${tail3.text} merci` }]); r = wkB.typeAndProve(x.read, x.send, N, fast)
 		hh.wordsAfterTailNoEnter = r.mixed === true && !x.keys.includes("\r")
-		x = scripted([midR, tail3, head3, { ok: true }]); r = wkB.typeAndProve(x.read, x.send, N, fast)
+		x = scripted([midR, tail3, head3, head3, { ok: true }]); r = wkB.typeAndProve(x.read, x.send, N, fast)
 		hh.middleWhileDrawn = r.taken === true && x.keys.filter((k) => k === "\r").length === 1
 		// NEGATIVE CONTROLS for every rule that widens what is the bus's (the second review: four widenings kept every leg green)
 		hh.noLooseEndWithoutProof = wkB.busText("[cl", { hidden: true }) === null

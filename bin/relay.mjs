@@ -255,10 +255,25 @@ if (ARGV[0] === "--after-turn") {
 	// joins the text and nothing is submitted - measured 11-02 on 2.1.316, 270 characters + `\r` in one write left whole
 	// in the box 3/3 (FINDINGS.md#enter-in-the-paste). Two writes usually reach it as two reads; a loaded machine can hand
 	// them over as one (a field's relay, 11-02 03h16: its prompt whole in the box, the expert inert 15 h). Once the
-	// box draws the prompt, its bytes were read, and the Enter is a key of its own. Not shown in time: typed as before.
-	let shown = null
-	let capped = null
-	for (const t = Date.now(); Date.now() - t < SHOWN_MS; nap(40)) { const s = atRest(st.sock, st.window); if (wake.shows(s, st.say)) { shown = Date.now() - t; capped = !wake.sameText(s.text, st.say); break } }
+	// box draws the prompt, its bytes were read, and the Enter is a key of its own.
+	// 🔴 NEVER AN ENTER ON A PROMPT NOT SEEN (the tenth review of #hidden-head). Words in the box that are not the prompt are somebody's:
+	// no Enter, as wake's bell does. No box at all within SHOWN_MS (a dialog, an unreadable screen), or the prompt never drawn whole:
+	// no Enter either - "not shown in time: typed as before" pressed it into a dialog, and a paste not drawn in 5 s swallows its Enter.
+	// The prompt stays in the box, said; a person sends it.
+	// A dialog over the box before any reading gets BOX_BACK_MS for the box to come back, as one after the Ctrl+A does; once a box is
+	// seen, SHOWN_MS from then (the eleventh review: 5 s here against 20 s there)
+	// The CURRENT reading decides: an empty box read before the prompt was drawn cut the dialog's 20 s to 5 (the twelfth review).
+	let shown = null, capped = null, theirs = false, noBoxNow = false
+	const t = Date.now()
+	for (let until = t + SHOWN_MS; Date.now() < until; nap(40)) {
+		const s = atRest(st.sock, st.window)
+		// a box of 3 lines or more may hide lines above even a prompt shown whole: its start is asked for too (the thirteenth review)
+		if (wake.shows(s, st.say)) { shown = Date.now() - t; capped = !wake.sameText(s.text, st.say) || wake.mayHide(s); break }
+		noBoxNow = !s.ok && !s.typed
+		if (noBoxNow) until = Math.max(until, Math.min(t + BOX_BACK_MS, Date.now() + SHOWN_MS))
+		if (s.typed && s.text && s.text.trim() && !wake.pieceOf(s, st.say)) { theirs = true; break }
+	}
+	if (shown === null) stop({ refused: `cleared and the first prompt typed, but ${theirs ? "somebody's words are in the box with it" : !noBoxNow ? `the box never showed it whole within ${SHOWN_MS / 1000} s` : `no box was seen within ${BOX_BACK_MS / 1000} s (a dialog?)`} - no Enter pressed; the prompt stays in the box, a person submits or clears it; look at window ${st.window}`, typed: ["/clear", "prompt"] })
 	// A BOX THAT HIDES ITS START shows the prompt's end: Ctrl+A brings its start into view, and words a person typed in front of it
 	// stop the Enter, as wake's bell does (FINDINGS.md#hidden-head). The cursor stays there: an Enter there submits it all.
 	// `atStart`: the cursor was SENT there, seen or not - it goes back to the end before any erase (the third review of #hidden-head)
@@ -266,26 +281,34 @@ if (ARGV[0] === "--after-turn") {
 	if (capped) {
 		send("\x01")
 		atStart = true
-		let h = wake.startInView(read, st.say)
+		// the relay's own SHOWN_MS, not wake's 1.5 s: a loaded kitty redraws slowly, and "unseen" now refuses (the tenth review)
+		let h = wake.startInView(read, st.say, SHOWN_MS)
 		// NO BOX after the Ctrl+A (a dialog): no key into it. The prompt is behind it, the handoff with it: the box back within
-		// BOX_BACK_MS and showing the prompt (its start, or its end if the dialog took the Ctrl+A), the start check again, as if no
-		// dialog had come. Erasing it instead lost the handoff with a refusal pointing at an empty box (the seventh review).
+		// BOX_BACK_MS (blank rows are a frame between two, read on) and showing the prompt, the start check again, as if no dialog had
+		// come. Showing anything else where the prompt starts: somebody's words (the seventh, eighth and ninth reviews of #hidden-head).
 		if (h === "nobox") {
-			// blank rows are a frame between two (the dialog closing), not the box back: read on (the eighth review)
 			let back = null
 			for (const until = Date.now() + BOX_BACK_MS; Date.now() < until; nap(500)) { const s = read(); if (s.ok || (s.typed && s.text)) { back = s; break } }
-			if (back && (wake.startOf(back, st.say) || wake.shows(back, st.say))) {
-				send("\x01")
-				h = wake.startInView(read, st.say)
-				// after a dialog that took a key, only a START SEEN goes on: "unseen" here is no other version's Ctrl+A, it may be the
-				// dialog again, and words typed in front would go with the handoff (the eighth review). The cursor back to the end,
-				// the prompt left in the box - a person submits or clears it, and the refusal says so.
-				if (h !== "start") { if (wake.startOf(read(), st.say)) send("\x05"); h = "nobox" }
-			}
+			if (back && (wake.startOf(back, st.say) || wake.shows(back, st.say))) { send("\x01"); h = wake.startInView(read, st.say, SHOWN_MS) }
+			else if (back && back.ok) h = "gone"
+			else if (back && back.typed) h = "theirs"
 			note({ prompt_box_back: { at: now(), back: !!back, check: h } })
 		}
-		if (h === "theirs" || h === "gone" || h === "nobox") { if (h === "theirs") send("\x05"); stop({ refused: `cleared and the first prompt typed, but its box hides its start and ${h === "theirs" ? "somebody's words are in front of it" : h === "gone" ? "it left the box when its start was asked for" : "the box went away when its start was asked for (a dialog?) - the prompt stays in it, a person submits or clears it"} - no Enter pressed; look at window ${st.window}`, typed: ["/clear", "prompt"] }) }
-		note({ prompt_start: { at: now(), seen: h === "start" } })
+		// ONLY A START SEEN GOES ON. "Unseen" is a Ctrl+A that showed nothing: another version's, or a dialog that took it and was gone
+		// before the box was read again - and words typed in front would go with the handoff (the ninth review). A relay is ONE prompt a
+		// person can send: it stays in the box and the refusal says so. (Wake's bell rings unseen: rung again and again, and a bell that
+		// never rings is the field's loop.) The cursor back to the end first, only into a box read to hold text - never into a dialog:
+		// that is where it was before this relay's Ctrl+A, the prompt having been typed at it.
+		if (h !== "start") {
+			const b = read()
+			if (b.typed && b.text && b.text.trim()) send("\x05")
+			const what = h === "theirs" ? "somebody's words are in front of it"
+				: h === "gone" ? "it left the box when its start was asked for"
+				: h === "nobox" ? "the box went away when its start was asked for (a dialog?)"
+				: "its start could not be brought into view (Ctrl+A showed nothing)"
+			stop({ refused: `cleared and the first prompt typed, but its box hides its start and ${what} - no Enter pressed;${h === "gone" ? "" : " the prompt stays in the box, a person submits or clears it;"} look at window ${st.window}`, typed: ["/clear", "prompt"] })
+		}
+		note({ prompt_start: { at: now(), seen: true } })
 	}
 	send("\r")
 	note({ prompt: { at: now(), shown_ms: shown } })
@@ -309,7 +332,8 @@ if (ARGV[0] === "--after-turn") {
 	// a box that hides its start shows the prompt's end, then slices of it as each press brings a hidden line down: `pieceOf`.
 	// The cursor at the prompt's start, Ctrl+U would take nothing: back to its end first - only into a box READ to show the prompt's
 	// start, never blind 15 s after an Enter that may have started a turn and a dialog (the fourth review of #hidden-head)
-	if (atStart && wake.startOf(read(), st.say)) send("\x05")
+	// and a moment for the box to redraw: a reading from before the key made the erase stop at its first press (the ninth review)
+	if (atStart && wake.startOf(read(), st.say)) { send("\x05"); nap(300) }
 	const left = wake.eraseOwn(read, send, (t, s) => wake.shows(s, st.say) || (wake.mayHide(s) && wake.pieceOf(s, st.say)), { own: st.say })
 	if (left.presses) note({ erased_own: { erased: left.erased, presses: left.presses } })
 	stop({ refused: `cleared and the first prompt typed${again ? `, its Enter pressed again at ${again} on the prompt left whole in the box,` : ","} but no user row carrying it reached the new transcript within ${TAKEN_MS / 1000} s - look at window ${st.window}` })
@@ -399,6 +423,11 @@ const cfgFile = join(root, ".comm", "config.json")
 if (!say || !say.trim()) die(`no first prompt for '${agent}': pass --say "<what the fresh session is told first>", or add it once to ${cfgFile}:\n` +
 	`    "relay": {"${agent}": "${agent === (cfg.leader || "leader") ? "hey leader expert" : "<the sentence that resumes this agent's work>"}"}`)
 if (/[\r\n]/.test(say)) die(`the first prompt must be ONE line: a newline typed into the prompt submits it half-way`)
+// Claude Code shows a text over 800 characters typed at once as `[Pasted text #1]` (2.1.325's own code, `S9=800`): the relay could
+// never see its prompt, and refuses one it cannot see (the eleventh review of #hidden-head). Point at a file instead.
+// kitten's send-text reads its text for backslash escapes ("\n" would be typed as a newline and submit it half-way)
+if (say.includes("\\")) die(`the first prompt holds a backslash: kitten's send-text reads it as an escape, so the prompt typed would not be the prompt written - write it without one`)
+if (say.length > 800) die(`the first prompt is ${say.length} characters: over 800, Claude Code collapses it into "[Pasted text]" and the relay cannot see it to press its Enter - write the details in a file and name the file in a short prompt`)
 if (!guards.length) die(`no guard: pass --guard "<a command that exits 0 only when your handoff is written>" (repeatable), or add\n` +
 	`    "relay": {"${agent}": {"say": ${JSON.stringify(say)}, "guard": "<cmd>"}}  to ${cfgFile}\n` +
 	`  - or declare the handoff itself there, and the bus checks it: "handoff": {"file": "<it>", "written": 30} (relay-guard.mjs --help).\n` +

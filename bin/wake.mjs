@@ -592,7 +592,9 @@ export function promptAtRest(screen) {
 	// `rows`: how many lines the box SHOWS between its edges, blank ones too - from 3 up it may hide its first ones (HIDES_FROM)
 	const rows = bottom - top
 	const text = [rest, ...lines.slice(top + 1, bottom)].map((l) => plain(l).trim()).filter(Boolean).join(" ")
-	for (let j = top + 1; j < bottom; j++) if (plain(lines[j]).trim()) return { ok: false, typed: true, text, rows, why: "the input holds more than one line of text" }
+	// `firstBlank`: the ❯ row blank with text under it - lines above the text, scrolled out of view (the twelfth review of #hidden-head)
+	const firstBlank = !plain(rest).trim()
+	for (let j = top + 1; j < bottom; j++) if (plain(lines[j]).trim()) return { ok: false, typed: true, text, rows, firstBlank, why: "the input holds more than one line of text" }
 	// An empty box is ONE line. Blank lines that fill it are a draft's (Shift+Enter), and in a box that hides its start the draft's
 	// words may be above them: the review of #hidden-head typed a bell under one and the bell's end, in view, took its Enter.
 	if (rows > 1 && !plain(rest).trim()) return { ok: false, typed: true, text: "", rows, why: "the input box shows only blank lines: a draft's, whose words may be above them" }
@@ -629,7 +631,7 @@ export const mayHide = (s) => !!s && s.typed === true && s.rows >= HIDES_FROM
 export const shows = (s, want) => !!s && s.typed === true && (sameText(s.text, want) ||
 	(mayHide(s) && squash(s.text).length >= CUT_MIN && squash(want).endsWith(squash(s.text))))
 /** Does the reading show the START of `want` - CUT_MIN of it, or all of a shorter one? A box whose cursor was sent to the start. */
-export const startOf = (s, want) => { if (!s || s.typed !== true) return false; const q = squash(s.text), t = squash(want); return !!q && t.startsWith(q) && q.length >= Math.min(CUT_MIN, t.length) }
+export const startOf = (s, want) => { if (!s || s.typed !== true || s.firstBlank) return false; const q = squash(s.text), t = squash(want); return !!q && t.startsWith(q) && q.length >= Math.min(CUT_MIN, t.length) }
 /** Is all the reading shows a piece of `want`: its start, or - in a box that may hide its start - any slice of CUT_MIN or more? */
 export const pieceOf = (s, want) => {
 	if (!s || s.typed !== true) return false
@@ -855,25 +857,41 @@ const SHOWN_MS = 1500, TAKEN_MS = 1500
 function boxAgainst(s, text) {
 	if (s.ok) return "empty"
 	if (!s.typed || !squash(s.text)) return "unknown"   // blank rows: a frame between two, never a reading of the text
-	if (sameText(s.text, text)) return "whole"
+	// the whole text in a box of 3 lines or more is its END as far as anyone can tell: lines may be above it - a person's, typed with
+	// a newline in the gap - so its start is asked for too (the thirteenth review of #hidden-head: 310 of 1026 configurations)
+	if (sameText(s.text, text)) return mayHide(s) ? "tail" : "whole"
 	if (shows(s, text)) return "tail"
 	return pieceOf(s, text) ? "partial" : "theirs"
 }
 /** After Ctrl+A in a box that hides its start: `start` once it shows the text's first lines, `theirs` if anything else shows, `gone`
  * if the box empties, `unseen` after `ms`. */
 export function startInView(read, text, ms = SHOWN_MS, nap = 40) {
+	let noBoxes = 0, starts = 0
 	for (let n = 1, t = Date.now(); ; n++, sleepSync(nap)) {
 		const s = read()
 		if (s.ok) return "gone"
 		const noBox = !s.typed, blank = s.typed && !squash(s.text)
+		if (noBox) noBoxes++
+		// ONE no-box reading is a dialog: at slow reads a dialog is seen once, and asking for two made an eaten key read "unseen" (a
+		// bell rung unseen) or "theirs" (the thirteenth review, reverting the twelfth). A frame that was only noise costs a wait and a retry.
+		const sawNoBox = noBoxes >= 1
 		if (s.typed && !blank) {
-			if (startOf(s, text)) return "start"
+			// blank rows ABOVE the text's first line: somebody's lines in front of it, scrolled out (the twelfth review)
+			if (s.firstBlank) return "theirs"
+			// the START in TWO readings running: a picture taken before the Ctrl+A redrew already looks like it for a text shown whole,
+			// and a line hidden above went with the Enter (the fourteenth review). The second reading comes after the first one's end.
+			if (startOf(s, text)) { if (++starts >= 2) return "start"; continue }
+			starts = 0
 			if (!pieceOf(s, text)) return "theirs"
+			// THE BOX BACK FROM A DIALOG, not at its start: the dialog took the Ctrl+A. "nobox" at once, so the caller waits for the box
+			// and asks again - an eaten key and a dialog gone within the wait read "unseen", and a relay refused (the eleventh review)
+			if (sawNoBox) return "nobox"
 		}
 		// two reads at least: one screen read can take 1.5 s on a loaded machine, and its picture may be from before the key. Blank
 		// rows still shown then are a draft's, in front of the text: somebody's (the fourth review of #hidden-head)
 		// and no box at all then - a dialog, a screen that cannot be read - gets no Enter (the fifth review)
-		if (n >= 2 && Date.now() - t >= ms) return blank ? "theirs" : noBox ? "nobox" : "unseen"
+		// (blank rows after a dialog are that dialog closing, not a draft's)
+		if (n >= 2 && Date.now() - t >= ms) return blank ? (sawNoBox ? "nobox" : "theirs") : noBox ? "nobox" : "unseen"
 	}
 }
 /** Read the box until it is `empty` or `theirs`, or `takenMs` have passed: [the last state, the last reading]. */
@@ -901,11 +919,13 @@ export function typeAndProve(read, send, text, { shownMs = SHOWN_MS, takenMs = T
 	// Ctrl+U takes nothing, and the ring that keeps looking is the field's loop again (the third review of #hidden-head: a hook ring,
 	// both Enters lost, then 60 presses a minute for 12 h). Not into a box it cannot read: a dialog gets no key.
 	let atStart = false
-	const back = () => { if (atStart) { send("\x05"); atStart = false } }
+	const back = () => { if (atStart) { send("\x05"); atStart = false; sleepSync(150) } }   // a moment to redraw: no reading from before it
 	const mixed = (again) => { back(); return { typed: true, taken: false, mixed: true, again, why: "somebody's words are in the box with the bell: both left alone, and no Enter pressed on them" } }
-	let shown = null, head = {}
-	for (const t = Date.now(); Date.now() - t < shownMs; sleepSync(nap)) {
+	let shown = null, head = {}, lastBox = false
+	// two readings at least before giving up: at 1.5 s a reading, one look was the whole wait (the fourteenth review)
+	for (let n = 1, t = Date.now(); n <= 2 || Date.now() - t < shownMs; n++, sleepSync(nap)) {
 		const st = boxAgainst(read(), text)
+		lastBox = st !== "unknown"
 		if (st === "theirs") return mixed(false)
 		if (st === "whole") { shown = Date.now() - t; break }
 		if (st === "tail") {
@@ -921,11 +941,16 @@ export function typeAndProve(read, send, text, { shownMs = SHOWN_MS, takenMs = T
 			if (h === "theirs") return { ...mixed(false), shownMs: shown, ...head }
 			// emptied by something else at that moment: not rung by this ring, and not claimed - the next look reads the session
 			if (h === "gone") { atStart = false; return { typed: true, taken: false, shownMs: shown, ...head, why: "the text left the box when its start was asked for - not rung by this ring" } }
-			// no box on screen after the Ctrl+A (a dialog, an unreadable screen): no Enter, and no key - the next look finds the cursor
-			if (h === "nobox") return { typed: true, taken: false, shownMs: shown, ...head, why: "its box went away when its start was asked for (a dialog?) - no Enter pressed" }
+			// no box on screen after the Ctrl+A (a dialog, an unreadable screen): no Enter. The cursor back to the end only if a box is
+			// there now holding text - one noise frame, gone (the fourteenth review); never a key into a dialog
+			if (h === "nobox") { const b = read(); if (b.typed && squash(b.text)) back(); return { typed: true, taken: false, shownMs: shown, ...head, why: "its box went away when its start was asked for (a dialog?) - no Enter pressed" } }
 			break
 		}
 	}
+	// NO BOX IN THE LAST READING, the text never seen (a dialog over it, an unreadable screen): no Enter - it would go to the dialog
+	// (the tenth review of #hidden-head; the LAST reading, the eleventh: one early box then a dialog still took it). The bell behind it
+	// is the bus's own: the next look erases it and rings once the box is back.
+	if (shown === null && !lastBox) return { typed: true, taken: false, why: "its box was never seen after the bell was typed (a dialog?) - no Enter pressed" }
 	send("\r")
 	// still in the box: whole, its end in view - or, the cursor at its start, its START (a person's first letter is not that)
 	const still = ([st, s]) => st === "whole" || st === "tail" || (atStart && startOf(s, text))
@@ -952,7 +977,9 @@ export function typeAndProve(read, send, text, { shownMs = SHOWN_MS, takenMs = T
 // A file per WINDOW, in the user's runtime dir: wake from this project, wake from a timer, a peer project's exchange bell and
 // a relay all type into the same box. link(2) publishes it whole or not at all. A holder that is dead, or whose pid now
 // names another process, or that has held longer than any typist can (a relay's /clear and first prompt are bounded by
-// 45 s, and 20 s more if a dialog covers its box - relay.mjs's BOX_BACK_MS), holds nothing: a hook killed at its 10 s leaves a file and no typist. A dir that cannot be made does not silence the
+// its steps' timeouts add up to about 90 s, BOX_BACK_MS's 20 s twice among them, and about 130 s with 1.5 s reads - past
+// HOLD_MAX_MS: another typist may then take the window, and it refuses a box that is not the bus's - the ninth and twelfth
+// reviews of #hidden-head), holds nothing: a hook killed at its 10 s leaves a file and no typist. A dir that cannot be made does not silence the
 // bell: it types unguarded, as it did before this existed.
 const HOLD_MAX_MS = 120_000
 const startTick = (pid) => { try { const st = readFileSync(`/proc/${pid}/stat`, "utf8"); return st.slice(st.lastIndexOf(") ") + 2).split(" ")[19] } catch { return null } }

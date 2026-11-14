@@ -3911,7 +3911,8 @@ bell's Enter is unmeasured") is now a measured candidate too.
 
 **The fix, in `relay.mjs` (release `2026-11-02.1`):** (1) the Enter waits until the box SHOWS the prompt (read off the
 screen, `wake.sameText`, whitespace-blind as wake's rule 8 is) - its bytes were read, so the Enter is a key of its own;
-not shown within 5 s, it is typed as before. (2) When it is lost anyway: 3 s after the Enter, the prompt whole and ALONE
+not shown within 5 s, it is typed as before (**no longer, since `2026-11-14.4`**: a prompt never seen gets no Enter,
+`#hidden-head` rounds 9-13). (2) When it is lost anyway: 3 s after the Enter, the prompt whole and ALONE
 in the box gets the Enter alone, ONCE - that box holds nothing but the relay's own words. Anything more in it, or an
 empty box, gets nothing. The record says when (`prompt.shown_ms`, `enter_again_at`), and so does the refusal.
 **A101**, in A95's bench, one variable each against `nominal`: `pasted` (the fake draws a long text 1200 ms late and loses
@@ -5239,6 +5240,28 @@ What stays named from that sweep:
 Every point is a leg of A125 or A121, and the real-box measurements above caught one the fakes had not drawn (the blank cursor
 line).
 
+**Rounds 9-13 (on `.3`; fixed in `.4`) and the relay's arm.**
+- Round 9: through the FIRST check, a dialog that took the Ctrl+A and was gone within one reading gave "unseen", and the relay
+  pressed Enter. Words typed in front would have gone with the handoff.
+- Round 10: in the relay's 5 s wait for its prompt, a reading of somebody's words, or no box at all, still ended in an Enter at
+  the timeout ("not shown in time: typed as before", 11-02). Wake's bell did the same with no box seen.
+- Round 11: that fix judged the box by its first reading, and its 5 s check refused a dialog that eats the Ctrl+A and closes
+  within it.
+- Round 12: a person's words plus newlines at the cursor scrolled above blank rows and read as the start (older than tonight).
+  Kitten's send-text reads backslash escapes, so a relay prompt holding one is not typed as written.
+- Round 13: a text that exactly fills a box of 3 or more read "whole", so there was no Ctrl+A, and a line typed above it in
+  the gap went with the Enter (older than tonight: 310 of 1026 configurations). Round 12's "two no-box readings for a dialog"
+  made slow-read dialogs read "unseen" or "theirs", and was reverted.
+**Now:** a relay goes on to its Enter only on a start seen. Words in the box that are not its prompt refuse at once. So does no
+box within 20 s, or a prompt never drawn whole within 5 s of a box. Every refusal leaves the prompt in the box for a person,
+puts the cursor back (only into a box that holds text) and says why. A box back from a dialog not at its start means the
+dialog ate the key, and is asked again. Wake presses no Enter when its last reading showed no box. A box of 3 lines or more never reads "whole": its start is asked for
+even when the text shows entire. A blank `❯` row above the text is somebody's. Arming refuses a backslash, and a prompt
+over 800 characters: Claude Code shows it as `[Pasted text #1]` (2.1.325's own code), and the relay could never see it.
+**A126** drives `relay.mjs` into capped panes, each scenario one variable against `capNominal`: words in front, words at the
+end, a letter after, a dialog (before the first reading, after the Ctrl+A, eating it, lasting, then a blank frame, then
+words), a Ctrl+A that shows nothing, a slow redraw, a second Enter taken, the last erase emptying the box. Mutants: below.
+
 **The arm.** A125:
 - the readers on drawn screens, each leg beside its control (the same text in a box that shows all it holds);
 - a box model with the measured keys (`capBox`), and negative controls for every widening rule;
@@ -5269,7 +5292,8 @@ reddened by name, 12 survived.**
   me together (the owner through work, its letter 71). The next session reviews `.3` first.
 - **The exchange bell after a dialog over the box**, in the exchange-bell tool itself (no ring keeps looking there): its text
   stays until another bell reaches that agent.
-- **The relay presses its first Enter even when its prompt was never seen** (as before this fix). In a capped box it now checks the start.
+- **The relay's first Enter, since `.4`, needs its prompt seen** (its start, in a box of 3 lines or more); a refusal leaves the
+  prompt in the box for a person. A prompt mostly of spaces in a box under 34 columns shows under 40 characters at its end and is refused.
 - **A person quoting the bus's own sentences**: in a box that may hide its start, any words then 40 characters or more of the
   exchange bell's sentence (16 around a path) read as the bus's, and lines of that draft can be erased. Chosen, measured
   (round 7): the alternative left exchange bells in boxes for good. Under 40 is the person's (A125).
