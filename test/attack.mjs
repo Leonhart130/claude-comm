@@ -6241,7 +6241,10 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		// a reading that goes THROUGH a path, the sentence's words on both sides, under 40 of them (`crossed`)
 		hh.crossThroughAPath = JSON.stringify(wkB.busText("his is only the bell: /home/someone/Dev/exchange/peer/out/proposition.md — nothing in this messa", { hidden: true })) === '{"bells":0,"cut":true}'
 		// a letter name whose accents are decomposed (NFD) is still a path
-		hh.crossDecomposedName = JSON.stringify(wkB.busText(crossText.replace(/\/[^/ ]+\.md/, "/lettre-élève.md".normalize("NFD")))) === '{"bells":1,"cut":false}'
+		// whole, and read from INSIDE that name (the box hid the path's start: PATH_TAIL - a survivor of the mutants, 11-14)
+		const nfd = crossText.replace(/\/[^/ ]+\.md/, "/lettre-élève.md".normalize("NFD"))
+		hh.crossDecomposedName = JSON.stringify(wkB.busText(nfd)) === '{"bells":1,"cut":false}' &&
+			JSON.stringify(wkB.busText(nfd.slice(nfd.indexOf("lettre") + 3), { hidden: true })) === '{"bells":0,"cut":true}'
 		// the exchange bell with an accented letter name, whole and cut inside its `.md`
 		const accented = crossText.replace(/\/[^/ ]+\.md/, "/lettre-élève.md"), cutMd = accented.slice(accented.indexOf(".md") + 1)
 		hh.crossAnyLetterName = JSON.stringify(wkB.busText(accented)) === '{"bells":1,"cut":false}' && JSON.stringify(wkB.busText(cutMd, { hidden: true })) === '{"bells":0,"cut":true}'
@@ -6321,7 +6324,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 	const rh = mkdtempSync(join(tmpdir(), "comm-attack-boxcap-"))
 	atExit(() => { try { rmSync(rh, { recursive: true, force: true }) } catch {} })
 	const W40 = "bonjour je voulais te dire quelque chose".padEnd(40, ".")
-	const Cap = project(rh, { capPlain: {}, capRing: { cap: 3 }, capLeft: { cap: 3, line: N }, capWords: { cap: 8, line: W40 + N }, capEb: { cap: 3 }, capLost: { cap: 3, loseEnters: 2 } },
+	const Cap = project(rh, { capPlain: {}, capRing: { cap: 3 }, capLeft: { cap: 3, line: N }, capWords: { cap: 8, line: W40 + N }, capEb: { cap: 3 }, capLost: { cap: 3, loseEnters: 2 }, capEbLeft: { cap: 3, line: crossText } },
 		{ retryMs: 250, notifyAfterMs: 3600_000, maxMs: 8000 })
 	const exchangeIn = async (Pj, root, k) => {
 		const ex = join(root, `ex-${k}`), tx = join(root, `idle-${k}.jsonl`), at = new Date(Date.now() - 5000).toISOString()
@@ -6338,6 +6341,8 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 	if (Cap.up) {
 		for (const k of ["capPlain", "capRing", "capLeft", "capWords", "capLost"]) r125[k] = Cap.ring(k)
 		r125.capEb = await exchangeIn(Cap, rh, "capEb")
+		// an older exchange bell left in a capped box: the exchange bell clears it, its tail read as the bus's, then rings (a survivor, 11-14)
+		r125.capEbLeft = await exchangeIn(Cap, rh, "capEbLeft")
 		for (const until = Date.now() + 15000; Date.now() < until && !(Cap.rows("capLeft").length && Cap.rows("capLost").length && Cap.rings("capWords").some((x) => x.erasedOwn === false)); nap(100)) {}
 		nap(400)
 	}
@@ -6352,6 +6357,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		wordsAboveNeverSent: rr125("capWords").sent === false && /^\x15+$/.test(Cap.keys("capWords")) && Cap.rows("capWords").length === 0 && /bonjour/.test(Cap.screen("capWords").text || "") && Cap.pending("capWords") === 1,
 		// a hook ring whose two Enters were lost: the cursor brought back to the end, then the ring that keeps looking erases and rings
 		capLostThenRung: rr125("capLost").sent === false && rr125("capLost").stays === true && Cap.keys("capLost").startsWith(`${N}\x01\r\r\x05\x15`) && Cap.rows("capLost").length === 1 && Cap.rows("capLost")[0] === N,
+		exchangeClearsItsLeftover: !!r125.capEbLeft && r125.capEbLeft.code === 0 && /^\x15+\[claude-comm\] cross-project/.test(Cap.keys("capEbLeft")) && Cap.rows("capEbLeft").length === 1 && /cross-project/.test(Cap.rows("capEbLeft")[0]),
 		exchangeRungOnItsEnd: !!r125.capEb && r125.capEb.code === 0 && r125.capEb.recorded && Cap.rows("capEb").length === 1 && /cross-project/.test(Cap.rows("capEb")[0]),
 	} : {}
 	check("A125 a box that shows only its last lines: the bell is rung on its end, the bus's text erased as hidden lines come into view, and words hidden above a bell are never sent",

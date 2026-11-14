@@ -13,10 +13,10 @@ works (11-05); **an adversarial review after EVERY implementation or fix, and an
 000. **`2026-11-14.1`, `.2`, `.3` delivered: a box that hides its start (`#hidden-head`, A125, letters 64-73).** Work's experts sat
    2 h with only the bell's end in a 17-row box: Claude Code shows its last 3 lines; Ctrl+A brings the start. Measured on real
    102×13 boxes, 2.1.323 and 2.1.325. Eight adversarial reviews, each found defects in the previous patch (round 3: the field
-   loop again; round 7 reversed round 6). **Next, in order:** (a) review 9 on `.3`'s relay dialog branch (unarmed; not run at
-   the delivery: the owner's 82 % usage ceiling for the night); (b) the
-   52 mutants `exchange/WIP-hidden-head-mutants.json` (untracked), `node test/mutate.mjs <it> --jobs 1`, memory-capped, ~6 h: the
-   relay ones should survive (named); (c) the exchange bell in boxes 50 columns wide or less, named in `#hidden-head`.
+   loop again; round 7 reversed round 6). **Next, in order:** (a) review 9 on `.3`'s relay dialog branch (not run at the
+   delivery: the owner's 82 % usage ceiling for the night); (b) **a relay arm**: the 52 mutants ran (40 red, 12 survived), and
+   9 survivors are the relay's: a pane that drives `relay.mjs` into a capped box (`#hidden-head`, "Mutants"); (c) the exchange
+   bell in boxes 50 columns wide or less, named there.
 00. **`2026-11-09.1` (`#usage-gate`, its named gaps there).** Work declared `"reopen"` + `"refuse": true` 11-09, then took
    `"reopen"` out for the owner's pause (its 63), to put it back as is: no real reopening yet. `test/teams-real.mjs` 8/8 before
    changing launch, close or reopen. Suite ~410 s, `GATE_CEILING_MS` 600 s.

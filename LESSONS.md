@@ -347,6 +347,10 @@ fait, et personne ne la revérifie, sauf le lecteur qui a une horloge sous les y
 
 **La même forme le 2026-11-08** : ma lettre 52 à work portait « 20h20 », nom et en-tête ; son fichier est de 20h13:45. Encore en avance, encore d'après le travail accompli, et encore lu par work : sa réponse était datée de 20h14, avant ma lettre.
 
+**Et le 2026-11-14, deux fois dans la même nuit** : ma lettre 70 portait « 01h33 » et « depuis 01h32 » quand `date` lisait 01h31,
+et ma lettre 69 « installé à 01h29 » quand `INSTALLED.json` disait 01h30. Prises avant la cloche, parce que je les ai lues contre
+l'horloge et le fichier. Trois nuits, et chaque heure écrite de tête était en avance, jamais en retard.
+
 ### Le contrôle
 
 **Pas encore armé, et je le nomme** (`STATUS.md` ▶ NEXT). La garde possible : la ligne `channel:` du boot compare l'heure

@@ -5245,9 +5245,13 @@ line).
 - panes drawing the capped box: rung on its end after Ctrl+A; a bell left in it erased line by line, then one clean bell; words
   hidden above a whole bell never sent; the exchange bell rung on its end; an uncapped pane as the positive control.
 
-A121 refuses the close of a capped box. A98's "hard lines" leg is now two lines, a box that cannot hide. **Mutants: 52 written,
-each applying once (`exchange/WIP-hidden-head-mutants.json`), NOT RUN at the delivery**: ~5 h one at a time, the owner's rule.
-A survivor is an arm to strengthen. The relay's mutants are expected to survive: no pane drives relay into a capped box.
+A121 refuses the close of a capped box. A98's "hard lines" leg is now two lines, a box that cannot hide. **Mutants, run on `.3`
+11-14 02h45-08h34** (52, one suite at a time, 21 221 s, baseline green; `exchange/WIP-hidden-head-mutants-result.log`): **40
+reddened by name, 12 survived.**
+- 9 are the relay's (no pane drives a relay into a capped box: its readers are armed, its flow is not).
+- The exchange bell's own pre-erase, and `\p{M}` in a path's tail, were armed after the batch: `exchangeClearsItsLeftover`,
+  `crossDecomposedName`. Each mutant reddened exactly that leg (baseline + 2, 1 188 s).
+- "An erase may start on one letter" survives because round 4 made it unreachable through `typeAndProve`. It stays as defence in depth.
 
 **Not verified.**
 - **The cap above 3, and what `Wi()` is.** `mayHide` from 3 rows does not need either. The cost is a retype where an Enter would have done.
