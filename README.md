@@ -238,8 +238,9 @@ too — it is how a check gets disabled wholesale a week later.*
   process no other way in. The screen is read first and text that is not the bus's is never typed into (A98), one typist
   at a time, and the bus's own text never stays there (A111-A114, `FINDINGS.md#left-in-the-box`). Claude Code shows
   only the last lines of a long input in a short window, with no mark: a box of 3 lines or more may hide its start, so
-  the bus brings it into view (Ctrl+A) before an Enter, and erases a line only after reading it as its own
-  (A125, `FINDINGS.md#hidden-head`). A key landing in the milliseconds between a read and a key is the limit that
+  the bus brings it into view (Ctrl+A) before an Enter - the terminal's cursor on the box's first cell is the proof, on
+  the alternate screen - and erases a line only after reading it as its own, never with more presses unseen than its own
+  lines in view; a box that does not answer ends the ring (A125, A126, `FINDINGS.md#hidden-head`). A key landing in the milliseconds between a read and a key is the limit that
   cannot be closed from outside the terminal.
 - **`comm who` is Linux-only** — it reads `/proc`. Elsewhere it degrades to "not running" for everyone,
   which is safe but useless; `send` still queues correctly.
