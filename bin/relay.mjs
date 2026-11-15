@@ -105,13 +105,13 @@ function runGuards(guards, cwd) {
 	}
 	return failed
 }
-const screenOf = (sock, id) => spawnSync("kitten", ["@", "--to", `unix:${sock}`, "get-text", "--ansi", "--match", `id:${id}`], { encoding: "utf8", timeout: 5000 })
+const screenOf = (sock, id) => spawnSync("kitten", ["@", "--to", `unix:${sock}`, "get-text", "--ansi", "--add-cursor", "--add-wrap-markers", "--match", `id:${id}`], { encoding: "utf8", timeout: 5000 })
 const sendTo = (sock, id) => (text) => spawnSync("kitten", ["@", "--to", `unix:${sock}`, "send-text", "--match", `id:${id}`, text], { encoding: "utf8", timeout: 5000 })
 /** The screen's verdict, or why it could not be read: NOT KNOWING IS NOT "AT REST". */
-function atRest(sock, id) {
+function atRest(sock, id, alt) {
 	const s = screenOf(sock, id)
 	if (s.status !== 0 || s.error) return { ok: false, why: `the screen could not be read (kitten @ get-text ${s.error ? s.error.code : `exit ${s.status}`})` }
-	return { ...wake.promptAtRest(s.stdout), tail: s.stdout.replace(/\x1b\[[0-9;:]*m/g, "").split("\n").filter((l) => l.trim()).slice(-6) }
+	return { ...wake.cursorCounts(wake.promptAtRest(s.stdout), alt), tail: s.stdout.replace(/\x1b\[[0-9;:?]*[ ]?[A-Za-z]/g, "").replace(/\r/g, "").split("\n").filter((l) => l.trim()).slice(-6) }
 }
 /** Has the transcript gained, past `from`, a row that says a turn ran? A row still being written is read on the next look. */
 function grewBusy(transcript, from) {
@@ -184,7 +184,10 @@ if (ARGV[0] === "--after-turn") {
 	// between the /clear and the prompt; and the bus's OWN text in the box is the bus's to clear (a field's leader, 11-08:
 	// two bells in its box refused this relay twice, then its timer's ring, and it slept until the owner came back).
 	const send = sendTo(st.sock, st.window)
-	const read = () => atRest(st.sock, st.window)
+	// `alt` from THIS run's window list, never the arming's: a session can leave the alternate screen (`/tui default`), and on the
+	// main one a cursor counts for nothing (the twenty-first review)
+	const alt = r.win.alt === true
+	const read = () => atRest(st.sock, st.window, alt)
 	const rules = wake.boxRules(cfgNow), waitFrom = Date.now()
 	let scr = null, told = false, waited = false, size = 0, boxWaitSince = null
 	try { size = statSync(st.transcript).size } catch {}
@@ -196,6 +199,8 @@ if (ARGV[0] === "--after-turn") {
 			if (own) {
 				const e = wake.eraseOwn(read, send, (t, s) => !!wake.busText(t, { hidden: wake.mayHide(s) }))
 				note({ erased_own: { at: now(), bells: own.bells, cut: own.cut, erased: e.erased, presses: e.presses, ...(e.why ? { why: e.why } : {}) } })
+				// presses still pending: never another erase on top of them, every retry for 12 h (the twenty-eighth review: 9 queued, 7 rows)
+				if (e.stalled) stop({ refused: `its box does not answer its keys (${e.why}) - nothing more typed` })
 				scr = read()
 			}
 			// AFTER A WAIT a /clear must not land on somebody. A box emptied may be a person between two sentences, so it must be free
@@ -247,7 +252,7 @@ if (ARGV[0] === "--after-turn") {
 	note({ new_transcript: fresh.ok ? fresh.transcript : null })
 	// 6. the prompt box back and empty, then the first prompt, proved by the new transcript
 	let ready = null
-	for (const until = Date.now() + READY_MS; Date.now() < until; nap(250)) { ready = atRest(st.sock, st.window); if (ready.ok) break }
+	for (const until = Date.now() + READY_MS; Date.now() < until; nap(250)) { ready = atRest(st.sock, st.window, alt); if (ready.ok) break }
 	if (!ready || !ready.ok) stop({ refused: `cleared, but the prompt did not come back at rest within ${READY_MS / 1000} s (${ready ? ready.why : "never read"}) - the first prompt was NOT typed; the session is fresh and waits`, screen: ready && ready.tail })
 	const a = send(st.say)
 	if (a.status !== 0) stop({ refused: `cleared, but the first prompt could not be typed (send-text exit ${a.status}) - the session is fresh and waits` })
@@ -266,7 +271,7 @@ if (ARGV[0] === "--after-turn") {
 	let shown = null, capped = null, theirs = false, noBoxNow = false
 	const t = Date.now()
 	for (let until = t + SHOWN_MS; Date.now() < until; nap(40)) {
-		const s = atRest(st.sock, st.window)
+		const s = atRest(st.sock, st.window, alt)
 		// a box of 3 lines or more may hide lines above even a prompt shown whole: its start is asked for too (the thirteenth review)
 		if (wake.shows(s, st.say)) { shown = Date.now() - t; capped = !wake.sameText(s.text, st.say) || wake.mayHide(s); break }
 		noBoxNow = !s.ok && !s.typed
@@ -303,6 +308,7 @@ if (ARGV[0] === "--after-turn") {
 			const b = read()
 			if (b.typed && b.text && b.text.trim()) send("\x05")
 			const what = h === "theirs" ? "somebody's words are in front of it"
+				: h === "unlanded" ? "its Ctrl+A did not land (the cursor stayed elsewhere)"
 				: h === "gone" ? "it left the box when its start was asked for"
 				: h === "nobox" ? "the box went away when its start was asked for (a dialog?)"
 				: "its start could not be brought into view (Ctrl+A showed nothing)"
@@ -324,7 +330,7 @@ if (ARGV[0] === "--after-turn") {
 		// rule 8 does for its own bell. That box holds nothing anybody else wrote; anything more in it, or an empty one, gets
 		// nothing. The field's question, 11-02: a lone `\r` then submitted 3/3.
 		if (!again && Date.now() - t0 >= ENTER_LOST_MS) {
-			const s = atRest(st.sock, st.window)
+			const s = atRest(st.sock, st.window, alt)
 			if (wake.shows(s, st.say) || (atStart && wake.startOf(s, st.say))) { send("\r"); again = now(); note({ enter_again_at: again }) }
 		}
 	}
@@ -452,7 +458,7 @@ const state = { agent, session: me, cwd, window: r.win.id, sock: r.win.sock, tra
 	say, guards, armed_at: now(), relay_pid: null, relayed: null }
 
 if (has("--dry-run")) {
-	const scr = atRest(r.win.sock, r.win.id)
+	const scr = atRest(r.win.sock, r.win.id, r.win.alt)
 	console.log(JSON.stringify({ ...state, would_arm: true, screen_now: scr.ok ? "at rest, empty" : scr.why }, null, 1))
 	process.exit(0)
 }

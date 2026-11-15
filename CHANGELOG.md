@@ -49,6 +49,15 @@ already have.
 
 
 
+
+## 2026-11-14.5 — bus print `756dc7b25620` — 2026-11-15
+
+- **The bus reads where the cursor is.** Each screen read also asks kitty for the terminal cursor and the line wraps (`--add-cursor --add-wrap-markers`). After a Ctrl+A, the text's start shown with the cursor on its first character proves the start: nothing can be above it. This holds only on the alternate screen, where Claude Code runs (4 of 4 windows here) and nothing scrolls back. Elsewhere the earlier checks decide, as in `.4`.
+- **When the cursor shows the Ctrl+A did not land, there is no Enter.** The ring that keeps looking erases its bell and tries again. After two such tries it stops and tells you. A Ctrl+A drawn late gets 3.5 s more before that.
+- **Erasing its own text, the bus never has more Ctrl+U presses unconfirmed than lines it can see that are its own.** Each press is waited for, up to 5 s. A box that still does not answer is a stalled session. The bus stops, tells you, and leaves the mail in the inbox. Before, a stalled session could receive dozens of presses at once when it woke, and a line of yours above the bell could go with them.
+- On a very slow machine, a bell rung from a hook may be cut by the hook's 10 s before its Enter. The ring that keeps looking then erases it and rings again. Nothing is lost.
+- **After clearing its own text from a box, the bell reads the box again before typing anything.** A dialog that comes over the box at that moment gets no key; the next look rings.
+
 ## 2026-11-14.4 — bus print `eaf7f863d8bf` — 2026-11-14
 
 - **A relay presses its first Enter only on a prompt it has SEEN in its box.** In a box of 3 lines or more, that means its START, brought into view with Ctrl+A, even when the prompt shows whole: lines a person typed above it would be hidden. Somebody's words in the box, no box at all within 20 s (a dialog), or a start never seen: no Enter. The prompt stays in the box for a person to submit or clear, the cursor goes back to its end, and the refusal says which. Before, a prompt not seen within 5 s still got its Enter.

@@ -425,3 +425,22 @@ si `free -m` montre **2 500 Mo disponibles**. Dans un binaire : `grep -a -b -o` 
 **Pas encore armé, et je le nomme** (`STATUS.md` ▶ NEXT). La garde : le hook `PreToolUse` que la branche `2026-11-05.2` prévoit
 pour `heavy.mjs` (« une liste par outil », la lettre 32 de work) refuse une commande sans `borne` qui a la forme d'une commande
 lourde, et `heavy.mjs` prend le verrou de work avec son plancher de 2 500 Mo au lieu d'un verrou à lui.
+
+## §11 — Neuf rondes sans suite complète, un script lancé par son propre chemin, et cinq correctifs de verdict qui se défaisaient (2026-11-14/15)
+
+**Les faits.**
+- **Rondes 16 à 24 de `#hidden-head`, aucune suite complète** : le lot de mutants de `.4` occupait la machine, et j'ai continué
+  sur les jambes isolées. La règle existait (« après chaque ronde, une suite d'abord », mémoire du 11-14). La première suite a
+  trouvé 4 bras rouges (A95, A96, A101, A92) ; l'un était un défaut du banc caché neuf rondes : un faux sur l'écran alternatif
+  perd le bas de sa case quand un partage le rétrécit (mesuré : dessiné sur 56 lignes, rétréci à 27, la case disparue).
+- **`node --input-type=module -e … <chemin de wake.mjs>`** : le chemin en `argv[1]`, donc wake a lancé son `main` dans ce dépôt
+  (« nothing is waiting for anyone else », rien tapé). La mémoire « an import is an execution » existait ; deuxième fois.
+- **Une chaîne `&&` jugeait le statut d'une boucle `for`** (celui de son dernier test, faux) : forme **I**.
+- **Rondes 29 à 33, cinq correctifs du verdict « bloqué » de l'effaceur, chacun défait par le suivant** : un correctif rendait
+  « figée » une case qui répondait, le suivant rouvrait une file de touches, et ainsi de suite. La garde contre une boîte de
+  dialogue avait été posée dans l'effaceur (ronde 32), où elle faussait son verdict ; elle appartenait à l'appelant (ronde 33).
+
+**Le prix** : environ une heure de diagnostic pour les quatre bras ; cinq rondes de revue pour le verdict.
+
+**Le contrôle, pas encore armé** : une ronde ne commence qu'après la suite verte de la précédente (son journal dans le
+scratchpad) ; une garde va chez celui qui tape, jamais dans celui qui mesure. Nommé dans `STATUS.md`.

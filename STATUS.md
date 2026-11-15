@@ -1,22 +1,27 @@
-# STATUS — claude-comm, 2026-11-14 (sessions 4–30)
+# STATUS — claude-comm, 2026-11-15 (sessions 4–30)
 
 Design and gates are in `README.md`; **this file is only what is OPEN.** Keep it short — when it grows,
 fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-11-14, `2026-11-14.1` delivered. **WORK IS THE MAIN FIELD**; usage up to 100 %. 🔴 The owner's rules: after EVERY
+*(2026-11-15, `2026-11-14.5` delivered. **WORK IS THE MAIN FIELD**; usage up to 100 %. 🔴 The owner's rules: after EVERY
 delivery docs, settings and skills current (measured in work's tree) and a letter to work (11-02); tests never wide while he
 works (11-05); **an adversarial review after EVERY implementation or fix, and anything over 1 GB only through `borne` at
 `free -m` ≥ 2 500 MB, arranged with work (11-13, its letter 66, my 68; `LESSONS.md` §10)**.)*
 
-000. **`2026-11-14.1`-`.4` delivered: a box that hides its start (`#hidden-head`, A125, A126, letters 64-75).** Work's experts sat
-   2 h with only the bell's end in a 17-row box: Claude Code shows its last 3 lines; Ctrl+A brings the start. Measured on real
-   102×13 boxes, 2.1.323 and 2.1.325. **Fourteen adversarial reviews**, each found defects in the previous patch (round 3: the
-   field loop again; round 7 reversed round 6; round 13 reversed round 12). The relay has its arm now (A126, 19 scenarios).
-   **Next:** (a) the mutant run on `.4` (`exchange/WIP-hidden-head-mutants-relay.json`, 29) - read its survivors; (b) the named
-   limits in `#hidden-head`: the one-read window, the exchange bell at 50 columns or less, a person pasting 40+ characters of
-   the bus's sentence, paths with `' ( ) ,`; (c) moving the bus's typing to `send-text --stdin` (no escapes at all).
+000. **`2026-11-14.1`-`.5` delivered: a box that hides its start (`#hidden-head`, A125, A126, letters 64-76).** Claude Code shows a
+   long input's last 3 lines (2.1.323/325); its start comes by Ctrl+A. **34 adversarial reviews**. `.5` reads the CURSOR
+   (`get-text --add-cursor --add-wrap-markers`, believed on the alternate screen only): the start seen with the cursor on the
+   `❯` row's first cell is proof; a cursor seen elsewhere is "unlanded", no Enter. The eraser never has more presses unseen
+   than the bus's rows in view, and a box that does not answer ends the run (rounds 23-31). `.4`'s mutants: 33 of 33 red.
+   **Next:** (a) `.5`'s mutants, `exchange/WIP-hidden-head-mutants-5.json` (74), an evening the owner is not on the machine,
+   one at a time; (b) **a stall remembered across runs**, per window with the screen it froze on - first measure a real
+   frozen Claude Code (SIGSTOP) in a minimized window: what get-text shows, whether keys queue (named in round 29); (c) the
+   capped flow WITH the cursor on a real box that really shrinks (the minimized window's splits did not); (d) the named
+   limits in `#hidden-head`: a first press that takes nothing at the deadline, the main screen's cursor-at-start trade-off,
+   the 46-character bell head, rounds 33-34's three, the one-read window, a version scrolling the cursor's line to the top; (e) moving the bus's
+   typing to `send-text --stdin` (no escapes at all).
 00. **`2026-11-09.1` (`#usage-gate`, its named gaps there).** Work declared `"reopen"` + `"refuse": true` 11-09, then took
    `"reopen"` out for the owner's pause (its 63), to put it back as is: no real reopening yet. `test/teams-real.mjs` 8/8 before
    changing launch, close or reopen. Suite ~410 s, `GATE_CEILING_MS` 600 s.

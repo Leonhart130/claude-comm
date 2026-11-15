@@ -5252,6 +5252,184 @@ line).
 - Round 13: a text that exactly fills a box of 3 or more read "whole", so there was no Ctrl+A, and a line typed above it in
   the gap went with the Enter (older than tonight: 310 of 1026 configurations). Round 12's "two no-box readings for a dialog"
   made slow-read dialogs read "unseen" or "theirs", and was reverted.
+- Round 14: a picture taken before the Ctrl+A redrew already looks like the start for a text shown whole, so "start" now needs
+  TWO readings running. A bell's shown loop takes two readings at least: at 1.5 s a reading, one look was the whole wait.
+- **`.4`'s mutants, run 11-14 21h47 to 11-15 02h13, one at a time: baseline green, 33 of 33 red.** 21 of them are the relay's:
+  18 reddened by A126, the relay's capped panes that `.3` lacked, and the 3 arming refusals by A95. Log: `exchange/WIP-hidden-head-mutants-relay-result.log`.
+- Round 15 (on `.4`): after a dialog that ate the Ctrl+A, the whole text still looked like its start. It now proves nothing
+  after a no-box reading when no cursor is known, and a no-box reading resets the count. A 300 ms settle came after each Ctrl+A.
+- Round 16 showed the guessing had reached its end: for a text shown whole, a box with nothing above and a box with a line
+  above look the same. Stale pictures, eaten keys and short dialogs beat every rule, and the settle hid the shortest dialogs.
+  **So the bus now reads the CURSOR.** `kitten @ get-text --add-cursor` appends the terminal's cursor to the same picture, and
+  Claude Code puts it where its input cursor is (measured, 2.1.325: the end after typing, the `❯` row's first text cell after
+  Ctrl+A, the end again after Ctrl+E). A reading showing the text's start with the cursor on that cell is the start, at once.
+  The cursor seen elsewhere is a picture from before the key or a key eaten: the bus reads on. The settle came out. With no
+  cursor (hidden, or column 3 on another row), the old guesses decide.
+- Round 17: a run of start readings never broken by a blank frame looped forever, so blank frames break it now (round 18
+  removed the ceiling added with it: a run ends at its next reading or breaks, and the ceiling cut the run it waited for). Kitty writes the cursor tail in another form after a program has set a cursor shape (`\e[N q`);
+  left in the text it made every reader refuse, so any trailing form is stripped, and `plain()` strips every terminal sequence.
+  Kitty joins soft-wrapped rows, so the cursor's row could run short; round 17 counted column 3 on another row as unknown.
+  **Round 19 measured kitty's `--add-wrap-markers`**: every screen row ends in `\r`, and a soft-wrapped line carries one more at
+  each wrap. So the `❯` row's SCREEN row is exact, and any cursor not on its first cell is elsewhere. That includes a bell filling
+  its last row exactly, whose END cursor sat at column 3 on a row of its own and had read as unknown, letting the guesses send a
+  line hidden above. "Unknown" is left for a hidden cursor and for a screen read without markers.
+- Round 20, measured on kitty: `get-text` returns the VIEW, so a window scrolled back shows older rows, while `--add-cursor`
+  reports SCREEN coordinates. Scrolled back, every cursor read as elsewhere: no ring, the relay refusing. Scrolled back by the
+  box's height, an end cursor landed on the `❯` row and read as the proof. And without markers, a stale wrap flag joins rows
+  and the count can read true. **So the cursor counts only on the ALTERNATE screen**, which keeps no scrollback. `windows()`
+  carries kitty's `in_alternate_screen`, and the relay keeps it in its state. A screen read without markers trusts no cursor.
+  Measured 11-15: every Claude Code window here runs on the alternate screen, 4 of 4 in three kittys (2.1.325). One that does
+  not is read by the earlier guesses. The bench's two cap fakes enter it as Claude Code does. A126 `capMainScreen` is the
+  control: the same eaten Ctrl+A on the main screen reads "could not be brought into view", not "did not land".
+  **Measured since, on my own window** (2.1.325, read with production's exact call): 56 marker rows for 56 lines, the `❯` row
+  computed as 53, the cursor at 53;3 on the empty box, no soft-wrapped rows (Claude Code wraps its own lines). Unverified:
+  whether 2.1.325 puts the cursor of an exactly full last row on a row of its own.
+- Round 21: wake's gate had no arm, since the wake panes sent the same keys with the cursor or the guesses. Two A125 panes
+  now hold the same eaten Ctrl+A: on the alternate screen, "did not land" and no Enter; on the main screen, rung "unseen",
+  as `.4` did. The relay read `alt` from its arming; it now takes it from each run's window list. **Named, unarmed:**
+  (1) Claude Code drops its fullscreen mode by itself after quick crashes (2.1.325: a launch that dies within 10 s of its
+  first frame is a strike, and two disable it on the machine), or by `tui: "default"`. Every session then falls back to the
+  `.4` guesses, silently, since no boot row counts them. (2) A Ctrl+A rebound in `keybindings.json` would read "did not
+  land" forever, where `.4` rang unseen. No keybindings file exists here (11-15). (3) A kitty without `--add-wrap-markers`
+  fails every read.
+- Round 22: "unlanded" left its bell in the box, and the ring that keeps looking counted it as nothing. So it erased the bell
+  and typed it again every minute for 12 h: the field's loop, in the rebound-Ctrl+A case. Now it erases its own bell, as for
+  an Enter not taken, and gives up after two unlanded looks running, the owner told ("sa touche Ctrl+A ne prend pas"). Arm:
+  A125 `capEaten`, three bells typed, then the end and the note. Named: the relay reads `alt` once per run, before its wait
+  for the box, so a screen switched during that wait is read stale.
+- Round 23: (1) **the eraser pressed blind.** After its one Ctrl+E it went on pressing on a box that did not change (a session
+  stalled), up to 60 Ctrl+U queued for when it woke, and a line of a person's above among them. This is older code that the
+  unlanded erase is a new way into. It now stops after two idle presses after its Ctrl+E: 4 Ctrl+U at most ("it does not
+  answer its keys"). (2) A cursor seen elsewhere once now makes the timeout "unlanded" even if the last reading hid it, so no
+  Enter goes on one hidden frame. (3) Unlanded looks are counted over the run, as an Enter not taken is, and the untested
+  reset is gone. (4) The unlanded erase is armed for rule 8: A125 `capEatenAbove` puts a person's line above the watcher's
+  bell, and the erase stops at it. **Named, older code:** a give-up does not stick. The next Stop of any agent rings again and
+  tells the owner again each cycle, for an Enter not taken as well. Also named: two passing unlanded readings in one run end
+  it, owner told, mail left for the next hook.
+- Round 24: round 23's cap held for one erase, not for a run. A frozen box was erased again at each look, 4 blind presses
+  each time, about 2 880 in 12 h. And the eraser pressed again before seeing its last press's effect (older code), so a box
+  redrawn late queued presses no reading had checked. Now **each press waits up to 1 s for its effect** (`answerMs`). One
+  quiet press after the Ctrl+E ends the erase, **3 blind presses at most**: a box that may hide its start shows 3 of the bus's
+  lines at least, so 3 presses take only those. **A box that does not answer ends the run, the owner told** ("sa fenêtre ne
+  répond plus"). And a cursor seen elsewhere extends the Ctrl+A wait by 3.5 s (`LANDING_MS`). Round 23's "elsewhere once"
+  had turned a redraw 2.5 s late into "unlanded", never rung, where `.4` rang. Arms: A125 `capFrozen` (exactly 3 Ctrl+U, 1
+  Ctrl+E, the end, the note), `lagWaitsForEachPress` (a box 120 ms behind is erased whole; without the wait it reads stalled,
+  the control; a person's line above survives), `aLateCtrlAIsWaitedFor`. Bench: the fakes live 120 s, Cap's maxMs and its
+  wait are 45 s.
+- Round 25 broke round 24's claim. A box's `rows` count a blank cursor line, so [bell, bell, blank] may hide its start with
+  2 of the bus's lines in view, and 3 blind presses took a person's "yes " above it, at every width from 85 to 105 (a
+  reviewer's model of the measured blank). Waiting up to 1 s per press did not bound the presses in flight either: with
+  ordered redraws late by 0 to 3 s, a person's line went in 5 of 96 runs (`.4`: 4, with 19 in flight). **Now the presses
+  pending are bounded by what is in view.** A press not seen within `answerMs` (5 s, twice the slowest redraw measured)
+  counts as pending until one is seen. Pending never passes `min(2, rows that are not blank)` while the box may hide its
+  start: a press takes one line, or a blank line and the one above it, so those presses take only rows read as the bus's.
+  At that bound, one Ctrl+E as a test. A box that answers is awake, its presses took nothing (a cursor at the start), and
+  its end is judged afresh. A box that does not answer is stalled: stop, the run ended. "Empty" is read twice. The hook no
+  longer waits the 3.5 s for a late Ctrl+A; the ring that keeps looking does. Arms (A125): `pendingNeverPastTheBus`,
+  `jitterStopsAtTheirLine` (6 seeds), `blankRowsBoundThePending`, `stalledComesOut`, pane `capFrozenLate` (stalled at the
+  watcher's own bell). **Named, unarmed:** the hook's shorter landing wait (a timing); redraws later than 5 s still
+  confuse the count; the bound rests on one blank row a press, the measured shape (one after the FIRST press).
+- Round 26: (1) **the Ctrl+E test could be fooled.** A press redrawn 10 to 15 s late (two to three waits) was taken for
+  the Ctrl+E's answer, pending reset to 0, and 3 presses went in flight against 2 rows of the bus's: a person's line erased,
+  silently. Keys land in order, so a change seen proves the OLDEST pending press landed, no more. It now lowers pending by
+  one, never to zero. (2) **A regression:** a box of 3 rows showing all its text, the cursor at its start, on the main
+  screen, read as stalled, where `.4` erased it. Round 25's `min(2, …)` was arbitrary. The bound is now what the proof gives,
+  `rows − blank` (each press takes one non-blank line, a blank perhaps with it). The Ctrl+E goes while one press of that
+  budget is left, and that press is the probe. A Ctrl+E that shows nothing is then no stall. (3) A cursor flickering hidden
+  then shown counted as an answer: now only text and rows show a press, and a cursor known in both readings the Ctrl+E.
+  (4) No erase outlasts 60 s, half the keyboard's 120 s hold. Arms (A125 `round26`): the reviewer's own harness, scaled (a
+  screen with markers and the cursor, keys served 2.6 waits apart), in which "pending reset to 0" loses the line 3 times in
+  3; the box of 3 rows with its cursor at the start; the flicker; the deadline. **Named:** a first press that takes nothing
+  leaves pending at 1 for the rest of the erase, so one later press redrawn over two waits late ends it as stalled.
+- Round 27: (1) **the bound was checked only after a quiet press.** A seen press sent the next one against a view that had
+  grown the measured first-press blank row, so `rows − blank` had dropped under what was pending. A person's line over 3 of
+  the bus's, keys 19 s late: taken 3 times in 3, and in 106 of 2 448 runs across caps 3 to 8. **The bound is now checked
+  before every press.** (2) Two survivors, "reset to 0 on a seen change" and "lower it by two", passed every leg. Four of the
+  reviewer's losing shapes are now a leg (`round27`), the harness as a function. (3) **The deadline called a slow box that
+  answers "stalled"** and told the owner. It is now "slow", left for the next look, at 45 s, so two erases and a bell's
+  typing fit in the keyboard's 120 s hold. It is checked inside each wait too, so an erase never overruns it by a wait.
+  (4) **A cursor known at its start** (the alternate screen) gets the Ctrl+E first, no press spent. **Named, a trade-off:**
+  on the MAIN screen, the cursor unknown, a box showing all its text with the cursor at its start (a hook killed between
+  its Ctrl+A and its Ctrl+E) stops as stalled. Its presses that took nothing cannot be told from presses queued, and pressing
+  on is round 27's hole. `.4` erased it. The owner is told; the mail waits for the next hook.
+- Round 28: (1) **presses pending at the end of one erase were never counted by the next.** "Slow" with presses queued let
+  the next look queue as many again (caps 6 to 8: 16 against 11 rows), and the relay erased again every retry for 12 h,
+  never reading "stalled" (`.4`: 60 a call). **Now any exit with presses pending is a stall**, the deadline included
+  (40 s now). The wake loop ends on it, the relay refuses, and the exchange bell says what its erase said. (2) **On the
+  alternate screen a Ctrl+E with no answer was followed by a press**, at an end nobody read, and a person's words after the
+  bell went. A known start with its Ctrl+E unanswered is now a stall. After the test Ctrl+E, the probe goes only where the
+  end is in view: a box showing all it holds, or a cursor known away from the start and never seen at it during the erase,
+  the readings inside the waits included. (3) The known start's answer is read twice, since a cursor flickering between the
+  start and elsewhere passed it; in the test path only text and rows answer. (4) The production waits were never armed, as
+  legs pass their own: `ERASE_LIMITS` is exported and pinned (twice the slowest redraw; two erases, the landing wait and a
+  bell inside the hold). Arms: A125 `aKnownStartGetsItsEndFirst` (the flicker begun both ways: one way only, the
+  mutant survived), `limitsMatchTheMeasures`, `round26`'s deadline parts. **Named, unarmed:** the relay's refusal on a
+  stalled erase (no relay scenario freezes its box); a slow erase at 44 to 46 columns can leave a bell's head of under 46
+  characters that no reader takes for the bus's (the "50 columns or less" family).
+- Round 29: within one erase, **no loss in 8 640 grid runs** (2 160 shapes, live and before, both screens), 256 shapes with
+  words after the bell, 81 legs. The verdicts were wrong, though. (1) The deadline cut the last press's wait, so one press
+  was always pending, and a slow box was a stall again (review 27's own case): 85 of 2 160 shapes on the alternate screen,
+  300 on the main. Now the presses pending at the deadline get one wait, uncut, and each seen lowers the count: none
+  left, slow; some, a stall. An erase is its deadline plus one wait: two still fit in the hold. (2) A first press that
+  took nothing stayed pending for good, so a person typing later read as "ne répond plus". A stall is now declared only
+  where the box did not answer (the deadline, the last press): a box that CHANGED answered its keys. (3) One hidden
+  cursor frame at the known start's second reading was a stall; it now reads on until the cursor is known. Arms (A125
+  `round29`): the drain, the person after a press that took nothing, the hidden frame in a box whose Ctrl+E moves only
+  the cursor. **Named, older than tonight:** a stall is not remembered across runs. The next Stop hook starts a new ring
+  that erases from none pending on a box still frozen: 6 Ctrl+U against 4 rows after two runs in the reviewer's model, a
+  person's hidden line taken. `.4` sent 60 a call. The way out is a stall kept per window with the screen it froze on,
+  refused while that screen is unchanged; it wants a measurement on a real frozen session (SIGSTOP) first. Also named:
+  the relay's `/clear` erase and its final erase drop the stall from their note.
+- Round 30: **a screen with no box counted as the box answering.** A failed read or a dialog's frame lowered the count, the
+  exit became a plain refusal again (round 29's), and the next look pressed on top: 8 Ctrl+U queued against 6 rows, a
+  person's hidden line taken. Now a press lands only if the reading shows the box, emptied or changed. "Went away", and a
+  Ctrl+E answered by no box, stall when presses are pending. The deadline's drain is one wait in all, not one per press
+  seen (an erase measured 48.7 s at production scale); the deadline is 35 s, so an erase is that plus two waits at most,
+  and the limits arm counts both. Arm: A125 `noBoxIsNoAnswer`. **Named:** a first press that takes nothing stays
+  pending, so an erase that reaches the deadline ends as a stall, the owner told for a box that answers: 80 of 2 160
+  shapes on the alternate screen in the reviewer's grid, all both slow and with that press.
+- Round 31 (no loss of a person's words anywhere in the grids): round 30 made **one failed read right after a press always a
+  stall**, in a box that had answered every key, even one already emptied. The wait now reads on past readings with no box;
+  only the box back, changed or emptied, ends it early. A re-read of an empty box that fails keeps it empty. The drain had
+  counted every empty reading as one more press landing; a box shown empty there is now simply done. Arms: A125
+  `noBoxIsNoAnswer` with its control (a box that answers, one failed read: erased), `round29` (emptied in the drain).
+  Named again: a stall is not remembered across runs; a slow erase at narrow widths stops at the 35 s deadline as slow.
+- Round 32, the release check (nothing blocking; grids D/E/F, 4 576 runs, no person's words lost): (1) **a bell typed
+  into a dialog.** An empty box, then a re-read showing a dialog, stayed "empty", and wakeAgent typed its 313 letters into
+  the dialog, with no Enter. A screen that could not be read is now marked `unread` (wake's and the relay's readers), and
+  only an unread re-read keeps "empty": a dialog is "went away". (2) The deadline's drain trusted one empty frame (13 lines
+  left, a person's among them, called erased): it reads twice now. (3) The Ctrl+E's wait reads past frames with no box, as
+  a press's does, and a box still gone after it goes to `judged`, never to a probe. Its own leg then found a fourth: one
+  empty frame answering the Ctrl+E test was "erased" at once; it is read twice too. Arm: A125 `aDialogIsNotEmpty` (the
+  dialog on the re-read, a dialog frame after a known start's Ctrl+E, a slow box glitching empty in the drain, a frozen one
+  glitching at its Ctrl+E).
+- Round 33 (a blocker; no person's words lost in some 12 000 runs): round 32's guard had gone into the eraser. An empty box
+  whose re-read showed a dialog was "went away", so a box that answered every key ended as a stall, the owner told, the
+  relay refusing. **The guard belongs to the caller**, as the relay and the exchange bell already had it. The eraser tells
+  the truth again: emptied is erased, whatever comes over the box next. wakeAgent reads its box again after its own erase,
+  and types nothing, neither a bell nor a `/clear`, unless the box is at rest. The `unread` mark went with the guard. Also
+  fixed, older: one empty frame in the known start's confirm loop was "erased" with the box still full; it is read twice
+  now. Arms: A125 pane `capDialogEmptied` (a dialog the moment the box empties, 2 s: not one key into it, the bell rung
+  after), legs in `aDialogIsNotEmpty`. **Named, older:** the exchange bell does not stop on a stall, so a second exchange
+  bell presses on top of keys still pending.
+- Round 34, the release check: **nothing blocking.** No person's words lost, no key into a dialog: 9 504 sweep runs, grids
+  D/E/F, 84 legs. wakeAgent's re-read never refuses for good: a placeholder is rung, a dialog gets no key and the next look
+  rings. Its pane needed a dialog drawn 250 ms after the box emptied; one drawn at once was waited out by the erase, and the
+  mutant without the re-read survived the first run. **Named, not fixed for `.5`:** (1) a person typing the start of the
+  line just erased, within about 150 ms of the box emptying, is taken for the bus's text coming back, and erased (since
+  round 25); (2) one empty frame inside the Ctrl+E's wait ends it, the re-read shows the box unchanged, and a box that
+  answered is a stall: 24 of 9 504 sweep runs.
+  **Why the proof holds, read in 2.1.325's code:** Ctrl+A goes to the start of the LOGICAL line, and the viewport keeps the
+  cursor's line near its middle, clamped, so the `❯` row holds it only when it is the input's first line. A version that
+  scrolled the cursor's line to the top would show a bell typed after a person's line and a newline as its start. Named, unarmed.
+- Round 18: when the cursor stayed visibly elsewhere, the bus still treated it as "unseen" (the old fallback for a version where
+  Ctrl+A shows nothing) and wake rang, so a line hidden above went with the Enter. The cursor proves the Ctrl+A did NOT land:
+  "unlanded", no Enter, the ring that keeps looking tries again. On a version where Ctrl+A does not move the cursor at all, a
+  capped bell is therefore never rung, and the owner is told (round 22: after two looks). Named. Without a cursor, a box flickering between the
+  start and blank frames reads "theirs".
+- Named: the cost in hook time. At about 1.2 to 2 s a reading (depending on how dear each send is), the hook's 10 s can end
+  before the Enter. What it leaves, the bell with the cursor at its start, is erased and rung by the ring that keeps looking,
+  whose first look is 15 s later. Nothing is lost.
 **Now:** a relay goes on to its Enter only on a start seen. Words in the box that are not its prompt refuse at once. So does no
 box within 20 s, or a prompt never drawn whole within 5 s of a box. Every refusal leaves the prompt in the box for a person,
 puts the cursor back (only into a box that holds text) and says why. A box back from a dialog not at its start means the

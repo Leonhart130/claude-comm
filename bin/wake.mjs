@@ -121,7 +121,8 @@ export function windows() {
 			// CURRENT tab, and was this window opened by launch.mjs at all. Adding them
 			// here rather than reading `ls` a second time keeps one implementation of
 			// "which kitty window is that" - the rule this file's own rule 2 states.
-			out.push({ sock, osWindow: osw.id, tab: tab.id, id: w.id, shellPid: w.pid,
+			// `alt`: on the ALTERNATE screen, where nothing scrolls back - the only screen whose cursor the bus believes (cursorCounts)
+			out.push({ sock, osWindow: osw.id, tab: tab.id, id: w.id, shellPid: w.pid, alt: w.in_alternate_screen === true,
 				vars: w.user_vars || {},
 				fg: (w.foreground_processes || []).map((p) => p.pid) })
 		}
@@ -558,7 +559,9 @@ export function awaitTurnEnd({ pid, transcript, offset = 0, lookup = null, grace
 // the bottom. Empty, the line after `❯ ` is nothing, or a placeholder drawn DIM (`\e[22;2m`, "Try …"); typed text is drawn
 // plain. A dialog (trust, a permission) draws no such box. Every unknown shape reads as NOT at rest: a wrong "busy" costs
 // one relay, a wrong "at rest" types into somebody's words.
-const SGR = /\x1b\[[0-9;:]*m/g
+// every CSI sequence, not only colours: a cursor tail kitty writes in another form (`\e[N q`, a cursor shape) left a line that was
+// not blank under the box, and every reader refused (the seventeenth review of #hidden-head)
+const SGR = /\x1b\[[0-9;:?]*[ ]?[A-Za-z]/g
 const plain = (l) => l.replace(SGR, "")
 const isRule = (l) => /^─{10,}\s*$/.test(plain(l).trim())
 // A NAMED session (`claude -n`, `/rename`) draws its name INTO the top edge, `──…── name ─`, and keeps it across a /clear:
@@ -566,8 +569,25 @@ const isRule = (l) => /^─{10,}\s*$/.test(plain(l).trim())
 // measured untitled, so only the top accepts a title. A96
 const isTopRule = (l) => isRule(l) || /^─{10,} .*\S ─+$/.test(plain(l).trim())
 /** { ok: true } when the screen shows Claude Code's input box at the bottom, empty; else { ok: false, why }. */
+// THE CURSOR, kitten @ get-text --add-cursor: `\e[?25h\e[ROW;COLH` after the text, the same picture, then a blink or shape setting in
+// one form or another. Claude Code puts the terminal's cursor where its input cursor is (measured 2.1.325, a pane 205 wide: the bell
+// typed, row 25 col 117 - its end; after Ctrl+A, the ❯ row, column 3 - its first text cell; after Ctrl+E, its end again). Why the
+// start lands on the ❯ row: Ctrl+A goes to the start of the LOGICAL line, and Claude Code's viewport keeps the cursor's wrapped line
+// near the middle, clamped - so the ❯ row holds it only when it is the input's first line (the seventeenth review read this in
+// 2.1.325's code). A version that scrolled the cursor's line to the top would show a bell typed after a line and a newline as its
+// start: named in #hidden-head, unarmed. (A kitty without --add-cursor or --add-wrap-markers fails the read altogether, and the bus then refuses every box: every kitty
+// here, 0.49, has both - `.4` read with neither. Named, the twenty-first review.)
+const CURSOR = /\x1b\[\?25([hl])\x1b\[(\d+);(\d+)H(?:\x1b\[[0-9;?]*[ ]?[A-Za-z])*\s*$/
 export function promptAtRest(screen) {
-	const lines = String(screen || "").split("\n")
+	let raw = String(screen || "")
+	const cm = CURSOR.exec(raw), cursor = cm ? { visible: cm[1] === "h", row: Number(cm[2]), col: Number(cm[3]) } : null
+	if (cm) raw = raw.slice(0, cm.index)
+	// WRAP MARKERS (--add-wrap-markers, measured: every screen row ends in \r, a soft-wrapped line carries one more at each wrap): a
+	// line's screen rows are its \r count, so the ❯ row's SCREEN row is exact - the cursor's row is compared to that, not guessed
+	// (the nineteenth review: a bell filling its last row exactly put its END cursor on a row of its own, at column 3, read "unknown")
+	const marked = raw.includes("\r"), split = raw.split("\n")
+	const rowsOf = split.map((l) => marked ? Math.max(1, (l.match(/\r/g) || []).length) : 1)
+	const lines = split.map((l) => l.replace(/\r/g, ""))
 	while (lines.length && !plain(lines[lines.length - 1]).trim()) lines.pop()
 	let top = -1
 	for (let i = lines.length - 1; i > 0; i--) if (/^❯[  ]/.test(plain(lines[i])) || plain(lines[i]) === "❯") { if (isTopRule(lines[i - 1])) { top = i; break } }
@@ -594,22 +614,35 @@ export function promptAtRest(screen) {
 	const text = [rest, ...lines.slice(top + 1, bottom)].map((l) => plain(l).trim()).filter(Boolean).join(" ")
 	// `firstBlank`: the ❯ row blank with text under it - lines above the text, scrolled out of view (the twelfth review of #hidden-head)
 	const firstBlank = !plain(rest).trim()
-	for (let j = top + 1; j < bottom; j++) if (plain(lines[j]).trim()) return { ok: false, typed: true, text, rows, firstBlank, why: "the input holds more than one line of text" }
+	// `cursorAtStart`: TRUE on the ❯ row's first text cell; FALSE when visible anywhere else (a picture from before the key, a key
+	// eaten); UNDEFINED when hidden, or on a screen read WITHOUT wrap markers - kitty joins soft-wrapped rows, a stale wrap flag too, so
+	// without them the row count runs short and could read true (the twentieth review). Undefined: the guesses decide.
+	const topRow = 1 + rowsOf.slice(0, top).reduce((a, b) => a + b, 0)
+	const cursorAtStart = !marked || !cursor || !cursor.visible ? undefined : cursor.row === topRow && cursor.col === 3
+	// `blank`: how many of those rows are blank (a cursor line) - what an erase may take with each press (eraseOwn)
+	const blank = [rest, ...lines.slice(top + 1, bottom)].filter((l) => !plain(l).trim()).length
+	for (let j = top + 1; j < bottom; j++) if (plain(lines[j]).trim()) return { ok: false, typed: true, text, rows, blank, firstBlank, cursorAtStart, why: "the input holds more than one line of text" }
 	// An empty box is ONE line. Blank lines that fill it are a draft's (Shift+Enter), and in a box that hides its start the draft's
 	// words may be above them: the review of #hidden-head typed a bell under one and the bell's end, in view, took its Enter.
 	if (rows > 1 && !plain(rest).trim()) return { ok: false, typed: true, text: "", rows, why: "the input box shows only blank lines: a draft's, whose words may be above them" }
 	if (!plain(rest).trim()) return { ok: true }
 	// a placeholder: the text after the mark starts DIM (SGR parameter 2), and is the only text there
 	if (/^\x1b\[(?:[0-9:]*;)*2(?:;[0-9:]*)*m/.test(rest)) return { ok: true, placeholder: plain(rest).trim().slice(0, 60) }
-	return { ok: false, typed: true, text, rows, why: `somebody's text is on the input line: "${plain(rest).trim().slice(0, 40)}"` }
+	return { ok: false, typed: true, text, rows, blank, cursorAtStart, why: `somebody's text is on the input line: "${plain(rest).trim().slice(0, 40)}"` }
 }
 
 /** promptAtRest on the window's screen, read now. A screen that cannot be read is NOT at rest. */
 export function screenAtRest(win) {
-	const s = spawnSync("kitten", ["@", "--to", `unix:${win.sock}`, "get-text", "--ansi", "--match", `id:${win.id}`], { encoding: "utf8", timeout: 5000 })
+	const s = spawnSync("kitten", ["@", "--to", `unix:${win.sock}`, "get-text", "--ansi", "--add-cursor", "--add-wrap-markers", "--match", `id:${win.id}`], { encoding: "utf8", timeout: 5000 })
 	if (s.status !== 0 || s.error) return { ok: false, why: `its screen could not be read (kitten @ get-text ${s.error ? s.error.code : `exit ${s.status}`})` }
-	return promptAtRest(s.stdout)
+	return cursorCounts(promptAtRest(s.stdout), win.alt)
 }
+// THE CURSOR COUNTS ONLY ON THE ALTERNATE SCREEN (the twentieth review, measured on kitty): get-text returns the VIEW - a window
+// scrolled back shows older rows - while --add-cursor reports SCREEN coordinates. Scrolled back, every cursor reads elsewhere (no
+// ring, the relay refuses), or, scrolled by the box's height, an end cursor lands on the ❯ row and reads as the proof. The alternate
+// screen keeps no scrollback: nothing scrolls. Every Claude Code window here runs there (4 of 4 in three kittys, 2.1.325, 11-15);
+// one that does not - or a window known only by its id - is read by the guesses, as before the cursor. relay.mjs's too.
+export const cursorCounts = (r, alt) => alt === true || !r || r.cursorAtStart === undefined ? r : { ...r, cursorAtStart: undefined }
 // A bell typed but never submitted (a field, 10-26: its text sat in the box, `comm sent` PENDING) is recognised whole,
 // wrapped or not; anything more in the box is somebody's words.
 const squash = (s) => String(s).replace(/\s+/g, "")
@@ -625,6 +658,10 @@ export const sameText = (text, want) => typeof text === "string" && squash(text)
 // for 2 h, none rung, until the owner pressed Enter (FINDINGS.md#hidden-head). A box showing under 3 lines shows all its text;
 // one showing 3 or more MAY hide its start, and nothing on the screen says which.
 const HIDES_FROM = 3
+// how long one press's effect is waited for, while erasing; and how much longer a Ctrl+A is waited for when the cursor is seen still
+// elsewhere - a key not yet drawn, on a loaded machine (the twenty-fourth review: a redraw 2.5 s late read "unlanded", never rung)
+const ANSWER_MS = 5000, LANDING_MS = 3500   // 5 s: twice the slowest redraw measured (2.5 s); a stall is ended, not guessed
+const ERASE_MAX_MS = 35_000                  // an erase is this plus two waits at most: two, and a bell's typing, fit in the hold (HOLD_MAX_MS, 120 s)
 /** May this reading (promptAtRest's) be the last lines of a longer text? */
 export const mayHide = (s) => !!s && s.typed === true && s.rows >= HIDES_FROM
 /** Does the reading show all of `want` - or, in a box that may hide its start, its end, CUT_MIN characters or more? relay.mjs's too. */
@@ -794,41 +831,137 @@ const keptUnder = (before, after) => {
  * remains must be the START of what was there. Anything else is somebody typing, and it stops with their words untouched.
  * { erased, presses } or { erased: false, presses, why }.
  */
-export function eraseOwn(read, send, isOurs, { pressMs = 150, presses = 60, own = "" } = {}) {
+export function eraseOwn(read, send, isOurs, { pressMs = 150, presses = 60, own = "", answerMs = ANSWER_MS, maxMs = ERASE_MAX_MS } = {}) {
 	// what is left, all of it in view, may be any START of the bus's text: of a bell, or of `own`, the text the caller typed
 	// - or the bus's text read from its very top, its end any start of a bell (the line a press left: `…nothing.[`)
 	const startOwn = (q) => (!!own && squash(own).startsWith(q)) || BELLS.some((t) => t.startsWith(q)) || crossCut(q) || !!ownWords(q, { looseEnd: true })
 	const first = read()
 	if (first.ok) return { erased: true, presses: 0 }
 	if (!first.typed || !isOurs(first.text, first)) return { erased: false, presses: 0, why: "the box does not hold the bus's own text" }
-	let before = squash(first.text), prev = first, n = 0, idle = 0, nudged = false
+	// EACH PRESS'S EFFECT IS WAITED FOR, up to `answerMs` (the twenty-fourth review): a box redrawn later than `pressMs` was pressed
+	// again before any reading had checked the last press - presses queued unchecked, and when the box caught up a hidden line of a
+	// person's above went with them. A screen that has not changed AT ALL by then (rows too: a press that drops a blank cursor line
+	// changes them) is "quiet".
+	// A PRESS'S effect is its text or its rows: a cursor that flickers (hidden, then shown) is no press seen (the twenty-sixth review).
+	// THE CTRL+E's is the cursor too, KNOWN in both readings: one that only moves it is an answer, on the alternate screen - a cursor
+	// hidden in one frame is no answer (a flicker counted as one put a fourth press past a bound of three).
+	const sig = (s) => `${s.ok}|${s.typed}|${s.rows}|${s.text}`
+	// A PRESS LANDED only if the reading shows the box, emptied or changed: no box at all (a read that failed, a dialog's frame) proves
+	// nothing - it lowered the count and let the next look press on top (the thirtieth review: 8 queued against 6 rows)
+	// (emptied: only from a box that was not empty - the drain counted every empty reading as one more press, the thirty-first review)
+	const landed = (s, from) => (!!s.ok && !from.ok) || (s.typed === true && sig(s) !== sig(from))
+	const moved = (a, b) => sig(a) !== sig(b) || (a.cursorAtStart !== undefined && b.cursorAtStart !== undefined && a.cursorAtStart !== b.cursorAtStart)
+	const t0 = Date.now()
+	// EVERY READING LOOKED AT, those inside the waits too: a cursor ever seen at the start forbids the probe after an unseen Ctrl+E (a
+	// cursor flickering between the start and elsewhere read "elsewhere" at the test - the twenty-eighth review)
+	let everStart = first.cursorAtStart === true
+	const look = () => { const s = read(); if (s.cursorAtStart === true) everStart = true; return s }
+	// (a wait ends at the deadline too: an erase never outlasts it by a wait - the twenty-seventh review)
+	const answer = (was, changed = (s) => sig(s) !== sig(was), cut = true) => { let s = look(); for (const t = Date.now(); !changed(s) && Date.now() - t < answerMs && (!cut || Date.now() - t0 < maxMs); ) { sleepSync(40); s = look() } return s }
+	// PRESSES PENDING, never more than the box shows of the bus's own (the twenty-fifth review: three blind presses took a person's
+	// "yes " above a box of [bell, bell, blank]). A press not seen within `answerMs` may be queued: it counts until one is seen, and
+	// a change seen lowers it by ONE - keys land in order, so it proves the oldest landed, no more (the twenty-sixth review: a late
+	// redraw taken for all of them put three in flight). A press takes one line that is not blank, a blank cursor line perhaps with
+	// it, so `pending` presses take only rows in view while `pending` <= the rows that are not blank. In a box that shows all it
+	// holds nothing is hidden. And no erase outlasts ERASE_MAX_MS: the keyboard's hold is 120 s (the twenty-sixth and twenty-seventh reviews).
+	let before = squash(first.text), prev = first, n = 0, pending = 0, nudged = false, lastQuiet = false
+	// THE BOUND: every row in view that is not blank - a box showing all it holds, 2 at least (the measured first press that takes
+	// nothing, 626 -> 626, #left-in-the-box)
+	const allowOf = (v) => Math.max(mayHide(v) ? 1 : 2, v.rows - (v.blank || 0))
+	// one Ctrl+E: the end brought into view, read, and judged as from the start (the fourth review) - null when nothing moved. Its answer
+	// is the text or the rows; `byCursor` (the cursor known at its start): the cursor too, read twice - a frame caught mid-render can put
+	// it anywhere (the twenty-eighth review)
+	const toEnd = (from, byCursor) => {
+		send("\x05"); sleepSync(pressMs)
+		// (frames with no box read past, as a press's wait does - the thirty-second review; the box still gone at the end: that reading,
+		// for `judged` - a refusal, a stall with presses pending, never a probe into a dialog)
+		const ok = (s) => (s.typed || s.ok) && (byCursor ? moved(s, from) : sig(s) !== sig(from))
+		let e = answer(from, ok)
+		// (and empty read twice, as after a press: one empty frame answering the Ctrl+E was "erased" at once - its own leg found it)
+		if (e.ok) { sleepSync(pressMs); const again = look(); if (again.typed) e = again }
+		if (!e.typed && !e.ok) return e
+		if (!ok(e)) return null
+		if (!byCursor || sig(e) !== sig(from)) return e
+		// read again until the cursor is KNOWN: back at the start, a flicker - no answer; away, the answer; a hidden frame says nothing
+		// (the twenty-ninth review: one hidden frame here was a stall where `.4` erased)
+		for (const t = Date.now(); ; sleepSync(40)) {
+			const again = look()
+			// (an empty frame read twice here too: one taken at once was "erased" with the box still full - the thirty-third review)
+			if (again.ok) { sleepSync(pressMs); if (!look().typed) return again; if (Date.now() - t >= answerMs) return null; continue }
+			if (!again.typed && !again.ok) { if (Date.now() - t >= answerMs) return again; continue }
+			if (again.cursorAtStart === true) return null
+			if (again.cursorAtStart === false || sig(again) !== sig(from)) return again
+			if (Date.now() - t >= answerMs) return null
+		}
+	}
+	// AN ERASE THAT ENDS ITS PRESSES UNSEEN IS A STALL (the twenty-eighth review): they may land later, and the next erase - the next look,
+	// the relay's next try - starts counting at none. The caller stops: the run ends, the relay refuses. Only where the box did not
+	// answer: at the deadline, after the pending presses had their wait, and after the last press - a box that CHANGED answered its keys,
+	// and "somebody started typing" is not "ne répond plus" (the twenty-ninth review: a first press that took nothing, counted pending
+	// for good, made every later exit a stall)
+	const leave = (r) => pending > 0 && !r.erased ? { ...r, stalled: true, pending } : r
+	const judged = (e) => e.ok ? { erased: true, presses: n } : !e.typed ? leave({ erased: false, presses: n, why: `the box went away when its end was asked for: ${e.why}` })
+		: !squash(e.text) || !isOurs(e.text, e) ? { erased: false, presses: n, why: "the box's end, brought into view, is not the bus's own text - left alone" } : null
 	while (n < presses) {
+		// THE DEADLINE: slow, not stalled - a box that answers slowly keeps what is left for the next look, nobody told it is stuck
+		// (the twenty-seventh review: two bells at 40 columns, each key drawn 2.5 s late, called stalled)
+		// (with presses pending, a stall: see `leave` - but first they get their wait, once and uncut: the deadline had cut the last one's,
+		// so one was always pending and a slow box a stall again - the twenty-ninth review)
+		if (Date.now() - t0 > maxMs) {
+			// (one wait in all, not one per press seen - the thirtieth review measured two)
+			// (the box shown empty meanwhile: done - what is still pending lands on nothing)
+			// (empty read twice here too: one empty frame, the text back, was "erased" with 13 lines in the box - the thirty-second review)
+			for (const until = Date.now() + answerMs; pending > 0 && Date.now() < until; sleepSync(40)) {
+				const s = look()
+				if (s.ok) { sleepSync(pressMs); const again = look(); if (!again.typed) return { erased: true, presses: n }; continue }
+				if (landed(s, prev)) { pending--; prev = s }
+			}
+			return leave({ erased: false, presses: n, slow: true, why: `erasing took over ${maxMs / 1000} s - what is left waits for the next look` })
+		}
+		// THE CURSOR KNOWN AT ITS START (the alternate screen): every Ctrl+U would take nothing - the end first, no press spent. No answer:
+		// the Ctrl+E pending and the end never read - not one press after it (the twenty-eighth review: one landed at an unread end)
+		if (prev.cursorAtStart === true) {
+			const e = toEnd(prev, true)
+			if (!e) return { erased: false, presses: n, stalled: true, pending: pending + 1, why: `the box did not answer a Ctrl+E within ${answerMs} ms: it does not answer its keys - left alone` }
+			const j = judged(e); if (j) return j
+			before = squash(e.text); prev = e; continue
+		}
+		// AFTER A QUIET PRESS, AS MANY PENDING AS IT MAY TAKE BUT ONE: one Ctrl+E, the test. Seen (its cursor too): the box is awake, its
+		// presses took nothing (a cursor at the start, the third review), one pending less - never all: a press redrawn late can be what
+		// was seen (the twenty-sixth). Unseen (a box showing all its text, the cursor unknown): the next press, the budget's last, probes.
+		if (lastQuiet && !nudged && pending >= allowOf(prev) - 1) {
+			nudged = true
+			const e = toEnd(prev, false)
+			if (e) { if (e.typed || e.ok) pending = Math.max(0, pending - 1); const j = judged(e); if (j) return j; before = squash(e.text); prev = e; lastQuiet = false; continue }
+			// unseen: the probe only where the end is in view already - a box showing all it holds, or a cursor known away from the start.
+			// Elsewhere the Ctrl+E may be pending, and a probe after it would land at an end nobody read (the twenty-eighth review)
+			if (mayHide(prev) && (prev.cursorAtStart !== false || everStart)) return { erased: false, presses: n, stalled: true, pending: pending + 1, why: `the box did not answer its presses nor a Ctrl+E within ${answerMs} ms: it does not answer its keys - left alone` }
+		}
+		// THE BOUND BEFORE EVERY PRESS, against the view now (the twenty-seventh review: checked only after a quiet press, a view grown a
+		// blank row let one press past it, a person's line taken 3 times in 3). No press that could take a row not read as the bus's.
+		if (pending + 1 > allowOf(prev)) return { erased: false, presses: n, stalled: true, why: `the box did not answer for ${answerMs} ms, ${pending} press(es) pending: it does not answer its keys - left alone` }
 		send("\x15")
-		n++
+		n++; pending++
 		sleepSync(pressMs)
-		const now = read()
+		// the wait reads ON past readings with no box (a read that failed, a dialog's frame): only the box back, changed or emptied, ends it
+		// early - one failed read right after a press was a stall in a box that had answered (the thirty-first review). The box gone for
+		// the whole wait: "went away", below, a stall with presses pending.
+		let now = answer(prev, (s) => landed(s, prev))
+		// "empty" read twice: one frame drawn empty, then the text again, was a bell typed over what was left (the twenty-fifth review) -
+		// a re-read with no box is no text again: still EMPTY, the erase done (the thirty-first; the thirty-third: taking a dialog there for
+		// "went away" made a box that had answered every key a stall). What comes over an emptied box is the CALLER's to read before it
+		// types anything (wakeAgent's re-read, the relay's, the exchange bell's - the thirty-second review: a bell typed into a dialog)
+		if (now.ok) { sleepSync(pressMs); const again = look(); if (again.typed) now = again }
+		const quiet = !landed(now, prev)
+		if (!quiet) pending = Math.max(0, pending - 1)
+		lastQuiet = quiet
 		if (now.ok) return { erased: true, presses: n }
-		if (!now.typed) return { erased: false, presses: n, why: `the box went away while it was being erased: ${now.why}` }
+		if (!now.typed) return leave({ erased: false, presses: n, why: `the box went away while it was being erased: ${now.why}` })
 		const after = squash(now.text)
 		// blank lines are nobody's bell: a draft's, its words perhaps above them - and "" is the start of anything
-		if (!after) return { erased: false, presses: n, why: "the box shows only blank lines: a draft's, left alone" }
-		// TWO PRESSES THAT TOOK NOTHING: the cursor may be at the text's start - a ring killed between its Ctrl+A and its Ctrl+E, or a
-		// dialog that took the Ctrl+E (the third review of #hidden-head). Two: a first press that takes nothing was measured on its own
-		// (2.1.319, `#left-in-the-box`). Ctrl+E once - and the end it brings into view was never read: the box is read AGAIN and judged
-		// as from the start, before any press (the fourth review: a person's words after the bell went with the next Ctrl+U).
-		if (after === before) {
-			prev = now
-			if (++idle === 2 && !nudged) {
-				send("\x05"); nudged = true; idle = 0
-				sleepSync(pressMs)
-				const e = read()
-				if (e.ok) return { erased: true, presses: n }
-				if (!e.typed || !squash(e.text) || !isOurs(e.text, e)) return { erased: false, presses: n, why: "the box's end, brought into view, is not the bus's own text - left alone" }
-				before = squash(e.text); prev = e
-			}
-			continue
-		}
-		idle = 0
+		if (!after) return ({ erased: false, presses: n, why: "the box shows only blank lines: a draft's, left alone" })
+		// the text unchanged (a quiet press, or one that dropped a blank cursor line): nothing to judge - the bound above decides
+		if (after === before) { prev = now; continue }
 		// A BOX THAT HID ITS START: the press took its last line and a hidden one came down at its top - so the box may now show fewer
 		// than 3 lines (measured, a real 102x13 box: a blank cursor line, then 2 lines). What it showed before must still be there,
 		// UNDER the line that came down, unchanged: a word typed meanwhile lands at the end and breaks that, whatever any reading of
@@ -836,20 +969,21 @@ export function eraseOwn(read, send, isOurs, { pressMs = 150, presses = 60, own 
 		// Once the box shows all it holds, the same reading as below: a press can drop the blank cursor line AND bring a hidden one
 		// down (the fifth review: two bells at widths 157-200, the relay's prompt at 102 columns, stopped there for good).
 		const oursNow = isOurs(now.text, now) || (!mayHide(now) && startOwn(after))
-		if (!before.startsWith(after) && !(mayHide(prev) && keptUnder(before, after) && oursNow)) return { erased: false, presses: n, why: "somebody started typing while it was being erased - their words were left alone" }
+		if (!before.startsWith(after) && !(mayHide(prev) && keptUnder(before, after) && oursNow)) return ({ erased: false, presses: n, why: "somebody started typing while it was being erased - their words were left alone" })
 		// THE BOX NOW SHOWS ALL IT HOLDS, after one that may have hidden its start: what is left is read whole before its top line
 		// can go. A short head taken for a bell's end on the way (`nothing.` in front of a bell) proves itself here, or the erase
 		// stops with it in the box (the fourth review of #hidden-head).
-		if (mayHide(prev) && !mayHide(now) && !oursNow) return { erased: false, presses: n, why: "what is left in the box, all of it in view, is not the bus's own text - left alone" }
+		if (mayHide(prev) && !mayHide(now) && !oursNow) return ({ erased: false, presses: n, why: "what is left in the box, all of it in view, is not the bus's own text - left alone" })
 		before = after; prev = now
 	}
-	return { erased: false, presses: n, why: `still text in the box after ${n} presses` }
+	return leave({ erased: false, presses: n, why: `still text in the box after ${n} presses` })
 }
 
 // A box drew a 313-character bell in ~60 ms and took its Enter at once (real sessions, 11-02, 11-08). 1.5 s each: a screen
 // read took ~1.5 s on a loaded machine. Every wait here can run inside a hook's 10 s: a kill mid-way leaves the text, and the
 // ring that keeps looking, started before the first key, finds it (rule 10).
 const SHOWN_MS = 1500, TAKEN_MS = 1500
+
 /**
  * One reading of the box against `text`: empty, whole, partial (still being drawn), theirs, or unknown (a dialog, an unreadable
  * screen) - and `tail`: whole as far as a box that hides its start can show, its end in view, its start never seen.
@@ -865,12 +999,13 @@ function boxAgainst(s, text) {
 }
 /** After Ctrl+A in a box that hides its start: `start` once it shows the text's first lines, `theirs` if anything else shows, `gone`
  * if the box empties, `unseen` after `ms`. */
-export function startInView(read, text, ms = SHOWN_MS, nap = 40) {
-	let noBoxes = 0, starts = 0
+export function startInView(read, text, ms = SHOWN_MS, nap = 40, landMs = LANDING_MS) {
+	let noBoxes = 0, starts = 0, elsewhere = false
 	for (let n = 1, t = Date.now(); ; n++, sleepSync(nap)) {
 		const s = read()
 		if (s.ok) return "gone"
 		const noBox = !s.typed, blank = s.typed && !squash(s.text)
+		if (noBox || blank) starts = 0   // a run of start readings is broken by anything else, a blank frame too (an endless loop, the seventeenth review)
 		if (noBox) noBoxes++
 		// ONE no-box reading is a dialog: at slow reads a dialog is seen once, and asking for two made an eaten key read "unseen" (a
 		// bell rung unseen) or "theirs" (the thirteenth review, reverting the twelfth). A frame that was only noise costs a wait and a retry.
@@ -878,20 +1013,37 @@ export function startInView(read, text, ms = SHOWN_MS, nap = 40) {
 		if (s.typed && !blank) {
 			// blank rows ABOVE the text's first line: somebody's lines in front of it, scrolled out (the twelfth review)
 			if (s.firstBlank) return "theirs"
-			// the START in TWO readings running: a picture taken before the Ctrl+A redrew already looks like it for a text shown whole,
-			// and a line hidden above went with the Enter (the fourteenth review). The second reading comes after the first one's end.
-			if (startOf(s, text)) { if (++starts >= 2) return "start"; continue }
-			starts = 0
-			if (!pieceOf(s, text)) return "theirs"
-			// THE BOX BACK FROM A DIALOG, not at its start: the dialog took the Ctrl+A. "nobox" at once, so the caller waits for the box
-			// and asks again - an eaten key and a dialog gone within the wait read "unseen", and a relay refused (the eleventh review)
-			if (sawNoBox) return "nobox"
+			if (startOf(s, text)) {
+				// THE CURSOR ON THE TEXT'S FIRST CELL, in the same picture as the start: the Ctrl+A landed at the input's start and nothing is
+				// above - a proof, where everything else here is a guess (the sixteenth review: stale pictures, eaten keys and short dialogs
+				// all beat the guesses). The cursor known ELSEWHERE: a picture from before the key, or the key eaten - read on (a dialog seen:
+				// "nobox", ask again). NO CURSOR REPORTED (an older kitty, a reading made by hand): the guesses - after a dialog the WHOLE
+				// text proves nothing (the fifteenth review), and the start needs two readings running (the fourteenth).
+				// Never `continue` here: every path reaches the timeout below (a `continue` on a cursor elsewhere spun forever, 11-14).
+				if (s.cursorAtStart === true) return "start"
+				if (s.cursorAtStart === false) { starts = 0; elsewhere = true; if (sawNoBox) return "nobox" }
+				else {
+					if (sawNoBox && sameText(s.text, text)) return "nobox"
+					if (++starts >= 2) return "start"
+				}
+			} else {
+				starts = 0
+				if (s.cursorAtStart === false) elsewhere = true   // seen elsewhere ONCE: a hidden cursor at the timeout is no "unseen" (the twenty-third review)
+				if (!pieceOf(s, text)) return "theirs"
+				// THE BOX BACK FROM A DIALOG, not at its start: the dialog took the Ctrl+A. "nobox" at once, so the caller waits for the box
+				// and asks again - an eaten key and a dialog gone within the wait read "unseen", and a relay refused (the eleventh review)
+				if (sawNoBox) return "nobox"
+			}
 		}
 		// two reads at least: one screen read can take 1.5 s on a loaded machine, and its picture may be from before the key. Blank
 		// rows still shown then are a draft's, in front of the text: somebody's (the fourth review of #hidden-head)
 		// and no box at all then - a dialog, a screen that cannot be read - gets no Enter (the fifth review)
 		// (blank rows after a dialog are that dialog closing, not a draft's)
-		if (n >= 2 && Date.now() - t >= ms) return blank ? (sawNoBox ? "nobox" : "theirs") : noBox ? "nobox" : "unseen"
+		// (not in the middle of a run of start readings, the fallback's: its second reading comes, and ends the run either way)
+		// (no ceiling: a run either ends at its next reading or breaks, so this waits one reading at most - a ceiling cut the very
+		// run it was meant to wait for, the eighteenth review.) A visible cursor that stayed ELSEWHERE: the Ctrl+A did not land -
+		// "unlanded", not "unseen": the cursor says so, and a line hidden above would go with an Enter (the eighteenth review)
+		if (n >= 2 && Date.now() - t >= ms + (elsewhere ? landMs : 0) && starts === 0) return blank ? (sawNoBox ? "nobox" : "theirs") : noBox ? "nobox" : elsewhere ? "unlanded" : "unseen"
 	}
 }
 /** Read the box until it is `empty` or `theirs`, or `takenMs` have passed: [the last state, the last reading]. */
@@ -912,7 +1064,7 @@ function untilItLeaves(read, text, takenMs, nap) {
  *   · A lost Enter is pressed once more. Still there: `stays`, or erased when `erase` is set (only a process no hook can kill).
  * { typed, taken, unproved, stays, erased, mixed, shownMs, again, presses, why }
  */
-export function typeAndProve(read, send, text, { shownMs = SHOWN_MS, takenMs = TAKEN_MS, nap = 40, erase = true } = {}) {
+export function typeAndProve(read, send, text, { shownMs = SHOWN_MS, takenMs = TAKEN_MS, nap = 40, erase = true, landMs = LANDING_MS, answerMs = ANSWER_MS } = {}) {
 	const a = send(text)
 	if (a && a.status !== 0) return { typed: false, taken: false, why: `send-text failed: ${(a.stderr || "").trim().slice(0, 80)}` }
 	// THE CURSOR SENT TO THE START GOES BACK TO THE END before this returns with text in the box. Left at the start, every later
@@ -936,13 +1088,24 @@ export function typeAndProve(read, send, text, { shownMs = SHOWN_MS, takenMs = T
 			shown = Date.now() - t
 			send("\x01")
 			atStart = true
-			const h = startInView(read, text, shownMs, nap)
+			const h = startInView(read, text, shownMs, nap, landMs)
 			head = { headHidden: true, headSeen: h === "start" }
 			if (h === "theirs") return { ...mixed(false), shownMs: shown, ...head }
 			// emptied by something else at that moment: not rung by this ring, and not claimed - the next look reads the session
 			if (h === "gone") { atStart = false; return { typed: true, taken: false, shownMs: shown, ...head, why: "the text left the box when its start was asked for - not rung by this ring" } }
 			// no box on screen after the Ctrl+A (a dialog, an unreadable screen): no Enter. The cursor back to the end only if a box is
 			// there now holding text - one noise frame, gone (the fourteenth review); never a key into a dialog
+			// the Ctrl+A did not land, the cursor seen elsewhere throughout: no Enter, the cursor back. As for an Enter not taken: the
+			// hook leaves it to the ring that keeps looking, which erases its own text, and gives up after two (the twenty-second review:
+			// the bell left in the box was erased and typed again every minute for 12 h - the field's loop)
+			if (h === "unlanded") {
+				back()
+				const why = "its Ctrl+A did not land (the cursor stayed elsewhere) - no Enter pressed"
+				if (!erase) return { typed: true, taken: false, unlanded: true, stays: true, shownMs: shown, ...head, why: `${why}; the ring that keeps looking clears it` }
+				const e = eraseOwn(read, send, (t, s) => pieceOf(s, text) && squash(t).length >= Math.min(CUT_MIN, squash(text).length), { own: text, answerMs })
+				return { typed: true, taken: false, unlanded: true, shownMs: shown, ...head, erased: e.erased, presses: e.presses, ...(e.stalled ? { stalled: true } : {}),
+					why: e.erased ? `${why}; its text erased` : `${why}, and it could not be erased: ${e.why}` }
+			}
 			if (h === "nobox") { const b = read(); if (b.typed && squash(b.text)) back(); return { typed: true, taken: false, shownMs: shown, ...head, why: "its box went away when its start was asked for (a dialog?) - no Enter pressed" } }
 			break
 		}
@@ -968,8 +1131,8 @@ export function typeAndProve(read, send, text, { shownMs = SHOWN_MS, takenMs = T
 	back()
 	if (!erase) return { typed: true, taken: false, stays: true, shownMs: shown, again, ...head, why: "its Enter was not taken, twice: the text is still in the box, and the ring that keeps looking clears it" }
 	// its own text, CUT_MIN of it at least: one letter a person typed after a taken Enter is the start of anything
-	const e = eraseOwn(read, send, (t, s) => pieceOf(s, text) && squash(t).length >= Math.min(CUT_MIN, squash(text).length), { own: text })
-	return { typed: true, taken: false, shownMs: shown, again, ...head, erased: e.erased, presses: e.presses,
+	const e = eraseOwn(read, send, (t, s) => pieceOf(s, text) && squash(t).length >= Math.min(CUT_MIN, squash(text).length), { own: text, answerMs })
+	return { typed: true, taken: false, shownMs: shown, again, ...head, erased: e.erased, presses: e.presses, ...(e.stalled ? { stalled: true } : {}),
 		why: e.erased ? "its Enter was not taken, twice: the text was erased and the mail stays in the inbox" : `its Enter was not taken, twice, and it could not be erased: ${e.why}` }
 }
 
@@ -982,6 +1145,8 @@ export function typeAndProve(read, send, text, { shownMs = SHOWN_MS, takenMs = T
 // reviews of #hidden-head), holds nothing: a hook killed at its 10 s leaves a file and no typist. A dir that cannot be made does not silence the
 // bell: it types unguarded, as it did before this existed.
 const HOLD_MAX_MS = 120_000
+/** The eraser's waits, for the arm that pins them to what was measured (A125): a test passes its own, never these. */
+export const ERASE_LIMITS = Object.freeze({ ANSWER_MS, LANDING_MS, ERASE_MAX_MS, HOLD_MAX_MS })
 const startTick = (pid) => { try { const st = readFileSync(`/proc/${pid}/stat`, "utf8"); return st.slice(st.lastIndexOf(") ") + 2).split(" ")[19] } catch { return null } }
 const holderAlive = (h, maxMs) => {
 	if (!h || !h.pid || Date.now() - h.at >= maxMs) return false
@@ -1169,8 +1334,15 @@ export function wakeAgent(root, agent, pid, { dryRun = false, wins, turn = null,
 		}
 		wiped = eraseOwn(read, send, (t, s) => !!busText(t, { hidden: mayHide(s) }))
 		if (!wiped.erased) {
-			done(false, { erasedOwn: false, presses: wiped.presses, why: wiped.why }, false)
-			return { agent, pid, sent: false, notAtRest: true, ...seen, ...said, why: `not rung: the bus's own text is in its box and could not be erased (${wiped.why})` }
+			done(false, { erasedOwn: false, presses: wiped.presses, ...(wiped.stalled ? { stalled: true } : {}), why: wiped.why }, false)
+			return { agent, pid, sent: false, notAtRest: true, ...(wiped.stalled ? { stalled: true } : {}), ...seen, ...said, why: `not rung: the bus's own text is in its box and could not be erased (${wiped.why})` }
+		}
+		// THE BOX READ AGAIN before anything is typed into it (the thirty-second and thirty-third reviews): emptied, then a dialog over it -
+		// a bell, or a /clear, typed into the dialog. Not at rest now: not rung; the next look types, into the box.
+		const again = read()
+		if (!again.ok) {
+			done(false, { erasedOwn: true, presses: wiped.presses, after: "not at rest" }, false)
+			return { agent, pid, sent: false, notAtRest: true, erasedOwn: true, ...seen, ...said, why: `not rung: its box was cleared of the bus's own text, then it was not at rest (${again.typed ? "text in it" : again.why}) - nothing typed` }
 		}
 		if (decision.clear && !allowClear) { done(false, { erasedOwn: true, presses: wiped.presses }, false); return { agent, pid, sent: false, deferred: true, erasedOwn: true, why: `its box was cleared of the bus's own text; a fresh restart is due (${decision.why}) and this run already typed one - left for the next turn boundary`, ...seen, ...said } }
 	}
@@ -1200,7 +1372,8 @@ export function wakeAgent(root, agent, pid, { dryRun = false, wins, turn = null,
 			}
 		}
 	}
-	const p = typeAndProve(read, send, text, { erase: watcher })
+	// the landing wait is the watcher's: the hook has 10 s, and killed after a Ctrl+A that landed it leaves the cursor at the bell's start
+	const p = typeAndProve(read, send, text, { erase: watcher, landMs: watcher ? LANDING_MS : 0 })
 	if (!p.typed) {
 		if (clearTyped) done(false, { sendFailed: true })
 		return { agent, pid, sent: false, cleared: ring.cleared, clearTyped, clearWhy: ring.clearWhy, why: p.why, ...seen, ...said }
@@ -1208,8 +1381,8 @@ export function wakeAgent(root, agent, pid, { dryRun = false, wins, turn = null,
 	const what = { text: text === FRESH_NUDGE ? "fresh" : "nudge", shownMs: p.shownMs, ...(p.again ? { enterAgain: true } : {}), ...(wiped ? { erasedOwn: true, presses: wiped.presses } : {}), ...(p.unproved ? { unproved: true } : {}), ...(p.headHidden ? { headHidden: true, headSeen: !!p.headSeen } : {}) }
 	if (!p.taken && !p.unproved) {
 		// Not quiet: nothing was rung. A bell is typed only into an empty box, so this cannot pile up.
-		done(false, { ...what, ...(p.stays ? { stays: true } : {}), ...(p.erased !== undefined ? { erased: p.erased } : {}), ...(p.mixed ? { mixed: true } : {}), why: p.why }, false)
-		return { agent, pid, sent: false, notAtRest: true, ...(p.stays ? { stays: true } : {}), ...(p.erased ? { erased: true } : {}), ...(p.mixed ? { mixed: true } : {}), cleared: ring.cleared, clearTyped, clearWhy: ring.clearWhy, why: `not rung: ${p.why}`, ...seen, ...said }
+		done(false, { ...what, ...(p.stays ? { stays: true } : {}), ...(p.erased !== undefined ? { erased: p.erased } : {}), ...(p.mixed ? { mixed: true } : {}), ...(p.unlanded ? { unlanded: true } : {}), ...(p.stalled ? { stalled: true } : {}), why: p.why }, false)
+		return { agent, pid, sent: false, notAtRest: true, ...(p.stays ? { stays: true } : {}), ...(p.erased ? { erased: true } : {}), ...(p.mixed ? { mixed: true } : {}), ...(p.unlanded ? { unlanded: true } : {}), ...(p.stalled ? { stalled: true } : {}), cleared: ring.cleared, clearTyped, clearWhy: ring.clearWhy, why: `not rung: ${p.why}`, ...seen, ...said }
 	}
 	done(true, what)
 	return { agent, pid, sent: true, window: r.win.id, socket: r.win.sock, how: r.how, cleared: ring.cleared, clearTyped, clearWhy: ring.clearWhy, ...(wiped ? { erasedOwn: true } : {}), ...(p.again ? { enterAgain: true } : {}), ...(p.unproved ? { unproved: true, unprovedWhy: p.why } : {}), ...(p.headHidden ? { headHidden: true, headSeen: !!p.headSeen } : {}), ...seen, ...said }
@@ -1230,7 +1403,7 @@ async function keepTrying(root, agent, lookup) {
 	try { mkdirSync(join(root, ".comm", "wake", "trying"), { recursive: true }) } catch {}
 	const c = claimFile(join(root, ".comm", "wake", "trying", `${agent}.json`), `until-rung ${agent}`, rules.maxMs + rules.retryMs + 60_000)
 	if (!c.ok) return
-	let told = false, last = "refused", blockedAt = null, erasedTimes = 0, whoFailed = 0
+	let told = false, last = "refused", blockedAt = null, erasedTimes = 0, unlandedTimes = 0, whoFailed = 0
 	const end = (how) => { if (blockedAt) noteRing(root, { at: new Date().toISOString(), agent, blocked: false, ended: how, afterMs: Date.now() - blockedAt, told }); c.release() }
 	const tell = (what) => { told = true; notifyOwner(root, cfg, agent, what) }
 	for (let wait = Math.min(rules.retryMs, 15_000); ; wait = rules.retryMs) {
@@ -1250,18 +1423,25 @@ async function keepTrying(root, agent, lookup) {
 		if (!a || !a.pending) return end("the mail was taken")
 		if (!a.pids.length) return end("the session is gone: its mail waits for its next start")
 		const wins = windows()
-		let blocked = false
+		let blocked = false, stalled = false
 		for (const pid of a.pids) {
 			const r = wakeAgent(root, agent, pid, { wins, turn: readTurn(pid, lookup), cfg, lookup, watcher: true })
 			if (r.sent && !r.unproved) return end("rung")
 			if (r.busy) return end("it took a turn: its Stop delivers")
 			if (r.notAtRest) blocked = true
-			if (r.erased) erasedTimes++
+			if (r.erased && !r.unlanded) erasedTimes++
+			if (r.unlanded) unlandedTimes++
+			if (r.stalled) stalled = true
 			if (r.why) last = r.why
 		}
 		if (blocked && !blockedAt) { blockedAt = Date.now(); noteRing(root, { at: new Date(blockedAt).toISOString(), agent, blocked: true }) }
 		// A SESSION THAT WILL NOT TAKE ITS ENTER is not typed into all night: twice, then a person is told. (Measured: a lone Enter has been taken every time.)
+		// A BOX THAT DOES NOT ANSWER ITS KEYS, once: its erase stopped with three presses queued, and every look from here would queue
+		// three more - blind, for when it wakes (the twenty-fourth review: 2 880 in 12 h). A person is told; the mail waits.
+		if (stalled) { tell("sa fenêtre ne répond plus à ses touches : la cloche n'est pas envoyée, le courrier reste dans sa boîte"); return end("gave up: its box does not answer its keys") }
 		if (erasedTimes >= 2) { tell("sa touche Entrée ne prend pas : deux cloches effacées, le courrier reste dans sa boîte"); return end("gave up: its Enter is not taken") }
+		// NOR ONE WHOSE CTRL+A DOES NOT LAND, twice in a run: its box may hide a line above the bell, and the bus cannot see it
+		if (unlandedTimes >= 2) { tell("sa touche Ctrl+A ne prend pas dans une case qui cache son début : la cloche n'est pas envoyée, le courrier reste dans sa boîte"); return end("gave up: its Ctrl+A does not land") }
 		if (!told && blocked && Date.now() - blockedAt >= rules.notifyAfterMs) tell(`du courrier l'attend et sa fenêtre refuse la cloche depuis ${Math.round((Date.now() - blockedAt) / 60_000)} min : ${last}`)
 		if (Date.now() - t0 >= rules.maxMs) {
 			tell(`la surveillance de sa sonnette s'arrête après ${Math.round((Date.now() - t0) / 60_000)} min, le courrier attend toujours : ${last}`)

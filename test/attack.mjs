@@ -4148,7 +4148,8 @@ process.stdout.write(JSON.stringify({ ops, res }))
 	// measurement here. Four one-variable cases against one control.
 	const E = (t) => ({ hash: "aaaaaaaaaaaa", transcript: t })
 	const base = new Map([["1.json", E("/home/u/.claude/1.jsonl")]])
-	const realT = join(mkdtempSync(join(tmpdir(), "comm-attack-a31-")), ".claude", "projects", "p", "s.jsonl")
+	const a31 = mkdtempSync(join(tmpdir(), "comm-attack-a31-")), realT = join(a31, ".claude", "projects", "p", "s.jsonl")
+	atExit(() => { try { rmSync(a31, { recursive: true, force: true }) } catch {} })   // it was left behind, one a run (35 on 11-15)
 	mkdirSync(dirname(realT), { recursive: true }); writeFileSync(realT, "")
 	const cases = {
 		"nothing moved": registryDiff(base, new Map(base), root),
@@ -5069,7 +5070,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 // FINDINGS.md#relay
 {
 	const r95 = mkdtempSync(join(tmpdir(), "comm-attack-relay-"))
-	const opened95 = [], ARMS = ["nominal", "typed", "dialog", "guard", "noclear", "untaken", "grace", "titled", "titledTyped", "pasted", "lostEnter", "lostEnterTyped", "declared", "twoBells", "cutBell", "overBell", "waitBox", "turnInWait", "keyboardHeld", "guardInWait", "movedInWait", "exitInWait", "rearmInWait", "clearStuck", "sayStuck", "capNominal", "capWordsInFront", "capLetterAfter", "capDialogShort", "capDialogForever", "capDialogUnseen", "capDialogBlank", "capLostDialog", "capUnseen", "capLostOnce", "capErase", "capDialogWords", "capDialogEats", "capWordsAtEnd", "capDialogFirst", "capDialogFirstLong", "capSlowRedraw", "capExactFill", "capExactFillClean", "capSay800"], REFUSED = ["nosay", "noguard", "nested", "mail", "selfcancel", "unregistered", "unregisteredOld", "flagguard", "declaredStale", "longsay", "backslashsay"], SC = [...ARMS, ...REFUSED]
+	const opened95 = [], ARMS = ["nominal", "typed", "dialog", "guard", "noclear", "untaken", "grace", "titled", "titledTyped", "pasted", "lostEnter", "lostEnterTyped", "declared", "twoBells", "cutBell", "overBell", "waitBox", "turnInWait", "keyboardHeld", "guardInWait", "movedInWait", "exitInWait", "rearmInWait", "clearStuck", "sayStuck", "capNominal", "capWordsInFront", "capLetterAfter", "capDialogShort", "capDialogForever", "capDialogUnseen", "capDialogBlank", "capLostDialog", "capUnseen", "capLostOnce", "capErase", "capDialogWords", "capDialogEats", "capWordsAtEnd", "capDialogFirst", "capDialogFirstLong", "capSlowRedraw", "capExactFill", "capExactFillClean", "capSay800", "capUnseenNoCursor", "capMainScreen"], REFUSED = ["nosay", "noguard", "nested", "mail", "selfcancel", "unregistered", "unregisteredOld", "flagguard", "declaredStale", "longsay", "backslashsay"], SC = [...ARMS, ...REFUSED]
 	atExit(() => {
 		for (const [sock, id] of opened95)
 			try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
@@ -5124,9 +5125,20 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 			const ch = chunks()
 			return (atStart ? ch.slice(0, c.cap) : ch.slice(-c.cap)).map((r, i) => (i ? "  " : "\x1b[m❯ ") + r).join("\r\n")
 		}
+		// in `cap` mode the terminal's cursor where Claude Code puts it (measured, --add-cursor): the ❯ row's first text cell after
+		// Ctrl+A, else the end of the last line shown. The ❯ row is the screen's row 4 here.
+		// `hideCursor`: the cursor hidden (`\e[?25l`): not known, the guesses decide (the nineteenth review: the relay's "unseen" unarmed)
+		const cursorAt = () => { if (!c.cap || blankNow) return ""; if (c.hideCursor) return "\x1b[?25l"; const ch = chunks(), shown = atStart ? ch.slice(0, c.cap) : ch.slice(-c.cap)
+			const last = shown[shown.length - 1] || ""
+			return atStart || !shown.length ? "\x1b[4;3H" : last.length >= WD ? `\x1b[${4 + shown.length};3H` : `\x1b[${4 + shown.length - 1};${3 + last.length}H` }
 		const draw = () => process.stdout.write("\x1b[2J\x1b[H" + (c.dialog || dialogNow
 			? " Quick safety check: Is this a project you created or one you trust?\r\n\r\n ❯ No, exit\r\n   Yes, I trust this folder\r\n\r\n Enter to confirm · Esc to cancel\r\n"
-			: "\r\n\r\n" + TOP + "\r\n" + boxText() + "\r\n" + RULE + "\r\n  ⏵⏵ fake session\r\n"))
+			: "\r\n\r\n" + TOP + "\r\n" + boxText() + "\r\n" + RULE + "\r\n  ⏵⏵ fake session\r\n" + cursorAt()))
+		// on the ALTERNATE screen, as Claude Code is (4 of 4 windows, 11-15): the only screen whose cursor the bus believes - in `cap`
+		// mode only, whose scenarios have a tab each. A pane shrunk after its frame (the shared tab's splits) keeps its bottom rows on
+		// the main screen and loses them on the alternate one, which this fake never redraws (measured 11-15: drawn on 56 rows, shrunk
+		// to 27, the box gone - nominal's tab went red four times, the first suite on the cursor). `mainScreen`: the control
+		if (c.cap && !c.mainScreen) process.stdout.write("\x1b[?1049h")
 		draw()
 		if (process.stdin.setRawMode) process.stdin.setRawMode(true)
 		process.stdin.on("data", (d) => {
@@ -5227,7 +5239,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 				paste: k === "pasted", loseEnter: /^lostEnter/.test(k) || k === "capLostOnce", appendOnLost: k === "lostEnterTyped",
 				loseClearEnter: k === "clearStuck", loseAllEnters: k === "sayStuck" || k === "capLostDialog" || k === "capErase", go2: join(r95, `${k}.go2`), out2: join(r95, `${k}.out2`),
 				cap: /^cap/.test(k) ? 3 : 0, width: 40, wordsBefore: k === "capWordsInFront" || k === "capDialogWords", letterAfter: k === "capLetterAfter", dialogAfterEnters: k === "capLostDialog" ? 1 : 0,
-				ctrlAIgnored: k === "capUnseen", lineBefore: k === "capExactFill", wordsAfter: k === "capWordsAtEnd", dialogOnPrompt: { capDialogFirst: 7000, capDialogFirstLong: 30000 }[k] || 0,
+				ctrlAIgnored: k === "capUnseen" || k === "capUnseenNoCursor" || k === "capMainScreen", lineBefore: k === "capExactFill", hideCursor: k === "capUnseenNoCursor", mainScreen: k === "capMainScreen", wordsAfter: k === "capWordsAtEnd", dialogOnPrompt: { capDialogFirst: 7000, capDialogFirstLong: 30000 }[k] || 0,
 				slowCtrlE: k === "capErase" ? 150 : 0, slowCtrlA: k === "capSlowRedraw" ? 2500 : 0,
 				// 6 s and 3 s: long enough that two readings 1.5 s apart, on a loaded machine, cannot step over them (the ninth review)
 				dialogOnCtrlA: { capDialogShort: { ms: 9000 }, capDialogForever: { ms: 1e9 }, capDialogUnseen: { ms: 9000, eats: true, ignoreAfter: true }, capDialogBlank: { ms: 2000, blankMs: 4000 }, capDialogWords: { ms: 9000 }, capDialogEats: { ms: 3000, eats: true } }[k] || null,
@@ -5350,16 +5362,27 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 	const k126 = (k, tail) => keys(k) === `/clear\r${say(k)}${tail}`
 	const ok126 = b95 ? {
 		startSeenThenRelayed: rec("capNominal").relayed === true && k126("capNominal", "\x01\r") && (rec("capNominal").prompt_start || {}).seen === true,
-		wordsInFrontRefused: rec("capWordsInFront").relayed === false && k126("capWordsInFront", "\x01\x05") && /in front of it/.test(why("capWordsInFront")),
+		// refused after its Ctrl+A, the words in front of its start - or at once, on a frame drawn mid-typing that shows "yes " in front of a
+		// piece of the prompt (the fake draws per character: the eleventh suite on the cursor took that path once, as capDialogWords did)
+		wordsInFrontRefused: rec("capWordsInFront").relayed === false && ((k126("capWordsInFront", "\x01\x05") && /in front of it/.test(why("capWordsInFront"))) ||
+			(k126("capWordsInFront", "") && /somebody's words/.test(why("capWordsInFront")))),
 		aLetterAfterIsNotItsStart: rec("capLetterAfter").relayed === false && k126("capLetterAfter", "\x01\r"),
 		dialogThenRelayed: rec("capDialogShort").relayed === true && k126("capDialogShort", "\x01\x01\r") && (rec("capDialogShort").prompt_box_back || {}).check === "start",
-		blankFrameWaitedFor: rec("capDialogBlank").relayed === true && k126("capDialogBlank", "\x01\x01\r"),
+		// two right paths since the cursor (the first suite on it, 11-15, took each once): the window ends on the blank frame - "nobox",
+		// the box waited for, asked again; or the box comes back at its start with the cursor on its first cell - the proof, at once
+		blankFrameWaitedFor: rec("capDialogBlank").relayed === true && (k126("capDialogBlank", "\x01\x01\r") || k126("capDialogBlank", "\x01\r")),
 		dialogThatStaysGetsNoKey: rec("capDialogForever").relayed === false && k126("capDialogForever", "\x01") && /a dialog/.test(why("capDialogForever")),
-		unseenAfterADialogRefused: rec("capDialogUnseen").relayed === false && k126("capDialogUnseen", "\x01\x01\x05") && /could not be brought into view/.test(why("capDialogUnseen")),
+		unseenAfterADialogRefused: rec("capDialogUnseen").relayed === false && k126("capDialogUnseen", "\x01\x01\x05") && /did not land/.test(why("capDialogUnseen")),
 		// the dialog comes at the first lost Enter: the second Enter and the last Ctrl+E both face it, and neither goes
 		noKeyIntoALaterDialog: rec("capLostDialog").relayed === false && k126("capLostDialog", "\x01\r"),
 		// THE NINTH REVIEW: a Ctrl+A that shows nothing, no dialog anywhere - refused, the prompt left, the cursor put back
-		unseenRefused: rec("capUnseen").relayed === false && k126("capUnseen", "\x01\x05") && /could not be brought into view/.test(why("capUnseen")) && /stays in the box/.test(why("capUnseen")),
+		// (the fake reports its cursor, still at the end: the Ctrl+A did not land, said so - the eighteenth review)
+		unseenRefused: rec("capUnseen").relayed === false && k126("capUnseen", "\x01\x05") && /did not land/.test(why("capUnseen")) && /stays in the box/.test(why("capUnseen")),
+		// with NO cursor known (hidden), a Ctrl+A that shows nothing: "unseen", refused (the nineteenth review: unarmed since the fake drew one)
+		unseenNoCursorRefused: rec("capUnseenNoCursor").relayed === false && k126("capUnseenNoCursor", "\x01\x05") && /could not be brought into view/.test(why("capUnseenNoCursor")),
+		// the same eaten Ctrl+A on the MAIN screen, its cursor visible at the end: believed, it would read "did not land"; on that screen
+		// it counts for nothing, the guesses decide - "could not be brought into view" (the twentieth review: a view scrolled back)
+		mainScreenCursorIgnored: rec("capMainScreen").relayed === false && k126("capMainScreen", "\x01\x05") && /could not be brought into view/.test(why("capMainScreen")),
 		// the first Enter lost, the second (its start in view) taken
 		secondEnterTaken: rec("capLostOnce").relayed === true && k126("capLostOnce", "\x01\r\r"),
 		// every Enter lost: the cursor to the end, then its own prompt erased line by line, all of it (`own`)
@@ -5379,7 +5402,10 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		// the start drawn 2.5 s after the Ctrl+A: seen within the relay's own 5 s, relayed
 		aSlowRedrawIsSeen: rec("capSlowRedraw").relayed === true && k126("capSlowRedraw", "\x01\r") && (rec("capSlowRedraw").prompt_start || {}).seen === true,
 		// a dialog, then the box back with somebody's words where the prompt starts: theirs, said so
-		dialogThenWordsRefused: rec("capDialogWords").relayed === false && k126("capDialogWords", "\x01\x05") && /in front of it/.test(why("capDialogWords")),
+		// refused after the dialog, words in front of its start - or at once, on a frame drawn mid-typing that shows "yes " in front of a
+		// piece of the prompt (the fake draws per character; the first suite on the cursor took each once). Either way no Enter.
+		dialogThenWordsRefused: rec("capDialogWords").relayed === false && ((k126("capDialogWords", "\x01\x05") && /in front of it/.test(why("capDialogWords"))) ||
+			(k126("capDialogWords", "") && /somebody's words/.test(why("capDialogWords")))),
 		finalEraseEmpties: rec("capErase").relayed === false && (keys("capErase") || "").startsWith(`/clear\r${say("capErase")}\x01\r\r\x05\x15`) && !!S95.capErase.boxAfter && S95.capErase.boxAfter.ok === true,
 	} : {}
 	check("A126 a relay in a box that hides its start: its start seen before the Enter, words in front refuse it, after a dialog only a start seen goes on, no key into a dialog",
@@ -5829,9 +5855,20 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		// `cap`: the box Claude Code draws for a long text in a short window (A125) - `width` characters a line, only the LAST `cap`
 		// lines, the `❯` on the first one shown; Ctrl+U takes the last line
 		const W = c.width || 40, chunks = () => { const o = []; for (let i = 0; i < line.length; i += W) o.push(line.slice(i, i + W)); return o }
-		let atStart = false   // Ctrl+A: the start in view, as a real capped box does (#hidden-head); Ctrl+E: the end again
+		let atStart = false, bellsSeen = 0, frozen = false, ctrlEs = 0, dialogNow = false, dialogDone = false   // Ctrl+A: the start in view, as a real capped box does (#hidden-head); Ctrl+E: the end again
 		const boxRows = () => c.cap ? ((atStart ? chunks().slice(0, c.cap) : chunks().slice(-c.cap)).map((r, i) => (i ? "  " : "❯ ") + r).join("\r\n") || "❯ ") : `❯ ${line}`
-		const draw = () => process.stdout.write(`\x1b[2J\x1b[H\r\n${RULE}\r\n${boxRows()}\r\n${RULE}\r\n  ⏵⏵ fake session\r\n`)
+		// in `cap` mode the terminal's cursor goes where Claude Code puts it (measured, --add-cursor): the ❯ row's first text cell after
+		// Ctrl+A, else the end of the last line shown. The ❯ row is the screen's row 3 here.
+		const cursorAt = () => { if (!c.cap) return ""; const ch = chunks(), shown = atStart ? ch.slice(0, c.cap) : ch.slice(-c.cap)
+			const last = shown[shown.length - 1] || ""
+			return atStart || !shown.length ? "\x1b[3;3H" : last.length >= W ? `\x1b[${3 + shown.length};3H` : `\x1b[${3 + shown.length - 1};${3 + last.length}H` }
+		// `freezeAtCtrlE`: the session stalls after its first Ctrl+E - nothing redrawn, no key applied (keys still recorded)
+		// `dialogWhenEmptied`: a dialog over the box the moment it is emptied, for that many ms - no box drawn, every key it gets kept in
+		// `<keys>.dialog`, none applied (the thirty-third review: a bell typed into a dialog that came over an emptied box)
+		const draw = () => { if (frozen) return; if (dialogNow) return void process.stdout.write("\x1b[2J\x1b[H Quick safety check: Is this a project you trust?\r\n\r\n ❯ No, exit\r\n   Yes, I trust this folder\r\n")
+			process.stdout.write(`\x1b[2J\x1b[H\r\n${RULE}\r\n${boxRows()}\r\n${RULE}\r\n  ⏵⏵ fake session\r\n${cursorAt()}`) }
+		// the alternate screen, as Claude Code's (the only one whose cursor counts); `mainScreen`: left on the main one (A125's control)
+		if (!c.mainScreen) process.stdout.write("\x1b[?1049h")
 		draw()
 		if (process.stdin.setRawMode) process.stdin.setRawMode(true)
 		process.stdin.on("data", (d) => {
@@ -5839,8 +5876,17 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 			// `lateMs`: a long text is drawn that much later, and an Enter read before it is drawn joins it - lost (#enter-in-the-paste)
 			if (c.lateMs && d.toString().replace(/\r/g, "").length > 20) { line += d.toString().replace(/\r/g, ""); late = true; setTimeout(() => { late = false; draw() }, c.lateMs); return }
 			for (const ch of d.toString()) {
-				if (ch === "\x15") { if (!atStart) line = c.cap ? line.slice(0, Math.max(0, (Math.ceil(line.length / W) - 1) * W)) : line.slice(0, Math.max(0, line.length - 60)); draw(); continue }
-				if (c.cap && (ch === "\x01" || ch === "\x05")) { atStart = ch === "\x01"; draw(); continue }
+				if (frozen) continue
+				if (dialogNow) { fs.appendFileSync(c.keys + ".dialog", ch); continue }
+				if (ch === "\x15") { const had = !!line; if (!atStart) line = c.cap ? line.slice(0, Math.max(0, (Math.ceil(line.length / W) - 1) * W)) : line.slice(0, Math.max(0, line.length - 60))
+					// (the empty box drawn first, the dialog 250 ms after: after the eraser saw it empty - its first reading 150 ms after the press -
+					// and as it reads again 150 ms later, before anything is typed: a dialog drawn at once was simply waited out by the erase)
+					if (c.dialogWhenEmptied && had && !line && !dialogDone) { dialogDone = true; setTimeout(() => { dialogNow = true; draw(); setTimeout(() => { dialogNow = false; draw() }, c.dialogWhenEmptied) }, 250) }
+					draw(); continue }
+				// `wordsAtBell`: a person's line typed just before the Nth bell lands - above it, hidden in a capped box (one width of it)
+				if (c.wordsAtBell && ch === "[" && line === "" && ++bellsSeen === c.wordsAtBell) line = "please read LETTER.md first".padEnd(W, " ")
+				// `ctrlAIgnored`: a Ctrl+A that does nothing (eaten): the end stays in view, the cursor at it
+				if (c.cap && (ch === "\x01" || ch === "\x05")) { atStart = ch === "\x01" && !c.ctrlAIgnored; draw(); if (ch === "\x05" && c.freezeAtCtrlE && ++ctrlEs >= Number(c.freezeAtCtrlE)) frozen = true; continue }
 				if (ch !== "\r") { line += ch; draw(); continue }
 				if (late || !line) continue
 				if (lost !== 0) { lost--; if (c.typesAfterLoss) { line += " hello"; draw() } continue }
@@ -5850,7 +5896,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 			}
 		})
 		fs.writeFileSync(c.pidFile, String(process.pid))
-		setTimeout(() => process.exit(0), 75000)
+		setTimeout(() => process.exit(0), 120000)   // 120 s: A125's rings that keep looking run up to 45 s after the hooks
 	}
 	const bB = await bench()
 	/** A project on the bench: one pane per scenario, each an agent of its own (`leader`: the root's), mail waiting for each. */
@@ -5992,7 +6038,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 	// One reading per call, then the last one again: the box as `typeAndProve` would read it, keys as they would be typed
 	const scripted = (reads) => { const keys = []; let i = 0; return { keys, read: () => reads[Math.min(i++, reads.length - 1)], send: (t) => { keys.push(t); return { status: 0, stderr: "" } } } }
 	const typed = (text) => ({ ok: false, typed: true, text })
-	const fast = { shownMs: 120, takenMs: 120, nap: 5 }
+	const fast = { shownMs: 120, takenMs: 120, nap: 5, landMs: 120, answerMs: 50 }
 	const u = {}
 	{
 		// the person's keystrokes landed before the bell / after it, before the first look: an Enter would submit them
@@ -6003,7 +6049,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		// "it left" is claimed only of text the box was seen to hold
 		x = scripted([{ ok: true }]); r = wkB.typeAndProve(x.read, x.send, N, fast)
 		u.neverSeenIsNotTaken = r.taken === false && r.unproved === true && x.keys.filter((k) => k === "\r").length === 1
-		x = scripted([typed(N), { ok: false, why: "its screen could not be read" }]); r = wkB.typeAndProve(x.read, x.send, N, fast)
+		x = scripted([typed(N), { ok: false, unread: true, why: "its screen could not be read" }]); r = wkB.typeAndProve(x.read, x.send, N, fast)
 		u.unreadableIsNotTaken = r.taken === false && r.unproved === true
 		x = scripted([typed(N), { ok: true }]); r = wkB.typeAndProve(x.read, x.send, N, fast)
 		u.seenThenEmptyIsTaken = r.taken === true && r.unproved !== true
@@ -6014,11 +6060,11 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		x = scripted([typed(N)]); r = wkB.typeAndProve(x.read, x.send, N, { ...fast, erase: false })
 		u.noEraseStays = r.stays === true && !x.keys.includes("\x15") && x.keys.filter((k) => k === "\r").length === 2
 		// erasing: anything but the start of what was there is somebody typing, and it stops
-		x = scripted([typed(N), typed(`${N.slice(0, 200)} MOTS`)]); r = wkB.eraseOwn(x.read, x.send, () => true, { pressMs: 1 })
+		x = scripted([typed(N), typed(`${N.slice(0, 200)} MOTS`)]); r = wkB.eraseOwn(x.read, x.send, () => true, { pressMs: 1, answerMs: 0 })
 		u.eraseStopsOnWords = r.erased === false && /somebody started typing/.test(r.why) && x.keys.length === 1
-		x = scripted([typed("bonjour")]); r = wkB.eraseOwn(x.read, x.send, (t) => !!wkB.busText(t), { pressMs: 1 })
+		x = scripted([typed("bonjour")]); r = wkB.eraseOwn(x.read, x.send, (t) => !!wkB.busText(t), { pressMs: 1, answerMs: 0 })
 		u.eraseRefusesOthers = r.erased === false && x.keys.length === 0
-		x = scripted([typed(N), typed(N), { ok: false, why: "a dialog" }]); r = wkB.eraseOwn(x.read, x.send, () => true, { pressMs: 1 })
+		x = scripted([typed(N), typed(N), { ok: false, why: "a dialog" }]); r = wkB.eraseOwn(x.read, x.send, () => true, { pressMs: 1, answerMs: 0 })
 		u.eraseStopsOnADialog = r.erased === false && /went away/.test(r.why)
 	}
 	const bellOf = (k) => r112[k] || {}
@@ -6249,7 +6295,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 			return { status: 0, stderr: "" }
 		} })
 	const byWords = (t, w) => { const o = []; let l = ""; for (const wd of t.split(" ")) { if (l && `${l} ${wd}`.length > w) { o.push(l); l = wd } else l = l ? `${l} ${wd}` : wd } if (l) o.push(l); return o }
-	const eraseIn = (b) => wkB.eraseOwn(() => b.read(), (t) => b.send(t), ours, { pressMs: 1 })
+	const eraseIn = (b) => wkB.eraseOwn(() => b.read(), (t) => b.send(t), ours, { pressMs: 1, answerMs: 0 })
 	let hhThrew = null
 	// a guard of its own: on code without these readers the legs read false, and the suite goes on to the arms after this one
 	try {
@@ -6314,7 +6360,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		for (const w of [40, 67, 79, 88, 102]) { const b = capBox([], { lose: 9, cursorLine: true, width: w }); const rr = wkB.typeAndProve(() => b.read(), (t) => b.send(t), SAY, fast); if (!rr.erased || b.lines.length) stuckSay.push(w) }
 		// and with the relay's own predicate (relay.mjs's final erase, as written there): at 2 lines nothing but `own` says it is its own
 		const relayOurs = (t, st) => wkB.shows(st, SAY) || (wkB.mayHide(st) && wkB.pieceOf(st, SAY))
-		for (const w of [40, 67, 79, 88, 102, 140]) { const b = capBox(wrapAt(SAY, w), { cursorLine: true }); const e = wkB.eraseOwn(() => b.read(), (t) => b.send(t), relayOurs, { pressMs: 1, own: SAY }); if (!e.erased || b.lines.length) stuckSay.push(`relay${w}`) }
+		for (const w of [40, 67, 79, 88, 102, 140]) { const b = capBox(wrapAt(SAY, w), { cursorLine: true }); const e = wkB.eraseOwn(() => b.read(), (t) => b.send(t), relayOurs, { pressMs: 1, answerMs: 0, own: SAY }); if (!e.erased || b.lines.length) stuckSay.push(`relay${w}`) }
 		hh.ownTextErasedWhole = stuckSay.length === 0
 		// no box on screen after the Ctrl+A (a dialog): no Enter into it
 		bx = capBox([]); const readN = bx.read; bx.read = function () { return this.atStart ? { ok: false, why: "a dialog" } : readN.call(this) }; r = ring(bx)
@@ -6361,13 +6407,260 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		// startInView on its own (wake's side, the twelfth to fourteenth reviews): an eaten key, a blank after a dialog, blank rows above
 		// the text, ONE no-box reading then the text's end (a dialog: "nobox"), and one then its start, twice (the start: "start")
 		const noBoxR = { ok: false, why: "a dialog" }, blankR = wkB.promptAtRest(["out", R, "❯\u00a0", "  ", "  ", R, "  x"].join("\n"))
-		const siv = (reads) => { const sc = scripted(reads); return wkB.startInView(sc.read, N, 30, 5) }
+		const siv = (reads) => { const sc = scripted(reads); return wkB.startInView(sc.read, N, 30, 5, 30) }
 		const firstBlankR = wkB.promptAtRest(["out", R, "❯\u00a0", "  ", `  ${NL[0]}`, R, "  x"].join("\n"))
 		hh.startInViewReadsDialogs = siv([noBoxR, noBoxR, tail3]) === "nobox" && siv([noBoxR, noBoxR, blankR]) === "nobox" && siv([blankR]) === "theirs" &&
 			firstBlankR.firstBlank === true && siv([firstBlankR]) === "theirs" && !wkB.startOf(firstBlankR, N) && siv([noBoxR, tail3, head3]) === "nobox" &&
 			siv([noBoxR, head3, head3]) === "start" && siv([head3, tail3, head3, head3]) === "start" &&
 			// one stale reading that looks like the start, then the truth - a line above: theirs, never "start" on the first
-			siv([head3, drawn(["hi", NL[0], NL[1]])]) === "theirs"
+			siv([head3, drawn(["hi", NL[0], NL[1]])]) === "theirs" &&
+			// two RUNNING, exactly two (the fifteenth review: a missing reset, or a count set higher, left every leg green), and after a
+			// dialog the whole text proves nothing - the view from before an eaten Ctrl+A shows it too
+			siv([head3, tail3, head3, tail3]) === "unseen" && siv([head3, head3, tail3]) === "start" && siv([noBoxR, drawn(NL), drawn(NL)]) === "nobox"
+		// THE CURSOR (the sixteenth review; --add-cursor, measured 2.1.325): the box's rows from screen row 3, `\e[R;CH` after them
+		// marked (`\r` ends each screen row, --add-wrap-markers): the screen as production reads it - a cursor counts only there
+		const marks = (lines) => lines.map((l) => l + "\r").join("\n")
+		const withCur = (rows, rc) => wkB.promptAtRest(marks(["out", R, ...rows.map((x, i) => (i ? "  " : "❯\u00a0") + x), R, "  x"]) + `\x1b[?25h\x1b[${rc[0]};${rc[1]}H\x1b[?12h\n`)
+		const startC = withCur(NL.slice(0, 3), [3, 3]), endC = withCur(NL.slice(0, 3), [5, 50]), aboveC = withCur(["hi", NL[0], NL[1]], [3, 3])
+		// with no markers a cursor counts for nothing (the twentieth review: a stale wrap flag joins rows - the count runs short and read true)
+		const unmarkedC = wkB.promptAtRest(["out", R, ...NL.slice(0, 3).map((x, i) => (i ? "  " : "❯\u00a0") + x), R, "  x"].join("\n") + "\x1b[?25h\x1b[3;3H")
+		// on the ❯ row but not its first cell (a cursor left mid-line, or at cols+1 waiting to wrap): elsewhere (a survivor, the twentieth)
+		const midRowC = withCur(NL.slice(0, 3), [3, 30]), wrapWaitC = withCur(NL.slice(0, 3), [3, 206])
+		// only the alternate screen's cursor counts: a window known by its id alone, or on the main screen, is read by the guesses
+		const onAlt = wkB.cursorCounts(endC, true), onMain = wkB.cursorCounts(endC, false), byId = wkB.cursorCounts(startC, undefined)
+		hh.theCursorProves = startC.cursorAtStart === true && endC.cursorAtStart === false && drawn(NL).cursorAtStart === undefined &&
+			unmarkedC.cursorAtStart === undefined && midRowC.cursorAtStart === false && wrapWaitC.cursorAtStart === false &&
+			onAlt.cursorAtStart === false && onMain.cursorAtStart === undefined && byId.cursorAtStart === undefined && onMain.text === endC.text &&
+			siv([startC]) === "start" && siv([endC]) === "unlanded" && siv([endC, startC]) === "start" && siv([aboveC]) === "theirs" &&
+			siv([noBoxR, withCur(NL, [3, 3])]) === "start" && siv([noBoxR, withCur(NL, [6, 40])]) === "nobox"
+		// THE SEVENTEENTH REVIEW. The tail in kitty's other form (a cursor shape, `\e[N q`) is parsed and stripped - a footer under the box
+		// still reads at rest; a hidden cursor, or column 3 on another row (rows joined above), is unknown: the guesses decide
+		const tailForm = (rows, tail) => wkB.promptAtRest(marks(["out", R, ...rows.map((x, i) => (i ? "  " : "❯\u00a0") + x), R, "  x"]) + tail)
+		const footerShape = wkB.promptAtRest(marks(["out", R, "❯\u00a0", R, "  x", "", "  ● main", "  ◯ general-purpose  x"]) + "\x1b[?25h\x1b[3;3H\x1b[6 q")
+		const wrongRow = tailForm(NL.slice(0, 3), "\x1b[?25h\x1b[4;3H")
+		hh.cursorTailForms = tailForm([""], "\x1b[?25h\x1b[3;3H\x1b[2 q\n").ok === true && footerShape.ok === true &&
+			// hidden: unknown; column 3 on ANOTHER row, the screen marked: elsewhere (round 17 read it unknown; markers make the row exact)
+			tailForm(NL.slice(0, 3), "\x1b[?25l\x1b[3;3H").cursorAtStart === undefined && wrongRow.cursorAtStart === false &&
+			// column 3 on another row is no proof: a reading of somebody's line after it is still theirs (a survivor, "the cursor on any row")
+			siv([wrongRow, withCur(["hi", NL[0], NL[1]], [6, 40])]) === "theirs"
+		// THE EIGHTEENTH REVIEW. The tail on a line of its own after blank rows, in the shape form: parsed (the cursor proof kept) and at rest;
+		// a line of nothing but a non-colour sequence after blank rows: blank to `plain`; a slow run not cut (no ceiling); and a lost Ctrl+A
+		// over a hidden line: "unlanded", no Enter
+		{
+			const own = (rows, extra) => wkB.promptAtRest(marks(["out", R, ...rows.map((x, i) => (i ? "  " : "❯\u00a0") + x), R, "  x"]) + extra)
+			const lineTail = own(NL.slice(0, 3), "\n\r\n\r\n\r\n\r\x1b[?25h\x1b[3;3H\x1b[6 q")
+			const csiLine = own([""], "\n\r".repeat(8) + "\x1b[?2004h\r\n")   // past `below`'s 6: blank only to a `plain` that strips it
+			let k2 = 0; const rd2 = () => { k2++; Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 35); return k2 === 1 ? tail3 : head3 }
+			const hid = ["hi", ...NL], endTail = `\x1b[?25h\x1b[6;${3 + NL[3].length}H`
+			const lost = { keys: [], typed: false, read() { if (!this.typed) return { ok: true }; return own(hid.slice(-4), endTail) }, send(t) { this.keys.push(t); if (t.length > 5) this.typed = true; return { status: 0, stderr: "" } } }
+			const rl = wkB.typeAndProve(() => lost.read(), (t) => lost.send(t), N, { ...fast, erase: false })
+			hh.round18 = lineTail.ok === false && lineTail.cursorAtStart === true && csiLine.ok === true && wkB.startInView(rd2, N, 30, 5) === "start" &&
+				rl.taken === false && rl.unlanded === true && rl.stays === true && !lost.keys.includes("\r") && /did not land/.test(rl.why || "") && lost.keys.at(-1) === "\x05"
+		}
+		// one start reading with no cursor, then blank rows: it ENDS (it spun forever, the seventeenth review)
+		// a reader that THROWS past 500 readings: a loop that never ends reddens this leg instead of hanging the suite (the nineteenth review)
+		{ const reads = [head3, blankR]; let i = 0; const bounded = () => { if (++i > 500) throw new Error("endless"); return reads[Math.min(i - 1, reads.length - 1)] }
+			let r0 = null; try { r0 = wkB.startInView(bounded, N, 30, 5) } catch { r0 = "endless" }; hh.noEndlessLoop = r0 === "theirs" }
+		// A BOX THAT DOES NOT ANSWER ITS KEYS (a session stalled): the erase stops after two idle presses, its Ctrl+E, two more - never
+		// 60 blind presses queued for when it wakes (the twenty-third review); and a cursor seen elsewhere once, hidden at the timeout:
+		// still "unlanded", never an Enter on one hidden frame
+		{
+			const frozen = drawn(NL.slice(-3)), keysF = []
+			const ef = wkB.eraseOwn(() => frozen, (t) => { keysF.push(t); return { status: 0 } }, () => true, { pressMs: 1, own: N, answerMs: 20 })
+			const tailC = withCur(NL.slice(-3), [5, 50]), hiddenTail = { ...tailC, cursorAtStart: undefined }
+			hh.frozenBoxStops = ef.erased === false && ef.stalled === true && /does not answer its keys/.test(ef.why || "") && keysF.filter((k) => k === "\x15").length === 2 && keysF.filter((k) => k === "\x05").length === 1 && keysF.join("") === "\x15\x15\x05" &&
+				siv([tailC, hiddenTail, hiddenTail]) === "unlanded" && siv([hiddenTail, hiddenTail]) === "unseen"
+		}
+		// A BOX REDRAWN LATE (the twenty-fourth review): each press waits for its effect - erased whole where, without the wait, the
+		// same box reads as stalled (the control); and a person's line above the bell, the box 120 ms behind, survives
+		{
+			const lagged = (b, lagMs) => { const q = []; const due = () => { while (q.length && Date.now() >= q[0].at) b.send(q.shift().t) }
+				return { box: b, read() { due(); return b.read() }, send(t) { q.push({ t, at: Date.now() + lagMs }); return { status: 0, stderr: "" } }, drain() { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, lagMs + 30); due() } } }
+			const lb = lagged(capBox(wrapAt(N, 80)), 120), le = wkB.eraseOwn(() => lb.read(), (t) => lb.send(t), ours, { pressMs: 1, answerMs: 1000 }); lb.drain()
+			const l0 = lagged(capBox(wrapAt(N, 80)), 120), l0e = wkB.eraseOwn(() => l0.read(), (t) => l0.send(t), ours, { pressMs: 1, answerMs: 0 }); l0.drain()
+			const lw = lagged(capBox(wrapAt(`please keep this line, it is mine ${N}`, 80)), 120), lwe = wkB.eraseOwn(() => lw.read(), (t) => lw.send(t), ours, { pressMs: 1, answerMs: 1000 }); lw.drain()
+			// a Ctrl+A drawn late, the cursor seen elsewhere until then: waited for, `landMs` past the window - "start", where the window
+			// alone read "unlanded" and the bell never rang (the twenty-fourth review: a redraw 2.5 s late)
+			const tailE = withCur(NL.slice(-3), [5, 50]), t0 = Date.now(), late = () => Date.now() - t0 < 100 ? tailE : startC
+			hh.aLateCtrlAIsWaitedFor = wkB.startInView(late, N, 30, 5, 400) === "start" && (() => { const t1 = Date.now(); return wkB.startInView(() => Date.now() - t1 < 100 ? tailE : startC, N, 30, 5, 0) === "unlanded" })()
+			hh.lagWaitsForEachPress = le.erased === true && lb.box.lines.length === 0 && l0e.stalled === true &&
+				lwe.erased === false && lw.box.lines.join("").startsWith("please keep this line, it is mine") && !lw.box.keys.includes("\r")
+		}
+		// THE TWENTY-FIFTH REVIEW. (1) Pending presses never past the bus's own rows: [bell, bell, blank] (the measured blank after a first
+		// press), "yes " hidden above, the session stalled after that press - what was queued lands when it wakes, and "yes " stays.
+		// (2) Redraws late by a random, ordered 0-60 ms: the erase reaches a person's line and stops there - never stalled, never past it.
+		// (3) `stalled` carried out of typeAndProve, from its unlanded erase and from its Enter-not-taken one.
+		{
+			const yes = capBox(wrapAt(`yes ${N}`, 102), { cursorLine: true }), queued = []
+			let pressed = 0
+			const r25 = wkB.eraseOwn(() => yes.read(), (t) => { if (queued.length || (t === "\x15" && ++pressed > 1)) { queued.push(t); return { status: 0, stderr: "" } } return yes.send(t) }, ours, { pressMs: 1, answerMs: 20 })
+			for (const t of queued) yes.send(t)
+			hh.pendingNeverPastTheBus = r25.stalled === true && yes.lines.join("").startsWith("yes ") && queued.filter((k) => k === "\x15").length === 1
+			const seeds = [1, 2, 3, 4, 5, 6].map((seed) => {
+				let x = seed * 7919; const rnd = () => (x = (x * 48271) % 2147483647) / 2147483647
+				const b = capBox(wrapAt(`please keep this line, it is mine ${N}${N}`, 66)), q = []
+				const due = () => { while (q.length && Date.now() >= q[0].at) b.send(q.shift().t) }
+				const e = wkB.eraseOwn(() => { due(); return b.read() }, (t) => { q.push({ t, at: Math.max(q.length ? q.at(-1).at : 0, Date.now() + rnd() * 60) }); return { status: 0, stderr: "" } }, ours, { pressMs: 1, answerMs: 300 })
+				Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 80); due()
+				return e.stalled !== true && e.erased === false && b.lines.join("").startsWith("please keep this line, it is mine")
+			})
+			hh.jitterStopsAtTheirLine = seeds.every(Boolean)
+			const typedBox = (shown) => ({ keys: [], typed: false, read() { return this.typed ? shown : { ok: true } }, send(t) { this.keys.push(t); if (t.length > 5) this.typed = true; return { status: 0, stderr: "" } } })
+			const fu = typedBox(withCur(NL.slice(-3), [5, 50])), ru = wkB.typeAndProve(() => fu.read(), (t) => fu.send(t), N, fast)
+			const fe = typedBox(drawn(wrapAt(N, 160))), re = wkB.typeAndProve(() => fe.read(), (t) => fe.send(t), N, fast)
+			// (4) a box of [line, blank, blank]: one line of the bus's in view, so ONE press pending at most (a survivor: blank rows not
+			// counted); (5) one frame drawn empty between two of the text: not "erased" (a survivor: empty read once)
+			const twoBlank = drawn([NL[0], "", ""]), kb = []
+			const rb = wkB.eraseOwn(() => twoBlank, (t) => { kb.push(t); return { status: 0, stderr: "" } }, ours, { pressMs: 1, answerMs: 20 })
+			const xf = scripted([tail3, { ok: true }, tail3]), rf = wkB.eraseOwn(xf.read, xf.send, ours, { pressMs: 1, answerMs: 0 })
+			// THE TWENTY-SIXTH REVIEW. (6) A late redraw taken for the Ctrl+E's answer lowers pending by ONE: keys served one after another,
+			// each drawn 2.6 answer-waits late, "yes " above [L1, L2, blank] - kept (pending reset to 0 took it). (7) A box of 3 rows showing
+			// all its text, the cursor at its start and known (the alternate screen): the end first, erased in 3 presses. (8) A cursor that
+			// flickers is no press seen.
+			{
+				// (the twenty-sixth review's own harness, scaled: a screen with wrap markers and the cursor, the alternate screen, keys served
+				// one after another, each 2.6 answer-waits after the last; the blank after the first press, as measured)
+				const W26 = 102, AM26 = 100, P26 = 260, R26 = "─".repeat(60)
+				const yb = { lines: wrapAt(`yes ${N}`, W26), atStart: false, pressed: 0,
+					apply(t) { if (t === "\x15") { if (!this.atStart) { const bl = this.lines.at(-1) === ""; this.lines.pop(); if (bl) this.lines.pop(); if (!this.pressed++ && this.lines.length) this.lines.push("") } } else if (t === "\x01" || t === "\x05") this.atStart = t === "\x01" },
+					pic() { const sh = this.atStart ? this.lines.slice(0, 3) : this.lines.slice(-3), last = sh.at(-1) || ""
+						const scr = ["", R26, ...(sh.length ? sh.map((r, i) => (i ? "  " : "❯ ") + r) : ["❯ "]), R26, "  x"]; while (scr.length < 24) scr.push("")
+						const [r, c] = this.atStart || !sh.length ? [3, 3] : [3 + sh.length - 1, 3 + Math.min(W26, last.length)]
+						return scr.map((l) => l + "\r").join("\n") + `\x1b[?25h\x1b[${r};${c}H` } }
+				const sq = [], hist = [[Date.now(), yb.pic()]]
+				let done26 = 0
+				const due = () => { while (sq.length && Date.now() >= sq[0].at) { const k = sq.shift(); yb.apply(k.t); hist.push([k.at, yb.pic()]) } }
+				const read26 = () => { due(); let pc = hist[0][1]; for (const [at, x] of hist) if (at <= Date.now()) pc = x; return wkB.cursorCounts(wkB.promptAtRest(pc), true) }
+				const send26 = (t) => { const at = Math.max(done26, Date.now()) + P26; done26 = at; sq.push({ t, at }); return { status: 0, stderr: "" } }
+				const rl = wkB.eraseOwn(read26, send26, ours, { pressMs: 1, answerMs: AM26 })
+				for (const k of sq) yb.apply(k.t)
+				const at3 = capBox(wrapAt(N, 110)); at3.atStart = true
+				// (the cursor KNOWN at its start, the alternate screen: the end first, no press spent - the twenty-seventh review. On the main
+				// screen, the cursor unknown, the presses that took nothing still count and the erase stops as stalled: named in #hidden-head)
+				const r3 = wkB.eraseOwn(() => { const v = at3.read(); return v.ok ? v : { ...v, cursorAtStart: at3.atStart } }, (t) => at3.send(t), ours, { pressMs: 1, answerMs: 20 })
+				let flick = 0; const fz = drawn(NL.slice(-3)), kf = []
+				const rk = wkB.eraseOwn(() => ({ ...fz, cursorAtStart: ++flick % 2 ? undefined : false }), (t) => { kf.push(t); return { status: 0, stderr: "" } }, ours, { pressMs: 1, answerMs: 20 })
+				// (9) no erase outlasts its deadline (the keyboard's hold): a box that answers nothing, a deadline shorter than its bound
+				const kd = [], rd9 = wkB.eraseOwn(() => fz, (t) => { kd.push(t); return { status: 0, stderr: "" } }, ours, { pressMs: 1, answerMs: 30, maxMs: 45 })
+				// and no wait runs past it but the one the pending presses get: a wait of 400 ms, a deadline of 500 - cut there, one wait more,
+				// back within 1050 ms (a wait not cut at the deadline ends near 800, then its wait: near 1200)
+				const t10 = Date.now(), rd10 = wkB.eraseOwn(() => fz, () => ({ status: 0, stderr: "" }), ours, { pressMs: 1, answerMs: 400, maxMs: 500 }), ms10 = Date.now() - t10
+				// (the twenty-eighth review: at the deadline with presses pending, a STALL - they may land later and the next look would count
+				// from none; with none pending, slow: what is left waits for the next look, nobody told it is stuck)
+				const slowBox = capBox(wrapAt(N + N, 60)), sq9 = []
+				const due9b = () => { while (sq9.length && Date.now() >= sq9[0].at) slowBox.send(sq9.shift().t) }
+				const rd9b = wkB.eraseOwn(() => { due9b(); return slowBox.read() }, (t) => { sq9.push({ t, at: Date.now() + 40 }); return { status: 0, stderr: "" } }, ours, { pressMs: 1, answerMs: 500, maxMs: 150 })
+				const deadlineHolds = rd10.slow === true && rd10.stalled === true && ms10 < 1050 && rd9.slow === true && rd9.stalled === true && rd9.pending === 2 && /took over/.test(rd9.why || "") &&
+					kd.filter((k) => k === "\x15").length === 2 && rd9b.slow === true && rd9b.stalled !== true && rd9b.presses >= 1 && slowBox.lines.length > 0
+				// THE TWENTY-SEVENTH REVIEW: the same harness as a function, on its losing shapes - the bound checked before EVERY press (a
+				// person's line over 3 of the bus's, keys 3.8 waits late: the first-press blank lowered the bound under what was pending); and
+				// a change seen lowers pending by one, not two, not all (keys 1.75 waits late, 1 and 2 bells, at 48, 88, 104 columns)
+				const serial = (w, head, bells, waits, cap = 3) => {
+					const b = { lines: wrapAt(head + (bells === 2 ? N + N : N), w), atStart: false, pressed: 0,
+						apply(t) { if (t === "\x15") { if (!this.atStart) { const bl = this.lines.at(-1) === ""; this.lines.pop(); if (bl) this.lines.pop(); if (!this.pressed++ && this.lines.length) this.lines.push("") } } else if (t === "\x01" || t === "\x05") this.atStart = t === "\x01" },
+						pic() { const sh = this.atStart ? this.lines.slice(0, cap) : this.lines.slice(-cap), last = sh.at(-1) || ""
+							const scr = ["", R26, ...(sh.length ? sh.map((r, i) => (i ? "  " : "❯ ") + r) : ["❯ "]), R26, "  x"]; while (scr.length < 24) scr.push("")
+							const [r, c] = this.atStart || !sh.length ? [3, 3] : [3 + sh.length - 1, 3 + Math.min(w, last.length)]
+							return scr.map((l) => l + "\r").join("\n") + `\x1b[?25h\x1b[${r};${c}H` } }
+					const q = [], h = [[Date.now(), b.pic()]]; let done = 0
+					const due9 = () => { while (q.length && Date.now() >= q[0].at) { const k = q.shift(); b.apply(k.t); h.push([k.at, b.pic()]) } }
+					const rd = () => { due9(); let pc = h[0][1]; for (const [at, x] of h) if (at <= Date.now()) pc = x; return wkB.cursorCounts(wkB.promptAtRest(pc), true) }
+					const e = wkB.eraseOwn(rd, (t) => { const at = Math.max(done, Date.now()) + waits * AM26; done = at; q.push({ t, at }); return { status: 0, stderr: "" } }, ours, { pressMs: 1, answerMs: AM26 })
+					for (const k of q) b.apply(k.t)
+					return b.lines.join("").startsWith(head.trim().slice(0, 20))
+				}
+				const LINE = (w) => "please keep this line, it is mine".padEnd(w, " ")
+				const grid27 = [serial(120, LINE(120), 1, 3.8), serial(48, LINE(48), 1, 1.75), serial(88, "yes ", 2, 1.75), serial(104, LINE(104), 2, 1.75)]
+				hh.round27 = grid27.every(Boolean)
+				hh.round26 = deadlineHolds && yb.lines.join("").startsWith("yes ") && rl.erased === false && rl.stalled === true && r3.erased === true && at3.lines.length === 0 && !at3.keys.includes("\r") && at3.keys[0] === "\x05" && at3.keys.filter((k) => k === "\x15").length === 3 &&
+					rk.stalled === true && kf.filter((k) => k === "\x15").length === 2
+			}
+			// THE PRODUCTION WAITS, pinned to what they rest on (the twenty-eighth review: legs pass their own, so ANSWER_MS 0 or no
+			// deadline at all left every leg green): twice the slowest redraw measured (2.5 s), and two erases plus a bell inside the hold
+			const L = wkB.ERASE_LIMITS || {}
+			// A CURSOR KNOWN AT ITS START, the box frozen: the Ctrl+E alone, then a stall - no press after a Ctrl+E nobody saw land; and one
+			// flickering between the start and elsewhere is no answer, read twice (the twenty-eighth review)
+			const atS = { ...drawn(NL.slice(0, 3)), cursorAtStart: true }, ks1 = [], ks2 = []
+			const rs1 = wkB.eraseOwn(() => atS, (t) => { ks1.push(t); return { status: 0, stderr: "" } }, ours, { pressMs: 1, answerMs: 20 })
+			// (the flicker begun either way: which reading comes first decides the path - one way the start is seen first)
+			const flickers = [0, 1].map((phase) => { const ks = []; let fl = phase
+				const r = wkB.eraseOwn(() => ({ ...atS, cursorAtStart: ++fl % 2 === 0 }), (t) => { ks.push(t); return { status: 0, stderr: "" } }, ours, { pressMs: 1, answerMs: 20 })
+				return r.stalled === true && ks.indexOf("\x05") === ks.length - 1 && ks.filter((k) => k === "\x15").length <= 2 })
+			hh.aKnownStartGetsItsEndFirst = rs1.stalled === true && ks1.join("") === "\x05" && flickers.every(Boolean) && ks2.length === 0
+			// (an erase is its deadline plus one uncut wait for what is pending at it - the twenty-ninth review)
+			// THE TWENTY-NINTH REVIEW, the verdicts. (a) a slow box at the deadline with a press pending: that press gets its wait, is seen -
+			// slow, not stalled. (b) a first press that takes nothing, then a person typing: their words left, no stall ("ne répond plus" was
+			// told). (c) a known start, its Ctrl+E answered, then one hidden frame: read on until the cursor is known - erased.
+			const lagB = capBox(wrapAt(N + N, 60)), lq = []
+			const lagDue = () => { while (lq.length && Date.now() >= lq[0].at) lagB.send(lq.shift().t) }
+			const r29a = wkB.eraseOwn(() => { lagDue(); return lagB.read() }, (t) => { lq.push({ t, at: Math.max(lq.length ? lq.at(-1).at : 0, Date.now() + 150) }); return { status: 0, stderr: "" } }, ours, { pressMs: 1, answerMs: 500, maxMs: 200 })
+			const x29 = scripted([tail3, tail3, typed(`${NL.slice(-3).join("")} hello`)]), r29b = wkB.eraseOwn(x29.read, x29.send, ours, { pressMs: 1, answerMs: 0 })
+			const hb = capBox(wrapAt(N, 110)); hb.atStart = true   // all its text in view: the Ctrl+E moves only the cursor
+			let afterE = -1
+			const r29c = wkB.eraseOwn(() => { const v = hb.read(); if (v.ok) return v; if (afterE >= 0 && ++afterE === 2) return { ...v, cursorAtStart: undefined }; return { ...v, cursorAtStart: hb.atStart } },
+				(t) => { if (t === "\x05" && afterE < 0) afterE = 0; return hb.send(t) }, ours, { pressMs: 1, answerMs: 50 })
+			// THE THIRTIETH REVIEW: a screen with no box (a read that failed, a dialog's frame) is no press landed - a frozen box, one unreadable
+			// read after the second press: a stall, its two presses pending; it was a plain refusal, and the next look pressed on top
+			let us30 = 0, blind30 = false
+			const fz30 = drawn(NL.slice(-3))
+			const r30 = wkB.eraseOwn(() => { if (blind30) { blind30 = false; return { ok: false, unread: true, why: "its screen could not be read" } } return fz30 },
+				(t) => { if (t === "\x15" && ++us30 === 2) blind30 = true; return { status: 0, stderr: "" } }, ours, { pressMs: 1, answerMs: 20 })
+			// and the control (the thirty-first review): a box that answers at once, one failed read after a press - erased, no stall; and the
+			// read after the box emptied failing - erased too
+			const ans31 = capBox(wrapAt(N, 80)); let us31 = 0, blind31 = false
+			const r31 = wkB.eraseOwn(() => { if (blind31) { blind31 = false; return { ok: false, unread: true, why: "its screen could not be read" } } return ans31.read() },
+				(t) => { if (t === "\x15" && ++us31 === 1) blind31 = true; return ans31.send(t) }, ours, { pressMs: 1, answerMs: 50 })
+			const emp31 = capBox(wrapAt(N, 80)); let emptied = false
+			const r31b = wkB.eraseOwn(() => { const v = emp31.read(); if (v.ok && !emptied) { emptied = true; return v } return v.ok ? { ok: false, unread: true, why: "its screen could not be read" } : v }, (t) => emp31.send(t), ours, { pressMs: 1, answerMs: 50 })
+			// THE THIRTY-SECOND REVIEW: empty, then a DIALOG on the re-read (no box, the screen read): not erased - a bell was typed into it;
+			// and a dialog frame right after a known start's Ctrl+E: read past, the end judged - erased
+			const dlg = { ok: false, why: "no input box on screen (a dialog, a menu, or not Claude Code's prompt)" }
+			const emp32 = capBox(wrapAt(N, 80)); let seenEmpty = false
+			const r32 = wkB.eraseOwn(() => { const v = emp32.read(); if (v.ok) { if (seenEmpty) return dlg; seenEmpty = true } return v }, (t) => emp32.send(t), ours, { pressMs: 1, answerMs: 50 })
+			const st32 = capBox(wrapAt(N, 110)); st32.atStart = true; let e32 = -1
+			const r32b = wkB.eraseOwn(() => { const v = st32.read(); if (v.ok) return v; if (e32 >= 0 && ++e32 === 1) return dlg; return { ...v, cursorAtStart: st32.atStart } },
+				(t) => { if (t === "\x05" && e32 < 0) e32 = 0; return st32.send(t) }, ours, { pressMs: 1, answerMs: 50 })
+			// and a frozen box glitching empty every third reading, the deadline reached: no "erased" from one frame, in the drain too
+			let g32 = 0; const fz32 = drawn(NL.slice(-3))
+			// (a box that answers each key 60 ms late, so the presses are seen and the deadline comes first, one pending: the drain runs, its
+			// readings glitching too - and what is left stays the bus's to erase next look)
+			const gb = capBox(wrapAt(N + N, 60)), gq = []
+			const gDue = () => { while (gq.length && Date.now() >= gq[0].at) gb.send(gq.shift().t) }
+			const r32c = wkB.eraseOwn(() => { gDue(); return ++g32 % 3 === 0 ? { ok: true } : gb.read() }, (t) => { gq.push({ t, at: Math.max(gq.length ? gq.at(-1).at : 0, Date.now() + 60) }); return { status: 0, stderr: "" } }, ours, { pressMs: 1, answerMs: 500, maxMs: 150 })
+			// (and a FROZEN box glitching: its Ctrl+E test answered by one empty frame - not "erased")
+			let g32d = 0
+			const r32d = wkB.eraseOwn(() => (++g32d % 3 === 0 ? { ok: true } : fz32), () => ({ status: 0, stderr: "" }), ours, { pressMs: 1, answerMs: 200, maxMs: 100 })
+			// (the thirty-third review: empty, then a dialog on the re-read - the box WAS emptied: erased, the truth; what comes over it is the
+			// caller's to read, A125's capDialogEmptied) - and one empty frame in a known start's confirm loop is no "erased" with text left
+			const st33 = capBox(wrapAt(N, 110)); st33.atStart = true; let e33 = -1
+			const r33 = wkB.eraseOwn(() => { const v = st33.read(); if (v.ok) return v; if (e33 >= 0 && ++e33 === 2) return { ok: true }; return { ...v, cursorAtStart: st33.atStart } },
+				(t) => { if (t === "\x05" && e33 < 0) e33 = 0; return st33.send(t) }, ours, { pressMs: 1, answerMs: 50 })
+			hh.aDialogIsNotEmpty = r32c.erased !== true && gb.lines.length > 0 && r32d.erased !== true && r32.erased === true && r32.stalled !== true && r32b.erased === true && st32.lines.length === 0 &&
+				r33.erased === true && st33.lines.length === 0
+			hh.noBoxIsNoAnswer = r30.stalled === true && r31.erased === true && r31.stalled !== true && ans31.lines.length === 0 && r31b.erased === true && r31b.stalled !== true
+			// (the box emptied during the deadline's wait: erased - its last presses land on nothing)
+			const lastB = capBox(wrapAt(N, 120)), lq2 = []
+			const lastDue = () => { while (lq2.length && Date.now() >= lq2[0].at) lastB.send(lq2.shift().t) }
+			const r29d = wkB.eraseOwn(() => { lastDue(); return lastB.read() }, (t) => { lq2.push({ t, at: Math.max(lq2.length ? lq2.at(-1).at : 0, Date.now() + 120) }); return { status: 0, stderr: "" } }, ours, { pressMs: 1, answerMs: 600, maxMs: 260 })
+			hh.round29 = r29d.erased === true && lastB.lines.length === 0 && r29a.slow === true && r29a.stalled !== true && r29b.stalled !== true && /somebody started typing/.test(r29b.why || "") && r29c.erased === true && hb.lines.length === 0
+			// (two waits past it at most: the drain, and a Ctrl+E's read on - the thirtieth review)
+			hh.limitsMatchTheMeasures = L.ANSWER_MS >= 5000 && L.LANDING_MS >= 2500 && L.ERASE_MAX_MS > 0 && 2 * (L.ERASE_MAX_MS + 2 * L.ANSWER_MS) + L.LANDING_MS + 3 * 1500 + 20_000 <= L.HOLD_MAX_MS
+			hh.blankRowsBoundThePending = twoBlank.blank === 2 && rb.stalled === true && kb.join("") === "\x15\x05" && rf.erased === false
+			hh.stalledComesOut = ru.unlanded === true && ru.stalled === true && !fu.keys.includes("\r") && re.taken === false && re.stalled === true && fe.keys.filter((k) => k === "\r").length === 2
+		}
+		// a known cursor elsewhere breaks a run of start readings too (a survivor, the nineteenth review)
+		hh.aCursorElsewhereBreaksTheRun = siv([head3, endC, head3, tail3]) !== "start"
+		// WRAP MARKERS: the ❯ row's SCREEN row counted from them - a soft-wrapped line above, the exact-fill end cursor on its own row
+		{
+			const rowsM = ["out\r", "a long line wrapped\rinto three\rrows\r", R + "\r", ...NL.slice(0, 3).map((x, i) => ((i ? "  " : "❯\u00a0") + x) + "\r"), R + "\r", "  x\r"]
+			const mk = (rc) => wkB.promptAtRest(rowsM.join("\n") + `\x1b[?25h\x1b[${rc[0]};${rc[1]}H\x1b[?12h\n`)
+			hh.wrapMarkersCountRows = mk([6, 3]).cursorAtStart === true && mk([4, 3]).cursorAtStart === false && mk([9, 3]).cursorAtStart === false && /^\[claude-comm\]/.test(mk([6, 3]).text)
+		}
+		// a dialog in a run of start readings breaks the run (a survivor, "no reset on a dialog")
+		hh.aDialogBreaksTheRun = siv([head3, noBoxR, head3, tail3]) === "nobox"
+		// the timeout does not cut a run of start readings: a slow second reading, then the third (a survivor, "cut by the timeout")
+		{ let k = 0; const rd = () => { k++; if (k === 2) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50); return k === 1 ? tail3 : head3 }
+			hh.theTimeoutWaitsForTheRun = wkB.startInView(rd, N, 30, 5) === "start" }
 		// the WHOLE text in a box of 4, a person's line hidden above it (typed with a newline in the gap): its start asked for, and
 		// seen to be theirs - no Enter (the thirteenth review)
 		{
@@ -6394,6 +6687,12 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 				send(t) { this.keys.push(t); if (t.length > 5) this.typed = true; else if (t === "\x01") this.noise = true; return { status: 0, stderr: "" } } }
 			r = wkB.typeAndProve(() => eaten.read(), (t) => eaten.send(t), N, fast)
 			hh.noiseThenTheCursorBack = r.taken === false && !eaten.keys.includes("\r") && eaten.keys.at(-1) === "\x05"
+			// a dialog, then blank rows: no Ctrl+E into blank rows, they are nobody's box to put a cursor back in (the fifteenth review)
+			const blanked = { keys: [], typed: false, after: 0,
+				read() { if (!this.typed) return { ok: true }; if (!this.after) return drawn(NL.slice(-3)); return this.after++ < 2 ? { ok: false, why: "a dialog" } : blankR },
+				send(t) { this.keys.push(t); if (t.length > 5) this.typed = true; else if (t === "\x01") this.after = 1; return { status: 0, stderr: "" } } }
+			r = wkB.typeAndProve(() => blanked.read(), (t) => blanked.send(t), N, fast)
+			hh.noCtrlEIntoBlankRows = r.taken === false && blanked.keys.at(-1) === "\x01"
 		}
 		// a screen that cannot be read after the Enter (a dialog): no key goes into it
 		bx = capBox([], { lose: 1 }); let entered = false; const sendD = bx.send, readD = bx.read
@@ -6422,22 +6721,22 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		hh.aDraftQuotingTheEnd = wkB.busText("i keep getting this bell and i do not know why it says (this channel is a file exchange, not a bus).", { hidden: true }) === null &&
 			wkB.busText("why does it say and/or (this channel is a file exchange, not a bus).", { hidden: true }) === null
 		// erasing: each press brings a hidden line down into view
-		x = scripted([tail3, head3, head2, head1, { ok: true }]); r = wkB.eraseOwn(x.read, x.send, ours, { pressMs: 1 })
+		x = scripted([tail3, head3, head2, head1, { ok: true }]); r = wkB.eraseOwn(x.read, x.send, ours, { pressMs: 1, answerMs: 0 })
 		hh.eraseScrolls = r.erased === true && r.presses === 4
 		// the control: the box BEFORE the press showed all it held, so nothing can come down - the old rule, unchanged
-		x = scripted([asAll(tail3), head3]); r = wkB.eraseOwn(x.read, x.send, ours, { pressMs: 1 })
+		x = scripted([asAll(tail3), head3]); r = wkB.eraseOwn(x.read, x.send, ours, { pressMs: 1, answerMs: 0 })
 		hh.controlAllShownStops = r.erased === false && /somebody started typing/.test(r.why) && x.keys.length === 1
-		x = scripted([tail3, { ...head3, text: `${head3.text} x` }]); r = wkB.eraseOwn(x.read, x.send, ours, { pressMs: 1 })
+		x = scripted([tail3, { ...head3, text: `${head3.text} x` }]); r = wkB.eraseOwn(x.read, x.send, ours, { pressMs: 1, answerMs: 0 })
 		hh.typedDuringErase = r.erased === false && x.keys.length === 1
 		// the second review: words typed during an erase that has reached a path were read as the path; what the box showed must stay
 		// under what comes down, so a word at the end stops it whatever the words read as. The box shows all it holds, 40 columns.
 		{
 			const P1 = wrapAt(crossText.slice(0, crossText.indexOf("bell: ") + 30), 40)
-			x = scripted([drawn(P1), drawn([...P1.slice(0, -1), "stop please"])]); r = wkB.eraseOwn(x.read, x.send, ours, { pressMs: 1 })
+			x = scripted([drawn(P1), drawn([...P1.slice(0, -1), "stop please"])]); r = wkB.eraseOwn(x.read, x.send, ours, { pressMs: 1, answerMs: 0 })
 			hh.wordsAfterAPathDuringErase = P1.length >= 3 && r.erased === false && x.keys.length === 1
 		}
 		// measured on a real box: a press left a blank cursor line, the next one dropped it under 3 lines with the start in view
-		x = scripted([tail3, drawn([NL[1], NL[2], ""]), head2, head1, { ok: true }]); r = wkB.eraseOwn(x.read, x.send, ours, { pressMs: 1 })
+		x = scripted([tail3, drawn([NL[1], NL[2], ""]), head2, head1, { ok: true }]); r = wkB.eraseOwn(x.read, x.send, ours, { pressMs: 1, answerMs: 0 })
 		hh.realBoxErase = r.erased === true && r.presses === 4
 		// a person's words above the bell, hidden: the bell's lines go, each read as the bus's first; the words' line never does
 		const words = "bonjour je voulais te dire", hw = capBox(wrapAt(`${words} ${N}`, 80))
@@ -6448,7 +6747,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		hh.blankRowsAreNotRest = blanks.ok === false && blanks.typed === true && blanks.rows === 3 && wkB.busText(blanks.text, { hidden: true }) === null && drawn([""]).ok === true
 		const blankFirst = drawn(["", NL[2], NL[3]])
 		hh.aBlankRowCounts = blankFirst.rows === 3 && wkB.mayHide(blankFirst)
-		x = scripted([tail3, blanks]); r = wkB.eraseOwn(x.read, x.send, ours, { pressMs: 1 })
+		x = scripted([tail3, blanks]); r = wkB.eraseOwn(x.read, x.send, ours, { pressMs: 1, answerMs: 0 })
 		hh.eraseStopsOnBlankRows = r.erased === false && /blank/.test(r.why) && x.keys.length === 1
 		// (2) a path slot holds a path: words typed where one goes are somebody's, cut from the top or not
 		const i1 = crossText.indexOf("bell: ") + 5, i2 = crossText.indexOf("file in ") + 7
@@ -6469,8 +6768,10 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 	const rh = mkdtempSync(join(tmpdir(), "comm-attack-boxcap-"))
 	atExit(() => { try { rmSync(rh, { recursive: true, force: true }) } catch {} })
 	const W40 = "bonjour je voulais te dire quelque chose".padEnd(40, ".")
-	const Cap = project(rh, { capPlain: {}, capRing: { cap: 3 }, capLeft: { cap: 3, line: N }, capWords: { cap: 8, line: W40 + N }, capEb: { cap: 3 }, capLost: { cap: 3, loseEnters: 2 }, capEbLeft: { cap: 3, line: crossText } },
-		{ retryMs: 250, notifyAfterMs: 3600_000, maxMs: 8000 })
+	const Cap = project(rh, { capPlain: {}, capRing: { cap: 3 }, capLeft: { cap: 3, line: N }, capWords: { cap: 8, line: W40 + N }, capEb: { cap: 3 }, capLost: { cap: 3, loseEnters: 2 },
+		capEaten: { cap: 3, ctrlAIgnored: true }, capEatenAbove: { cap: 3, ctrlAIgnored: true, wordsAtBell: 2 },
+		capFrozen: { cap: 3, ctrlAIgnored: true, freezeAtCtrlE: 1 }, capDialogEmptied: { cap: 3, line: N, dialogWhenEmptied: 3000 }, capFrozenLate: { cap: 3, ctrlAIgnored: true, freezeAtCtrlE: 2 }, capEatenMain: { cap: 3, ctrlAIgnored: true, mainScreen: true }, capEbLeft: { cap: 3, line: crossText } },
+		{ retryMs: 250, notifyAfterMs: 3600_000, maxMs: 60000 })   // 60 s: capFrozenLate's look is ~35 s (a stalled erase is 4 waits of 5 s)
 	const exchangeIn = async (Pj, root, k) => {
 		const ex = join(root, `ex-${k}`), tx = join(root, `idle-${k}.jsonl`), at = new Date(Date.now() - 5000).toISOString()
 		mkdirSync(join(ex, "peer", "out"), { recursive: true }); mkdirSync(join(ex, "peer", "in"), { recursive: true })
@@ -6484,11 +6785,15 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 	}
 	const r125 = {}
 	if (Cap.up) {
-		for (const k of ["capPlain", "capRing", "capLeft", "capWords", "capLost"]) r125[k] = Cap.ring(k)
+		for (const k of ["capPlain", "capRing", "capLeft", "capWords", "capLost", "capEaten", "capEatenAbove", "capFrozen", "capFrozenLate", "capEatenMain", "capDialogEmptied"]) r125[k] = Cap.ring(k)
 		r125.capEb = await exchangeIn(Cap, rh, "capEb")
 		// an older exchange bell left in a capped box: the exchange bell clears it, its tail read as the bus's, then rings (a survivor, 11-14)
 		r125.capEbLeft = await exchangeIn(Cap, rh, "capEbLeft")
-		for (const until = Date.now() + 15000; Date.now() < until && !(Cap.rows("capLeft").length && Cap.rows("capLost").length && Cap.rings("capWords").some((x) => x.erasedOwn === false)); nap(100)) {}
+		const notified = (k) => { try { return readFileSync(join(rh, ".comm", "wake", "notified.jsonl"), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)).filter((x) => x.agent === k) } catch { return [] } }
+		Cap.notified = notified
+		for (const until = Date.now() + 60000; Date.now() < until && !(Cap.rows("capLeft").length && Cap.rows("capLost").length && Cap.rings("capWords").some((x) => x.erasedOwn === false) &&
+			Cap.rings("capEaten").some((x) => /Ctrl\+A does not land/.test(x.ended || "")) && Cap.rings("capEatenAbove").some((x) => x.unlanded && x.erased === false) &&
+			Cap.rings("capFrozen").some((x) => /does not answer its keys/.test(x.ended || "")) && Cap.rings("capFrozenLate").some((x) => /does not answer its keys/.test(x.ended || "")) && Cap.rows("capDialogEmptied").length); nap(100)) {}
 		nap(400)
 	}
 	const rr125 = (k) => r125[k] || {}
@@ -6503,12 +6808,36 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		// a hook ring whose two Enters were lost: the cursor brought back to the end, then the ring that keeps looking erases and rings
 		capLostThenRung: rr125("capLost").sent === false && rr125("capLost").stays === true && Cap.keys("capLost").startsWith(`${N}\x01\r\r\x05\x15`) && Cap.rows("capLost").length === 1 && Cap.rows("capLost")[0] === N,
 		exchangeClearsItsLeftover: !!r125.capEbLeft && r125.capEbLeft.code === 0 && /^\x15+\[claude-comm\] cross-project/.test(Cap.keys("capEbLeft")) && Cap.rows("capEbLeft").length === 1 && /cross-project/.test(Cap.rows("capEbLeft")[0]),
+		// THE CURSOR COUNTS ONLY ON THE ALTERNATE SCREEN (the twenty-first review: wake's gate had no arm). The same eaten Ctrl+A:
+		// there, the cursor still at the end - "did not land", no Enter ever; on the MAIN screen it counts for nothing and the
+		// guesses ring it unseen, as `.4` did. Believing none reddens the first (rung), believing every screen the second (the
+		// twenty-second review corrected this line). And the ring that keeps looking erases its bell and gives up after two
+		// looks, a person told - not a bell typed and erased every minute for 12 h (the twenty-second review)
+		eatenOnAltNoEnter: rr125("capEaten").sent === false && /did not land/.test(rr125("capEaten").why || "") && !Cap.keys("capEaten").includes("\r") && Cap.rows("capEaten").length === 0,
+		// the watcher's bell, a person's line typed above it, its Ctrl+A eaten: the erase stops at their words, which stay (rule 8 -
+		// the twenty-third review: an erase that took anything left this leg alone green)
+		eatenEraseStopsAtWords: rr125("capEatenAbove").sent === false && !Cap.keys("capEatenAbove").includes("\r") && /please read LETTER\.md first/.test(Cap.screen("capEatenAbove").text || "") &&
+			Cap.rings("capEatenAbove").some((x) => x.unlanded && x.erased === false),
+		// A SESSION STALLED after the hook's ring: the ring that keeps looking presses three times, its Ctrl+E between, and ENDS - a
+		// person told; never three more a look for 12 h (the twenty-fourth review)
+		frozenEndsTheRun: Cap.keys("capFrozen") === `${N}\x01\x05\x15\x15\x05\x15` && Cap.rings("capFrozen").some((x) => /does not answer its keys/.test(x.ended || "")) &&
+			Cap.notified("capFrozen").some((x) => /ne répond plus/.test(x.what)),
+		// stalled at the WATCHER's own bell (its Ctrl+E, the second): the stall comes out of typeAndProve, through wakeAgent, and ends the run
+		// THE BOX READ AGAIN AFTER ITS OWN ERASE (the thirty-third review): a dialog comes over the box the moment it is emptied - not one
+		// key into it; the bell rung once the box is back
+		dialogAfterTheEraseGetsNoKey: (() => { let into = ""; try { into = readFileSync(`${Cap.P.capDialogEmptied.c.keys}.dialog`, "utf8") } catch {} return into === "" })() &&
+			Cap.rows("capDialogEmptied").length === 1 && Cap.rows("capDialogEmptied")[0] === N,
+		frozenLateEndsTheRun: Cap.keys("capFrozenLate").endsWith(`${N}\x01\x05\x15\x15\x05\x15`) && (Cap.keys("capFrozenLate").match(/\[claude-comm\] doorbell/g) || []).length === 2 &&
+			Cap.rings("capFrozenLate").some((x) => /does not answer its keys/.test(x.ended || "")),
+		eatenGivesUp: Cap.rings("capEaten").some((x) => /Ctrl\+A does not land/.test(x.ended || "")) && Cap.notified("capEaten").some((x) => /Ctrl\+A ne prend pas/.test(x.what)) &&
+			Cap.screen("capEaten").ok === true && (Cap.keys("capEaten").match(/\[claude-comm\] doorbell/g) || []).length === 3,
+		eatenOnMainRungUnseen: rr125("capEatenMain").sent === true && rr125("capEatenMain").headSeen === false && Cap.keys("capEatenMain").startsWith(`${N}\x01`) && Cap.keys("capEatenMain").endsWith("\r") && Cap.rows("capEatenMain").length === 1,
 		exchangeRungOnItsEnd: !!r125.capEb && r125.capEb.code === 0 && r125.capEb.recorded && Cap.rows("capEb").length === 1 && /cross-project/.test(Cap.rows("capEb")[0]),
 	} : {}
 	check("A125 a box that shows only its last lines: the bell is rung on its end, the bus's text erased as hidden lines come into view, and words hidden above a bell are never sent",
 		Cap.up && Object.values(hh).every(Boolean) && Object.values(ok125).every(Boolean),
 		`${bB ? "" : "THE ARM COULD NOT RUN: no kitty bench for this suite; "}${hhThrew ? `ITS LEGS THREW: ${String(hhThrew.message).slice(0, 80)}; ` : ""}` + Object.entries({ ...hh, ...ok125 }).map(([k, v]) => `${k}=${v}`).join("; ") +
-		(Cap.up ? ["capRing", "capLeft", "capWords"].map((k) => `; ${k}: ${JSON.stringify(Cap.keys(k).replaceAll(N, "<bell>")).slice(0, 44)} (${(rr125(k).why || "rung").slice(0, 60)})`).join("") + `; capEb: exit ${r125.capEb && r125.capEb.code}, ${JSON.stringify((r125.capEb && r125.capEb.out) || "").slice(0, 80)}` : ""))
+		(Cap.up ? ["capRing", "capLeft", "capWords", "capEaten", "capEatenAbove", "capFrozen", "capFrozenLate", "capEatenMain", "capDialogEmptied"].map((k) => `; ${k}: ${JSON.stringify(Cap.keys(k).replaceAll(N, "<bell>")).slice(0, 44)} (${(rr125(k).why || "rung").slice(0, 60)})`).join("") + `; capEb: exit ${r125.capEb && r125.capEb.code}, ${JSON.stringify((r125.capEb && r125.capEb.out) || "").slice(0, 80)}` : ""))
 }
 
 // A119 - A123: WHO MAY OPEN AND CLOSE, UNDER WHAT ROOM, AND A CLOSED AGENT REOPENED BY ITS MAIL. Work's leader, 11-08 (letters 38, 44, 48): nothing checked who launches,
@@ -7315,7 +7644,7 @@ else if(a.includes("set-user-vars")){if(fs.existsSync(D+"/nomark"))process.exit(
 	// whoami's (claim); restart-signal's (restart); git's (handoff); comm send's (usage, a crossing's message; pair's bells);
 	// claude's own permission flags, which launch names only to REFUSE them in a "launch" entry (A106)
 	const FOREIGN = { launch: ["--keep-focus", "--match", "--next-to", "--to", "--dangerously-skip-permissions", "--allow-dangerously-skip-permissions", "--permission-mode"], close: ["--match", "--to", "--root", "--json", "--after-turn", "--verify"],
-		wake: ["--match", "--to", "--ansi"], claim: ["--agent-root"], restart: ["--by"], handoff: ["--porcelain", "--short", "--stdin"], ledger: [], usage: ["--ref", "--kind", "--note"],
+		wake: ["--match", "--to", "--ansi", "--add-cursor", "--add-wrap-markers"], claim: ["--agent-root"], restart: ["--by"], handoff: ["--porcelain", "--short", "--stdin"], ledger: [], usage: ["--ref", "--kind", "--note"],
 		pair: ["--kind", "--note"], "relay-due": ["--agent-root"], team: ["--json"], reopen: ["--to", "--match", "--kind", "--ref", "--note", "--from", "--agent", "--model", "--effort", "--prompt", "--os-window", "--minimized", "--reopen", "--print"] }
 	const undocumented = (src, foreign) => { const head = src.slice(0, src.indexOf("*/"))
 		return [...new Set([...src.matchAll(/["'](--[a-z][a-z0-9-]+)["']/g)].map((m) => m[1]))].filter((f) => f !== "--help" && !head.includes(f) && !foreign.includes(f)) }
