@@ -1,11 +1,11 @@
-# STATUS — claude-comm, 2026-11-15 (sessions 4–30)
+# STATUS — claude-comm, 2026-11-16 (sessions 4–30)
 
 Design and gates are in `README.md`; **this file is only what is OPEN.** Keep it short — when it grows,
 fold the settled parts into the README.
 
 ## ▶ NEXT
 
-*(2026-11-15, `2026-11-14.5` delivered. **WORK IS THE MAIN FIELD**; usage up to 100 %. 🔴 The owner's rules: after EVERY
+*(2026-11-16 close: `.5` in the 12 trees, letter 76 sent. **First: fold this file - tier 0 near its cap.** **WORK IS THE MAIN FIELD**; usage up to 100 %. 🔴 The owner's rules: after EVERY
 delivery docs, settings and skills current (measured in work's tree) and a letter to work (11-02); tests never wide while he
 works (11-05); **an adversarial review after EVERY implementation or fix, and anything over 1 GB only through `borne` at
 `free -m` ≥ 2 500 MB, arranged with work (11-13, its letter 66, my 68; `LESSONS.md` §10)**.)*
@@ -21,7 +21,8 @@ works (11-05); **an adversarial review after EVERY implementation or fix, and an
    capped flow WITH the cursor on a real box that really shrinks (the minimized window's splits did not); (d) the named
    limits in `#hidden-head`: a first press that takes nothing at the deadline, the main screen's cursor-at-start trade-off,
    the 46-character bell head, rounds 33-34's three, the one-read window, a version scrolling the cursor's line to the top; (e) moving the bus's
-   typing to `send-text --stdin` (no escapes at all).
+   typing to `send-text --stdin` (no escapes at all). Probes for (b) and (c), saved from the scratchpad:
+   `exchange/WIP-hidden-head-probe-*` (start at its `-README.md`). Work's 77 (11-15 22h34): its relay passed on `.5`, 0 alerts.
 00. **`2026-11-09.1` (`#usage-gate`, its named gaps there).** Work declared `"reopen"` + `"refuse": true` 11-09, then took
    `"reopen"` out for the owner's pause (its 63), to put it back as is: no real reopening yet. `test/teams-real.mjs` 8/8 before
    changing launch, close or reopen. Suite ~410 s, `GATE_CEILING_MS` 600 s.
@@ -65,12 +66,12 @@ works (11-05); **an adversarial review after EVERY implementation or fix, and an
    `busy`; show `wake.readTurn`'s turn end beside it). Both in `who.mjs`: the bus is at 93 % of A22.
 5. **`channel:` prints "arrived 22h ago" for a letter 1 min old**: the NAME's date at 00:00Z (`stampOfName`) - show the mtime.
 6. **rigel's four memory ideas** (10-25 15h09; my 20h06 reply): `claim --machine`, `launch --memory`, memory in `who`,
-   "closed" vs "crashed" from `.comm/close/`. **Arm LESSONS §8** (a letter's written time AHEAD of its file's by over 2 min: twice now, 10-25 and 11-08). **The generated
+   "closed" vs "crashed" from `.comm/close/`. **Arm LESSONS §8** (a letter's written time AHEAD of its file's by over 2 min: twice now, 10-25 and 11-08) **and §11** (a review round starts only on the previous one's green suite). **The generated
    SKILL names every tool**: unarmed, A92 gates the README only. **`boot --prove-red` is 1-1.6 h**: make the one-block
    harness of 10-30 (`#stranded-named`) be `--only` itself (C).
 7. **`/tmp/comm-attack-*`: the owner deleted 449 folders, 164 MB of tmpfs, 11-09.** A stopped batch leaves them (255 on 11-05), so say so when stopping one. The permission check refuses my sweep of shared `/tmp`: it is his to run.
 
-**Done**: 11-04 `.1` (A105), `.2` (A106); 11-05 `.1` (`#relay-guard`, A107, mutants 15/15); **11-08 `.1`** (`#left-in-the-box`, A111-A115), **`.2`** (`#teams`, A116-A118), **`.3`** (`#teams-b`, A119-A123), **`.4`** (work's 51: three sentences, A118); **11-14 `.1`-`.4`** (`#hidden-head`, A125, A126); the parked branch keeps A108-A110, and its own `.2` label must change. A33 reddened once in two runs of the same bus bytes (0 winners, barrier fine): not triaged. Each in the 12 trees.
+**Done**: every release in `CHANGELOG.md` (FINDINGS since 11-05: `#relay-guard`, `#left-in-the-box`, `#teams`, `#teams-b`, `#hidden-head`); `.5` is in the 12 trees; the parked branch keeps A108-A110, its own `.2` label must change. A33 reddened once in two runs of the same bus bytes (0 winners, barrier fine): not triaged.
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field project has a
 codename here; the mapping is in no repo. The boot report prints the REAL directory names: **never copy a `field:` row
@@ -109,10 +110,6 @@ order:** adoption (orion measured 09-19) → Rust port → value, with atlas's l
    transcribe the table. 26 deliveries: leader→expert median **1462 s**, expert→leader **586 s** — mail
    lands at the recipient's *turn boundary*. Since 10-24 an IDLE recipient is rung at once by the sender's
    `PostToolUse` (213 ms, measured live, A90); a BUSY one still waits for its turn end. Never call it real-time. A16.
-
-5. ✅ `who`'s states, BUILT 10-24 (A91, `#who-shows-the-turn`): working / IDLE n min / WAITING / the runtime's word, from
-   the runtime's own record - the 2 h 30 a leader lost reading `running` for four sessions at their prompt is closed.
-   Still true: a session that has taken no turn has no transcript (`#no-turn-yet`).
 
 6. 🟢 **A reply names what it answers** (`Answers:` on line 1; `exchange/README.md`, `#answered-mtime`). ⚠️ The row
    dates letters by FILENAME (C3, carried).
