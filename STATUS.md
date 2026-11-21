@@ -5,7 +5,7 @@ fold the settled parts into the README, the carried ones into `FINDINGS.md#carri
 
 ## ▶ NEXT
 
-*(2026-11-21 close: `2026-11-21.1` - `team.mjs --withdraw`, work's 78 - released; STATUS folded 15.4 → 7.2 KB; the bench's geometry fixed. **WORK IS THE MAIN FIELD**; usage up to 100 %. 🔴 The owner's rules: after EVERY delivery docs, settings and skills current (measured in work's tree) and a letter to work (11-02); tests never wide while he works (11-05); an adversarial review after EVERY implementation or fix; anything over 1 GB only through `borne` at `free -m` ≥ 2 500 MB, arranged with work (11-13, `LESSONS.md` §10).)*
+*(2026-11-21 close: `2026-11-21.1` - `team.mjs --withdraw`, work's 78 - in the 12 trees (labels read back; work's README and its 15 skills name it), letter 79 rung; STATUS folded 15.4 → 7.8 KB; the bench in `stack`. **WORK IS THE MAIN FIELD**; usage up to 100 %. 🔴 The owner's rules: after EVERY delivery docs, settings and skills current (measured in work's tree) and a letter to work (11-02); tests never wide while he works (11-05); an adversarial review after EVERY implementation or fix; anything over 1 GB only through `borne` at `free -m` ≥ 2 500 MB, arranged with work (11-13, `LESSONS.md` §10).)*
 
 0000. **`2026-11-21.1` (`#withdraw`, A127): what is left.** Work's first real withdrawal: ask what it printed. The
    review's named ⑥⑦⑧ (`#withdraw`). **The bench (`#bench-geometry`):** `stack` now; it still opens at the size kitty
