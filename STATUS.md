@@ -5,16 +5,25 @@ fold the settled parts into the README, the carried ones into `FINDINGS.md#carri
 
 ## ▶ NEXT
 
-*(2026-11-21 close: `2026-11-21.2` - the project renamed **Claude Toolbox**, its bus keeps `claude-comm` (owner 11-21) - and letter 80 asks work what it needs beyond the bus. `2026-11-21.1` - `team.mjs --withdraw`, work's 78 - in the 12 trees (labels read back; work's README and its 15 skills name it), letter 79 rung; STATUS folded 15.4 → 7.8 KB; the bench in `stack`. **WORK IS THE MAIN FIELD**; usage up to 100 %. 🔴 The owner's rules: after EVERY delivery docs, settings and skills current (measured in work's tree) and a letter to work (11-02); tests never wide while he works (11-05); an adversarial review after EVERY implementation or fix; anything over 1 GB only through `borne` at `free -m` ≥ 2 500 MB, arranged with work (11-13, `LESSONS.md` §10).)*
+*(2026-11-21 close: `2026-11-21.2` - the project renamed **Claude Toolbox**, its bus keeps `claude-comm` (owner 11-21) - and letter 80 asked work what it needs beyond the bus: its 81 and 82 answered within minutes, letter 83 replied. `2026-11-21.1` - `team.mjs --withdraw`, work's 78 - in the 12 trees (labels read back; work's README and its 15 skills name it), letter 79 rung; STATUS folded 15.4 → 7.8 KB; the bench in `stack`. **WORK IS THE MAIN FIELD**; usage up to 100 %. 🔴 The owner's rules: after EVERY delivery docs, settings and skills current (measured in work's tree) and a letter to work (11-02); tests never wide while he works (11-05); an adversarial review after EVERY implementation or fix; anything over 1 GB only through `borne` at `free -m` ≥ 2 500 MB, arranged with work (11-13, `LESSONS.md` §10).)*
 
-00000. **The rename (`2026-11-21.2`): what is left is the owner's call.** Renamed: titles, file headers, help, the boot's
+00000. **FIRST: the next release - work's 82 and its 81 §2.2.** (a) `comm who` glues state and mail: `working1 pending`
+   (`who.mjs`, inside A22: 279 B left); check its IDLE line with mail too. (b) **Two live sessions of one identity, said at
+   SessionStart**, at the head of the hook's context: the other's pid, start time, its transcript's last write, its child
+   processes. Measured at work 11-21: the owner opened a second leader believing the first closed; the first lived, idle,
+   its three watchers as children, and only `comm who` said "2 SESSIONS SHARE THIS INBOX". Not tied to `.2`. **Then work's
+   order (81 §3)**: the leader's watcher as a bus wait (bell, letter, usage, idle expert, memory floor, a dated task from
+   its tsv), `.2`, a threshold with an end date, the usage readers, PreToolUse and its `cd` guard's removal; the `echo
+   ===` guard is struck. Its tools to take: the night watcher, `remettre-seuils.mjs`, three usage readers, `shells.sh`,
+   `veille-memoire.sh`, `garde-borne.mjs` after A110. Its own to keep: boot, relay and close tools.
+0000a. **The rename (`2026-11-21.2`): what is left is the owner's call.** Renamed: titles, file headers, help, the boot's
    first line, the installer's messages, the version notice, the skill's description. **Kept, because something reads
    them:** the folder `~/Dev/claude-comm` (work's boot reads its `exchange/`; my memory folder is keyed on it), the GitHub
    repository's name, `.comm/`, `CLAUDE_COMM_*`, the skill id (the leader-expert skill names it), the `[claude-comm]` tag
    (the eraser, and a tool of work's, recognise bells by it). Changing any of those is a migration with a transition, not
    an edit. Its review: nothing here or in the 11 fields parses a renamed text; `comm.mjs` and `who.mjs` kept their bytes
    (A22 at 99.5 %, 279 B left). Named: this repo's own boot hook in `.claude/settings.json` still says `claude-comm:`
-   when node is missing. **Letter 80's answer orders `0a`.**
+   when node is missing. **Work's 81 ordered `0a`: item 00000.**
 0000. **`2026-11-21.1` (`#withdraw`, A127): what is left.** Work's first real withdrawal: ask what it printed. The
    review's named ⑥⑦⑧ (`#withdraw`). **The bench (`#bench-geometry`):** `stack` now; it still opens at the size kitty
    remembers - a tiny one would redden A121 and the relay arms again; its layout is printed, not gated. 🔴 My probe left
@@ -30,7 +39,7 @@ fold the settled parts into the README, the carried ones into `FINDINGS.md#carri
    no real reopening yet. `test/teams-real.mjs` 8/8 before changing launch, close or reopen. Suite ~410 s, ceiling 600 s.
 01. **`2026-11-08.1`'s MUTANTS NOT RUN** - an evening he is inactive (his word 11-08). `node test/mutate.mjs
    exchange/WIP-box-mutants.json --jobs N` (45, + A119-A123; 3 h 30 in series, measure a suite's peak before 4 wide). A
-   survivor is an arm to strengthen. Waiting from work: its recount of letter 43, `chef-ventes`'s needs. Later (its 44):
+   survivor is an arm to strengthen. Waiting from work: `chef-ventes`'s needs (after 11-22); its recount of 43 came, 3 of 3. Later (its 44):
    `comm remind`, the relay carrying the last reply, `--from` limited to the roster. **Nothing rings me when work writes
    to `in/`**: I asked it to ring at every letter (58).
 0. 🔴 **RESUME `2026-11-05.2`: built, reviewed, NEVER RUN, on the LOCAL branch `wip/2026-11-05.2`** (next-bell, heavy,
