@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * claude-comm RELAY DUE — past its project's context threshold, an agent is told to hand over: after a tool call, as
+ * Claude Toolbox RELAY DUE — past its project's context threshold, an agent is told to hand over: after a tool call, as
  * ADVICE (RELAY SOON), and at its turn's end by a HOLD (RELAY DUE) until it has armed its relay. Each once per 25 k. The
  * bus's hook stub asks it - after the mail at a Stop, after the usage note after a tool; nothing else runs it.
  *

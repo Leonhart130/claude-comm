@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * claude-comm REOPEN — mail for a closed agent its project declared: open it, once, inside the caps, minimized.
+ * Claude Toolbox REOPEN — mail for a closed agent its project declared: open it, once, inside the caps, minimized.
  *
  *   node .comm/bin/reopen.mjs <agent> [--root <dir>]             what wake.mjs runs, detached, from the sender's hook
  *   node .comm/bin/reopen.mjs <agent> [--root <dir>] --now       without waiting out a recent refusal: what a close runs, room having just been freed

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * claude-comm CLOSE — an agent closes its OWN window; the leader or a chief may close an expert's at rest; nothing else.
+ * Claude Toolbox CLOSE — an agent closes its OWN window; the leader or a chief may close an expert's at rest; nothing else.
  *
  *   node .comm/bin/close.mjs                 close the window this session is running in
  *   node .comm/bin/close.mjs --dry-run       resolve and check everything, close nothing

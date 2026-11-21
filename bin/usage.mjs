@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * claude-comm USAGE — the account's usage, read live by Claude Code itself, told to an agent at its threshold.
+ * Claude Toolbox USAGE — the account's usage, read live by Claude Code itself, told to an agent at its threshold.
  *
  *   node .comm/bin/usage.mjs              the last reading on this machine: session and week, their age and reset
  *   node .comm/bin/usage.mjs --json       the same, as the JSON the hooks read

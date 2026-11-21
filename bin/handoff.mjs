@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * claude-comm HANDOFF — what survives a restart, and it is a PROOF, not a summary.
+ * Claude Toolbox HANDOFF — what survives a restart, and it is a PROOF, not a summary.
  *
  *   node bin/handoff.mjs write  --obligations <file> [--read <path>]... [--guard "<cmd>"]...
  *   node bin/handoff.mjs verify [--agent <name>] [--root <dir>]

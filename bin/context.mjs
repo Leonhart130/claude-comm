@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * claude-comm CONTEXT — how full is this session, measured rather than felt.
+ * Claude Toolbox CONTEXT — how full is this session, measured rather than felt.
  *
  *   node bin/context.mjs                        the session running in this directory
  *   node bin/context.mjs --transcript <path>    a named transcript

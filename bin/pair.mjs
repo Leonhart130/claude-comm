@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * claude-comm PAIRS — two experts the LEADER lets write to each other directly, until a time it set.
+ * Claude Toolbox PAIRS — two experts the LEADER lets write to each other directly, until a time it set.
  *
  *   node .comm/bin/pair.mjs <a> <b> --for 2h --ref <file>       the LEADER or a CHIEF of one of them: open it (--for <n>m or <n>h, at most 24h)
  *   node .comm/bin/pair.mjs <a> <b> --close                      end it now; their next send to each other is refused

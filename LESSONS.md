@@ -1,4 +1,4 @@
-# LEÇONS — claude-comm, registre de conduite
+# LEÇONS — Claude Toolbox, registre de conduite
 
 🔴 **Une leçon avec une étiquette de prix. Sans prix, c'est une platitude et ça n'entre pas ici.**
 

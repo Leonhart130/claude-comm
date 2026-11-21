@@ -1,4 +1,13 @@
-# claude-comm — a message bus for a hub-and-spoke team of Claude Code agents
+# Claude Toolbox — tools for a hub-and-spoke team of Claude Code agents, starting with its message bus
+
+**The name.** Until 2026-11-21 this project was called claude-comm, after its message bus. It is now a toolbox: the bus,
+and the tools around it that launch, close, relay and restart agents, read context and usage, and hold shared
+resources. Only what names the project changed: titles, header comments, the skill's description, the boot's first
+line, the installer's result lines and the version notices. **`claude-comm` stays in every name a session or a tool
+reads**: `.comm/`, the `claude-comm` skill, `CLAUDE_COMM_*`, `$XDG_RUNTIME_DIR/claude-comm/` (else
+`/tmp/claude-comm-<uid>/`), `~/.config/claude-comm/`, the `[claude-comm]` tag of every bell and bus message, and for now
+this repository's name. The projects already running it read
+those names, so renaming them would break those projects. An independent project, not made by Anthropic.
 
 **In plain words:** when several AI coding assistants (Claude Code sessions) work on one project, each in its own
 folder, this lets them pass notes to each other - a lead assistant hands out work, the others report back - without a

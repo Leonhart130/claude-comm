@@ -1,4 +1,4 @@
-# claude-comm — what changed, for the agent using it
+# Claude Toolbox — what changed, for the agent using it
 
 Each entry names the **bus print** it was written for: a hash of the files this installer actually ships.
 That is what makes the label honest — if the bus changes and nobody writes a note, the installer says so
@@ -50,6 +50,12 @@ already have.
 
 
 
+
+
+
+## 2026-11-21.2 — bus print `992c1b90ea35` — 2026-11-21
+
+- **The project is now called Claude Toolbox.** It was named claude-comm, after its message bus, and it now holds more tools than the bus. **Nothing you type changes:** `claude-comm` stays in every path, command, setting and tag. That covers `.comm/`, `node .comm/bin/comm.mjs`, the `claude-comm` skill, `CLAUDE_COMM_AGENT`, and the `[claude-comm]` at the start of every bell and bus notice. A tool of yours that reads one of those names keeps working. Only what names the project says Claude Toolbox: titles, header comments, the skill's description, the installer's result lines, and the version notices at a session's start.
 
 ## 2026-11-21.1 — bus print `1dc3c5bd42a6` — 2026-11-21
 

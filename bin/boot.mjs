@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * claude-comm BOOT — the orientation a session opening this repo runs first.
+ * Claude Toolbox BOOT — the orientation a session opening this repo runs first.
  *
  *   node bin/boot.mjs              state + the adversarial gate      (~13 s)
  *   node bin/boot.mjs --fast       state only, no gate               (~0.3 s)
@@ -2020,7 +2020,7 @@ const open = statusText.split(/^## /m).find((x) => /OPEN/.test(x.slice(0, 12)))
 // small, but a budget row that under-reports its own subject fails in the one direction
 // that matters.
 const report =
-	`\nclaude-comm boot - ${new Date().toISOString().slice(0, 10)} - ${ROOT}\n\n` +
+	`\nClaude Toolbox boot - ${new Date().toISOString().slice(0, 10)} - ${ROOT}\n\n` +
 	// The headline only. The full section is in STATUS.md, which is tier 0 and read
 	// anyway - printing all of it here would put the boot's own cost back where this
 	// session spent the morning removing it.

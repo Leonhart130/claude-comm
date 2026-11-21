@@ -1,4 +1,4 @@
-# HISTORY — claude-comm, session by session
+# HISTORY — Claude Toolbox (claude-comm until 2026-11-21), session by session
 
 **This file is not read at boot.** `STATUS.md` says what is OPEN; `FINDINGS.md` says why each guard
 exists; this is the record of how each was arrived at, kept because the reasoning behind a closed

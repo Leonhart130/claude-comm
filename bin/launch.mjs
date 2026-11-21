@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * claude-comm LAUNCH — start an agent's session, or REFUSE. Never both.
+ * Claude Toolbox LAUNCH — start an agent's session, or REFUSE. Never both.
  *
  *   node bin/launch.mjs <agent> --model <m> --effort <e> [--prompt "<first turn>"]     a pane beside YOUR window; refused if none
  *   node bin/launch.mjs <agent> --model <m> --effort <e> ... --print                   the launch it would make; nothing launched

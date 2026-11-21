@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * claude-comm RESOURCE CLAIMS — the thing an agent is HOLDING, written down.
+ * Claude Toolbox RESOURCE CLAIMS — the thing an agent is HOLDING, written down.
  *
  *   node bin/claim.mjs take <resource> --purpose "what for" [--pid <holder>] [--agent <name>] [--force] [--quiet]
  *   node bin/claim.mjs list [--json]

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * claude-comm MUTATION RUNNER — does each gate redden for the property in its own title?
+ * Claude Toolbox MUTATION RUNNER — does each gate redden for the property in its own title?
  *
  *   node test/mutate.mjs <mutants.json> [--jobs N]     baseline + every mutant, N suites at a time
  *   node test/mutate.mjs --baselines N [--jobs N]      N unmodified suites: the parallelism control

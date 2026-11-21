@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * claude-comm ADVERSARIAL GATE — attacks the bus and ABORTS on regression.
+ * Claude Toolbox ADVERSARIAL GATE — attacks the bus and ABORTS on regression.
  *
  *   node test/attack.mjs
  *
@@ -7810,7 +7810,7 @@ else if(a.includes("set-user-vars")){if(fs.existsSync(D+"/nomark"))process.exit(
 		input: JSON.stringify({ hook_event_name: "SessionStart", session_id: "a92", transcript_path: join(r92, "none.jsonl"), source: "startup" }) }).stdout || ""
 		try { return JSON.parse(out).hookSpecificOutput.additionalContext || "" } catch { return "" } }
 	const s1 = start(), s2 = start()
-	const told = s1.includes(`claude-comm is now ${label}`) && s1.includes(firstLine.trim().slice(0, 60)), once = !s2.includes("claude-comm is now")
+	const told = s1.includes(`Claude Toolbox is now ${label}`) && s1.includes(firstLine.trim().slice(0, 60)), once = !s2.includes("Claude Toolbox is now")
 
 	check("A92 every command and every setting is documented by the code itself, --help does nothing else, and each agent is told what changed",
 		!Object.keys(gaps).length && ctlCaught && !commGaps.length && helpRuns.every((h) => h.ok) && commHelp.status === 0 && /comm send/.test(commHelp.stdout || "") && helpAnywhere.status === 0 && /comm send/.test(helpAnywhere.stdout || "") &&

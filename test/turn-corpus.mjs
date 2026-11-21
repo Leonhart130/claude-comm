@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * claude-comm TURN CORPUS — does wake's reading of a turn still agree with Claude Code?
+ * Claude Toolbox TURN CORPUS — does wake's reading of a turn still agree with Claude Code?
  *
  *   node test/turn-corpus.mjs [projects-dir]      default ~/.claude/projects
  *

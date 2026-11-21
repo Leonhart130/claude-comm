@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * claude-comm WAKE — make an idle agent take a turn, so the gated Stop path can deliver.
+ * Claude Toolbox WAKE — make an idle agent take a turn, so the gated Stop path can deliver.
  *
  *   node bin/wake.mjs --root <project>        wake every agent that has mail waiting
  *   node bin/wake.mjs --resolve <pid>         diagnostic: which window is that session in?

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * claude-comm LEDGER — did the reboots cost us anything? A query, not a debate.
+ * Claude Toolbox LEDGER — did the reboots cost us anything? A query, not a debate.
  *
  *   node bin/ledger.mjs                     the question, over every agent's log
  *   node bin/ledger.mjs --agent leader      one agent

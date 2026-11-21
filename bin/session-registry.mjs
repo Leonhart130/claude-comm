@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * claude-comm SESSION REGISTRY - which transcript is a pid writing NOW.
+ * Claude Toolbox SESSION REGISTRY - which transcript is a pid writing NOW.
  *
  *   node bin/session-registry.mjs          list what this machine has recorded
  *

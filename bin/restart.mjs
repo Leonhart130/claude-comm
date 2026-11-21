@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * claude-comm RESTART — a declared restart, in the one order that survives.
+ * Claude Toolbox RESTART — a declared restart, in the one order that survives.
  *
  *   node bin/restart.mjs prepare --obligations <file> [--read <p>]... [--guard "<cmd>"]... [--ttl <s>]
  *   node bin/restart.mjs prepare ... [--agent <a>] [--root <dir>] [--prev-session <id>]   when it cannot tell them itself

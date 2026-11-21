@@ -1,8 +1,9 @@
-# claude-comm
+# Claude Toolbox
 
-A message bus for a hub-and-spoke team of Claude Code agents, and the lifecycle tooling that lets them
-run themselves. Everything follows from one rule: **the file is the artifact, the message is only a
-doorbell** — and a reboot obeys it too, since what survives a restart is what was written down.
+The tools that let a hub-and-spoke team of Claude Code agents run themselves, first of all its message bus,
+**claude-comm** - the project's name until 2026-11-21, kept in every path, command, setting and tag.
+Everything follows from one rule: **the file is the artifact, the message is only a doorbell** — and a
+reboot obeys it too, since what survives a restart is what was written down.
 
 ## Boot — read in tiers, never everything
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * claude-comm RESTART SIGNAL — the one thing that survives a restart.
+ * Claude Toolbox RESTART SIGNAL — the one thing that survives a restart.
  *
  *   node bin/restart-signal.mjs arm --agent leader --prev-session <id> [--ttl 900]
  *   node bin/restart-signal.mjs peek  [--agent leader]      read, do NOT consume

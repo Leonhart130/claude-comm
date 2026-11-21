@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * claude-comm TEAMS, REAL - who launches, who closes, and a closed chief reopened by its mail, on real Claude Code sessions.
+ * Claude Toolbox TEAMS, REAL - who launches, who closes, and a closed chief reopened by its mail, on real Claude Code sessions.
  *
  *   node test/teams-real.mjs                    this repo's bus, every scenario in order (each builds on the last)
  *   node test/teams-real.mjs --repo <dir>       another checkout's bus

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * claude-comm TEAM — what "teams" in .comm/config.json means: for one agent, for who may act on whom, and on one page.
+ * Claude Toolbox TEAM — what "teams" in .comm/config.json means: for one agent, for who may act on whom, and on one page.
  *
  *   node .comm/bin/team.mjs                      what is yours: who you lead, who you work for, who you write to with no pair
  *   node .comm/bin/team.mjs --agent-root <dir>   the same for the agent whose stub is there (what the start message prints)

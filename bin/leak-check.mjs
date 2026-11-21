@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * claude-comm LEAK CHECK — no private word reaches a public commit.
+ * Claude Toolbox LEAK CHECK — no private word reaches a public commit.
  *
  *   node bin/leak-check.mjs --tree [<commit>]      the tracked files on disk (and their paths), or <commit>'s tree
  *   node bin/leak-check.mjs --staged               what the next commit would carry (pre-commit, pre-merge-commit)

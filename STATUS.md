@@ -1,12 +1,20 @@
-# STATUS — claude-comm, 2026-11-21 (sessions 4–31)
+# STATUS — Claude Toolbox, 2026-11-21 (sessions 4–31)
 
 Design and gates are in `README.md`; **this file is only what is OPEN.** Keep it short — when it grows,
 fold the settled parts into the README, the carried ones into `FINDINGS.md#carried`.
 
 ## ▶ NEXT
 
-*(2026-11-21 close: `2026-11-21.1` - `team.mjs --withdraw`, work's 78 - in the 12 trees (labels read back; work's README and its 15 skills name it), letter 79 rung; STATUS folded 15.4 → 7.8 KB; the bench in `stack`. **WORK IS THE MAIN FIELD**; usage up to 100 %. 🔴 The owner's rules: after EVERY delivery docs, settings and skills current (measured in work's tree) and a letter to work (11-02); tests never wide while he works (11-05); an adversarial review after EVERY implementation or fix; anything over 1 GB only through `borne` at `free -m` ≥ 2 500 MB, arranged with work (11-13, `LESSONS.md` §10).)*
+*(2026-11-21 close: `2026-11-21.2` - the project renamed **Claude Toolbox**, its bus keeps `claude-comm` (owner 11-21) - and letter 80 asks work what it needs beyond the bus. `2026-11-21.1` - `team.mjs --withdraw`, work's 78 - in the 12 trees (labels read back; work's README and its 15 skills name it), letter 79 rung; STATUS folded 15.4 → 7.8 KB; the bench in `stack`. **WORK IS THE MAIN FIELD**; usage up to 100 %. 🔴 The owner's rules: after EVERY delivery docs, settings and skills current (measured in work's tree) and a letter to work (11-02); tests never wide while he works (11-05); an adversarial review after EVERY implementation or fix; anything over 1 GB only through `borne` at `free -m` ≥ 2 500 MB, arranged with work (11-13, `LESSONS.md` §10).)*
 
+00000. **The rename (`2026-11-21.2`): what is left is the owner's call.** Renamed: titles, file headers, help, the boot's
+   first line, the installer's messages, the version notice, the skill's description. **Kept, because something reads
+   them:** the folder `~/Dev/claude-comm` (work's boot reads its `exchange/`; my memory folder is keyed on it), the GitHub
+   repository's name, `.comm/`, `CLAUDE_COMM_*`, the skill id (the leader-expert skill names it), the `[claude-comm]` tag
+   (the eraser, and a tool of work's, recognise bells by it). Changing any of those is a migration with a transition, not
+   an edit. Its review: nothing here or in the 11 fields parses a renamed text; `comm.mjs` and `who.mjs` kept their bytes
+   (A22 at 99.5 %, 279 B left). Named: this repo's own boot hook in `.claude/settings.json` still says `claude-comm:`
+   when node is missing. **Letter 80's answer orders `0a`.**
 0000. **`2026-11-21.1` (`#withdraw`, A127): what is left.** Work's first real withdrawal: ask what it printed. The
    review's named ⑥⑦⑧ (`#withdraw`). **The bench (`#bench-geometry`):** `stack` now; it still opens at the size kitty
    remembers - a tiny one would redden A121 and the relay arms again; its layout is printed, not gated. 🔴 My probe left

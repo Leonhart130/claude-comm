@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * claude-comm RELAY GUARD — is this agent's handoff written? Checked from what its project DECLARES, so a project needs
+ * Claude Toolbox RELAY GUARD — is this agent's handoff written? Checked from what its project DECLARES, so a project needs
  * no script of its own; relay.mjs runs it as one more guard for every agent with a declaration.
  *
  *   node .comm/bin/relay-guard.mjs                    this session's agent: each check, exit 0 only if all pass

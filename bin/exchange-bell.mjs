@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * claude-comm EXCHANGE BELL — tell a peer project's leader that a file is waiting.
+ * Claude Toolbox EXCHANGE BELL — tell a peer project's leader that a file is waiting.
  *
  *   node bin/exchange-bell.mjs --peer work-leader --ref exchange/work-leader/out/X.md
  *   node bin/exchange-bell.mjs --peer work-leader --ref ... --dry-run

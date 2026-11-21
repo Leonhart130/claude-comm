@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * claude-comm SELF-TEST — an end-to-end proof that the bus delivers, using real
+ * Claude Toolbox SELF-TEST — an end-to-end proof that the bus delivers, using real
  * installed hooks and real `claude -p` sessions.
  *
  *   node test/selftest.mjs              run the gate

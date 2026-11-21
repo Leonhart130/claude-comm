@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * claude-comm RELAY — a session hands over to a fresh copy of ITSELF, in its own window, with nobody at the keyboard.
+ * Claude Toolbox RELAY — a session hands over to a fresh copy of ITSELF, in its own window, with nobody at the keyboard.
  *
  *   node .comm/bin/relay.mjs --guard "<cmd>"                     after THIS turn: /clear, then the agent's first prompt
  *   node .comm/bin/relay.mjs --guard "<cmd>" --say "<prompt>"    the first prompt given here, not by .comm/config.json

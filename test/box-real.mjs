@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * claude-comm BOX, REAL - the bus's own text left in a box, replayed on a real Claude Code session.
+ * Claude Toolbox BOX, REAL - the bus's own text left in a box, replayed on a real Claude Code session.
  *
  *   node test/box-real.mjs                    this repo's bus, every scenario
  *   node test/box-real.mjs --repo <dir>       another checkout's bus: the control, run on the code BEFORE the fix it must redden
