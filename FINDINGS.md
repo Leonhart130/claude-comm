@@ -744,6 +744,10 @@ the LEDGER's root had no seam, so nothing stopped the write and nothing announce
 
 ⇒ Same shape each time: **the instrument's view was not the view of the thing being judged.**
 
+**An eleventh, 2026-11-21, mine:** a probe of the bench's geometry resized a minimized kitty window, and closing it made
+kitty remember that size for the next OS window - the owner's, and the next suite's bench (`#bench-geometry`). A probe
+that resizes, focuses or closes a window writes into what every later window inherits.
+
 ## `#tier0-calibration` — the tier-0 cap counts bytes; here is what a byte is worth
 
 Prompted 2026-09-04 by the `~/Dev/work` leader, who found the same class of defect in his own instrument and
@@ -3653,6 +3657,8 @@ these areas reads this section before claiming anything about them.
   pointed at, and 09-11 added a 4th miss in 4 runs. This bus rings bells nobody answers and no gate sees it.
   🟢 Transport green 09-11 with and without `CLAUDE_COMM_AGENT` (`FINDINGS.md#one-suite-hardened`).
 - **Anything non-Linux**: `comm who` reads `/proc`, degrading to "not running" elsewhere.
+- **`launch --minimized` is UNARMED**: `kitten @ ls` reports no minimized state, so nothing checks a window really went
+  minimized (moved from `STATUS.md`'s OPEN 7, 2026-11-21; `#self-close`, `#split-raised-the-cap`).
 - **The ledger's witness**: startup, `/clear`, `resume`, `compact`, `fork` measured (8/8, `#review13` + `#review14`).
   NOT measured: an in-process `/resume` (same pid, id switched), an AUTO-compaction, `--continue`.
 - **A torn read of the in-place-rewritten `<pid>.json`**: the rewrite is observed, the race is not. The retry that
@@ -5480,3 +5486,139 @@ reddened by name, 12 survived.**
 - **A loose end of a person's own**: text that is exactly a bell's start (`[`, `[c` ...) typed after the bus's text reads as the bus's.
 - **The field's `rows`**: the reading counts box rows. A box whose cursor cell wraps onto its own blank line counts one more: more
   cautious, never less.
+
+## `#carried` — what STATUS.md carried open for weeks, moved here at 95 % of tier 0 (2026-11-21)
+
+**Moved out of `STATUS.md` on 2026-11-21, at 26 688 B of a 28 000 B tier 0** (`CLAUDE.md`: *split or cut*). Nothing here
+was retracted or settled by the move; each item is as open as it was. Verbatim from `STATUS.md` at `d40663e`, its ▶ NEXT
+item numbers dropped. `STATUS.md` keeps the pointer.
+
+**B - the registry half of #13 §1, MEASURED 09-27 by A31 going red on my own end-to-end probe**: a hand-fire from
+inside a session in the project rewrites that session's registry entry. Design in `FINDINGS.md#review13` "Named, not
+fixed" - gate `record()` AND `refresh()` on the witness. Touches `Stop`, the hottest path: own change, own arm,
+`selftest` both ways.
+
+**C - tests faster, still reliable (owner, 09-27): `test/mutate.mjs` is built and in use.** Next: `attack` itself faster,
+`--only <arm>` for iteration; the full suite stays the gate.
+
+**F - carried, each named in FINDINGS:** #15's (`#review15`), REVIEW-12b's seven points (`#review12b`), `boot.mjs --hook`
+records with no ownership test, #13 §7b/§7c (`#review13`), the stub filing `basename(transcript_path)` as the session,
+#14's (`#review14`), D2's obedience to a pointer (`#midturn-channel`: build `--kind blocked` only on atlas's field count) ·
+A27 reads STATUS and README, undeclared in `gate-docs` (11-05: a STATUS pointer reddened a gate that said CODE UNCHANGED).
+
+**Carried:** A2 marker · the installer overwrites a `SKILL.md` it did not generate · S6 · atlas's `rings.jsonl` (A62,
+A65) · #9 A3 · C7 · the restart trigger (ledger UNKNOWN) · C3 (the `channel:` rows date a letter by its FILENAME;
+`Answers:` on line 1 is how a reply names what it answers, `exchange/README.md`, `#answered-mtime`). **Later, owner's
+order:** adoption (orion measured 09-19) → Rust port → value, with atlas's leader.
+
+**Carried forward from ▶ NEXT, 2026-09-08** *(cut then, not retracted)*:
+- **ESLint is uncovered.** A43 stops a configured *prettier* rewriting our generated files; ESLint is the same shape,
+  unarmed. `FINDINGS.md#generated-in-their-tree`.
+- **The 15-minute window is untested and my own timestamps are why:** each defect is dated at its commit, the upper
+  bound. Not a result.
+- **The restart TTL lapsed on a human TWICE, then 3 acks on 09-13.** Try armer-gone AND not ancient, TTL as a
+  backstop — `claim.mjs` already ships the (pid, start, boot) test. Not built.
+- **Test debt from review #4, none of it gated:** `FINDINGS.md#test-debt`.
+- **`#A20` from 2026-09-04 is still unexplained** (the 09-05 instance was fixed, `#update-signal`). **Run gates
+  unfiltered.**
+
+## `#withdraw` — a request its own author could not take back (2026-11-21, work's letter 78)
+
+**What happened in the field (work, 11-16).** At 06h18 work's leader launched `seo`, an expert of `chef-technique`, in
+its chief's place, with a first turn: `launch.mjs` opened `.comm/asked/seo/leader` (A119). `seo` reported to its chief,
+as it should - four `done` to `chef-technique` from 06h42 to 08h20 - and each closed the CHIEF's request, never the
+leader's. The chief then had to close `seo` with `--force` three times (06h50, 07h31, 08h24): `close.mjs` keeps another's
+request (decision 2, work's letter 48). At 08h25 the leader removed the file by hand. No command did it: a request closed
+only by the agent's `done` to that asker, or by that asker closing the window itself.
+
+**What was built.** `node .comm/bin/team.mjs --withdraw <agent>`: the caller's OWN request on `<agent>` is removed, and
+nothing else - there is no argument that names an asker, so another's request cannot be named, let alone removed.
+
+- **The caller is its session**, as for `launch.mjs` and `close.mjs --agent` (`callerOf`, `#teams-b`): a shell that moved
+  into the leader's folder is still the expert's session. `comm.mjs`'s cwd identity would have withdrawn the leader's
+  request from there (A110's defect class, parked on `wip/2026-11-05.2`). No session, a sub-session, a session off the
+  roster, a name off the roster: refused, nothing touched, and the refusal says why.
+- **A failed read is not "none open"** (form E): only ENOENT reads as absence; a request that cannot be read is named
+  with its error and left.
+- **The effect is read back**: the file gone, not the call returned.
+- **Recorded in `.comm/withdrawn.jsonl`, NOT in `log.jsonl` as work proposed.** Every reader of `log.jsonl` takes each
+  line for a delivered message: `comm sent` would print a withdrawal "✓ delivered", boot's `field:` row would date its
+  "last delivery" by it, `comm log` would show it as mail, and `send`'s stale-ref warning would count it as the last send
+  from that asker. A row that names something other than what happened is this project's signature defect (form D).
+- **It says what changes**: where the agent's `send @asker` goes now (`askerOf`, the bus's own rule), and that the agent
+  is NOT told - a withdrawal carries no pointer, so the withdrawer sends one if the agent is still at work for it.
+- **Work's second ask - route a request to the agent's chief when the launcher is not that chief - is NOT built.** It
+  would guess: the leader that gave the first turn may want the report itself. Instead the launch SAYS it: when the
+  caller is not a chief of an agent that has one, the `request:` line names the chief, says its closes are refused while
+  the request is open, and prints the withdrawal to type. The same line no longer promises "send @asker reaches you" when
+  another asker already waits (it refuses then, and names them).
+- **A close refused for another's request** now says how that asker withdraws it (form K: a refusal carries what to do).
+- **Exit codes**: 0 withdrawn (stdout); 2 refused, nothing touched (stderr, `team: nothing withdrawn - <why>`), and no
+  project, an unreadable config or no agent named are 2 as well - never the silent exit 0 of the start-line path; 4
+  withdrawn and NOT recorded (stdout, with its ⚠). `--help` wins over `--withdraw`: usage printed, nothing withdrawn, 0.
+
+**The adversarial review (Opus, read only, 11-21): 0 ways found to remove another's request; 2 important, 7 nits.**
+Fixed: ① the command printed by `close.mjs` was RELATIVE to the closer's folder and addressed to the asker, in another one
+- from the leader's folder at the root it resolved outside the project (A121 passed it: both chiefs sat at the same
+depth). It is absolute and quoted now, A121 compares it byte for byte with the project's own `team.mjs`, and A127 TYPES
+the launch's as printed, from another folder, and it withdraws. ② FINDINGS named a sub-session and a session off the
+roster as refused, and A127 tried neither (deleting the sub-session test left it green): both are keys now. ③ the
+`../e1` key planted nothing where the traversal lands: it plants and reads back `.comm/e1/boss`. ④ a request that is a
+link to nothing read ENOENT while `readdir` listed it - "none open. Open: 'boss'": said as a link now, and left. ⑤ the
+bench's `goto-layout --match id:` named a TAB id: `window_id:`, as `besideMe`. ⑨ the installer's field text named
+`--board` and not `--withdraw`: both places. Named, not fixed: ⑥ a chief's launch does not say the LEADER's close is
+refused too (true, unsaid: a line at every chief's launch would cost every chief's context for the rare case); ⑦ exit 4
+is printed with its ✓ on stdout (a retry is told "no request open", which is true); ⑧ another session of the SAME asker
+nudging between the read and the removal: the new request goes and `since` is the old one's; between the removal and
+the check: refused as "there again", nothing recorded. ⑤'s other half: the bench's layout is printed, never gated - on a
+kitty without `stack` in `enabled_layouts` A121 runs in the grid as before.
+
+**The arm: A127**, in the `#teams-b` fixture (fake sessions, a fake kitten for the one launch): another's request, a
+moved shell, a plain shell, a name off the roster and a path each withdraw nothing, the requests compared byte for byte;
+a sub-session and a session off the roster too; the positive control is one variable away - the leader's own session; it is recorded with by, agent, since and session
+pid; the delivery log is byte-identical; a second withdrawal is refused; an unreadable request is said; a leader's launch
+over a chief says so, a chief's own does not. A121 carries the close refusal's new words. **And A92 (5) reddened on the release itself:** it looked for the entry's first
+60 characters verbatim in an agent's start, and the stub rewrites `node .comm/bin/` to the path from the agent's folder
+(A74) - `db` is a subfolder. This was the first entry to name a tool that early. The arm now applies the same rewrite. A
+stub that stopped rewriting reddens it now, where before it passed.
+
+**Named, not built.** A person at a shell cannot withdraw through the tool (no session, no identity): the refusal prints
+the file to remove by hand. A withdrawal racing the agent's own `done` to the same asker: both remove one file, and the
+withdrawal that loses says it was closed meanwhile. An agent can still `rm` any request: like every guard here, it stops
+mistakes, not an agent that means it.
+
+**NOT verified:** under real Claude Code sessions (the arm's sessions are `node` named `claude`, as A119-A123's); in
+work's tree, on a real request.
+
+## `#bench-geometry` — A121 reddened on bytes green six days before: the bench's panes had shrunk (2026-11-21)
+
+**The red.** The 11-21 full boot: `✗ gate attack: 1 FAILED, 124 passed in 545.7s - CODE UNCHANGED since last green`
+(`d40663e`, green 11-16). Re-run untouched, the same: A121's `theBusOwnBellIsAtRest=false` and
+`aBoxThatMayHideIsNotAtRest=false`, its 31 other keys true. Triaged as a change in the world (`#A20`), as CLAUDE.md says.
+
+**What moved, measured.** Not the code, not kitty (0.49.0, its binary dated 09-21, `kitty.conf` 09-21). Claude Code had
+updated itself that day (2.1.330, 17:49) - and A121 runs no Claude Code, only `node` named `claude`. What moved is the
+bench's SIZE: it is an OS window opened at the size kitty last REMEMBERED (`remember_window_size`, the default: the size
+of the last OS window closed), and the owner's `enabled_layouts` start with `grid`. A probe opened a minimized OS window
+and split it as A121 does (18 panes): alone it was 103x56; split, its panes were **19-22 columns by 7-19 lines**. The bell
+(`NUDGE`, 313 characters) wraps there to ~16 rows, its box no longer fits a pane, and the two keys that read a bell in a
+box went red. The last green's bench was bigger; what it was is not known - nothing recorded it.
+
+**The fix, in the suite only.** `bench()` puts its tab in the `stack` layout, which is in the owner's `enabled_layouts`:
+every pane then gets the whole bench, however many there are. Measured: 18 panes in `stack`, all 205x56; a pane not in
+front still draws its box and `get-text` reads it. The layout is read back from `ls` and kept on the bench (`geom`);
+A121 prints it. **Its control, one variable moved (the layout), the same squeeze in both:** two copies of the tree, each bench given 30
+more panes. `grid`: the bench's pane 34x10, **5 red** - A121 on exactly its two keys, and A95, A96, A101, A114a (the relay's
+arms: their fakes draw a box that no longer fits either). `stack`: 205x56, **126 of 126 green**. And `grid` with NO squeeze
+at the size my probe left (205x56): green - so the size decides, and the layout takes the pane count out of it. **Not resized**, measured twice: GNOME on Wayland GREW a minimized window on `resize-os-window` (103x56 →
+205x57 asked 240x64) and never shrank one (asked 103x56: exit 0, no effect) - and a bench closed at another size changes
+the size of the owner's NEXT window.
+
+🔴 **A measurement trap of mine, the eleventh (`#measurement-traps`): the probe wrote into the world it measured.** Closing
+the window I had grown made kitty remember 205x57, so the owner's next new OS window opens at that size, and the next
+suite's bench too; putting it back failed for the reason above. It heals when he closes one of his own windows. Probes of
+window geometry run without a resize from now on.
+
+**Named, not fixed.** The bench still opens at a remembered size: a tiny one (under ~65 columns or ~10 lines) would
+redden the same two keys in `stack` too, and A121's detail now says the size it ran at. Other arms that open panes beside
+the bench now get the whole bench where they had a grid cell: three full suites in `stack`, 126 of 126 each.

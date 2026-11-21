@@ -50,6 +50,13 @@ already have.
 
 
 
+
+## 2026-11-21.1 — bus print `1dc3c5bd42a6` — 2026-11-21
+
+- **A request you opened can now be withdrawn: `node .comm/bin/team.mjs --withdraw <agent>`.** A first turn you give at launch, or a nudge, opens a request on that agent. Until now only its `done` to you, or your own close of its window, took the request away, and while it stayed open its chief's closes were refused. The command removes YOUR request only. Who you are comes from your session, not from your shell's folder. If you have none open, it refuses and lists the open ones and whose they are. Each withdrawal is recorded in `.comm/withdrawn.jsonl`, not in `log.jsonl`, which lists delivered messages. The agent is not told: if it is still working on it for you, tell it.
+- **A launch over a chief says so.** When you give a first turn to an expert that has a chief other than you, the `request:` line names that chief, says its close of the expert is refused without `--force` while your request is open, and prints the withdraw command. When someone else already waits on the agent, the line says so, instead of promising that `send @asker` reaches you.
+- **A close refused because of another agent's request** now also says how that agent withdraws it.
+
 ## 2026-11-14.5 — bus print `756dc7b25620` — 2026-11-15
 
 - **The bus reads where the cursor is.** Each screen read also asks kitty for the terminal cursor and the line wraps (`--add-cursor --add-wrap-markers`). After a Ctrl+A, the text's start shown with the cursor on its first character proves the start: nothing can be above it. This holds only on the alternate screen, where Claude Code runs (4 of 4 windows here) and nothing scrolls back. Elsewhere the earlier checks decide, as in `.4`.

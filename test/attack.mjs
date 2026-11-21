@@ -16,7 +16,7 @@
  * result, which is this project's signature failure mode.
  */
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync, statSync, lstatSync, symlinkSync, cpSync, utimesSync, chmodSync, renameSync, appendFileSync } from "node:fs"
-import { join, delimiter, resolve, dirname, basename } from "node:path"
+import { join, delimiter, resolve, dirname, basename, relative } from "node:path"
 import { execFileSync, spawnSync, spawn } from "node:child_process"
 import { createHash, randomUUID } from "node:crypto"
 import { pathToFileURL } from "node:url"
@@ -4466,7 +4466,20 @@ async function bench() {
 	for (const until = Date.now() + 10000; Date.now() < until && !pid; nap(50)) try { pid = Number(readFileSync(join(dir, "ready"), "utf8")) } catch {}
 	const win = wk.windows().find((w) => w.sock === sock && w.id === id)
 	if (!win || !pid || !win.fg.includes(pid)) return null
-	return (benchWin = { ...win, dir, pid })
+	// 🔴 EVERY PANE THE WHOLE BENCH: the `stack` layout (2026-11-21, `FINDINGS.md#bench-geometry`). In the owner's `grid`, A121's 18 panes
+	// split a bench that opens at the size kitty last REMEMBERED (`remember_window_size`, any OS window closed) - 103x56 that day, so panes
+	// of 19-22 x 7-19: the bell wrapped to 16 rows, its box no longer fitted, and A121 reddened twice on bytes green 6 days before. The
+	// layout is READ BACK from `ls`, never taken from goto-layout's exit code (resize-os-window exited 0 doing nothing that day), and kept:
+	// an arm that depends on the box's geometry prints it. Not resized: GNOME on Wayland grows a minimized window and never shrinks it
+	// (measured: resize exit 0, no effect), and a bench closed at another size changes the size of the owner's next window.
+	// `window_id:`, the TAB holding that window: `id:` names a tab id here, and only kitty's fallback made it the bench's (the review of 11-21)
+	spawnSync("kitten", ["@", "--to", `unix:${sock}`, "goto-layout", "--match", `window_id:${id}`, "stack"], { encoding: "utf8", timeout: 5000 })
+	let geom = "unread"
+	try {
+		for (const o of JSON.parse(spawnSync("kitten", ["@", "--to", `unix:${sock}`, "ls"], { encoding: "utf8", timeout: 5000 }).stdout))
+			for (const t of o.tabs) for (const w of t.windows) if (w.id === id) geom = `${t.layout} ${w.columns}x${w.lines}`
+	} catch {}
+	return (benchWin = { ...win, dir, pid, geom })
 }
 let benchJobs = 0
 /** spawnSync's answer for `argv`, run by the bench's own process - so from INSIDE the bench window. */
@@ -6988,6 +7001,82 @@ else if(a.includes("set-user-vars")){if(fs.existsSync(D+"/nomark"))process.exit(
 	check("A119 with teams only the leader or a chief of an agent launches it, a plain shell and a star as before; a first turn opens a request, a refusal opens nothing",
 		Object.values(ok119).every(Boolean), Object.entries(ok119).map(([k, v]) => `${k}=${!!v}`).join("; "))
 
+	// ── A127: A REQUEST IS WITHDRAWN BY WHO OPENED IT, AND BY NOBODY ELSE (work's letter 78, 11-16) ─────────────────────
+	// Work's leader launched a chief's expert with a first turn; the expert reported to its chief, the leader's request stayed
+	// open, and the chief closed it --force three times: nothing but a hand `rm` withdrew it. The asker is its SESSION (a shell
+	// moved into another's folder withdraws as itself), its own file only, recorded outside the delivery log. Every refusal
+	// leaves the requests byte for byte as they were; the positive control is one variable away, the session. FINDINGS.md#withdraw
+	{
+		const A = join(P1.r, ".comm", "asked"), WD = join(P1.r, ".comm", "withdrawn.jsonl"), LOG = join(P1.r, ".comm", "log.jsonl")
+		const reqs = () => { const o = {}; try { for (const a of readdirSync(A).sort()) try { o[a] = readdirSync(join(A, a)).sort().map((w) => `${w}=${readFileSync(join(A, a, w), "utf8")}`) } catch (e) { o[a] = e.code } } catch {} ; return JSON.stringify(o) }
+		const plant = (a, ...who) => { mkdirSync(join(A, a), { recursive: true }); for (const w of who) writeFileSync(join(A, a, w), "2026-11-16T06:18:00.000Z") }
+		const recs = () => { try { return readFileSync(WD, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)) } catch { return [] } }
+		const logBytes = () => { try { return readFileSync(LOG, "utf8") } catch { return "" } }
+		const wd = (s, target, cwd = s.cwd) => benchRun(s, [process.execPath, P1.bin("team.mjs"), "--withdraw", target], { cwd, env: baseEnv })
+		const nope = (r, re) => r.status === 2 && re.test(r.stderr || "") && !/✓/.test(r.stdout || "")
+		const ok127 = {}
+		rmSync(A, { recursive: true, force: true }); rmSync(WD, { force: true })
+		plant("e1", "boss", "chiefA")
+		const log0 = logBytes()
+		let before = reqs()
+		ok127.planted = before === JSON.stringify({ e1: ["boss=2026-11-16T06:18:00.000Z", "chiefA=2026-11-16T06:18:00.000Z"] })
+		// another's request: chiefB opened none on e1, and nothing lets it name chiefA's or the leader's
+		ok127.anotherWithdrawsNothing = nope(wd(S1.chiefB, "e1"), /'chiefB' has no request open on 'e1'\. Open: 'boss', 'chiefA'/) && reqs() === before
+		// a shell MOVED into the leader's folder is still its own session, `shared`, which opened none: by its folder it would be the leader
+		ok127.aMovedShellIsItsSession = nope(wd(S1.shared, "e1", P1.r), /'shared' has no request open on 'e1'/) && reqs() === before
+		// a plain shell at the root: no session, nothing - by its folder it would be the leader too
+		const plain = noSession([process.execPath, P1.bin("team.mjs"), "--withdraw", "e1"], { cwd: P1.r })
+		ok127.aPlainShellWithdrawsNothing = plain.status === 2 && /this is no session/.test(plain.stderr) && reqs() === before
+		// a sub-session of the leader (a `claude -p` it started: same folder, same environment) and a session in no agent's folder
+		ok127.aSubSessionWithdrawsNothing = /started by another session/.test(nestedRun(S1.boss, [P1.bin("team.mjs"), "--withdraw", "e1"]).stderr) && reqs() === before
+		ok127.aSessionOffTheRosterNothing = nope(wd(S1.docs, "e1"), /is no agent of this project/) && reqs() === before
+		// a name off the roster, or a path: refused before a path is made of it - and where `../e1` would land, a file that must stay
+		mkdirSync(join(P1.r, ".comm", "e1"), { recursive: true }); writeFileSync(join(P1.r, ".comm", "e1", "boss"), "the traversal's target")
+		ok127.offTheRosterNothing = nope(wd(S1.boss, "../e1"), /not on this project's roster/) && nope(wd(S1.boss, "ghost"), /not on this project's roster/) && reqs() === before &&
+			readFileSync(join(P1.r, ".comm", "e1", "boss"), "utf8") === "the traversal's target"
+		rmSync(join(P1.r, ".comm", "e1"), { recursive: true, force: true })
+		ok127.noRecordForARefusal = recs().length === 0 && !existsSync(WD)
+		// THE POSITIVE CONTROL: the leader's session, its own request goes, the chief's stays, and @asker now finds the chief
+		const mine = wd(S1.boss, "e1")
+		ok127.itsOwnGoes = mine.status === 0 && /✓ 'boss' withdrew its request on 'e1'/.test(mine.stdout) && !existsSync(join(A, "e1", "boss"))
+		ok127.anothersStays = reqs() === JSON.stringify({ e1: ["chiefA=2026-11-16T06:18:00.000Z"] })
+		ok127.saysWhereAskerGoesNow = /send @asker` now: it reaches 'chiefA'/.test(mine.stdout)
+		const r1 = recs()
+		ok127.recorded = r1.length === 1 && r1[0].by === "boss" && r1[0].agent === "e1" && r1[0].since === "2026-11-16T06:18:00.000Z" && r1[0].session === S1.boss.pid
+		ok127.notInTheDeliveryLog = logBytes() === log0
+		// twice: nothing of its own left, said, the chief's named, nothing recorded
+		before = reqs()
+		ok127.twiceIsRefused = nope(wd(S1.boss, "e1"), /'boss' has no request open on 'e1'\. Open: 'chiefA'/) && reqs() === before && recs().length === 1
+		// the chief withdraws its own, from its own folder; nobody waits then, so @asker is its only chief
+		const chiefs = wd(S1.chiefA, "e1")
+		ok127.theChiefsOwn = chiefs.status === 0 && !existsSync(join(A, "e1", "chiefA")) && recs().length === 2 && /it reaches 'chiefA'/.test(chiefs.stdout)
+		// A FAILED READ IS NOT "NONE OPEN" (form E): a request that is a directory is said, and left
+		mkdirSync(join(A, "e1", "boss"), { recursive: true })
+		ok127.anUnreadableRequestIsSaid = nope(wd(S1.boss, "e1"), /could not be read \(EISDIR\)/) && statSync(join(A, "e1", "boss")).isDirectory() && recs().length === 2
+		rmSync(join(A, "e1", "boss"), { recursive: true, force: true })
+		// a link to nothing reads ENOENT while readdir lists it: said as a link, left, never "none open"
+		symlinkSync(join(rB, "no-such-file"), join(A, "e1", "boss"))
+		ok127.aLinkToNothingIsSaid = nope(wd(S1.boss, "e1"), /is a link to nothing/) && lstatSync(join(A, "e1", "boss")).isSymbolicLink() && recs().length === 2
+		rmSync(join(A, "e1", "boss"), { force: true })
+		// no agent named: the usage, nothing else
+		const bare = benchRun(S1.boss, [process.execPath, P1.bin("team.mjs"), "--withdraw"], { cwd: P1.r, env: baseEnv })
+		ok127.usage = bare.status === 2 && /--withdraw <agent>/.test(bare.stderr)
+		// THE LAUNCH SAYS IT: the leader's first turn to a chief's expert names the chief and the withdrawal; a chief's own launch does not
+		rmSync(A, { recursive: true, force: true })
+		const byLeader = realL(S1.boss, "e1", "--prompt", "start")
+		const cmd127 = `node ${JSON.stringify(P1.bin("team.mjs"))} --withdraw e1`
+		ok127.aLaunchOverAChiefSaysSo = byLeader.status === 0 && /request: 'e1' now owes 'boss'/.test(byLeader.stdout) && /'chiefA' leads it/.test(byLeader.stdout) && byLeader.stdout.includes(cmd127)
+		// and the command it prints WORKS: typed as printed, from the leader's session, in a folder of the project that is not the root
+		const typed = benchRun(S1.boss, ["sh", "-c", cmd127], { cwd: join(P1.r, "docs"), env: baseEnv })
+		ok127.thePrintedCommandWorks = typed.status === 0 && /✓ 'boss' withdrew its request on 'e1'/.test(typed.stdout) && !existsSync(join(A, "e1", "boss"))
+		ok127.aChiefsOwnLaunchDoesNot = r119a.status === 0 && !/--withdraw/.test(r119a.stdout)
+		fkReset()
+		for (const u = Date.now() + 3000; Date.now() < u && JSON.parse(spawnSync(process.execPath, [P1.bin("comm.mjs"), "who", "--json"], { cwd: P1.r, encoding: "utf8" }).stdout).agents.e1.pids.length; nap(30)) {}
+		rmSync(A, { recursive: true, force: true }); rmSync(WD, { force: true })
+		check("A127 a request is withdrawn by the session that opened it and by nobody else - another's, a moved shell, a plain shell, a name off the roster withdraw nothing; it is recorded outside the delivery log, and a launch over a chief says so",
+			Object.values(ok127).every(Boolean), Object.entries(ok127).map(([k, v]) => `${k}=${!!v}`).join("; "))
+	}
+
 	// ── A120: THE CAPS ───────────────────────────────────────────────────────────────────────────────────────
 	const P2agents = ["chiefA", "chiefB", "e1", "e2", "x1", "x2", "x3", "x4"]
 	const told2 = join(rB, "told2.txt")
@@ -7551,6 +7640,9 @@ else if(a.includes("set-user-vars")){if(fs.existsSync(D+"/nomark"))process.exit(
 		mkdirSync(join(P3.r, ".comm", "asked", "t_other"), { recursive: true }); writeFileSync(join(P3.r, ".comm", "asked", "t_other", "chiefB"), ts3())
 		const reqA = C3(S3.chiefA, "t_other", "--dry-run"), reqLeader = C3(S3.boss, "t_other", "--dry-run")
 		ok121.anotherChiefsRequestRefuses = reqA.status === 3 && /'chiefB' waits on its work/.test(reqA.stderr) && reqLeader.status === 3
+		// and says how its asker withdraws it (work's letter 78, A127)
+		// ABSOLUTE, the project's own: the closer is in chiefA's folder and the command is for chiefB's (a relative path resolved outside the project)
+		ok121.itsRefusalSaysHowItsAskerWithdraws = reqA.stderr.includes(`'chiefB' withdraws it: node ${JSON.stringify(P3.bin("team.mjs"))} --withdraw t_other`)
 		ok121.forceLiftsIt = C3(S3.chiefA, "t_other", "--dry-run", "--force").status === 0
 		ok121.itsOwnRequestDoesNot = C3(S3.chiefB, "t_other", "--dry-run").status === 0
 		// a star: the leader only
@@ -7573,7 +7665,7 @@ else if(a.includes("set-user-vars")){if(fs.existsSync(D+"/nomark"))process.exit(
 		ok121.theOthersStayed = ["t_busy", "t_sub", "t_words", "t_unmarked", "t_shell", "t_far", "t_dry"].every((a) => there3(W[a].id))
 	}
 	check("A121 the leader or a chief closes an expert's window at rest, verified gone, by-name in its record; identity and rest are never forced, unfinished work only with --force",
-		couldRun && Object.values(ok121).every(Boolean), `${couldRun ? "" : "THE ARM COULD NOT RUN: no kitty bench; "}` + Object.entries(ok121).map(([k, v]) => `${k}=${!!v}`).join("; "))
+		couldRun && Object.values(ok121).every(Boolean), `${couldRun ? `bench ${b3.geom}; ` : "THE ARM COULD NOT RUN: no kitty bench; "}` + Object.entries(ok121).map(([k, v]) => `${k}=${!!v}`).join("; "))
 
 	// ── A123: THE BOARD ──────────────────────────────────────────────────────────────────────────────────────
 	const CANARY = "UNE-NOTE-CANARI"
@@ -7711,7 +7803,9 @@ else if(a.includes("set-user-vars")){if(fs.existsSync(D+"/nomark"))process.exit(
 	// (5) the news: the entry for the installed version, at the first start, once
 	const label = String(JSON.parse(readFileSync(join(r92, ".comm", "INSTALLED.json"), "utf8")).label || "").replace(/\+unreleased$/, "")
 	const entry = (readFileSync(join(PKG, "CHANGELOG.md"), "utf8").split(/^## /m).find((e) => e.startsWith(label + " ")) || "")
-	const firstLine = entry.split("\n").slice(1).find((l) => l.trim()) || "\u0000none"
+	// AS THE AGENT IS TOLD IT: the stub rewrites `node .comm/bin/` to the path from the agent's own folder (A74), and `db` is a
+	// subfolder - the first entry to name a tool in its first 60 characters (2026-11-21.1) reddened this leg on a notice told whole
+	const firstLine = (entry.split("\n").slice(1).find((l) => l.trim()) || "\u0000none").replace(/node \.comm\/bin\//g, `node ${relative(join(r92, "db"), join(r92, ".comm", "bin"))}/`)
 	const start = () => { const out = spawnSync(process.execPath, [join(r92, "db", ".claude", "comm-hook.mjs"), "session-start"], { cwd: join(r92, "db"), encoding: "utf8",
 		input: JSON.stringify({ hook_event_name: "SessionStart", session_id: "a92", transcript_path: join(r92, "none.jsonl"), source: "startup" }) }).stdout || ""
 		try { return JSON.parse(out).hookSpecificOutput.additionalContext || "" } catch { return "" } }

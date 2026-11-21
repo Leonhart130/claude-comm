@@ -8,7 +8,7 @@
  *   node bin/launch.mjs <agent> --reopen --model <m> --effort <e> --prompt "<say>" --os-window --minimized   what reopen.mjs runs: exactly a "reopen" entry, for mail that asks
  *
  *   With "teams" in .comm/config.json only the leader or a chief of <agent> may launch it (a plain shell, with no session: as without).
- *   With "caps" it refuses past any of them, and the refusal gives the numbers (bin/team.mjs). A --prompt opens a request: the agent's `done` to you closes it.
+ *   With "caps" it refuses past any of them, and the refusal gives the numbers (bin/team.mjs). A --prompt opens a request: the agent's `done` to you closes it, or your `team.mjs --withdraw <agent>`.
  *   With "usage": {"refuse": true} it refuses an agent at its threshold, or with no reading under 30 min old (bin/usage.mjs). No flag passes it: change the threshold.
  *
  *   .comm/config.json  "launch": {"<agent>": {"args": ["--channels", "plugin:telegram@claude-plugins-official"],
@@ -487,7 +487,13 @@ if (capsLine) console.log(`  caps:   ${capsLine}, before this one`)
 if (usageLine) console.log(`  usage:  ${usageLine}`)
 // A FIRST TURN IS WORK ASKED FOR, as a nudge is: `send @asker` reaches this caller, and its `done` closes it. After the
 // window exists: a refused launch asked nobody. A launch by its declaration asked nothing, the mail did.
-if (prompt && caller && team.openRequest(root, cfg, agent, caller)) console.log(`  request: '${agent}' now owes '${caller}' its \`done\` (send @asker reaches you)`)
+if (prompt && caller && team.openRequest(root, cfg, agent, caller)) {
+	// WHAT IS TRUE NOW: with another asker open, its `send @asker` refuses and names you both. And a request over a chief blocks the chief's
+	// closes until it goes: work's leader launched a chief's expert, the expert reported to its chief, the chief forced its close three times (letter 78)
+	const others = team.askersOf(root, cfg, agent).filter((a) => a !== caller).sort(), hs = team.headsOf(cfg, agent).filter((h) => h !== caller)
+	console.log(`  request: '${agent}' now owes '${caller}' its \`done\` (${others.length ? `${others.map((a) => `'${a}'`).join(", ")} ${others.length > 1 ? "wait" : "waits"} on it too: its send @asker will ask it to name one` : "send @asker reaches you"})`)
+	if (hs.length) console.log(`           ${hs.map((h) => `'${h}'`).join(" and ")} ${hs.length > 1 ? "lead" : "leads"} it, and a close by ${hs.length > 1 ? "them" : "it"} is refused without --force while this is open: once you no longer wait, ${team.withdrawCmd(agent)}`)
+}
 // SAY THE CONSEQUENCE, EVERY TIME. A launch with no first turn is the failure that does not
 // look like one, so the launcher that created it is the one place a reader is certain to be
 // looking. This is deliberately not a refusal: an interactive session a human will type into

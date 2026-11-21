@@ -177,6 +177,8 @@ wait rather than guess. A send to the leader still goes to the leader, with a wa
 session's own process, and a first turn opens a request. `close.mjs --agent <x>`: the same two close a window `launch.mjs` opened, at rest, verified gone, by name in its record. `"caps"` refuses
 a launch past `working`, `windows` or `availableMb`, with the numbers. `"reopen"` opens a closed agent when mail that asks reaches it, from the sender's hook, once, minimized, inside the caps, and a refusal
 tells the owner and the leader. `team.mjs --board`: by chief, each member's state, open requests, `done` and `blocked` since your last look, pointers only.
+`team.mjs --withdraw <x>` (`FINDINGS.md#withdraw`): the caller's own request on `x` goes - the caller is its session, another's request cannot be named -
+recorded in `.comm/withdrawn.jsonl`, not in the delivery log; a launch over a chief, and a close refused for another's request, print it.
 
 **Under a usage threshold** (since `2026-11-09.1`, `FINDINGS.md#usage-gate`). A reopening is refused at the agent's threshold in `"usage"`, or with no reading under 30 min old, and only the leader hears it, once per window of usage. `"usage": {"refuse": true}` holds an ordinary launch to the same, with no flag past it; a threshold alone stays advice.
 

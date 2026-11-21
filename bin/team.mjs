@@ -5,25 +5,26 @@
  *   node .comm/bin/team.mjs                      what is yours: who you lead, who you work for, who you write to with no pair
  *   node .comm/bin/team.mjs --agent-root <dir>   the same for the agent whose stub is there (what the start message prints)
  *   node .comm/bin/team.mjs --board              by chief: each member's state, its open requests, its `done` and `blocked` since your last look; pointers only
+ *   node .comm/bin/team.mjs --withdraw <agent>   the request YOU opened on <agent> (a first turn, a nudge) is withdrawn: yours only, your session decides who you are; recorded in .comm/withdrawn.jsonl
  *
  *   .comm/config.json  "teams": {"<chief>": ["<expert>", ...]}   a chief and its experts, the chiefs, the experts of one team write with no pair
  *   .comm/config.json  "caps": {"working": 5, "availableMb": 2500, "windows": 12}   launch.mjs refuses past any of them, and the refusal gives the numbers
  *
  * A start line is nothing when the agent is in no team and leads none, or the project declares none: it writes nothing and rings nobody.
- * Only --board writes, one file, its reader's last look (.comm/board/<reader>).
+ * Only --board and --withdraw write: the board its reader's last look (.comm/board/<reader>), --withdraw the caller's request, gone, and its record.
  * Out of comm.mjs because the bus is capped at one Read call (A22) and only a start message, launch.mjs, close.mjs and the board need these. FINDINGS.md#teams, #teams-b
  */
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, statSync } from "node:fs"
+import { readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, statSync, lstatSync } from "node:fs"
 import { spawnSync } from "node:child_process"
 import { join, dirname, resolve, relative } from "node:path"
 import { fileURLToPath } from "node:url"
-import { teams, headsOf, teamFaults, leads, askersOf, ASKED } from "./comm.mjs"
+import { teams, headsOf, teamFaults, leads, askersOf, askerOf, ASKED } from "./comm.mjs"
 import { turnOf } from "./who.mjs"
 import { sessionPid, processState, startTimeOf, bootId } from "./session-registry.mjs"
 
 const own = (o, k) => !!o && Object.prototype.hasOwnProperty.call(o, k)
 const nap = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
-export { leads, teams, askersOf, teamFaults }
+export { leads, teams, askersOf, teamFaults, headsOf }
 
 // THE TIER's two rules, here because launch.mjs cannot be imported (it runs) and a "reopen" entry is judged against the same ones. A57.
 export const EFFORTS = ["low", "medium", "high", "xhigh", "max"]   // `claude --help`, 2026-09-13
@@ -80,6 +81,47 @@ export function judge(cfg, c, agent) {
 export function openRequest(root, cfg, agent, asker) {
 	if (!teams(cfg) || !(asker === cfg.leader || leads(cfg, asker, agent))) return false
 	try { mkdirSync(ASKED(root, agent), { recursive: true }); writeFileSync(join(ASKED(root, agent), asker), new Date().toISOString()); return true } catch { return false }
+}
+
+// ── A REQUEST WITHDRAWN BY WHO OPENED IT (work's letter 78) ────────────────────────────────────────────────────────
+/** The command to type, ABSOLUTE: close.mjs prints it for ANOTHER session, in another folder - a path relative to the closer's cwd
+ *  resolved outside the project from the asker's (the review of 11-21). The root is found from the cwd, so it works from any folder of it. */
+export const withdrawCmd = (agent) => `node ${JSON.stringify(fileURLToPath(import.meta.url))} --withdraw ${agent}`
+/**
+ * `--withdraw <agent>`: the CALLER's own request on `agent` goes, and nothing else - no argument names an asker. The caller is
+ * its session, as for launch and close: a shell moved into the leader's folder withdraws as itself. Recorded in
+ * `.comm/withdrawn.jsonl`, never log.jsonl, whose every reader takes a line for a delivered message. FINDINGS.md#withdraw
+ * { ok, code, line }: 0 withdrawn; 2 refused, nothing touched; 4 withdrawn and NOT recorded.
+ */
+export function withdraw(root, cfg, c, agent, { now = Date.now() } = {}) {
+	const no = (why) => ({ ok: false, code: 2, line: `team: nothing withdrawn - ${why}` })
+	if (!own(cfg.agents, agent)) return no(`'${agent}' is not on this project's roster: ${Object.keys(cfg.agents || {}).join(", ")}`)
+	const f = join(ASKED(root, agent), String(c.agent))
+	if (!c.session) return no(`this is no session, and a request is withdrawn by the session that opened it. A person removes one by hand: ${join(ASKED(root, agent), "<asker>")}`)
+	if (c.unknown) return no(`who is asking could not be read: ${c.unknown}. Not knowing is not permission.`)
+	if (c.nested) return no(`this session (pid ${c.pid}) was started by another session (pid ${c.nested}), and a sub-session acts for nobody. Run it from the session above.`)
+	if (!c.agent) return no(`this session (pid ${c.pid}) is no agent of this project, so it opened no request here.`)
+	let since
+	try { since = readFileSync(f, "utf8").trim() } catch (e) {
+		// A FAILED READ IS NOT "NONE OPEN" (form E): only ENOENT is absence
+		if (e.code !== "ENOENT") return no(`'${c.agent}''s request on '${agent}' could not be read (${e.code}): ${f}`)
+		// a link to nothing reads ENOENT, and readdir still lists it: absent here and open in askersOf, close.mjs refusing over it
+		try { lstatSync(f); return no(`'${c.agent}''s request on '${agent}' is a link to nothing: ${f}. The bus writes no links; remove it by hand`) } catch {}
+		const open = askersOf(root, cfg, agent).sort()
+		return no(`'${c.agent}' has no request open on '${agent}'${open.length ? `. Open: ${open.map((a) => `'${a}'`).join(", ")} - each is withdrawn by its own asker, or closed by the agent's \`done\` to it` : ": none is"}`)
+	}
+	try { unlinkSync(f) } catch (e) {
+		return no(e.code === "ENOENT" ? `'${c.agent}''s request on '${agent}' was closed meanwhile (its \`done\`?)` : `${f} could not be removed (${e.code})`)
+	}
+	// THE EFFECT, NOT THE CALL. There again: a nudge of yours opened it anew in between (it stays, and is yours to withdraw)
+	if (existsSync(f)) return { ok: false, code: 2, line: `team: removed, then there again - a new request of yours opened meanwhile? It stays, and nothing is recorded: ${f}` }
+	let recorded = true
+	try { appendFileSync(join(root, ".comm", "withdrawn.jsonl"), JSON.stringify({ at: new Date(now).toISOString(), by: c.agent, agent, since: since || null, session: c.pid }) + "\n") } catch { recorded = false }
+	const to = askerOf(root, cfg, agent)
+	return { ok: true, code: recorded ? 0 : 4, line: `✓ '${c.agent}' withdrew its request on '${agent}'${since ? ` (open since ${when(since)})` : ""}. Its \`send @asker\` now: ` +
+		(to ? `it reaches '${to}'` : `several still wait (${askersOf(root, cfg, agent).sort().join(", ")}): it will be asked to name one`) + ".\n" +
+		`  '${agent}' is not told: if it is still working on it for you, say so (comm send ${agent} --ref <file>).\n` +
+		(recorded ? "  Recorded: .comm/withdrawn.jsonl" : "  ⚠ NOT recorded: .comm/withdrawn.jsonl could not be written") }
 }
 
 // ── WHAT A SESSION IS DOING ────────────────────────────────────────────────────────────────────────────────────
@@ -310,10 +352,21 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
 		process.exit(0)
 	}
 	const i = process.argv.indexOf("--agent-root"), at = resolve(i > 0 && process.argv[i + 1] ? process.argv[i + 1] : process.cwd())
+	// --withdraw is asked for by a caller who waits for its answer: no project, or a config unread, is said, never a silent exit 0 (form E)
+	const W = process.argv.indexOf("--withdraw")
+	const quiet = (why) => { if (W < 0) process.exit(0); console.error(`team: nothing withdrawn - ${why}`); process.exit(2) }
 	let root = at
-	while (!existsSync(join(root, ".comm", "config.json"))) { const up = dirname(root); if (up === root) process.exit(0); root = up }
+	while (!existsSync(join(root, ".comm", "config.json"))) { const up = dirname(root); if (up === root) quiet(`no .comm/config.json in ${at} or above it`); root = up }
 	let cfg
-	try { cfg = JSON.parse(readFileSync(join(root, ".comm", "config.json"), "utf8")) } catch { process.exit(0) }
+	try { cfg = JSON.parse(readFileSync(join(root, ".comm", "config.json"), "utf8")) } catch (e) { quiet(`${join(root, ".comm", "config.json")} could not be read (${e.code || e.message})`) }
+	if (W > 0) {
+		if (!cfg || typeof cfg !== "object" || !cfg.agents || typeof cfg.agents !== "object") quiet(`${join(root, ".comm", "config.json")} has no "agents"`)
+		const agent = process.argv[W + 1]
+		if (!agent || agent.startsWith("--")) { console.error("usage: node .comm/bin/team.mjs --withdraw <agent>   the request you opened on <agent>, yours only"); process.exit(2) }
+		const r = withdraw(root, cfg, callerOf(liveState(root)), agent)
+		;(r.ok ? console.log : console.error)(r.line)
+		process.exit(r.code)
+	}
 	// identity is the bus's to say (comm.mjs whoami), the one place it is resolved
 	const whoami = () => { const w = spawnSync(process.execPath, [COMM, "whoami", "--agent-root", at], { cwd: at, encoding: "utf8", timeout: 5000 }); return w.status === 0 ? String(w.stdout).trim() : "" }
 	if (process.argv.includes("--board")) {

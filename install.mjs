@@ -1361,6 +1361,7 @@ function SKILL(ids, agentRoot) {
 		"- The expert reports with `--kind done` and a file. Read the file, decide, answer with a file.",
 		`- **Teams**: \`"teams": {"<chief>": ["<expert>", ...]}\` in \`.comm/config.json\` links a chief, its experts and the other chiefs with no pair and no bell at the start; a project without it stays a star. One fault in it and it is ignored: the installer and boot say so.`,
 		`  With it, only you or a chief of an expert may launch it, and a \`--prompt\` opens a request. \`node ${B}/team.mjs --board\`: by chief, each member's state, its open requests, its \`done\` and \`blocked\` since your last look.`,
+		`  A request you opened (a first turn, a nudge) and no longer wait on: \`node ${B}/team.mjs --withdraw <agent>\` - yours only; while it is open, a close of that agent by anyone else is refused without \`--force\`.`,
 		`- **Close an expert's window** (at rest, one \`launch.mjs\` opened; you, or a chief of it): \`node ${B}/close.mjs --agent <x>\`. Mail, a claim or another's open request refuse, \`--force\` lifts them and is noted; a turn under way or somebody's words on its box refuse for good.`,
 		`- **Room:** \`"caps": {"working": 5, "availableMb": 2500, "windows": 12}\`: a launch past any of them is refused, with the numbers.`,
 		`- **A closed agent reopened by its mail:** \`"reopen": {"<agent>": {"model": "...", "effort": "...", "say": "<first prompt>"}}\`: mail that asks (not an \`fyi\`) opens it from the sender's hook, once, minimized, inside the caps; a refusal tells the owner and you. \`node ${B}/reopen.mjs <agent> --dry-run\` says what it would do.`,
@@ -1375,7 +1376,7 @@ function SKILL(ids, agentRoot) {
 		shared ? "## If you are an expert: reporting to your leader" : "## Reporting to your leader", "",
 		`Write the report to a file, then \`${C} send @asker --ref <report> --kind done --note "<where to read, then the verdict>"\`: it reaches the one who waits on your work, else your chief, else \`${leader}\`. If several wait, it says so: name one. With several chiefs, always name the one whose task you answer: \`send <chief>\`. To another chief too.`,
 		"**If your start message says you LEAD a team**, you are its leader: give your experts their work (`send <expert>`, a file in their folder), judge what they return, and take to the leader only what is its own. Your start message and `team.mjs` say who is yours.",
-		`You launch your experts as a leader does (\`launch.mjs <expert> --model <m> --effort <e> --prompt "..."\`), close one at rest with \`node ${B}/close.mjs --agent <x>\`, and read them with \`node ${B}/team.mjs --board\`. Launching anyone else is refused.`,
+		`You launch your experts as a leader does (\`launch.mjs <expert> --model <m> --effort <e> --prompt "..."\`), close one at rest with \`node ${B}/close.mjs --agent <x>\`, read them with \`node ${B}/team.mjs --board\`, and withdraw a request of yours you no longer wait on with \`node ${B}/team.mjs --withdraw <x>\`. Launching anyone else is refused.`,
 		"Stuck on a decision that is not yours: `--kind blocked`, same form, and wait for the ruling.",
 		`Your task done, the report sent, and you were launched for it: close your window (\`node ${B}/close.mjs\`, below). If you lead a team: once the chains you launched are returned.`, "")
 	L.push(

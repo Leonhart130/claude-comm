@@ -302,7 +302,7 @@ if (has("--agent")) {
 	for (const a of team.askersOf(root, cfg, x).filter((w) => w !== j.by)) {
 		let since = ""
 		try { since = ` since ${readFileSync(join(root, ".comm", "asked", x, a), "utf8").trim()}` } catch {}
-		blocks.push(`'${a}' waits on its work${since}: its \`done\` to '${a}' closes that request`)
+		blocks.push(`'${a}' waits on its work${since}: its \`done\` to '${a}' closes that request, or '${a}' withdraws it: ${team.withdrawCmd(x)}`)
 	}
 	if (blocks.length && !has("--force")) {
 		console.error(`close: REFUSING to close '${x}' (window ${r.win.id}) — ${blocks.length} thing(s) unfinished:`)
