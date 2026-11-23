@@ -1,13 +1,22 @@
-# STATUS — Claude Toolbox, 2026-11-21 (sessions 4–31)
+# STATUS — Claude Toolbox, 2026-11-23 (sessions 4–32)
 
 Design and gates are in `README.md`; **this file is only what is OPEN.** Keep it short — when it grows,
 fold the settled parts into the README, the carried ones into `FINDINGS.md#carried`.
 
 ## ▶ NEXT
 
-*(2026-11-21 close: `2026-11-21.2` - the project renamed **Claude Toolbox**, its bus keeps `claude-comm` (owner 11-21) - and letter 80 asked work what it needs beyond the bus: its 81 and 82 answered within minutes, letter 83 replied. `2026-11-21.1` - `team.mjs --withdraw`, work's 78 - in the 12 trees (labels read back; work's README and its 15 skills name it), letter 79 rung; STATUS folded 15.4 → 7.8 KB; the bench in `stack`. **WORK IS THE MAIN FIELD**; usage up to 100 %. 🔴 The owner's rules: after EVERY delivery docs, settings and skills current (measured in work's tree) and a letter to work (11-02); tests never wide while he works (11-05); an adversarial review after EVERY implementation or fix; anything over 1 GB only through `borne` at `free -m` ≥ 2 500 MB, arranged with work (11-13, `LESSONS.md` §10).)*
+*(2026-11-23 close: `2026-11-23.1` - Claude Code 2.1.330 writes `↑ N more` into the box's edge and the bus lost the box: seven bells left in five of work's boxes over 25 h, its letters 84-89 unread (no session here). Fixed in `promptAtRest`, three rounds of adversarial review (four defects of my own fixes) and a fourth on the arm, A128 47 legs, in the 12 trees at 03h03, letters 90 and 91 rung, pushed. `LESSONS.md` §12. **WORK IS THE MAIN FIELD**; usage up to 100 %. 🔴 The owner's rules: after EVERY delivery docs, settings and skills current (measured in work's tree) and a letter to work (11-02); tests never wide while he works (11-05); an adversarial review after EVERY implementation or fix; anything over 1 GB only through `borne` at `free -m` ≥ 2 500 MB, arranged with work (11-13, `LESSONS.md` §10).)*
 
-00000. **FIRST: the next release - work's 82 and its 81 §2.2.** (a) `comm who` glues state and mail: `working1 pending`
+000000. **FIRST: is `.1` working at work?** Over `~/Dev/work/.comm/wake/rings.jsonl`, the rows since 2026-11-23T02:03Z: those
+   whose `why` says "its box was never seen after the bell was typed" must be 0 (baseline: 7 in the 3 h before, each a
+   watcher block ended by a hand's Enter); rows with `headHidden` are the fix at work (the first: 03:05:38, seen=true).
+   One such row, or work's `saisie-restee.py` alerting on a bus text: a defect. **Then §12's control:** a boot row when the
+   installed Claude Code is newer than the last real-box run, and `test/box-real.mjs` taking a box that hides its start (s9,
+   `exchange/WIP-more-edge-probe-box-real-s9.mjs`) - its s1, s2, s8 are red on the release before too: stale, or the
+   watcher's defect, triage first. **Then work's 90, in its order:** 88 (`who` counts a `claude -p --bare`: in `liveAgents`,
+   `who.mjs`, a `--bare` process is no inbox's - keep it in `tree`; A22 has 279 B), 85 §2 (`wake` says what a dialog shows,
+   read-only), 85 §3 (read a screen, unblock, force: ask work what is left now), 84 §2 (`relay --model --effort`), then 00000.
+00000. **After 000000: work's 82 and its 81 §2.2** (its (b), the alarm of two sessions, must ignore a `--bare` too: 88). (a) `comm who` glues state and mail: `working1 pending`
    (`who.mjs`, inside A22: 279 B left); check its IDLE line with mail too. (b) **Two live sessions of one identity, said at
    SessionStart**, at the head of the hook's context: the other's pid, start time, its transcript's last write, its child
    processes. Measured at work 11-21: the owner opened a second leader believing the first closed; the first lived, idle,

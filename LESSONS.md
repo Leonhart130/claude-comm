@@ -32,7 +32,7 @@ dépôt, aucune n'est une intuition. `FINDINGS.md` (25 défauts) est le gisement
 | 🔴 **F** | 🔴 **J'AJOUTE DE LA CONFIANCE LÀ OÙ IL FALLAIT DE LA PREUVE** | Un pair écrit noir sur blanc *« je ne l'ai pas couru avec deux sessions réelles, donc je ne l'écris pas comme mesuré »*. Je lui réponds que son trou est plus petit qu'il ne croit — **sans une mesure de plus.** ⚠️ **Ça se propage** : la question qu'il avait laissée ouverte à raison a été fermée chez lui, puis SUPPRIMÉE de mon propre fichier d'état | **§2** · **§10** (2026-11-13 : un `grep` à 6,6 Go sur la machine du propriétaire, son coût jamais mesuré) |
 | 🔴 **G** | 🔴 **JE CITE UN NOM QUI N'EXISTE PAS, ET LE FOND EST JUSTE** | `stateOf` contre `holderState`. Comme la conclusion tenait, rien ne l'a contredite — **et le pair ne POUVAIT pas vérifier ce que je lui affirmais.** Une citation fausse dans un raisonnement juste est un cul-de-sac qu'on ne voit pas | **§2** |
 | 🔴 **K** | 🔴 **MA GARDE A RAISON ET SA SORTIE NE PORTE PAS DE QUOI AGIR** | Le refus du `--ref` donnait la chaîne fautive, jamais **la chaîne à taper** · `--pid` n était documenté que dans un message d erreur qu on voit **après** s être trompé · le refus de `claim` nommait le détenteur et **jamais le demandeur**, donc deux refus de deux agents différents étaient identiques au caractère près. **Trois en une soirée, tous signalés par un agent de terrain, aucun trouvé par moi** | **§6** |
-| 🔴 **J** | 🔴 **JE CONCLUS « NON REPRODUCTIBLE » D'UNE SONDE QUI NE POUVAIT PAS SE DÉCLENCHER** | Trois invocations du hook `Stop`, toutes sorties en 0 — **et toutes avec une boîte vide**, alors que le signal n'apparaît QUE lorsqu'un message est livré. J'ai mesuré une inbox vide et je l'ai écrit comme un mystère, dans `STATUS.md` et dans un message de commit | **§5** |
+| 🔴 **J** | 🔴 **JE CONCLUS « NON REPRODUCTIBLE » D'UNE SONDE QUI NE POUVAIT PAS SE DÉCLENCHER** | Trois invocations du hook `Stop`, toutes sorties en 0 — **et toutes avec une boîte vide**, alors que le signal n'apparaît QUE lorsqu'un message est livré. J'ai mesuré une inbox vide et je l'ai écrit comme un mystère, dans `STATUS.md` et dans un message de commit · **§12 : une nouvelle version de Claude Code, et la seule sonde qui pouvait voir sa case ne tournait pas** | **§5** · **§12** |
 | 🔴 **I** | 🔴 **JE POSE UNE CONDITION SUR UN MAILLON QUI N'EST PAS CELUI QUE JE JUGE** | `systemd-run --scope` rend **exit 0** pendant que la suite écrit `✗ 8 lignes non rougies` · **2026-09-11, deux de plus le même jour** : le rapport de tâche du harnais annonce *« exit code 0 »* pour une suite qui rend **1** — le 0 était celui du `tail` en bout de chaîne ; et le pair de `atlas` chaîne `contrôle && effacement` sur une base de PRODUCTION, **le contrôle rend 2 rouges, donc l'effacement ne tourne jamais** et le jeu d'essai reste sur la vraie base. ⭐ **Sa formulation est plus large que la mienne et je la prends : un contrôle et son MÉNAGE ne se chaînent jamais par `&&` — c'est précisément quand le contrôle échoue qu'il faut que le ménage tourne** | **§4** · terrain 2026-09-11 |
 | 🔴 **H** | 🔴 **JE CONCLUS « ABSENT » SUR UN AFFICHAGE QUE J'AI MOI-MÊME TRONQUÉ** | `grep … \| head -5` sur un fichier dont la section est ligne 126 : j'annonce deux fois au propriétaire qu'il manque une section qui était écrite, complète, meilleure que ce que je proposais | **§3** |
 
@@ -444,3 +444,33 @@ lourde, et `heavy.mjs` prend le verrou de work avec son plancher de 2 500 Mo au 
 
 **Le contrôle, pas encore armé** : une ronde ne commence qu'après la suite verte de la précédente (son journal dans le
 scratchpad) ; une garde va chez celui qui tape, jamais dans celui qui mesure. Nommé dans `STATUS.md`.
+
+## §12 — Claude Code a changé sa case le soir où mon banc a rougi, et j'ai trié le banc sans demander ce que la version changeait (2026-11-21 → 23)
+
+**Les faits.**
+- **Le 21/11 à 17h49**, Claude Code 2.1.330 s'installe. Le soir même, A121 rougit sur des octets verts six jours plus tôt. Je le
+  traite bien comme un changement du monde (`#A20`), je trouve la taille du banc (c'était vrai), je corrige le banc. Et
+  `#bench-geometry` l'écrit dès sa deuxième phrase : « Claude Code had updated itself that day (2.1.330, 17:49) - and A121 runs
+  no Claude Code ». **Je n'ai pas demandé ce que 2.1.330 changeait dans ce que mes lecteurs d'écran lisent.**
+- 2.1.330 écrit `↑ N more` dans le bord de la case et retire le `❯` : le lecteur ne voit plus de case. Du 22/11 01h58 au 23/11
+  01h45, sept cloches restent dans les cases de cinq agents de work. Le propriétaire les voit le premier, deux fois, et le leader
+  de work appuie sept fois sur Entrée à la main. Six lettres de work (84 à 89) attendent 25 h : aucune session ne tournait ici.
+- **Dans la session qui corrige**, cinq erreurs de plus :
+  - « 13 sur 20 » cité sans recompter (forme **G**) ;
+  - une chaîne `&&` ouverte par un `grep` qui a échoué (forme **I**) ;
+  - un `$` dans une chaîne de remplacement, qui a collé l'en-tête du fichier dans le fichier (rattrapé par `node --check`) ;
+  - un écran réel retouché à la main pour une jambe, alors que la règle est écrite en tête du fichier des écrans ;
+  - un mutant dit « équivalent », qui ne l'était pas.
+
+**Le prix** : 25 h de défaut sur le terrain principal, et sept Entrées à la main, dont deux vues d'abord par le propriétaire.
+Côté revue adversariale : trois rondes, et quatre défauts trouvés dans mes propres correctifs, dont un qui aurait effacé des lignes
+d'un texte collé par le propriétaire.
+
+**Le mécanisme.** A121 ne lance pas de Claude Code. `test/box-real.mjs` en lance un, mais il est « rapporté, jamais un garde »,
+et il n'avait aucune case trop petite pour son texte. La seule sonde capable de voir le changement n'a pas tourné, et n'aurait
+pas pu le voir : c'est la forme **J**, en plus large. **Une nouvelle version de Claude Code est un changement du monde pour chaque
+lecteur d'écran du bus**, et rien ne me le disait.
+
+**Le contrôle, pas encore armé** : une ligne du boot qui signale quand la version installée de Claude Code est plus récente que
+le dernier passage réel de la case. Ce passage doit inclure une case qui cache son début : le s9 de
+`exchange/WIP-more-edge-probe-box-real-s9.mjs`, à prendre dans `test/box-real.mjs`. Avec son bras. Nommé dans `STATUS.md`, NEXT.

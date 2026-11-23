@@ -226,10 +226,12 @@ export function edgeLegs(wk) {
 		const flickF = before.replace("\x1b[4;20H", "\x1b[3;3H")
 		const endv = scr("out", up, "  " + N.slice(168, 224), "  " + N.slice(224, 280), "  " + N.slice(280), R) + `\x1b[?25h\x1b[5;${3 + N.slice(280).length}H\x1b[?12h\n`
 		const empty = scr("out", R, "❯ ", R) + "\x1b[?25h\x1b[3;3H\x1b[?12h\n"
-		const keys = []; let after = 0
-		const e = wk.eraseOwn(() => keys.includes("\x15") ? read(empty) : !keys.length ? read(before) : read(++after === 1 ? flickF : after === 2 ? before : endv),
-			(t) => { keys.push(t); return { status: 0, stderr: "" } }, (t, st) => !!wk.busText(t, { hidden: wk.mayHide(st) }), { pressMs: 1, answerMs: 200 })
-		legs.lineFlickerIsNoAnswer = e.erased === true && keys[0] === "\x05" && keys.includes("\x15") }
+		// beside its control, the same frames without the flicker (the fourth review: the variable is the flicker, nothing else)
+		const ring = (flicker) => { const keys = []; let after = 0
+			const e = wk.eraseOwn(() => keys.includes("\x15") ? read(empty) : !keys.length ? read(before) : read(++after === 1 && flicker ? flickF : after <= 2 ? before : endv),
+				(t) => { keys.push(t); return { status: 0, stderr: "" } }, (t, st) => !!wk.busText(t, { hidden: wk.mayHide(st) }), { pressMs: 1, answerMs: 200 })
+			return e.erased === true && keys[0] === "\x05" && keys.includes("\x15") }
+		legs.lineFlickerIsNoAnswer = ring(true) && ring(false) }
 	// THE ENTER ALONE never on a box whose END an edge says is hidden - beside its control, the same whole bell, its end in view
 	const enterAlone = (lower) => { const root = mkdtempSync(join(tmpdir(), "comm-edge-legs-")), keys = []
 		try {
