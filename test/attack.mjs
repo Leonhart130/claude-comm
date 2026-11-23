@@ -6853,6 +6853,23 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		(Cap.up ? ["capRing", "capLeft", "capWords", "capEaten", "capEatenAbove", "capFrozen", "capFrozenLate", "capEatenMain", "capDialogEmptied"].map((k) => `; ${k}: ${JSON.stringify(Cap.keys(k).replaceAll(N, "<bell>")).slice(0, 44)} (${(rr125(k).why || "rung").slice(0, 60)})`).join("") + `; capEb: exit ${r125.capEb && r125.capEb.code}, ${JSON.stringify((r125.capEb && r125.capEb.out) || "").slice(0, 80)}` : ""))
 }
 
+// A128 — AN EDGE THAT SAYS HOW MANY LINES IT HIDES. Claude Code 2.1.330 writes `↑ 4 more` into the box's top edge and drops the `❯`
+// under it, `↓ 4 more` into the lower one; the reader found no box, so a bell typed into an idle agent was never sent and never seen
+// again to erase - five field agents in two hours, 11-22/23, the owner the first to see it (work's 84-89, FINDINGS.md#more-edge).
+// The legs are test/edge-legs.mjs: the screens 2.1.330 drew, byte for byte; one fake box in either form through the real
+// typeAndProve and eraseOwn, the old form the positive control; what the fix must not accept. Proved red: the release before the
+// fix reddens 13 of 20 legs and none of the old form's; nine mutants of the fix, each killed by the leg named for its property.
+{
+	const wk128 = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
+	const { edgeLegs } = await import(pathToFileURL(join(PKG, "test", "edge-legs.mjs")).href)
+	let legs128 = {}, threw128 = null
+	try { legs128 = edgeLegs(wk128) } catch (e) { threw128 = e }
+	const n128 = Object.keys(legs128).length
+	check("A128 an edge that says how many lines it hides (2.1.330) is read as the box's: a bell left there is the bus's own, erased, rung on its start; words above it kept; no arrow outside a rule, nor on the wrong edge, makes a box",
+		!threw128 && n128 >= 20 && Object.values(legs128).every(Boolean),
+		`${threw128 ? `ITS LEGS THREW: ${String(threw128.message).slice(0, 80)}; ` : ""}${n128} legs; ` + Object.entries(legs128).filter(([, v]) => !v).map(([k]) => `${k}=false`).join("; "))
+}
+
 // A119 - A123: WHO MAY OPEN AND CLOSE, UNDER WHAT ROOM, AND A CLOSED AGENT REOPENED BY ITS MAIL. Work's leader, 11-08 (letters 38, 44, 48): nothing checked who launches,
 // a stuck expert held 329 MB until the owner closed it by hand, 13 chiefs reopened by hand for one Monday. The sessions here are what a session is to these tools: a process
 // named `claude`, in the agent's folder, with NO `claude` above it (an orphan, or a suite run from a session would make every one a sub-session), running jobs like the bench.

@@ -568,6 +568,13 @@ const isRule = (l) => /^─{10,}\s*$/.test(plain(l).trim())
 // a field's relay refused twice on 10-26 at a box empty and at rest (FINDINGS.md#relay, 2.1.310). The lower edge was
 // measured untitled, so only the top accepts a title. A96
 const isTopRule = (l) => isRule(l) || /^─{10,} .*\S ─+$/.test(plain(l).trim())
+// AN EDGE THAT SAYS HOW MANY LINES IT HIDES - Claude Code 2.1.330 (measured 11-23, real sessions, a 51x13 pane, named and not): a
+// box that hides lines writes the count INTO its edge, dim: `─── ↑ 4 more ───…` on top (a named session's title after it,
+// `─── ↑ 4 more ──── name ─`), `─── ↓ 4 more ───…` at the bottom - and the first row shown under a `↑` carries no `❯`: the `❯`
+// stands on line 1, out of view. Before 2.1.330 an edge was a bare rule and the `❯` stood on the first row shown. Read without
+// this, every box hiding its start was "no input box on screen": no Enter after a bell or a relay's prompt, and no later look
+// ever saw the text to erase or submit it - left in five field agents' boxes in one night (work's 84-89, `FINDINGS.md#more-edge`)
+const moreIn = (l, arrow) => { const m = new RegExp(`^─{2,} ${arrow} (\\d+) more ─{2,}${arrow === "↑" ? "(?: .*\\S ─+)?" : ""}$`).exec(plain(l).trim()); return m ? Number(m[1]) : 0 }
 /** { ok: true } when the screen shows Claude Code's input box at the bottom, empty; else { ok: false, why }. */
 // THE CURSOR, kitten @ get-text --add-cursor: `\e[?25h\e[ROW;COLH` after the text, the same picture, then a blink or shape setting in
 // one form or another. Claude Code puts the terminal's cursor where its input cursor is (measured 2.1.325, a pane 205 wide: the bell
@@ -589,12 +596,17 @@ export function promptAtRest(screen) {
 	const rowsOf = split.map((l) => marked ? Math.max(1, (l.match(/\r/g) || []).length) : 1)
 	const lines = split.map((l) => l.replace(/\r/g, ""))
 	while (lines.length && !plain(lines[lines.length - 1]).trim()) lines.pop()
-	let top = -1
-	for (let i = lines.length - 1; i > 0; i--) if (/^❯[  ]/.test(plain(lines[i])) || plain(lines[i]) === "❯") { if (isTopRule(lines[i - 1])) { top = i; break } }
+	let top = -1, above = 0
+	for (let i = lines.length - 1; i > 0; i--) {
+		if ((/^❯[  ]/.test(plain(lines[i])) || plain(lines[i]) === "❯") && isTopRule(lines[i - 1])) { top = i; break }
+		if ((above = moreIn(lines[i - 1], "↑"))) { top = i; break }
+	}
 	if (top < 0) return { ok: false, why: "no input box on screen (a dialog, a menu, or not Claude Code's prompt)" }
-	let bottom = -1
-	for (let j = top + 1; j < lines.length; j++) if (isRule(lines[j])) { bottom = j; break }
+	let bottom = -1, belowHidden = 0
+	for (let j = top + 1; j < lines.length; j++) if (isRule(lines[j]) || (belowHidden = moreIn(lines[j], "↓"))) { bottom = j; break }
 	if (bottom < 0) return { ok: false, why: "the input box has no lower edge on screen" }
+	// what the edges SAY is hidden, and only when they say it: an edge without a count (before 2.1.330) proves nothing either way
+	const hid = { ...(above ? { hiddenAbove: above } : {}), ...(belowHidden ? { hiddenBelow: belowHidden } : {}) }
 	// THE AGENTS' FOOTER IS NOT A DIALOG. Sub-agents running or just returned draw, under the two status lines, a blank, `● main`
 	// and one `◯ <type>  <what>` each (a field's expert, 11-06, read off its screen), `↓ 2 more` past five (a real session, 2.1.319,
 	// test/box-real.mjs s7): with 3 or more the count below passed 6 and an expert with designers at work could be neither relayed
@@ -618,17 +630,19 @@ export function promptAtRest(screen) {
 	// eaten); UNDEFINED when hidden, or on a screen read WITHOUT wrap markers - kitty joins soft-wrapped rows, a stale wrap flag too, so
 	// without them the row count runs short and could read true (the twentieth review). Undefined: the guesses decide.
 	const topRow = 1 + rowsOf.slice(0, top).reduce((a, b) => a + b, 0)
-	const cursorAtStart = !marked || !cursor || !cursor.visible ? undefined : cursor.row === topRow && cursor.col === 3
+	// an edge saying lines are hidden ABOVE puts the start out of view: no cell on screen is it
+	const cursorAtStart = !marked || !cursor || !cursor.visible ? undefined : !above && cursor.row === topRow && cursor.col === 3
 	// `blank`: how many of those rows are blank (a cursor line) - what an erase may take with each press (eraseOwn)
 	const blank = [rest, ...lines.slice(top + 1, bottom)].filter((l) => !plain(l).trim()).length
-	for (let j = top + 1; j < bottom; j++) if (plain(lines[j]).trim()) return { ok: false, typed: true, text, rows, blank, firstBlank, cursorAtStart, why: "the input holds more than one line of text" }
+	for (let j = top + 1; j < bottom; j++) if (plain(lines[j]).trim()) return { ok: false, typed: true, text, rows, blank, firstBlank, cursorAtStart, ...hid, why: "the input holds more than one line of text" }
 	// An empty box is ONE line. Blank lines that fill it are a draft's (Shift+Enter), and in a box that hides its start the draft's
 	// words may be above them: the review of #hidden-head typed a bell under one and the bell's end, in view, took its Enter.
-	if (rows > 1 && !plain(rest).trim()) return { ok: false, typed: true, text: "", rows, why: "the input box shows only blank lines: a draft's, whose words may be above them" }
+	// (an edge that says lines are hidden is never an empty box, whatever its rows show)
+	if ((rows > 1 || above) && !plain(rest).trim()) return { ok: false, typed: true, text: "", rows, ...hid, why: "the input box shows only blank lines: a draft's, whose words may be above them" }
 	if (!plain(rest).trim()) return { ok: true }
 	// a placeholder: the text after the mark starts DIM (SGR parameter 2), and is the only text there
-	if (/^\x1b\[(?:[0-9:]*;)*2(?:;[0-9:]*)*m/.test(rest)) return { ok: true, placeholder: plain(rest).trim().slice(0, 60) }
-	return { ok: false, typed: true, text, rows, blank, cursorAtStart, why: `somebody's text is on the input line: "${plain(rest).trim().slice(0, 40)}"` }
+	if (!above && /^\x1b\[(?:[0-9:]*;)*2(?:;[0-9:]*)*m/.test(rest)) return { ok: true, placeholder: plain(rest).trim().slice(0, 60) }
+	return { ok: false, typed: true, text, rows, blank, cursorAtStart, ...hid, why: `somebody's text is on the input line: "${plain(rest).trim().slice(0, 40)}"` }
 }
 
 /** promptAtRest on the window's screen, read now. A screen that cannot be read is NOT at rest. */
@@ -663,7 +677,8 @@ const HIDES_FROM = 3
 const ANSWER_MS = 5000, LANDING_MS = 3500   // 5 s: twice the slowest redraw measured (2.5 s); a stall is ended, not guessed
 const ERASE_MAX_MS = 35_000                  // an erase is this plus two waits at most: two, and a bell's typing, fit in the hold (HOLD_MAX_MS, 120 s)
 /** May this reading (promptAtRest's) be the last lines of a longer text? */
-export const mayHide = (s) => !!s && s.typed === true && s.rows >= HIDES_FROM
+// or fewer rows under an edge that SAYS lines are hidden above (2.1.330): what it shows is the end, never all of it
+export const mayHide = (s) => !!s && s.typed === true && (s.rows >= HIDES_FROM || s.hiddenAbove > 0)
 /** Does the reading show all of `want` - or, in a box that may hide its start, its end, CUT_MIN characters or more? relay.mjs's too. */
 export const shows = (s, want) => !!s && s.typed === true && (sameText(s.text, want) ||
 	(mayHide(s) && squash(s.text).length >= CUT_MIN && squash(want).endsWith(squash(s.text))))

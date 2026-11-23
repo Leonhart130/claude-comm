@@ -5622,3 +5622,47 @@ window geometry run without a resize from now on.
 **Named, not fixed.** The bench still opens at a remembered size: a tiny one (under ~65 columns or ~10 lines) would
 redden the same two keys in `stack` too, and A121's detail now says the size it ran at. Other arms that open panes beside
 the bench now get the whole bench where they had a grid cell: three full suites in `stack`, 126 of 126 each.
+
+## `#more-edge` — 2.1.330 wrote the hidden count into the box's edge, and every reader lost the box (2026-11-23, work's 84-89)
+
+**The field.** 11-22 01h58 → 11-23 01h45, work: a bell, or a relay's first prompt, left typed in an idle agent's box with no
+Enter - `developpeur-sites` 87 min, then `chef-ventes` (three times), `video` (twice, after a relay's `/clear`), `comptable`,
+`juridique` (twice): five agents, the owner the first to see it twice ("Il y a trois textes qui sont bloqués"). Work's leader
+pressed Enter by hand each time (allowed by the owner, R1060). `wake.mjs` answered "not rung, its input is not at rest: no
+input box on screen" on a screen that showed the box with the bell in it; the relay "no box was seen within 20 s (a dialog?)".
+Six letters, 84-89, over 25 h with no session here to read them.
+
+**What moved, measured** (`exchange/WIP-more-edge-probe-*`, 11-23, a real 2.1.330 session, Haiku, a 51x13 pane of one minimized window):
+Claude Code 2.1.330 (installed 11-21 17:49) draws a box that hides lines with the count IN its edge, dim:
+`─── ↑ 4 more ───…` on top - a named session's title after it, `─── ↑ 4 more ──── probe-nom ─` - and `─── ↓ 4 more ───…`
+at the bottom after a Ctrl+A. The row under a `↑` has **no `❯`**: it stands on line 1, out of view. Before (2.1.323-.325,
+`#hidden-head`) an edge was a bare rule and the `❯` stood on the first row shown. `promptAtRest` looks for a `❯` row under a
+top edge: with a `↑` there is none, so "no input box"; after a Ctrl+A the `↓` edge is no rule, so "no lower edge". Every
+reader then refuses: `typeAndProve` presses no Enter on a box it never saw (its rule: never without seeing it), and the next
+look - the one that erases the bus's own text - sees no box either. The bell stays until a person comes.
+
+**The fix** (`bin/wake.mjs`, the one reader every tool uses - wake, relay, close, the exchange bell): an edge carrying
+`↑ N more` is a top edge and the row under it the first shown; `↓ N more` is a lower edge (only the top takes a title, as
+measured). The counts are reported (`hiddenAbove`, `hiddenBelow`) only when an edge says them. Under a `↑`: never an empty box,
+never a placeholder, the cursor never "at the start" (the start is not on screen), and `mayHide` holds whatever the rows. The
+guesses of `#hidden-head` stay: a session started before 2.1.330 still draws the old box, and a bare edge proves nothing.
+**Measured on the real box, one variable moved (the reader's code):** fixed - the left bell read as the bus's own (`cut`), erased
+in 7 presses, a clean bell typed, its start brought into view and proved by the cursor, Enter, taken; the release before -
+"no input box on screen", not the bus's, nothing erased: the field's state exactly.
+
+**The arm, A128** (`test/edge-legs.mjs`, pure): the screens 2.1.330 drew, byte for byte (`test/edge-screens.mjs`); one fake box
+that draws either form through the real `typeAndProve` and `eraseOwn` - the old form its positive control; what the fix must not
+accept. **Red on the release before:** 13 of 20 legs, none of the old form's. **Nine mutants of the fix**, each killed by the leg
+named for its property (an arrow on the wrong edge, an arrow outside a rule, the cursor under a `↑`, blank and dim rows under a
+`↑`, `mayHide` blind to it, the counts unreported, the title after the count).
+
+🔴 **The world told me on 11-21 and I read it as the bench** (`#bench-geometry`): that boot's red came the day 2.1.330 arrived,
+and its entry says so in its second sentence - and I triaged the size of the bench, rightly, without asking what else 2.1.330
+changed. A121 runs no Claude Code; `test/box-real.mjs` does, and is "reported, never gated" - not run since. **A new Claude Code
+version is a change in the world every screen reader depends on**: named, the control is a boot row that says when the installed
+version is newer than the last real-box measurement (NEXT).
+
+**Not verified.** A box wider than 51 columns, or taller than 13 rows, on 2.1.330 (the form is the same code path; not measured).
+A `↑` and a `↓` on the same box at once (a long text with the cursor in its middle) - read as a box whose start is hidden, which
+is what it is; not drawn here. Whether 2.1.330 still caps the box at 3 rows in a small pane (it did at 51x13). The relay's
+first-prompt path end to end on 2.1.330: through the same reader, not run.
