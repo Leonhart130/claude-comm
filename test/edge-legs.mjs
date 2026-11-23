@@ -55,12 +55,74 @@ export function edgeLegs(wk) {
 	const theirs = eraseMiddle(["need to know whether it is still waiting, `comm", "inbox` tells you and consumes nothing.", "merci, je regarde ce que tu dis"])
 	const ours = eraseMiddle(["boundary, which may not be this one. If you", "need to know whether it is still waiting, `comm", "inbox` tells you and consumes nothing."])
 	legs.realMiddleEndJudgedFirst = theirs.keys.join("|") === "\x05" && theirs.e.erased === false && ours.keys[0] === "\x05" && ours.keys.includes("\x15")
-	// lines STILL hidden below after the Ctrl+E (a text with a newline: Ctrl+E ends one line): a draft's, left alone - and said so, not
-	// called a stall ("does not answer its keys" sends its reader to the wrong place)
-	{ const keys = []
-		const e = wk.eraseOwn(() => read(SC.middle.replace("↓ 3 more", keys.length ? "↓ 2 more" : "↓ 3 more").replace("↑ 8 more", keys.length ? "↑ 9 more" : "↑ 8 more")),
-			(t) => { keys.push(t); return { status: 0, stderr: "" } }, (t, s) => !!wk.busText(t, { hidden: wk.mayHide(s) }), { pressMs: 1, answerMs: 30 })
-		legs.realMiddleStillHiddenIsLeft = keys.join("|") === "\x05" && e.erased === false && !e.stalled && /still hidden below/.test(e.why || "") }
+	// ── A BOX OF LOGICAL LINES (the second review of #more-edge: its model, taken whole) ──
+	// Ctrl+E ends ONE logical line, Ctrl+A starts one, Ctrl+U takes from the cursor's row start to the cursor; the view keeps the
+	// cursor's row in the middle, clamped (2.1.330's `getViewportStartLine`, read in its binary by the review). A model, not a capture:
+	// it carries what the real screens above cannot, a cursor inside a text of several lines. `looks`: the watcher's looks, one after another.
+	const LW = 60
+	const lineBox = ({ text, off, width = 56, cap = 3, alt = true }) => {
+		const bx = { text, off, keys: [] }
+		const rowsOf = () => { const rows = []; let base = 0; for (const l of bx.text.split("\n")) { if (!l.length) rows.push({ s: base, e: base }); for (let i = 0; i < l.length; i += width) rows.push({ s: base + i, e: base + Math.min(l.length, i + width) }); base += l.length + 1 } return rows }
+		const curRow = (rows) => { let r = 0; rows.forEach((x, i) => { if (bx.off >= x.s && bx.off <= x.e) r = i }); return r }
+		bx.screen = () => {
+			if (!bx.text) return ["out", "─".repeat(LW), "❯ \x1b[22;2mTry \"x\"\x1b[22m", "─".repeat(LW)].map((l) => l + "\r").join("\n") + "\x1b[?25h\x1b[3;3H\x1b[?12h\n"
+			const rows = rowsOf(), n = rows.length, cr = curRow(rows), c = Math.min(cap, n), start = Math.max(0, Math.min(cr - Math.floor(c / 2), n - c))
+			const edge = (arrow, k) => k ? `─── ${arrow} ${k} more ${"─".repeat(LW - 10 - String(k).length)}` : "─".repeat(LW)
+			const shown = rows.slice(start, start + c).map((x, i) => (start === 0 && i === 0 ? "❯ " : "  ") + bx.text.slice(x.s, x.e))
+			return ["out", edge("↑", start), ...shown, edge("↓", n - start - c)].map((l) => l + "\r").join("\n") + `\x1b[?25h\x1b[${3 + cr - start};${3 + bx.off - rows[cr].s}H\x1b[?12h\n`
+		}
+		bx.read = () => wk.cursorCounts(wk.promptAtRest(bx.screen()), alt)
+		bx.send = (t) => { bx.keys.push(t); const rows = rowsOf(), cr = rows[curRow(rows)], nl = bx.text.indexOf("\n", bx.off), le = nl < 0 ? bx.text.length : nl
+			if (t === "\x05") bx.off = le; else if (t === "\x01") bx.off = bx.text.lastIndexOf("\n", bx.off - 1) + 1
+			else if (t === "\x15") { bx.text = bx.text.slice(0, cr.s) + bx.text.slice(bx.off); bx.off = cr.s }
+			return { status: 0, stderr: "" } }
+		return bx
+	}
+	const looks = (bx, k) => { const out = []; for (let i = 0; i < k; i++) { const r0 = bx.read(); out.push(own(r0) ? wk.eraseOwn(bx.read, bx.send, (t, s) => !!wk.busText(t, { hidden: wk.mayHide(s) }), { pressMs: 1, answerMs: 40 }) : { notOurs: true }) } return out }
+	const untouched = (bx, text) => !bx.keys.includes("\x15") && bx.text === text
+	// a bell, a blank line, a person's line - the cursor left at the start (a hook killed after its Ctrl+A): look after look, no press
+	// and NEVER "stalled" - its Ctrl+E ends the bell's line and the rest stays below (the review's S1; cursor counted and not)
+	for (const alt of [true, false]) {
+		const t = N + "\n\nmerci, je regarde", bx = lineBox({ text: t, off: 0, alt }), r = looks(bx, 2)
+		legs[`lineBellThenWordsNoStall${alt ? "" : "Uncounted"}`] = untouched(bx, t) && r.every((x) => x.erased !== true && !x.stalled)
+	}
+	// a person's words after the bell on its line, the cursor moved up into the bell: one Ctrl+E, the end read, left alone (S2)
+	for (const alt of [true, false]) {
+		const t = N + " wait, do not send this yet", bx = lineBox({ text: t, off: 130, alt }), [r] = looks(bx, 1)
+		// (split: the property apart from the reading - a reader that saw no box keeps the words too, and must not redden "kept")
+		legs[`lineWordsAfterTheBellKept${alt ? "" : "Uncounted"}`] = untouched(bx, t) && r.erased !== true
+		legs[`lineWordsAfterTheBellEndReadFirst${alt ? "" : "Uncounted"}`] = bx.keys.join("|") === "\x05"
+	}
+	// its control: the bell alone, the cursor inside it, not counted - erased (S3)
+	{ const bx = lineBox({ text: N, off: 130, alt: false }), [r] = looks(bx, 1); legs.lineBellAloneErased = r.erased === true && bx.text === "" }
+	// ONE line hidden below - a person's - and the cursor inside the bell: the end first, no Ctrl+U before it was read
+	{ const t = N + "\nmerci", bx = lineBox({ text: t, off: 234 }), first = bx.read(), [r] = looks(bx, 1)
+		legs.lineOneHiddenBelowIsReadFirst = first.hiddenBelow === 1 && bx.keys[0] === "\x05" && untouched(bx, t) && r.erased === false }
+	// ONE line still hidden after the Ctrl+E (two bells, a newline between - all of it the bus's as far as it shows): left alone, not
+	// pressed into an end never read, and not called stalled on the next look either
+	{ const t = N + "\n" + N.slice(0, 100), bx = lineBox({ text: t, off: 0 }), r = looks(bx, 2)
+		// (and ONE Ctrl+E a look, no more: each one moves the cursor of whoever is writing there)
+		legs.lineOneStillHiddenIsLeft = untouched(bx, t) && r.every((x) => x.erased !== true && !x.stalled) && bx.keys.join("|") === "\x05|\x05" }
+	// the cursor at the start of a text ALL in view: its Ctrl+E moves only the cursor, and that is its answer - not a stall
+	{ const bx = lineBox({ text: N.slice(0, 100), off: 0 }), [r] = looks(bx, 1); legs.lineCursorOnlyAnswerIsNoStall = bx.read().ok === true && r.erased === true && !r.stalled }
+	// A COUNT DRAWN A FRAME AFTER ITS ROWS (the second review of #more-edge, its model taken whole): each key lands 150 ms after the one
+	// before, and for 100 ms after it lands the top edge still shows the count from before. A person's line hidden above the bell. The
+	// count is no press landed: the line is kept - beside its control, the count drawn with its rows
+	const lateCount = (gap) => {
+		const Wd = 56, RR = "─".repeat(70), mine = "please keep this line, it is mine, do not touch it now.."
+		const lb = { lines: wrapAt(mine + N, Wd), queue: [], lastAt: -1e9, stale: 0 }
+		const settle = (now) => { while (lb.queue.length && lb.queue[0].at <= now) { const k = lb.queue.shift(); lb.stale = Math.max(0, lb.lines.length - 3); if (k.t === "\x15") lb.lines.pop(); lb.lastAt = k.at } }
+		const screen = () => { const now = Date.now(); settle(now)
+			if (!lb.lines.length) return ["out", RR, "❯ \x1b[22;2mTry \"x\"\x1b[22m", RR].map((l) => l + "\r").join("\n") + "\x1b[?25h\x1b[3;3H\x1b[?12h\n"
+			const n = lb.lines.length, up = Math.max(0, n - 3), shown = lb.lines.slice(-3), count = now - lb.lastAt < gap ? lb.stale : up
+			const top = count ? `─── ↑ ${count} more ${"─".repeat(56)}` : RR
+			return ["out", top, ...shown.map((x, i) => (i === 0 && !count ? "❯ " : "  ") + x), RR].map((l) => l + "\r").join("\n") + `\x1b[?25h\x1b[${2 + shown.length};${3 + shown.at(-1).length}H\x1b[?12h\n` }
+		const send = (t) => { const last = lb.queue.length ? lb.queue.at(-1).at : Math.max(Date.now(), lb.lastAt); lb.queue.push({ t, at: Math.max(Date.now(), last) + 150 }); return { status: 0 } }
+		wk.eraseOwn(() => read(screen()), send, (t, s) => !!wk.busText(t, { hidden: wk.mayHide(s) }), { pressMs: 1, answerMs: 120 })
+		for (const until = Date.now() + 3000; lb.queue.length && Date.now() < until; ) settle(Date.now())   // every queued key lands
+		return lb.lines.join("").startsWith(mine)
+	}
+	legs.lateCountFrameTakesNoLine = lateCount(100) && lateCount(0)
 	// control: the same session's empty box is at rest before the fix and after
 	legs.realEmptyAtRest = read(SC.empty).ok === true && read(SC.namedEmpty).ok === true
 	// ── one fake box, either form ──

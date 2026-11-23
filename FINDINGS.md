@@ -5655,19 +5655,26 @@ cursor, Enter, taken; the release before - "no input box on screen", not the bus
 waiting, a hook's ring on a real session whose box hides its start): fixed - the hook leaves it to the ring that keeps looking,
 which erases it and rings once, the box empty, in 7 s; the release before - "no input box on screen", nothing for 60 s.
 
-**Its adversarial review** (one round, on the commit before this text, pure harnesses on a copy): two defects CONFIRMED, both
+**Its adversarial review, two rounds** (pure harnesses on a copy of each commit). **Round 1:** two defects CONFIRMED, both
 regressions of the first fix against the release before. (1) `moreIn` trimmed the line, so an INDENTED `─── ↑ N more ───` - a
 2.1.330 capture pasted in the owner's draft, or quoted in a transcript above a bash prompt or a dialog - was a top edge: the
 draft's lines read as the bus's and an erase took 3 of them (no Enter in any case). (2) An empty row over a `↓` edge read
 "empty". And arm weaknesses: 6 mutants survived every leg - a one-digit count among them, the field's defect again at `↑ 12
 more` - one leg reddened for a side variable, and my "13 of 20" was 11 (LESSONS form G: a number cited, not re-counted).
-Plausible, now closed: an eraser that pressed Ctrl+U at a cursor inside the text (`↑` and `↓` at once: the review's harness D),
-and `startOf` read under a `↑` where the cursor does not count. **The arm now** (A128, `test/edge-legs.mjs`, pure, 36 legs; the
-real screens byte for byte in `test/edge-screens.mjs`, `↑ 11 more` and the cursor-inside screen among them): one fake box that
-draws either form through the real `typeAndProve` and `eraseOwn` - the old form its positive control; `wakeAgent` on a fake
-window for the Enter alone; what the fix must not accept. **Red:** the release before, 18 of 36, none of the old form's; the
-fix before its review, 7 - each a defect the review measured. **24 mutants** (`exchange/WIP-more-edge-probe-mutants2.mjs`: 9 of
-mine, the review's 7 survivors, one per review fix), each killed by the leg named for its property.
+Closed with them: an eraser pressing Ctrl+U at a cursor inside the text (`↑` and `↓` at once), `startOf` read under a `↑`.
+**Round 2, on that round's own patch** (attack the recent fix): (3) the counts I had put into the eraser's comparison made a
+count drawn a frame after its rows a "press landed" - in its model 8 Ctrl+U and a person's line taken, against 6 and the line
+kept without them; they bought nothing measured, and the one leg that needed them ran on a real screen I had EDITED, which the
+fixtures file forbids: removed, both. (4) The new `↓` path called a draft of several lines "stalled, does not answer its keys"
+from its second look on (a Ctrl+E already at the end of its line moves nothing): never a stall now, a pending Ctrl+E only moves
+a cursor. Its 7 mutants that survived: legs for 6, one equivalent in every reachable state (`toEnd` asked to wait on the cursor
+on the `↓` path: it answers the same), named here. **The arm now** (A128, `test/edge-legs.mjs`, pure, 46 legs, 2.7 s, stable 5
+runs in 5): the real screens byte for byte (`test/edge-screens.mjs`, `↑ 11 more` and the cursor-inside screen among them); one
+fake box in either form through the real `typeAndProve` and `eraseOwn`, the old form its positive control; the review's box of
+logical lines and its late-count frame, taken whole; `wakeAgent` on a fake window for the Enter alone. **Red:** the release
+before, 22 of 46, none of the old form's; the first fix 15; round 1's patch 4 - each a defect a review measured. **29 mutants**
+(`exchange/WIP-more-edge-probe-mutants2.mjs`): 28 killed, each by the leg named for its property, 1 equivalent. The real box and
+s9 end to end pass on the final bytes.
 
 🔴 **The world told me on 11-21 and I read it as the bench** (`#bench-geometry`): that boot's red came the day 2.1.330 arrived,
 and its entry says so in its second sentence - and I triaged the size of the bench, rightly, without asking what else 2.1.330
@@ -5677,9 +5684,9 @@ version is newer than the last real-box measurement (NEXT).
 
 **Not verified.** A box wider than 51 columns or taller than 13 rows on 2.1.330 (the same code path; not measured). Whether
 2.1.330 keeps the 3-row floor in every pane (it did at 51x13). The relay's first prompt end to end on 2.1.330 (the same reader;
-read by the review, not run). Real 2.1.330 dialogs and bash mode beside an indented edge (the review's shapes are synthetic). A
-Ctrl+E that only moves the cursor in a view that does not change: no answer seen, so a stall is said - safe (nothing erased),
-its word wrong (a cursor is not in the comparison on purpose: a flickering one was taken for a press, the twenty-sixth review of
-`#hidden-head`). **`test/box-real.mjs` s1, s2, s8 are red on the release before too** (11-23, 2.1.330): s1 and s8 check a hook's
+read by the review, not run). Real 2.1.330 dialogs and bash mode beside an indented edge (the review's shapes are synthetic). Two
+bells with a newline between and the cursor left at their start: left alone, look after look, until a person comes (Ctrl+E ends
+one line; another key to reach the end was not measured). The column-0 rule: a Claude Code that drew its box with a left margin
+would lose every counted edge again (all 8 real screens are at column 0). **`test/box-real.mjs` s1, s2, s8 are red on the release before too** (11-23, 2.1.330): s1 and s8 check a hook's
 ring on two whole bells in a box of 4 rows, which `#hidden-head` leaves to the ring that keeps looking; s2 waits 12 s for that
 ring - stale expectations, or a defect in the ring that keeps looking: not triaged (NEXT).

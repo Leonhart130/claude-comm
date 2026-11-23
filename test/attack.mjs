@@ -6858,9 +6858,10 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 // again to erase - five field agents in two hours, 11-22/23, the owner the first to see it (work's 84-89, FINDINGS.md#more-edge).
 // The legs are test/edge-legs.mjs: the screens 2.1.330 drew, byte for byte; one fake box in either form through the real
 // typeAndProve and eraseOwn, the old form the positive control; what the fix must not accept, the review's cases among them (an
-// indented edge, a `↓` over an empty row, the cursor inside the text, the Enter alone over a hidden end). Proved red: the release
-// before the fix reddens 18 of 36 legs and none of the old form's; the fix before its review, 7 - each a defect the review measured;
-// 24 mutants of the fix (9 of mine, the review's 7 survivors, one per review fix), each killed by the leg named for its property.
+// indented edge, a `↓` over an empty row, the cursor inside the text, the Enter alone over a hidden end, a box of logical lines, a
+// count drawn a frame late). Proved red: the release before the fix reddens 22 of 46 legs and none of the old form's; the first fix
+// 15, the first round of review 4 - each a defect a review measured; 29 mutants, 28 each killed by the leg named for its property,
+// one equivalent and named (FINDINGS.md#more-edge).
 {
 	const wk128 = await import(pathToFileURL(join(PKG, "bin", "wake.mjs")).href)
 	const { edgeLegs } = await import(pathToFileURL(join(PKG, "test", "edge-legs.mjs")).href)
@@ -6868,7 +6869,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 	try { legs128 = edgeLegs(wk128) } catch (e) { threw128 = e }
 	const n128 = Object.keys(legs128).length
 	check("A128 an edge that says how many lines it hides (2.1.330) is read as the box's: a bell left there is the bus's own, erased, rung on its start; words above it kept; no arrow outside a rule, nor on the wrong edge, makes a box",
-		!threw128 && n128 >= 36 && Object.values(legs128).every(Boolean),
+		!threw128 && n128 >= 46 && Object.values(legs128).every(Boolean),
 		`${threw128 ? `ITS LEGS THREW: ${String(threw128.message).slice(0, 80)}; ` : ""}${n128} legs; ` + Object.entries(legs128).filter(([, v]) => !v).map(([k]) => `${k}=false`).join("; "))
 }
 

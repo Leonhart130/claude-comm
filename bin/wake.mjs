@@ -863,8 +863,7 @@ export function eraseOwn(read, send, isOurs, { pressMs = 150, presses = 60, own 
 	// A PRESS'S effect is its text or its rows: a cursor that flickers (hidden, then shown) is no press seen (the twenty-sixth review).
 	// THE CTRL+E's is the cursor too, KNOWN in both readings: one that only moves it is an answer, on the alternate screen - a cursor
 	// hidden in one frame is no answer (a flicker counted as one put a fourth press past a bound of three).
-	// (and what the edges SAY is hidden, 2.1.330: a Ctrl+E that changes only the counts is an answer, not a stall - the review of #more-edge)
-	const sig = (s) => `${s.ok}|${s.typed}|${s.rows}|${s.hiddenAbove || 0}|${s.hiddenBelow || 0}|${s.text}`
+	const sig = (s) => `${s.ok}|${s.typed}|${s.rows}|${s.text}`
 	// A PRESS LANDED only if the reading shows the box, emptied or changed: no box at all (a read that failed, a dialog's frame) proves
 	// nothing - it lowered the count and let the next look press on top (the thirtieth review: 8 queued against 6 rows)
 	// (emptied: only from a box that was not empty - the drain counted every empty reading as one more press, the thirty-first review)
@@ -890,6 +889,9 @@ export function eraseOwn(read, send, isOurs, { pressMs = 150, presses = 60, own 
 	// one Ctrl+E: the end brought into view, read, and judged as from the start (the fourth review) - null when nothing moved. Its answer
 	// is the text or the rows; `byCursor` (the cursor known at its start): the cursor too, read twice - a frame caught mid-render can put
 	// it anywhere (the twenty-eighth review)
+	// (the edges' counts are NOT in any comparison here: a count drawn a frame after its rows was taken for a press that landed, and a
+	// press went past the bound into a person's line - the second review of #more-edge, its model; in every box measured or modelled a
+	// count changes only with the rows it counts)
 	const toEnd = (from, byCursor) => {
 		send("\x05"); sleepSync(pressMs)
 		// (frames with no box read past, as a press's wait does - the thirty-second review; the box still gone at the end: that reading,
@@ -943,10 +945,15 @@ export function eraseOwn(read, send, isOurs, { pressMs = 150, presses = 60, own 
 		// inside the text, and what is below - somebody's words after a bell - was never read. The end first, judged before any press.
 		// Still hidden after it: lines of their own (a newline: Ctrl+E ends ONE line) - a draft's, left alone (the review of #more-edge)
 		if (prev.cursorAtStart === true || prev.hiddenBelow > 0) {
-			const e = toEnd(prev, prev.cursorAtStart === true)
+			const forEnd = prev.cursorAtStart !== true
+			const e = toEnd(prev, !forEnd)
+			// (only the `↓` path, its cursor not at the start, never says "stalled": a Ctrl+E already at the end of ITS line moves nothing,
+			// look after look - a draft of several lines, not a box asleep - and a Ctrl+E left pending only moves a cursor. Presses pending
+			// from before still make it one, through leave(): the second review of #more-edge)
+			if (!e && forEnd) return leave({ erased: false, presses: n, why: "its end is hidden below the cursor and a Ctrl+E did not bring it into view: a text of several lines - left alone" })
 			if (!e) return { erased: false, presses: n, stalled: true, pending: pending + 1, why: `the box did not answer a Ctrl+E within ${answerMs} ms: it does not answer its keys - left alone` }
 			const j = judged(e); if (j) return j
-			if (e.hiddenBelow > 0) return { erased: false, presses: n, why: "lines are still hidden below the cursor after a Ctrl+E: a text of several lines, somebody's - left alone" }
+			if (e.hiddenBelow > 0) return leave({ erased: false, presses: n, why: "lines are still hidden below the cursor after a Ctrl+E: a text of several lines, somebody's - left alone" })
 			before = squash(e.text); prev = e; continue
 		}
 		// AFTER A QUIET PRESS, AS MANY PENDING AS IT MAY TAKE BUT ONE: one Ctrl+E, the test. Seen (its cursor too): the box is awake, its
