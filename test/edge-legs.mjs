@@ -106,23 +106,31 @@ export function edgeLegs(wk) {
 	// the cursor at the start of a text ALL in view: its Ctrl+E moves only the cursor, and that is its answer - not a stall
 	{ const bx = lineBox({ text: N.slice(0, 100), off: 0 }), [r] = looks(bx, 1); legs.lineCursorOnlyAnswerIsNoStall = bx.read().ok === true && r.erased === true && !r.stalled }
 	// A COUNT DRAWN A FRAME AFTER ITS ROWS (the second review of #more-edge, its model taken whole): each key lands 150 ms after the one
-	// before, and for 100 ms after it lands the top edge still shows the count from before. A person's line hidden above the bell. The
-	// count is no press landed: the line is kept - beside its control, the count drawn with its rows
-	const lateCount = (gap) => {
+	// before, and for `gap` ms after it lands the top edge still shows the count from before. A person's line hidden above the bell. The
+	// count is no press landed: the line is kept - beside its control, the count drawn with its rows (gap 0).
+	// ON A CLOCK THAT READS ADVANCE, `perRead` ms a reading, never the machine's (the third review: on wall time the bad code passed at
+	// 60, 120, 160 and 250 ms a read - a loaded machine let it through). Every wait in eraseOwn is Date.now(): stubbed here, for this
+	// call only, so the outcome is a function of the readings alone - and run at five costs a read: the bad code (the counts in the
+	// comparison) reddens at 20, 30 and 40 ms a read, 3 runs in 3; at 60 and 90 the gap spans under two readings and it passes there.
+	const lateCount = (gap, perRead) => {
 		const Wd = 56, RR = "─".repeat(70), mine = "please keep this line, it is mine, do not touch it now.."
+		const realNow = Date.now
+		let clock = realNow.call(Date)
 		const lb = { lines: wrapAt(mine + N, Wd), queue: [], lastAt: -1e9, stale: 0 }
 		const settle = (now) => { while (lb.queue.length && lb.queue[0].at <= now) { const k = lb.queue.shift(); lb.stale = Math.max(0, lb.lines.length - 3); if (k.t === "\x15") lb.lines.pop(); lb.lastAt = k.at } }
-		const screen = () => { const now = Date.now(); settle(now)
+		const screen = () => { clock += perRead; const now = clock; settle(now)
 			if (!lb.lines.length) return ["out", RR, "❯ \x1b[22;2mTry \"x\"\x1b[22m", RR].map((l) => l + "\r").join("\n") + "\x1b[?25h\x1b[3;3H\x1b[?12h\n"
 			const n = lb.lines.length, up = Math.max(0, n - 3), shown = lb.lines.slice(-3), count = now - lb.lastAt < gap ? lb.stale : up
 			const top = count ? `─── ↑ ${count} more ${"─".repeat(56)}` : RR
 			return ["out", top, ...shown.map((x, i) => (i === 0 && !count ? "❯ " : "  ") + x), RR].map((l) => l + "\r").join("\n") + `\x1b[?25h\x1b[${2 + shown.length};${3 + shown.at(-1).length}H\x1b[?12h\n` }
-		const send = (t) => { const last = lb.queue.length ? lb.queue.at(-1).at : Math.max(Date.now(), lb.lastAt); lb.queue.push({ t, at: Math.max(Date.now(), last) + 150 }); return { status: 0 } }
-		wk.eraseOwn(() => read(screen()), send, (t, s) => !!wk.busText(t, { hidden: wk.mayHide(s) }), { pressMs: 1, answerMs: 120 })
-		for (const until = Date.now() + 3000; lb.queue.length && Date.now() < until; ) settle(Date.now())   // every queued key lands
+		const send = (t) => { const last = lb.queue.length ? lb.queue.at(-1).at : Math.max(clock, lb.lastAt); lb.queue.push({ t, at: Math.max(clock, last) + 150 }); return { status: 0 } }
+		Date.now = () => clock
+		try { wk.eraseOwn(() => read(screen()), send, (t, s) => !!wk.busText(t, { hidden: wk.mayHide(s) }), { pressMs: 1, answerMs: 120 }) }
+		finally { Date.now = realNow }
+		settle(clock + 60_000)   // every queued key lands
 		return lb.lines.join("").startsWith(mine)
 	}
-	legs.lateCountFrameTakesNoLine = lateCount(100) && lateCount(0)
+	legs.lateCountFrameTakesNoLine = [20, 30, 40, 60, 90].every((p) => lateCount(100, p) && lateCount(0, p))
 	// control: the same session's empty box is at rest before the fix and after
 	legs.realEmptyAtRest = read(SC.empty).ok === true && read(SC.namedEmpty).ok === true
 	// ── one fake box, either form ──
@@ -210,6 +218,18 @@ export function edgeLegs(wk) {
 	// under a `↑`, a reading that READS like the start is not it: no `startOf` (the cursor not counted - a window not on the alternate screen)
 	const like = wk.promptAtRest(scr("out", `─── ↑ 1 more ${"─".repeat(70)}`, ...wrapAt(N, 80).slice(0, 3).map((x) => "  " + x), R))
 	legs.narrowNoStartUnderAnArrow = like.typed === true && like.hiddenAbove === 1 && !wk.startOf(like, N)
+	// A FLICKER ON THE `↓` PATH (the third review): after its Ctrl+E, one frame shows the cursor at the start (a frame caught mid-render,
+	// the twenty-eighth review of #hidden-head), then the box unchanged, then the end. The flicker is no answer: the end is read, judged
+	// the bus's, and the look erases - it does not give the look up. By read index, not time.
+	{ const dn = `─── ↓ 3 more ${"─".repeat(70)}`, up = `─── ↑ 3 more ${"─".repeat(70)}`
+		const before = scr("out", R, "❯ " + N.slice(0, 56), "  " + N.slice(56, 112), "  " + N.slice(112, 168), dn) + "\x1b[?25h\x1b[4;20H\x1b[?12h\n"
+		const flickF = before.replace("\x1b[4;20H", "\x1b[3;3H")
+		const endv = scr("out", up, "  " + N.slice(168, 224), "  " + N.slice(224, 280), "  " + N.slice(280), R) + `\x1b[?25h\x1b[5;${3 + N.slice(280).length}H\x1b[?12h\n`
+		const empty = scr("out", R, "❯ ", R) + "\x1b[?25h\x1b[3;3H\x1b[?12h\n"
+		const keys = []; let after = 0
+		const e = wk.eraseOwn(() => keys.includes("\x15") ? read(empty) : !keys.length ? read(before) : read(++after === 1 ? flickF : after === 2 ? before : endv),
+			(t) => { keys.push(t); return { status: 0, stderr: "" } }, (t, st) => !!wk.busText(t, { hidden: wk.mayHide(st) }), { pressMs: 1, answerMs: 200 })
+		legs.lineFlickerIsNoAnswer = e.erased === true && keys[0] === "\x05" && keys.includes("\x15") }
 	// THE ENTER ALONE never on a box whose END an edge says is hidden - beside its control, the same whole bell, its end in view
 	const enterAlone = (lower) => { const root = mkdtempSync(join(tmpdir(), "comm-edge-legs-")), keys = []
 		try {

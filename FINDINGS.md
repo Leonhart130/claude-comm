@@ -5655,7 +5655,7 @@ cursor, Enter, taken; the release before - "no input box on screen", not the bus
 waiting, a hook's ring on a real session whose box hides its start): fixed - the hook leaves it to the ring that keeps looking,
 which erases it and rings once, the box empty, in 7 s; the release before - "no input box on screen", nothing for 60 s.
 
-**Its adversarial review, two rounds** (pure harnesses on a copy of each commit). **Round 1:** two defects CONFIRMED, both
+**Its adversarial review, three rounds** (pure harnesses on a copy of each commit). **Round 1:** two defects CONFIRMED, both
 regressions of the first fix against the release before. (1) `moreIn` trimmed the line, so an INDENTED `─── ↑ N more ───` - a
 2.1.330 capture pasted in the owner's draft, or quoted in a transcript above a bash prompt or a dialog - was a top edge: the
 draft's lines read as the bus's and an erase took 3 of them (no Enter in any case). (2) An empty row over a `↓` edge read
@@ -5667,13 +5667,16 @@ count drawn a frame after its rows a "press landed" - in its model 8 Ctrl+U and 
 kept without them; they bought nothing measured, and the one leg that needed them ran on a real screen I had EDITED, which the
 fixtures file forbids: removed, both. (4) The new `↓` path called a draft of several lines "stalled, does not answer its keys"
 from its second look on (a Ctrl+E already at the end of its line moves nothing): never a stall now, a pending Ctrl+E only moves
-a cursor. Its 7 mutants that survived: legs for 6, one equivalent in every reachable state (`toEnd` asked to wait on the cursor
-on the `↓` path: it answers the same), named here. **The arm now** (A128, `test/edge-legs.mjs`, pure, 46 legs, 2.7 s, stable 5
-runs in 5): the real screens byte for byte (`test/edge-screens.mjs`, `↑ 11 more` and the cursor-inside screen among them); one
+a cursor. Its 7 mutants that survived: legs for 6, and one I called equivalent. **Round 3**: that claim was false - a frame that flickers
+the cursor to the start makes it give the look up (safe, but reachable): a leg kills it now. And the late-count leg ran on wall
+time: on the bad code it was red at some read speeds and green at others, so a loaded machine could pass it. It runs now on a
+clock that readings advance (Date.now stubbed for that call), at five costs a read: the bad code red at 20, 30 and 40 ms a read,
+3 runs in 3. The never-stalled `↓` exit hides no real stall: `leave()` still makes pending presses one (measured by the review).
+**The arm now** (A128, `test/edge-legs.mjs`, pure, 47 legs, 5.9 s, stable 3 runs in 3): the real screens byte for byte (`test/edge-screens.mjs`, `↑ 11 more` and the cursor-inside screen among them); one
 fake box in either form through the real `typeAndProve` and `eraseOwn`, the old form its positive control; the review's box of
 logical lines and its late-count frame, taken whole; `wakeAgent` on a fake window for the Enter alone. **Red:** the release
-before, 22 of 46, none of the old form's; the first fix 15; round 1's patch 4 - each a defect a review measured. **29 mutants**
-(`exchange/WIP-more-edge-probe-mutants2.mjs`): 28 killed, each by the leg named for its property, 1 equivalent. The real box and
+before, 23 of 47, none of the old form's; the first fix 16; round 1's patch 4 - each a defect a review measured. **29 mutants**
+(`exchange/WIP-more-edge-probe-mutants2.mjs`): all killed, each by the leg named for its property. The real box and
 s9 end to end pass on the final bytes.
 
 🔴 **The world told me on 11-21 and I read it as the bench** (`#bench-geometry`): that boot's red came the day 2.1.330 arrived,

@@ -53,6 +53,12 @@ already have.
 
 
 
+
+## 2026-11-23.1 — bus print `f49ac0d0673d` — 2026-11-23
+
+- **A bell or a relay's prompt no longer stays typed in your box without its Enter.** Claude Code 2.1.330 changed how it draws an input box too long for its window: it writes `↑ 4 more` into the box's top edge, and `↓ 4 more` into its lower edge after a Ctrl+A. The bus did not recognise that box. It typed its text, saw no box, so pressed no Enter (it never presses Enter on a box it cannot see), and no later ring could see its text to clear it. Now it reads that box. A bell left there is recognised as the bus's own, erased, typed again, its start checked, and sent. Your own words in the box are still never sent or erased.
+- If you saw `no input box on screen` from `wake.mjs`, or `no box was seen within 20 s` from a relay, on a box that clearly held the bus's text: this was it. Nothing to do on your side. The next ring clears what is left.
+
 ## 2026-11-21.2 — bus print `992c1b90ea35` — 2026-11-21
 
 - **The project is now called Claude Toolbox.** It was named claude-comm, after its message bus, and it now holds more tools than the bus. **Nothing you type changes:** `claude-comm` stays in every path, command, setting and tag. That covers `.comm/`, `node .comm/bin/comm.mjs`, the `claude-comm` skill, `CLAUDE_COMM_AGENT`, and the `[claude-comm]` at the start of every bell and bus notice. A tool of yours that reads one of those names keeps working. Only what names the project says Claude Toolbox: titles, header comments, the skill's description, the installer's result lines, and the version notices at a session's start.
