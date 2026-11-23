@@ -45,7 +45,7 @@ fold the settled parts into the README, the carried ones into `FINDINGS.md#carri
    really shrinks; (d) the limits named in `#hidden-head`; (e) the bus's typing through `send-text --stdin`. Probes:
    `exchange/WIP-hidden-head-probe-*` (start at its `-README.md`). Work's 77: its relay passed on `.5`, 0 alerts.
 00. **`2026-11-09.1` (`#usage-gate`, its gaps there).** Work has `"refuse": true`, `"reopen"` out for the owner's pause:
-   no real reopening yet. `test/teams-real.mjs` 8/8 before changing launch, close or reopen. Suite ~410 s, ceiling 600 s.
+   no real reopening yet. `test/teams-real.mjs` 8/8 before changing launch, close or reopen. 🔴 Suite 553-581 s on 11-23 (A128 ~6 s of it), its ceiling 600 s: killed at it once at load 9 (11-23 03h2x, 123 arms run, none red; alone after, no ceiling: green in 568 s) - speed it or split it (carried C) BEFORE the next arm.
 01. **`2026-11-08.1`'s MUTANTS NOT RUN** - an evening he is inactive (his word 11-08). `node test/mutate.mjs
    exchange/WIP-box-mutants.json --jobs N` (45, + A119-A123; 3 h 30 in series, measure a suite's peak before 4 wide). A
    survivor is an arm to strengthen. Waiting from work: `chef-ventes`'s needs (after 11-22); its recount of 43 came, 3 of 3. Later (its 44):
