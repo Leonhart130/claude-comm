@@ -574,7 +574,9 @@ const isTopRule = (l) => isRule(l) || /^─{10,} .*\S ─+$/.test(plain(l).trim(
 // stands on line 1, out of view. Before 2.1.330 an edge was a bare rule and the `❯` stood on the first row shown. Read without
 // this, every box hiding its start was "no input box on screen": no Enter after a bell or a relay's prompt, and no later look
 // ever saw the text to erase or submit it - left in five field agents' boxes in one night (work's 84-89, `FINDINGS.md#more-edge`)
-const moreIn = (l, arrow) => { const m = new RegExp(`^─{2,} ${arrow} (\\d+) more ─{2,}${arrow === "↑" ? "(?: .*\\S ─+)?" : ""}$`).exec(plain(l).trim()); return m ? Number(m[1]) : 0 }
+// AT COLUMN 0, as Claude Code draws its edges: an indented one is somebody's text - a capture pasted in a draft, quoted in a
+// transcript above a dialog - and read trimmed it made the lines under it the bus's, and an erase took a person's (the review of #more-edge)
+const moreIn = (l, arrow) => { const m = new RegExp(`^─{2,} ${arrow} (\\d+) more ─{2,}${arrow === "↑" ? "(?: .*\\S ─+)?" : ""}$`).exec(plain(l).trimEnd()); return m ? Number(m[1]) : 0 }
 /** { ok: true } when the screen shows Claude Code's input box at the bottom, empty; else { ok: false, why }. */
 // THE CURSOR, kitten @ get-text --add-cursor: `\e[?25h\e[ROW;COLH` after the text, the same picture, then a blink or shape setting in
 // one form or another. Claude Code puts the terminal's cursor where its input cursor is (measured 2.1.325, a pane 205 wide: the bell
@@ -637,11 +639,11 @@ export function promptAtRest(screen) {
 	for (let j = top + 1; j < bottom; j++) if (plain(lines[j]).trim()) return { ok: false, typed: true, text, rows, blank, firstBlank, cursorAtStart, ...hid, why: "the input holds more than one line of text" }
 	// An empty box is ONE line. Blank lines that fill it are a draft's (Shift+Enter), and in a box that hides its start the draft's
 	// words may be above them: the review of #hidden-head typed a bell under one and the bell's end, in view, took its Enter.
-	// (an edge that says lines are hidden is never an empty box, whatever its rows show)
-	if ((rows > 1 || above) && !plain(rest).trim()) return { ok: false, typed: true, text: "", rows, ...hid, why: "the input box shows only blank lines: a draft's, whose words may be above them" }
+	// (an edge that says lines are hidden, above OR below, is never an empty box, whatever its rows show - the review of #more-edge)
+	if ((rows > 1 || above || belowHidden) && !plain(rest).trim()) return { ok: false, typed: true, text: "", rows, ...hid, why: "the input box shows only blank lines: a draft's, whose words may be above them" }
 	if (!plain(rest).trim()) return { ok: true }
 	// a placeholder: the text after the mark starts DIM (SGR parameter 2), and is the only text there
-	if (!above && /^\x1b\[(?:[0-9:]*;)*2(?:;[0-9:]*)*m/.test(rest)) return { ok: true, placeholder: plain(rest).trim().slice(0, 60) }
+	if (!above && !belowHidden && /^\x1b\[(?:[0-9:]*;)*2(?:;[0-9:]*)*m/.test(rest)) return { ok: true, placeholder: plain(rest).trim().slice(0, 60) }
 	return { ok: false, typed: true, text, rows, blank, cursorAtStart, ...hid, why: `somebody's text is on the input line: "${plain(rest).trim().slice(0, 40)}"` }
 }
 
@@ -683,7 +685,8 @@ export const mayHide = (s) => !!s && s.typed === true && (s.rows >= HIDES_FROM |
 export const shows = (s, want) => !!s && s.typed === true && (sameText(s.text, want) ||
 	(mayHide(s) && squash(s.text).length >= CUT_MIN && squash(want).endsWith(squash(s.text))))
 /** Does the reading show the START of `want` - CUT_MIN of it, or all of a shorter one? A box whose cursor was sent to the start. */
-export const startOf = (s, want) => { if (!s || s.typed !== true || s.firstBlank) return false; const q = squash(s.text), t = squash(want); return !!q && t.startsWith(q) && q.length >= Math.min(CUT_MIN, t.length) }
+// (never under an edge that says lines are hidden ABOVE: what it shows is not the start, whatever it reads like - the review of #more-edge)
+export const startOf = (s, want) => { if (!s || s.typed !== true || s.firstBlank || s.hiddenAbove > 0) return false; const q = squash(s.text), t = squash(want); return !!q && t.startsWith(q) && q.length >= Math.min(CUT_MIN, t.length) }
 /** Is all the reading shows a piece of `want`: its start, or - in a box that may hide its start - any slice of CUT_MIN or more? */
 export const pieceOf = (s, want) => {
 	if (!s || s.typed !== true) return false
@@ -860,7 +863,8 @@ export function eraseOwn(read, send, isOurs, { pressMs = 150, presses = 60, own 
 	// A PRESS'S effect is its text or its rows: a cursor that flickers (hidden, then shown) is no press seen (the twenty-sixth review).
 	// THE CTRL+E's is the cursor too, KNOWN in both readings: one that only moves it is an answer, on the alternate screen - a cursor
 	// hidden in one frame is no answer (a flicker counted as one put a fourth press past a bound of three).
-	const sig = (s) => `${s.ok}|${s.typed}|${s.rows}|${s.text}`
+	// (and what the edges SAY is hidden, 2.1.330: a Ctrl+E that changes only the counts is an answer, not a stall - the review of #more-edge)
+	const sig = (s) => `${s.ok}|${s.typed}|${s.rows}|${s.hiddenAbove || 0}|${s.hiddenBelow || 0}|${s.text}`
 	// A PRESS LANDED only if the reading shows the box, emptied or changed: no box at all (a read that failed, a dialog's frame) proves
 	// nothing - it lowered the count and let the next look press on top (the thirtieth review: 8 queued against 6 rows)
 	// (emptied: only from a box that was not empty - the drain counted every empty reading as one more press, the thirty-first review)
@@ -935,10 +939,14 @@ export function eraseOwn(read, send, isOurs, { pressMs = 150, presses = 60, own 
 		}
 		// THE CURSOR KNOWN AT ITS START (the alternate screen): every Ctrl+U would take nothing - the end first, no press spent. No answer:
 		// the Ctrl+E pending and the end never read - not one press after it (the twenty-eighth review: one landed at an unread end)
-		if (prev.cursorAtStart === true) {
-			const e = toEnd(prev, true)
+		// THE SAME WHEN AN EDGE SAYS LINES ARE HIDDEN BELOW (2.1.330's `↓ N more`): the cursor is not at the end, a Ctrl+U would cut
+		// inside the text, and what is below - somebody's words after a bell - was never read. The end first, judged before any press.
+		// Still hidden after it: lines of their own (a newline: Ctrl+E ends ONE line) - a draft's, left alone (the review of #more-edge)
+		if (prev.cursorAtStart === true || prev.hiddenBelow > 0) {
+			const e = toEnd(prev, prev.cursorAtStart === true)
 			if (!e) return { erased: false, presses: n, stalled: true, pending: pending + 1, why: `the box did not answer a Ctrl+E within ${answerMs} ms: it does not answer its keys - left alone` }
 			const j = judged(e); if (j) return j
+			if (e.hiddenBelow > 0) return { erased: false, presses: n, why: "lines are still hidden below the cursor after a Ctrl+E: a text of several lines, somebody's - left alone" }
 			before = squash(e.text); prev = e; continue
 		}
 		// AFTER A QUIET PRESS, AS MANY PENDING AS IT MAY TAKE BUT ONE: one Ctrl+E, the test. Seen (its cursor too): the box is awake, its
@@ -1303,7 +1311,8 @@ export function wakeAgent(root, agent, pid, { dryRun = false, wins, turn = null,
 	const own = !rest.ok && rest.typed === true ? busText(rest.text, { hidden: mayHide(rest) }) : null
 	// The Enter alone only on bells the box shows WHOLE: one that may hide its start may hide somebody's words above them.
 	// Those are erased, a line at a time, each line read as the bus's before it goes, and one clean bell follows.
-	const ownUnsent = !!own && !own.cut && !mayHide(rest)
+	// (nor on one whose END an edge says is hidden: below it may be anybody's - the review of #more-edge)
+	const ownUnsent = !!own && !own.cut && !mayHide(rest) && !(rest.hiddenBelow > 0)
 	if (quiet && !own) return quiet
 	if (!rest.ok && !own) return { agent, pid, sent: false, notAtRest: true, ...seen, ...said,
 		why: `not rung, its input is not at rest: ${rest.typed ? "text is on its input line (a person typing, or a draft left there) - never typed into" : rest.why}` }
