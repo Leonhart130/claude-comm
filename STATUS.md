@@ -78,8 +78,9 @@ fold the settled parts into the README, the carried ones into `FINDINGS.md#carri
    one. Sweeping shared `/tmp` is his.
 
 **Carried, each still open:** `FINDINGS.md#carried` - B (the registry half of #13 §1), C (tests faster), F (each
-review's named points), the older carried list. Read it before claiming any is done. A33 reddened once in two runs of
-the same bytes: not triaged. **Done:** every release in `CHANGELOG.md`.
+review's named points), the older carried list. Read it before claiming any is done. 🔴 **A33 red TWICE on unchanged bytes**, green on the next run (the 11-24 03h5x close 128/129, its rerun 129/129).
+Likely variable, unconfirmed (boot cuts its detail at 150 chars): its control `naive.won > 1` needs a race to HAPPEN.
+Triage before the next close: print its detail, run its block alone. **Done:** every release in `CHANGELOG.md`.
 
 🔴 **THE OWNER'S RULE (09-27): no name of his personal projects in this PUBLIC repo** - every field has a codename here,
 the mapping in no repo. The boot report prints REAL directory names: **never copy a `field:` row into a tracked file.** A
