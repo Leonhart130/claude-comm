@@ -64,7 +64,7 @@ const STUB = `#!/usr/bin/env node
 import { existsSync, readFileSync, readdirSync, readlinkSync, writeFileSync, statSync } from "node:fs"
 import { join, dirname, resolve, basename, relative } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
-import { spawnSync } from "node:child_process"
+import { spawnSync, spawn } from "node:child_process"
 
 let dir = resolve(dirname(fileURLToPath(import.meta.url)))
 // This stub lives at <agentRoot>/.claude/comm-hook.mjs, one per agent, so its own
@@ -241,6 +241,28 @@ if (process.argv[2] !== "session-start") {
 			spawnSync(process.execPath, [wake, "--root", projectRoot], { timeout: 10000, stdio: "ignore" })
 		}
 	} catch { /* a doorbell must never break a turn boundary */ }
+	// A RELAY WHOSE WATCHER IS GONE (work's letter 93, 2026-11-23): an expert armed its relay, the watcher died without writing
+	// a word, and the expert slept 46 min until its chief rang it - inside an idle session nobody is left to see it. So every
+	// Stop of any agent here looks: a record not relayed, not ended, armed over 30 s ago, whose pid runs no watcher. A readdir
+	// and a few small reads; only then \`relay.mjs --reap\`, detached, which checks it all again under a lock and tells.
+	// The same test as the reaper's (\`orphaned\` in relay.mjs): an agent on the roster, and the pid a watcher OF THIS RECORD - a pid
+	// recycled into another record's watcher is none (the review's F5), and a record off the roster would start a reaper for nothing.
+	try {
+		const rdir = join(projectRoot, ".comm", "relay"), relayBin = join(dirname(bus), "relay.mjs")
+		let roster = {}
+		try { roster = JSON.parse(readFileSync(join(projectRoot, ".comm", "config.json"), "utf8")).agents || {} } catch {}
+		let orphan = false
+		for (const f of readdirSync(rdir)) {
+			if (!f.endsWith(".json") || f.endsWith(".due.json") || !Object.hasOwn(roster, f.slice(0, -5))) continue
+			let r = null
+			try { r = JSON.parse(readFileSync(join(rdir, f), "utf8")) } catch { continue }
+			if (!r || r.relayed != null || r.ended_at || !(Date.now() - Date.parse(r.armed_at) > 30000)) continue
+			let c = ""
+			try { c = readFileSync(\`/proc/\${r.relay_pid}/cmdline\`, "utf8") } catch {}
+			if (!(c.includes("--after-turn") && c.includes(join(rdir, f)))) { orphan = true; break }
+		}
+		if (orphan && existsSync(relayBin)) spawn(process.execPath, [relayBin, "--reap", projectRoot], { detached: true, stdio: "ignore" }).unref()
+	} catch { /* an instrument must never break a turn boundary */ }
 	// Same rule as the session-start exit at the foot of this file, and I fixed that one
 	// first while assuming it was the only one — it is not. THE STOP PATH IS THE HOT ONE:
 	// it runs at every turn boundary, so a bus that cannot start breaks every turn until
@@ -1390,6 +1412,8 @@ function SKILL(ids, agentRoot) {
 		"instead declare what your handoff is, beside that prompt - `\"handoff\": {\"file\": \"RAPPORT.md\", \"written\": 30}` - and the",
 		`bus checks it as a guard: \`node ${B}/relay-guard.mjs\` says what is still missing. Anything that`,
 		`starts another turn first cancels it. Every step lands in \`.comm/relay/${id}.json\`; \`--dry-run\` checks it all and arms nothing.`,
+		"Exit 4: your relay armed before is past your box and relaying this window right now, so nothing was armed: this session",
+		"is being cleared and given its first prompt. If that does not come, arm again in a moment, as this turn's last act.",
 		"When to restart is yours - or your project's: an `\"at\"` beside your prompt (or under `\"*\"`) in that `\"relay\"` key, in",
 		"tokens of context. Past it you are told after a tool call of yours - never in a sub-agent you launch, whose tool calls",
 		"the hook hears too - once per 25 k (*RELAY SOON*: finish the task in hand, start",

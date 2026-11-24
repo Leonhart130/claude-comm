@@ -1,22 +1,25 @@
-# STATUS — Claude Toolbox, 2026-11-23 (sessions 4–32)
+# STATUS — Claude Toolbox, 2026-11-24 (sessions 4–33)
 
 Design and gates are in `README.md`; **this file is only what is OPEN.** Keep it short — when it grows,
 fold the settled parts into the README, the carried ones into `FINDINGS.md#carried`.
 
 ## ▶ NEXT
 
-*(2026-11-23 close: `2026-11-23.1` - Claude Code 2.1.330 writes `↑ N more` into the box's edge and the bus lost the box: seven bells left in five of work's boxes over 25 h, its letters 84-89 unread (no session here). Fixed in `promptAtRest`, three rounds of adversarial review (four defects of my own fixes) and a fourth on the arm, A128 47 legs, in the 12 trees at 03h03, letters 90 and 91 rung, pushed. `LESSONS.md` §12. **WORK IS THE MAIN FIELD**; usage up to 100 %. 🔴 The owner's rules: after EVERY delivery docs, settings and skills current (measured in work's tree) and a letter to work (11-02); tests never wide while he works (11-05); an adversarial review after EVERY implementation or fix; anything over 1 GB only through `borne` at `free -m` ≥ 2 500 MB, arranged with work (11-13, `LESSONS.md` §10).)*
+*(2026-11-24 close: `2026-11-23.2` - work's 93: a relay's watcher that dies says so, and one dead without a word is seen from outside (a keeper, its stderr kept, a log of every relay that did not happen, a reaper at any Stop; `#relay-death`); the arming's replace judged by PHASE (A129 36 legs, A130 25 headless, 29 mutants). Nine adversarial reviews: rounds 5-7 found my own keyboard-hold patch worse than its race - removed (`LESSONS.md` §14). The 23h20 OOM that took the desktop: my gate ran outside `borne` on a September figure; it is 1-2.4 GB, its bench OUTSIDE `agents.slice` (§13). **WORK IS THE MAIN FIELD**; usage up to 100 %. 🔴 The owner's rules: after EVERY delivery docs, settings and skills current (measured in work's tree) and a letter to work (11-02); tests never wide while he works (11-05); an adversarial review after EVERY implementation or fix; anything over 1 GB only through `borne`, arranged with work (11-13) - the gate at ≥ 5 000 MB available, announced in one line (letters 96-107).)*
 
-000000. **FIRST: is `.1` working at work?** Over `~/Dev/work/.comm/wake/rings.jsonl`, the rows since 2026-11-23T02:03Z: those
-   whose `why` says "its box was never seen after the bell was typed" must be 0 (baseline: 7 in the 3 h before, each a
-   watcher block ended by a hand's Enter); rows with `headHidden` are the fix at work (the first: 03:05:38, seen=true).
-   One such row, or work's `saisie-restee.py` alerting on a bus text: a defect. **Then §12's control:** a boot row when the
-   installed Claude Code is newer than the last real-box run, and `test/box-real.mjs` taking a box that hides its start (s9,
-   `exchange/WIP-more-edge-probe-box-real-s9.mjs`) - its s1, s2, s8 are red on the release before too: stale, or the
-   watcher's defect, triage first. **Then work's 90, in its order:** 88 (`who` counts a `claude -p --bare`: in `liveAgents`,
-   `who.mjs`, a `--bare` process is no inbox's - keep it in `tree`; A22 has 279 B), 85 §2 (`wake` says what a dialog shows,
-   read-only), 85 §3 (read a screen, unblock, force: ask work what is left now), 84 §2 (`relay --model --effort`), then 00000.
-00000. **After 000000: work's 82 and its 81 §2.2** (its (b), the alarm of two sessions, must ignore a `--bare` too: 88). (a) `comm who` glues state and mail: `working1 pending`
+000000. **FIRST: `.2` at work.** Any `.comm/relay/*.json` there with a `died` or `crashed`: read its `.err` - the cause 93 could
+   not give. A `died` on a LIVE watcher (its pid still `--after-turn` in /proc) is a false reap: a defect. **Then the replace path's
+   named gaps** (`#relay-death`, rounds 8-9): the watcher notes "typing the /clear" UNDER THE RECORD'S LOCK, which the arming holds
+   across its read and kill - that closes the microsecond; then "checking" may be replaced again, and a watcher of ANOTHER live
+   session is never replaced. §14 first: the race's width and the mechanism's length, side by side. Arm it in A130 (its harness).
+00000. **RAM, work's 97:** the bench's windows through `systemd-run --slice=agents.slice` so the whole gate fits `borne` (then its
+   floor back to 2 500 MB), then the sessions of `launch`/`reopen`/the relay there too (§1, measure first); a memory alert mid-turn
+   (§2: `PostToolUse` reads `MemAvailable`). And §13's control: a full `boot.mjs` refuses outside `agents.slice` or under 5 000 MB.
+0000b. **Then §12's control** (a boot row when the installed Claude Code is newer than the last real-box run; `test/box-real.mjs`
+   taking s9, `exchange/WIP-more-edge-probe-box-real-s9.mjs` - its s1, s2, s8 red on the release before too: triage first), **then
+   work's 90 in its order:** 88 (`who` counts a `claude -p --bare`: `liveAgents`, `who.mjs`, keep it in `tree`; A22 has 279 B),
+   85 §2 (`wake` says what a dialog shows), 85 §3 (ask work what is left), 84 §2 (`relay --model --effort`); **then work's 82 and
+   its 81 §2.2** (its (b), the alarm of two sessions, must ignore a `--bare` too: 88). (a) `comm who` glues state and mail: `working1 pending`
    (`who.mjs`, inside A22: 279 B left); check its IDLE line with mail too. (b) **Two live sessions of one identity, said at
    SessionStart**, at the head of the hook's context: the other's pid, start time, its transcript's last write, its child
    processes. Measured at work 11-21: the owner opened a second leader believing the first closed; the first lived, idle,
@@ -45,7 +48,7 @@ fold the settled parts into the README, the carried ones into `FINDINGS.md#carri
    really shrinks; (d) the limits named in `#hidden-head`; (e) the bus's typing through `send-text --stdin`. Probes:
    `exchange/WIP-hidden-head-probe-*` (start at its `-README.md`). Work's 77: its relay passed on `.5`, 0 alerts.
 00. **`2026-11-09.1` (`#usage-gate`, its gaps there).** Work has `"refuse": true`, `"reopen"` out for the owner's pause:
-   no real reopening yet. `test/teams-real.mjs` 8/8 before changing launch, close or reopen. 🔴 Suite 553-581 s on 11-23 (A128 ~6 s of it), its ceiling 600 s: killed at it once at load 9 (11-23 03h2x, 123 arms run, none red; alone after, no ceiling: green in 568 s) - speed it or split it (carried C) BEFORE the next arm.
+   no real reopening yet. `test/teams-real.mjs` 8/8 before changing launch, close or reopen. Suite 511-536 s on 11-24 with A129 (~23 s) and A130 (~12 s); its 600 s ceiling is gone - a hang is now 300 s of SILENCE (`#gate-silence`), so length no longer kills it: speeding it is carried C.
 01. **`2026-11-08.1`'s MUTANTS NOT RUN** - an evening he is inactive (his word 11-08). `node test/mutate.mjs
    exchange/WIP-box-mutants.json --jobs N` (45, + A119-A123; 3 h 30 in series, measure a suite's peak before 4 wide). A
    survivor is an arm to strengthen. Waiting from work: `chef-ventes`'s needs (after 11-22); its recount of 43 came, 3 of 3. Later (its 44):

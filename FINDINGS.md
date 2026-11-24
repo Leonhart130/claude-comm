@@ -5693,3 +5693,233 @@ one line; another key to reach the end was not measured). The column-0 rule: a C
 would lose every counted edge again (all 8 real screens are at column 0). **`test/box-real.mjs` s1, s2, s8 are red on the release before too** (11-23, 2.1.330): s1 and s8 check a hook's
 ring on two whole bells in a box of 4 rows, which `#hidden-head` leaves to the ring that keeps looking; s2 waits 12 s for that
 ring - stale expectations, or a defect in the ring that keeps looking: not triaged (NEXT).
+
+## `#relay-death` — a relay's watcher died without a word, and nothing could see it (2026-11-23, work's 93)
+
+**The field.** 11-23, work: an expert armed its relay at 04:57:50.826Z (`relay_pid` 90776, one guard on its handoff's
+age), its turn ended at 04:58:03.666Z - and nothing came. At 05:4xZ its record still said `relayed: null`, no `ended_at`, and
+pid 90776 was gone. The screen: the box empty, at rest. It slept 46 min until its chief rang it; work's watcher saw it through
+the chief, not the bus. Work asked (1) why the watcher died without writing, (2) that such a relay signal itself.
+
+**Why is lost, and that is two defects of the bus.** The record was written over by the next relay of the same agent, 13:11Z.
+The watcher's stderr went to `stdio: "ignore"`. **Ruled out, measured:** an OOM or a kill (kernel and user journals 05:55-06:10
+local: nothing; no systemd unit started at 05:57:50; the arming was a plain Bash call, no `systemd-run`, no `timeout`); `.1`'s
+new screen reader (`exchange/WIP-relay-death-fuzz-reader.mjs`: 78 034 screens - A128's real 2.1.330 captures, three live ones, their
+mutations - through the watcher's exact calls: 0 throws, its control throw counted); `windows()` (every path caught). **Not
+ruled out:** a throw elsewhere in the watcher, a signal from outside, a torn read of its record at its start (the arming wrote
+it twice, non-atomically; a watcher that could not parse it exited 2 without a word). On the release before, a throw anywhere
+in the watcher leaves exactly the field's signature - `relayed: null`, no `ended_at`, the pid gone (A129's crash leg, red there).
+
+**How often, measured** over work's transcripts since 11-01 (`exchange/WIP-relay-death-fate-scan.mjs`; 2 561 files holding an arming, read streamed under an 800 MB cap):
+2 654 armings, 2 615 relayed, 4 told by the Stop hook, 35 with no note - 31 of which were armed again in the next turn, the
+cancel path (a new turn before the `/clear`), normal. This one is the only silence that long since 11-08 (when every refusal
+started telling the owner): rare, and invisible when it happens.
+
+**The fix** (`bin/relay.mjs`, the stub's Stop in `install.mjs`, `wake.notifyOwner`). (1) **A record is written whole**
+(`writeRecord`: a temp file and a rename). (2) **The watcher's stderr is kept**, one run's worth, in `.comm/relay/<agent>.err`,
+headed by its pid and arming. (3) **A throw is a refusal** (`uncaughtException`): `relayed: false`, where it was (`phase`,
+noted as each step starts) and what it had typed (`keys_sent`: each new kind of key, and the first Enter after the prompt,
+noted BEFORE it goes - through the one `send` the eraser and the `/clear` are handed), the stack, the owner told; the agent
+hears it at its next Stop (comm.mjs `untoldRelay`, unchanged). A throw once its end is being written rewrites nothing.
+(4) **The watcher runs under a keeper**: the arming starts `sh -c '<watcher>; exec relay.mjs --kept <record> $?'`, which leads
+their process group. A watcher that ended without writing its end - an exit code, or 128 + a signal, SIGKILL included - is
+reported by its keeper the moment it ends: the record ended with `died.how` ("was killed by signal 9 (SIGKILL)"), the owner
+told, the leader sent a `blocked` letter, signed by the agent as `reopen.mjs` does, at `<agent>.died.md` (a file of its own:
+the next arming rewrites the record), then rung. Nobody else need be awake. (5) **The stub's Stop is the backstop** for a
+keeper gone too (its whole group killed): at every Stop of any agent it reads the records and, for one on the roster, not
+relayed, not ended, armed over 30 s ago, whose pid is no watcher OF THAT RECORD, starts `relay.mjs --reap` detached - the
+same test the reaper makes again. (6) **One lock per record** (`<record>.reap`, stale after a minute), held by the keeper,
+the reaper, `--cancel` (the kill and its write) and an arming that replaces a waiting watcher - which now kills it only once
+every check of its own has passed. (7) **Every relay that does not happen is logged** in `<agent>.log.jsonl` by whoever ends
+it; each reaper run leaves one line in `reap.log`. A record whose SESSION is gone too (a reboot, a logout) is closed and logged,
+nobody told. `notifyOwner` strips NUL bytes and never throws. Never for the leader's own relay a letter, never a retry.
+
+**🔴 Not a signal handler in the watcher.** It waits synchronously (`Atomics.wait`, `spawnSync`): a JS handler would never
+run while it waits, and installing one replaces the default action - `relay.mjs --cancel`'s SIGTERM would stop nothing.
+A signal is its keeper's to see; `--cancel` stops both, so a cancel is never reported as a death.
+
+**Its first adversarial review** (`exchange/REVIEW-relay-death-1.md`, a fresh reviewer on a copy, 7 findings, all taken):
+**F1** an arming that replaced a waiting watcher killed it BEFORE its own checks - a refusal then left an orphan, and the
+reaper told the owner, the leader and the agent of a death the arming had caused (reproduced) → killed after every check, under
+the lock. **F2** detection ran only at some agent's Stop - a quiet project's dead relay (a leader's, at night) seen by nobody,
+and a signal death unexplained → the keeper. **F3** a throw inside the refusal's own telling (a guard's stderr with a NUL:
+`spawnSync` throws on one) relabelled it a crash (reproduced) → no rewrite after the end, `notifyOwner` NUL-safe. **F4** "every
+key-sending step notes itself" was false (the Enter, Ctrl+A/E, the erases) and unarmed → the one `send`. **F5** the stub's
+orphan test and the reaper's disagreed (a recycled pid never reaped through the stub; an off-roster record started a reaper
+at every Stop) and was unarmed → one test, armed. **F6** `#gate-silence`'s watchdog decided on the pipes, not the exit (below).
+**F7** the reaper's late write could land on a new record; a dead session's relay was reported as a death; the log's cut was
+in characters and a torn last line swallowed the next → each fixed. Named, not fixed: comm.mjs `mark()` still writes
+non-atomically (A22's bytes; its readers skip a parse error - all but the watcher's `note()`, which wrote over one until the
+third review, F2); `.died.md` holds the latest death only (the log holds all); a
+reaper killed between its write and its telling tells nobody (at-most-once, chosen over twice).
+
+**Its second review** (`exchange/REVIEW-relay-death-2.md`, on round 1's fixes - attack the recent fix): **F1, the worst, in the
+keeper itself**, reproduced 7 of 7 with the real arming against a fake kitty: a watcher waiting for its box cancels itself
+cleanly when the agent takes a turn; if the agent arms again within ~0.1-0.4 s, the OLD watcher's keeper read the NEW record,
+open, and ended it as "exited 1" - the owner and the leader told of a death, the agent's Stop resumed, which cancelled the live
+relay → the keeper carries its arming's `armed_at` and ends that record or none; the watcher's own late notes likewise land
+only on its own arming's record. **F2** the late-merge guard unarmed → armed (a `comm.mjs` that writes a new arming when asked
+to send). **F3** three of A95's new legs could not fail for their own property: `keysNoted` read the final record only → now
+also what the record said the moment each key ARRIVED in the fake session; `rearmInWait` never interleaves as F1 did (A129 arms
+F1 directly); `cancelNoDeath` holds by the lock alone, the group kill being defence in depth (named). **F4** `--cancel` read
+what was typed before its kill → after; `dropLock` removed whatever lock was there → only its own; A129's `young` control
+armed at once, not 5 s back. Named: a Stop reaper can beat the keeper by ~0.1 s and record no signal; the watchdog kills the
+suite, not its children (as before); boot's prove-red wait grew to the backstop's 1 830 s, only when a fixture boot hangs.
+
+**Its third review** (`exchange/REVIEW-relay-death-3.md`, on round 2's fixes; its first run was killed by the 23h20 OOM, `LESSONS.md`
+§13, and run again): 7 findings, none a live false alarm today, all taken. **F1** the keeper's identity test UNDER THE LOCK -
+the one round 2's F1 rests on - was unarmed: removing it alone left A129 green → `keeperUnderLock`, the lock held as a new arming
+holds it, the keeper's `reap.log` line its positive control (written only past the first read). **F2** `note()` wrote over a
+record it could not parse as `{intent_unreadable}` - its `armed_at` and `transcript` gone, so no Stop, keeper or reaper could ever
+tell of that relay again → read again, 20 ms apart, for 100 ms, then nothing written; the identity test strict. **F3** the
+arming's replace path ended the old record from a read before its kill (round 2's F4a, fixed in `--cancel` only) → read after;
+and found while briefing round 4, the same read now shows an end the watcher wrote a moment before the kill (relayed, even),
+which then stands, never "replaced" over it.
+**F4** a refusal whose record was another arming's was logged nowhere → logged from what the watcher knows, `unwritten` saying
+why. **F5** round 2's `dropLock` fix was unarmed → `dropLockOwnOnly`. **F6** "already armed" was decided outside the lock only: a
+live watcher's record could be written over without a kill, the watcher then blind → decided again under the lock. **F7** A95's
+`keysNotedBefore` passed its Enter flag vacuously when a prompt arrived in pieces → `promptIn` required; and **A129 was not
+hermetic**: the reaper's ring of the leader sent `kitten @ ls` to the owner's live sockets, 20 a run - in every gate since A129
+(read-only, nothing typed) → a kitten that logs and fails on its PATH, its log the positive control.
+
+**Its fourth review** (`exchange/REVIEW-relay-death-4.md`, on round 3's fixes): 8 findings, all taken or named. **F1, the worst,
+in a branch I added while briefing it, unreviewed:** "its end stands" kept a watcher's end that was then written over by the new
+record - the watcher, killed as it ended, had not logged it, so that relay was in no record and no log (reproduced with a real
+watcher under strace) → logged on its behalf, once (`endLogged`). **F2** round 3's F3 and F6 are armable WITHOUT a window, and I
+had written they were not → **A130** (below). **F3** the loose identity test was not equivalent: it wrote onto a record with no
+`armed_at` at all → `foreignNotWritten`. **F4** "already armed" under the lock refused a watcher waiting for its box, which the
+unlocked test replaces → replaced under the lock too. **F5** `hermetic` could not see one spawn that forgot `env129` → the fake
+kitten on the block's own `PATH`. **F6** the `unwritten` row's arming was unasserted (a row without `st` survived), and it is the
+record AS ARMED with its end, not "what the watcher knows" → asserted, and said so. **F7** a note that cannot be written is acted
+on as if it were - a relay done whose success note failed would be reported dead by its keeper, a key sent with its note refused:
+unreachable by today's writers (no open record is ever left torn), named. **F8** `keeperUnderLock` passed if the keeper's own
+5 s lock wait expired → it must go on within 1.5 s of the lock's removal.
+
+**Its fifth review** (`exchange/REVIEW-relay-death-5.md`, on round 4's fixes and A130): 7 findings, all taken. **F1, a defect older
+than this change** (2026-11-08.1): a watcher's `box_wait_since` is written once and never cleared, so a watcher past its box -
+holding the keyboard, typing its /clear - was killed by a new arming as "waiting for its box" (reproduced with a real watcher);
+round 4's F4 had carried that test under the lock → one classification for both tests, by PHASE (`liveState`): waiting for its box
+(replaced), typing - it holds the window's keyboard, or is past its box (refused, exit 4, never killed) - or its turn not ended
+(already armed); and the arming **holds the window's keyboard across the kill** (my addition, closing the microsecond the phase
+left; not had: refused). **F2** round 4's F8 fix could not see a keeper that gave up its lock wait BEFORE the removal (`KNOWAIT`
+survived) → it must be alive as the lock goes. **F3** "logged once" was unarmed: the fake watcher never logged its own row →
+`endlog`, and `relayed` (a relay done is never logged as one that did not happen). **F4** A130's write was timed by a 100 ms timer
+→ written the moment strace's log shows the kill. **F5** A130 lacked A129's block-wide net → PATH and `CLAUDE_COMM_RUNTIME` its own
+for the block. **F6** a suite killed mid-block left its fake watcher alive for good → it exits with the suite, a zombie suite
+included (measured: a killed suite not yet reaped answers `kill(pid, 0)`; 0 left 1.5 s after a SIGKILL). **F7** its sweep matched
+any process naming its temp dir → only the pids it knows.
+
+**The gate, red after round 5** (11-24 01h34, 127/129: A95 and A114a, the bench's real relays), **green alone on the same bytes**
+minutes later (129/129): under load, a re-arm met the waiting watcher holding the keyboard for a LOOK, and round 5's classification
+called that "typing" - refused, exit 4, the relay lost. **Its sixth review** (`exchange/REVIEW-relay-death-6.md`) found the same,
+reproduced with a real watcher, and 5 more, all taken: **F1** exit 4 lost the relay (a look holds the keyboard up to ~1.5 s on a
+loaded kitty; another typist's hold refused too, which the release before replaced; exit 4 documented nowhere) → classified by
+PHASE alone, the kill waits a look out (4 s) and reads the watcher again, another typist's hold does not refuse (the watcher cannot
+type while it is held), exit 4 in the skill. **F2** a watcher whose turn ended, checking its guards, was "already armed" → replaced.
+**F3, F4** "past its box" was decided by the keyboard, not the phase (a stale or unguarded hold read "already armed") → by phase.
+**F5** a `startsWith` phase test survived → `aftclear`. **F6** a waiting watcher of the release before (no phase) was refused where
+that release replaced it → judged as it judged. **F7** nits: the fake watcher also ends at 120 s; `NOUNLOCKEDTYPING` and `KBNEWWIN`
+equivalent today, named; the unlocked test reads `ended_at` only through `isWatcher` (an ended record has no live pid), named.
+
+**Its seventh review** (`exchange/REVIEW-relay-death-7.md`): 6 defects, five reproduced, **all but one in the keyboard hold across
+the kill** - my addition of round 5, which round 6 had made wait 4 s for a look. **F1** a look longer than the wait still lost the
+relay (exit 4, nothing typed, RELAY DUE silent); **F2** the record's lock held across that wait outlasted another arming's 3 s: two
+armings 0.3 s apart both armed, the second's stale "replaced" written over the first's new record, two live watchers, one blind;
+**F3** `look`'s timing let two mutants survive a slower arming; **F4** four branches of it unarmed; **F5** the watcher's hold
+compared by pid read as another typist's when the record still named its keeper; **F6** the wait let the old watcher finish its look,
+read the new turn busy and alarm the owner. **Decision: the hold and the wait are REMOVED**, the classification by phase kept -
+three rounds of my own patches on one microsecond had made the arming worse than the defect. The microsecond between the test and
+the kill stays, named (every release since 11-08.1 had it for the whole of the /clear's typing); its cure belongs to the watcher -
+before it types, under its own hold, it reads its record still its arming's - designed separately (STATUS, next). **F7** nits:
+exit 4 now means only "past its box" (the skill says so); `--cancel`'s own exit 4 means other things, named.
+
+**Its eighth review** (`exchange/REVIEW-relay-death-8.md`, on the removal): the removal complete, `holdKeyboard` byte-identical
+to HEAD; 6 findings. **F1** a watcher "checking its guards and its window" - replaceable since round 6's F2 - may be ERASING the
+bus's own text under its hold at its first look, up to 35 s, and was killed there (reproduced with a real watcher) → that phase is
+"already armed" again, as HEAD said. Its lie when the turn has ended (round 6's F2), the kill mid-erase of a watcher waiting for its
+box (HEAD's), **F4** a watcher of ANOTHER live session of this agent replaced (HEAD's, for a box wait): NAMED, the release before's;
+and **F6**'s stale read of a predecessor dead without a word (~50 µs: one ending on its own may be called dead), NAMED - that branch
+is new in this change (the ninth review corrected me here). **F5** the cure
+I planned for the microsecond ("the watcher reads its record still its arming's") cannot close it - the arming writes nothing before
+its kill → the cure is the watcher's note of its /clear UNDER THE RECORD'S LOCK, which the arming holds across its read and kill
+(STATUS ▶ NEXT). **F2** "one that left its wait before the lock is refused" was unarmed → `lefttyping`. **F3** the "typing" default
+armed for two of its phases → `prompting`, `proving`, `unknown`. **F6** the dead-predecessor branch armed by no leg → `deadprev`.
+**F7** nits: exit 4 now says "past its box, relaying this window" (the skill too); A130's title and A129's header said what they no
+longer test; README and `--help` still carry no exit codes - the skill does, named.
+
+**Its ninth review** (`exchange/REVIEW-relay-death-9.md`), a shipping read: **no case where a real relay does worse than HEAD's** -
+it never kills a watcher HEAD would not have killed at the same instant; where HEAD killed during the typing phases it now refuses
+(exit 4), and HEAD lost those relays too; "already armed" covers fewer cases. The 17 mutants re-killed; the named gaps honest but
+two (corrected above and below). **F1** the WATCHER's half of the phase table was armed by no leg - two one-line watcher mutants
+(`BOX-AT-LOOK`: round 8's F1 back; `CLEAR-NOTED-LATE`: round 5's) survived A129 and A130 → its three legs taken as written: a real
+watcher's record read at the instant each of its keys reaches the fake kitten (`realclear`, `realerase`, `realerase2`) - no window
+needed, so A129's header ("they need a window") was wrong. **F2** "already armed under the lock" was armed for one of its two
+phases → `f6checking`. **F3** nits: exit 4 told ANOTHER session of the agent "this session is being cleared" → it names that
+session; the headers corrected. Verdict: ship.
+
+**A130, 25 legs, ~12 s, no window**: the REAL arming inside a fake session (an orphan named `claude`, its registry entry written), a
+fake kitten answering `ls` with that session's window and refusing everything else, strace delaying the arming's kill 400 ms so
+the old watcher's write lands between its read under the lock and its kill. `note` (a key noted then is in the "replaced" row),
+`end` (an end written then stands, logged once on its behalf), `endlog` (logged by the watcher too: one row), `relayed` (no row),
+by phase at the unlocked read - refused, never killed: `typing`, `heldtyping` (no box wait, the keyboard its own), `aftclear`;
+`prompting`, `proving`, `unknown`; replaced, whoever holds the keyboard: `heldkb`, `heldother`, `oldrelease`; already armed:
+`guardphase`, `oldarmed` - `lefttyping` (waiting at the unlocked read, typing under the lock: refused), `f6checking` (checking,
+found only under the lock: already armed), `deadprev` (a predecessor dead without a word: logged, said), `realclear`, `realerase`,
+`realerase2` (a real watcher's phase as each key arrives: "typing the /clear" at its /clear, an armed phase at its erase, and a
+second arming then "already armed") -
+`f6` (a live watcher seen only under the lock: "already armed", its record, its watcher, no lock left), `f6held` (the lock never
+had: the holder's lock spared), `f6box` (one waiting for its box: replaced), `locktyping` (typing, seen only under the lock:
+refused, its lock dropped). Positive controls: strace's log of the DELAYED kill, the old watcher's own mark that it wrote, the kitten's
+log of the arming's `ls` before the swap. strace missing: red, said so. **Twenty mutants, all killed**, each by its own
+leg (`NOREREAD`, `NOKEEPEND`, `NOLOGEND`, `NOENDLOGGED`, `RELAYEDLOGGED`, `NOF6`, `NODROPARMED`, `NOF4`, `BY-BOXWAIT`, `STARTSWITH`,
+`OLD-TYPING`, `NOPHASE-WAITING`, `CHECKING-TYPING`, `CHECKING-WAITING` - round 6's choice -, `TYPING-LIST`, `LOCKED-IF-UNSEEN`,
+`NODEADPREV`, `BOX-AT-LOOK`, `CLEAR-NOTED-LATE`, `LOCKED-CHECKING-REPLACED`). 🔴 My mutant runner copied `bin/` and not `test/`: the
+three newest "survived" with NO leg red - the harness had crashed on a missing `test/edge-screens.mjs`. A survivor with an empty red
+list is a crashed run, not a pass: runner fixed, all twenty re-run. A129: nine of nine, `KNOWAIT` included.
+
+**A129, 36 legs, ~23 s, no window, its own kitten**: a watcher that throws (its guards not a list) - the refusal, the stack in its stderr, a log
+row, the owner told; a guard printing a NUL - a refusal still, the owner told; a gone watcher reaped - the refusal, one `blocked`
+letter at its `.died.md`, the owner told; what it typed said; a session gone - closed, nobody told; a torn log line closed;
+reaped once, a second pass tells nobody; the keeper's `--kept` leaving a newer arming's record alone and reporting its own
+with the signal; the keeper's read under the lock leaving a record armed meanwhile alone; the watcher's notes kept off a newer arming's record,
+its refusal logged all the same; a record read torn never written over (whole again 20 ms later: the refusal on it; torn for
+good: untouched, the refusal in the log); the reaper's late write kept off one; a lock broken and retaken while its holder
+worked left to the new holder; two reapers at once; the lock held (hands off) and stale (taken over); the leader's own
+(no letter); through the installed stub's Stop - an orphan reaped, a record off the roster starting no reaper (`reap.log`), a
+pid recycled into another record's watcher reaped. Controls one variable away, green on both releases: armed 5 s ago, a LIVE
+watcher of the record, a finished record, a live watcher beside the reaped one. **A95, through the real arming in the bench**:
+its stderr kept (the header line proves the fd reached the watcher); one log row for a refusal, a cancel, a replaced watcher;
+`keys_sent` and `phase` on the relay done, none on a refusal before any key, Ctrl+A on the capped path; a cancel reports no
+death; a re-arm whose guard refuses leaves the waiting watcher alive, which then cancels (F1); a watcher SIGKILLed mid-wait
+reported by its keeper with its signal, the owner told (F2); every key already in the record when the session received it. **Red on the release before:** every A129 leg but the controls.
+**Nineteen mutants on A129**, each killed by the leg named for its property, but one: the `ending` guard alone survives - no throw
+is left reachable in the refusal's telling once `notifyOwner` cannot throw (defence in depth, named); the NUL's three defences
+removed together are killed. **Seven more on round 3's fixes** (`K505`, `K550`, `DROP`, `CLOBBER`, `NO-RETRY`, `NO-LOG`, `LENIENT`):
+six killed, each by its own leg alone; the loose identity test (`prev.armed_at &&`) survived, called equivalent - wrongly (round 4,
+F3): `foreignNotWritten` kills it now, and `LOGNOST` (the row without `st`) is killed by the two rows' `armed_at`. Eight of eight
+on A129 after round 4. A95's new legs were not mutated (a bench run each).
+
+**Not verified.** A real relay killed in a real window, then reported by its keeper to a LIVE leader (A95's leader runs no
+session, its `comm.mjs` is not in the bench's tree, so the letter there fails cleanly); the reaper's ring of a live leader.
+What killed work's watcher at 04:58: still unknown - the next one leaves its stderr, its keeper says how it ended. Round 3's F3
+and F6, said here "armed nowhere, A95's ground", were armable headlessly (round 4, F2): A130 arms them. F5's other half is open:
+two processes breaking the same stale lock both believe they hold it. Round 4's F7, named above. A95's legs ran only in the gate.
+
+## `#gate-silence` — the gate's hang detector measures silence, not length (2026-11-23)
+
+The total-time ceiling on `attack` (600 s) killed a healthy suite at load 9 on 11-23 03h2x (123 arms printed, none red; alone
+after, green in 568 s) and called it HUNG: a row naming something other than what it measured (form D). Timed that evening,
+every line stamped (517 s, 125 arms): the longest silence between two lines is 93 s (A122), then 81 (A125), 46 (A95). The hang
+the ceiling exists for - a loop waiting on an inbox a render exception left full - prints nothing, ever. So boot runs the suite
+under a watchdog: its streams passed through, the clock reset by each chunk; **silent past 300 s** (3.2x the longest gap) it
+is killed and called HUNG with how long it was silent; a 1 800 s backstop bounds one that prints and never ends. **The
+review's F6** (reproduced on stand-ins): it decided on the pipes closing, so a grandchild holding stdout made a suite that had
+passed read as HUNG, and one killed for silence wait for the backstop; and the backstop killed the watchdog alone, the suite
+running on. Now decided on the suite's EXIT, 3 s for the pipes to drain and no more, never "silent" after the exit, and the
+watchdog's own SIGTERM passed to the suite. Proved
+both ways on stand-ins (a 2 s silence): one silent after a line - killed in 3.1 s, exit 124, the marker; one printing every
+0.9 s for 5.5 s - not killed, its exit 3 passed through; both streams kept; a passing one whose grandchild holds stdout 8 s -
+exit 0 in 3.1 s; a silent one whose grandchild holds it - killed and marked in 6.1 s, not at the backstop; the backstop's
+SIGTERM - the suite gone with the watchdog. **The suite is still slow** (STATUS's item C): a
+detector slowness cannot trip says nothing about speed - the row prints the seconds. This replaces the 11-23 close's "speed it
+or split it before the next arm": that rule existed because the ceiling would kill the suite, and it no longer can.

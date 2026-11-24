@@ -29,12 +29,13 @@ dépôt, aucune n'est une intuition. `FINDINGS.md` (25 défauts) est le gisement
 | 🔴 **C** | 🔴 **JE PARAPHRASE L'ÉTAT AU LIEU DE LE MESURER** | Le fichier d'état disait vert pendant qu'un bus 4 commits en retard tournait sur le terrain. **Même forme le 2026-09-10 : j'ai lu une tranche `sed` de `STATUS.md` et parlé d'après le résumé du boot** | `CLAUDE.md` · **§1** |
 | 🔴 **D** | 🔴 **UNE LIGNE NOMME AUTRE CHOSE QUE CE QU'ELLE A MESURÉ** | La ligne terrain affichait « HOOK DRIFT » alors que ce qui avait changé était un `.gitignore` : elle envoyait le lecteur inspecter des hooks parfaits | `bin/boot.mjs`, commentaire du 2026-09-04 : *« a row that names something other than what it measured is this project's signature defect »* |
 | 🔴 **E** | 🔴 **UN BALAYAGE QUI ÉCHOUE REND LE MÊME RÉSULTAT QU'UN BALAYAGE VIDE** | `catch {}` nu, retour `{at:0}` : un dossier illisible est indiscernable d'un dossier vide, et la ligne **disparaît** au lieu de crier | mesuré le 2026-09-10, `bin/boot.mjs:1011-1023` — à un appel de distance du même défaut corrigé le 09-08 |
-| 🔴 **F** | 🔴 **J'AJOUTE DE LA CONFIANCE LÀ OÙ IL FALLAIT DE LA PREUVE** | Un pair écrit noir sur blanc *« je ne l'ai pas couru avec deux sessions réelles, donc je ne l'écris pas comme mesuré »*. Je lui réponds que son trou est plus petit qu'il ne croit — **sans une mesure de plus.** ⚠️ **Ça se propage** : la question qu'il avait laissée ouverte à raison a été fermée chez lui, puis SUPPRIMÉE de mon propre fichier d'état | **§2** · **§10** (2026-11-13 : un `grep` à 6,6 Go sur la machine du propriétaire, son coût jamais mesuré) |
+| 🔴 **F** | 🔴 **J'AJOUTE DE LA CONFIANCE LÀ OÙ IL FALLAIT DE LA PREUVE** | Un pair écrit noir sur blanc *« je ne l'ai pas couru avec deux sessions réelles, donc je ne l'écris pas comme mesuré »*. Je lui réponds que son trou est plus petit qu'il ne croit — **sans une mesure de plus.** ⚠️ **Ça se propage** : la question qu'il avait laissée ouverte à raison a été fermée chez lui, puis SUPPRIMÉE de mon propre fichier d'état | **§2** · **§10** (2026-11-13 : un `grep` à 6,6 Go sur la machine du propriétaire, son coût jamais mesuré) · **§13** (2026-11-23 : ma porte complète hors de `borne`, sur un chiffre de septembre ; le bureau tombe) |
 | 🔴 **G** | 🔴 **JE CITE UN NOM QUI N'EXISTE PAS, ET LE FOND EST JUSTE** | `stateOf` contre `holderState`. Comme la conclusion tenait, rien ne l'a contredite — **et le pair ne POUVAIT pas vérifier ce que je lui affirmais.** Une citation fausse dans un raisonnement juste est un cul-de-sac qu'on ne voit pas | **§2** |
 | 🔴 **K** | 🔴 **MA GARDE A RAISON ET SA SORTIE NE PORTE PAS DE QUOI AGIR** | Le refus du `--ref` donnait la chaîne fautive, jamais **la chaîne à taper** · `--pid` n était documenté que dans un message d erreur qu on voit **après** s être trompé · le refus de `claim` nommait le détenteur et **jamais le demandeur**, donc deux refus de deux agents différents étaient identiques au caractère près. **Trois en une soirée, tous signalés par un agent de terrain, aucun trouvé par moi** | **§6** |
 | 🔴 **J** | 🔴 **JE CONCLUS « NON REPRODUCTIBLE » D'UNE SONDE QUI NE POUVAIT PAS SE DÉCLENCHER** | Trois invocations du hook `Stop`, toutes sorties en 0 — **et toutes avec une boîte vide**, alors que le signal n'apparaît QUE lorsqu'un message est livré. J'ai mesuré une inbox vide et je l'ai écrit comme un mystère, dans `STATUS.md` et dans un message de commit · **§12 : une nouvelle version de Claude Code, et la seule sonde qui pouvait voir sa case ne tournait pas** | **§5** · **§12** |
 | 🔴 **I** | 🔴 **JE POSE UNE CONDITION SUR UN MAILLON QUI N'EST PAS CELUI QUE JE JUGE** | `systemd-run --scope` rend **exit 0** pendant que la suite écrit `✗ 8 lignes non rougies` · **2026-09-11, deux de plus le même jour** : le rapport de tâche du harnais annonce *« exit code 0 »* pour une suite qui rend **1** — le 0 était celui du `tail` en bout de chaîne ; et le pair de `atlas` chaîne `contrôle && effacement` sur une base de PRODUCTION, **le contrôle rend 2 rouges, donc l'effacement ne tourne jamais** et le jeu d'essai reste sur la vraie base. ⭐ **Sa formulation est plus large que la mienne et je la prends : un contrôle et son MÉNAGE ne se chaînent jamais par `&&` — c'est précisément quand le contrôle échoue qu'il faut que le ménage tourne** | **§4** · terrain 2026-09-11 |
 | 🔴 **H** | 🔴 **JE CONCLUS « ABSENT » SUR UN AFFICHAGE QUE J'AI MOI-MÊME TRONQUÉ** | `grep … \| head -5` sur un fichier dont la section est ligne 126 : j'annonce deux fois au propriétaire qu'il manque une section qui était écrite, complète, meilleure que ce que je proposais | **§3** |
+| 🔴 **L** | 🔴 **JE FERME UNE MICROSECONDE AVEC UN MÉCANISME QUI DURE DES SECONDES** | Une course de la taille d'un appel système entre un test et un arrêt ; j'ajoute une prise du clavier, puis une attente de 4 s pour elle, et le verrou tenu pendant l'attente laisse passer deux armements à la fois. **Chaque ronde trouvait le défaut dans ma rustine d'avant** | **§14** |
 
 ---
 
@@ -474,3 +475,87 @@ lecteur d'écran du bus**, et rien ne me le disait.
 **Le contrôle, pas encore armé** : une ligne du boot qui signale quand la version installée de Claude Code est plus récente que
 le dernier passage réel de la case. Ce passage doit inclure une case qui cache son début : le s9 de
 `exchange/WIP-more-edge-probe-box-real-s9.mjs`, à prendre dans `test/box-real.mjs`. Avec son bras. Nommé dans `STATUS.md`, NEXT.
+
+---
+
+## §13 — J'ai lancé ma porte complète hors de `borne`, sur la foi d'une mesure de septembre, et le bureau est tombé (2026-11-23)
+
+**Le 2026-11-23 à 23h17:38.** Pour repasser la porte sur les correctifs de la ronde 2 (`#relay-death`), j'ai lancé
+`node bin/boot.mjs` en fond, **sans `borne`**, avec une ronde de revue en même temps. `free -m` venait d'afficher 1 188 Mo
+libres et 3 690 disponibles. À **23h20:47**, l'OOM killer du noyau s'est déclenché, le swap était plein, et GNOME Shell a
+perdu Xwayland puis s'est arrêté. Toutes les fenêtres de la machine sont mortes : la mienne, celles de work, celles du
+propriétaire. Dans la table du noyau, au moment du kill : **124 processus node, 2 337 Mo de mémoire anonyme**, démarrés
+dans les trois minutes de ma porte, brave à 3,4 Go (les captures de work) et `/tmp`, qui est en RAM, à 4,9 Go.
+
+**Mesuré ensuite, la même nuit**, la même porte dans `borne` : **575 Mio dans son scope** (`memory.peak`), plus les fenêtres
+du banc, **que kitty lance dans son propre cgroup, hors de l'enveloppe** (141 processus, jusqu'à 1,8 Go qui se chevauchent).
+Ma porte pèse donc entre 1 et 2,4 Go. Et même lancée par `borne`, elle n'aurait été tenue qu'à un quart.
+
+### Le mécanisme
+
+Le §10 dit « toute commande qui **peut** dépasser 1 Go ». Je l'ai appliquée à ce que je croyais lourd. La porte, je la
+croyais à 164 Mo, parce que ma mémoire le disait. Ce chiffre a été mesuré le 2026-09-07, quand la suite avait une trentaine
+de bras. Elle en a 128 aujourd'hui, et certains lancent des rafales de processus (40 envois concurrents, 8 preneurs).
+**Le coût d'une commande change avec elle. Une mesure de coût a une date de péremption, et je ne la regarde jamais.**
+C'est la forme **F**, comme au §10 : ce sont les entrées (une suite quatre fois plus grosse) qui font le coût, pas le nom de
+la commande. Et la règle invitait l'erreur, parce que « qui peut dépasser » demande un jugement, et qu'un jugement repose
+sur ce qu'on croit.
+
+### Ce que ça a coûté
+
+Le bureau entier du propriétaire, pendant qu'il travaillait. La session de work et la mienne. La porte et la ronde 3 de la
+revue, perdues (relancées depuis). Il a fallu qu'il redémarre les sessions et me dise de reprendre.
+
+### La règle
+
+Plus de jugement : **toute porte, suite ou série de mutants de ce dépôt passe par `borne`**, sans exception, et je
+l'annonce à work avant de la lancer (lettres 96, 99-101). Comme le banc échappe à l'enveloppe, je la compte à 2,5 Go et ne la
+lance qu'à 5 000 Mo disponibles. Le pic se mesure dans `borne` (`memory.peak` du scope) **et** dans le journal pour le banc.
+Il se remesure à chaque bras ajouté qui lance des processus. Trois pièges mesurés en le faisant : `systemd-run` remplace
+lui-même `${VAR}` ; `/proc/self/cgroup` a deux lignes ici ; les pid font le tour (work m'a corrigé : j'avais attribué trois
+`claude` par l'ordre des pid).
+
+### Le contrôle
+
+**À armer, et je le nomme** (`STATUS.md` ▶ NEXT) : (1) `node bin/boot.mjs` complet refuse de lancer sa porte hors de
+`agents.slice` (lu dans `/proc/self/cgroup`) ou sous 5 000 Mo disponibles (`MemAvailable`). Son refus donne la commande à
+taper (forme **K**). Le bras : hors de l'enveloppe, refus ; dans l'enveloppe, la porte tourne. Avec un contrôle positif.
+(2) Les fenêtres du banc lancées à travers `systemd-run --slice=agents.slice`, pour que l'enveloppe tienne toute la porte.
+
+---
+
+## §14 — Trois rondes de mes propres rustines sur une microseconde, et la bonne réponse était de les retirer (2026-11-24)
+
+**La nuit du 23 au 24.** La 5e revue de `#relay-death` trouve un vrai défaut, ancien (2026-11-08.1) : un armement pouvait tuer
+un veilleur en train de taper son `/clear`, parce que `box_wait_since` n'est jamais effacé. Le correctif validé par le
+relecteur classait le veilleur par sa phase. **J'y ai ajouté, sans revue, une prise du clavier pendant l'arrêt** pour fermer
+la microseconde qui restait entre le test et l'arrêt. La 6e revue (et la porte, rouge sous la charge) : un veilleur qui
+regarde son écran tient le clavier un instant, donc l'armement refusait et le relais était perdu. J'ai ajouté une attente de
+4 s. La 7e revue : un regard plus long que 4 s perdait encore le relais, et surtout **le verrou de l'enregistrement, tenu
+pendant l'attente, dépassait les 3 s d'un autre armement** : deux armements à la fois, un veilleur aveugle. C'est pire que la
+microseconde de départ. J'ai retiré la prise et l'attente, et gardé le classement par phase.
+
+### Le mécanisme
+
+Une course de la taille d'un appel système, je la ferme avec un mécanisme (un verrou, une attente). **Ce mécanisme a sa propre
+durée, et cette durée crée des courses plus larges que celle qu'il ferme.** Chaque ronde trouvait le défaut dans la rustine de la
+ronde d'avant : c'est la règle « attaque le dernier correctif », vérifiée trois fois de suite sur ma propre ligne. Et je ne
+mesurais pas l'échange : une microseconde fermée contre quatre secondes ouvertes.
+
+### Ce que ça a coûté
+
+Trois rondes de revue (25 à 32 min et 247 à 262 k jetons chacune, lus dans leurs comptes rendus), trois portes (9 min
+chacune), une porte rouge, et la livraison de la lettre 93 de work repoussée d'autant.
+
+### La règle
+
+**Avant d'ajouter un mécanisme pour fermer une course, je mesure la largeur de la course et la durée du mécanisme, et je les
+écris côte à côte.** Si le mécanisme dure plus longtemps que la course, il ne ferme rien : il déplace le problème. Une course
+qui ne se ferme qu'au bon endroit (ici, chez le veilleur, avant qu'il tape, sous sa propre prise) se nomme et se conçoit à
+part. On ne la colmate pas chez l'appelant pendant une livraison.
+
+### Le contrôle
+
+**À armer, et je le nomme** : chaque correctif d'une revue qui ajoute un verrou, une attente ou une prise porte dans sa
+description de commit les deux chiffres, la largeur de la course et la durée ajoutée. Le hook `commit-msg` refuse un commit
+qui touche `takeLock`, `holdKeyboard` ou un `nap(` dans `bin/` sans la ligne `race:`. Pas encore écrit.

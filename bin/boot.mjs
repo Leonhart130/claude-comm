@@ -128,7 +128,28 @@ const MARK = ["✓", "?", "⚠", "✗"]
 // least this long - F2's 90 s wait read a suite grown to 94 s as "nothing wrote" (2026-10-25).
 // 🔴 A HANG DETECTOR, NOT A BUDGET: past it the row says "attack HUNG". Measured 2026-11-08 with A119-A123: 349 s, the owner at work on the machine, 300 s would have
 // called a healthy suite hung. So it sits well above the honest run. That the suite is slow is STATUS's item C, and a ceiling hides nothing about it: the row prints the seconds. 2026-11-09: 410 s on a loaded machine before A124, so 480 s went too (FINDINGS.md#usage-gate).
-const GATE_CEILING_MS = 600_000
+// 🔴 2026-11-23: A HANG IS SILENCE, NOT LENGTH. The total-time ceiling (600 s) killed a healthy suite at load 9 (553-581 s honest,
+// 123 arms printed, none red) and called it HUNG - a row naming something other than what it measured. Measured that evening,
+// every arm's gap timed (517 s, 125 arms): the longest silence between two lines is 93 s (A122), then 81 (A125), 46 (A95). The
+// hang this exists for - a loop waiting for an inbox a render exception left full - prints nothing, ever. So: SILENCE past
+// GATE_SILENCE_MS (3.2x the longest gap) is a hang; the backstop only bounds a suite that prints and never ends. Its speed is
+// still STATUS's item C: a detector that cannot be tripped by slowness says nothing about slowness, and the row prints the seconds.
+const GATE_SILENCE_MS = 300_000, GATE_BACKSTOP_MS = 1_800_000
+// The watchdog between boot and the suite: the suite's two streams passed through as they come, the clock reset by each chunk;
+// SIGTERM past the silence (as spawnSync's timeout sent), SIGKILL 5 s later, then a marker line boot reads, and exit 124.
+// DECIDED ON THE SUITE'S EXIT, not on its pipes closing (the review of #gate-silence, F6): a grandchild holding stdout made a
+// suite that had passed read as silent, and a killed one wait for the backstop. After the exit, 3 s for the pipes to drain, no
+// more, and never "silent" again. Its own SIGTERM (spawnSync's backstop) is passed to the suite, which ran on unparented before.
+const GATE_WATCHDOG = `const { spawn } = require("child_process"); const [file, ms] = process.argv.slice(1)
+const c = spawn(process.execPath, [file], { stdio: ["ignore", "pipe", "pipe"] })
+let last = Date.now(), silent = 0, code = null, done = false
+const pass = (to) => (d) => { last = Date.now(); to.write(d) }
+c.stdout.on("data", pass(process.stdout)); c.stderr.on("data", pass(process.stderr))
+const finish = () => { if (done) return; done = true; clearInterval(t); if (silent) process.stdout.write("\\nGATE-WATCHDOG silent " + Math.round(silent / 1000) + " s\\n"); process.exit(silent ? 124 : code === null ? 1 : code) }
+const t = setInterval(() => { const q = Date.now() - last; if (code === null && !silent && q > Number(ms)) { silent = q; try { c.kill("SIGTERM") } catch {} setTimeout(() => { try { c.kill("SIGKILL") } catch {} }, 5000).unref() } }, 1000)
+c.on("exit", (x, sig) => { code = x === null ? 1 : x; setTimeout(finish, 3000) })
+c.on("close", () => { if (code !== null) finish() })
+process.on("SIGTERM", () => { try { c.kill("SIGKILL") } catch {} process.exit(124) })`
 let worst = OK
 const rows = []
 // `causes`: the codes a row DECLARES for what made it non-green, where it computed them.
@@ -1704,12 +1725,14 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 		// a timeout that hang is inherited by EVERY boot, and boot runs at every session
 		// start, so one bad commit would make the project unstartable. 300 s was ~7× the
 		// suite's 25-40 s; it is 3.2× its 94 s measured 2026-10-25. A ceiling, not a budget.
-		const g = spawnSync("node", [join(ROOT, "test", "attack.mjs")], { encoding: "utf8", timeout: GATE_CEILING_MS })
+		const g = spawnSync("node", ["-e", GATE_WATCHDOG, join(ROOT, "test", "attack.mjs"), String(GATE_SILENCE_MS)],
+			{ encoding: "utf8", timeout: GATE_BACKSTOP_MS, maxBuffer: 64 << 20 })
 		const out = `${g.stdout || ""}${g.stderr || ""}`
 		// A TIMEOUT IS NOT A FAILING SUITE and must not be reported as one: the arms that
 		// did run say nothing about the arms that never did. Named separately, or a reader
 		// goes looking for a red case that does not exist.
-		const hung = !!(g.error && g.error.code === "ETIMEDOUT")
+		const silentFor = (/^GATE-WATCHDOG silent (\d+) s$/m.exec(g.stdout || "") || [])[1]
+		const hung = (g.status === 124 && !!silentFor) || !!(g.error && g.error.code === "ETIMEDOUT")
 		// F5 (review #5): `\s` matches a NEWLINE, so under /m the blank line before
 		// test/attack.mjs's summary let `^\s+✓` swallow the banner itself - the row claimed
 		// 31 where the suite ran 30, and that inflated number then propagated into CLAUDE.md
@@ -1720,7 +1743,7 @@ if (existsSync(join(ROOT, ".comm", "bin"))) {
 		const fails = out.split("\n").filter((l) => /^\s+✗/.test(l))
 		const secs = ((Date.now() - t0) / 1000).toFixed(1)
 		if (hung) {
-			row("gate", RED, `attack HUNG — killed at ${GATE_CEILING_MS / 1000}s after ${secs}s of output. The ${pass} arm(s) that ` +
+			row("gate", RED, `attack HUNG — ${silentFor ? `silent for ${silentFor} s (past ${GATE_SILENCE_MS / 1000}), killed` : `still running at the ${GATE_BACKSTOP_MS / 1000} s backstop, killed`} after ${secs}s. The ${pass} arm(s) that ` +
 				`ran are not a verdict on the ones that never did. A render exception leaves the inbox ` +
 				`undrained BY DESIGN, and a loop waiting for it to empty then never ends. ` +
 				`FINDINGS.md#suite-abort-reads-clean`, ["hung"])
@@ -3393,7 +3416,7 @@ function proveRed() {
 			const before = stateOf()
 			writeFileSync(sp, JSON.stringify({ ...before, ackCounts: { "a-concurrent-close": 7 },
 				lastClose: { at: midAt, head: "cafe123", acked: ["a-concurrent-close"] } }, null, 2) + "\n")
-			const t1 = Date.now(); while (Date.now() - t1 < GATE_CEILING_MS + 30_000 && alive()) {}
+			const t1 = Date.now(); while (Date.now() - t1 < GATE_BACKSTOP_MS + 30_000 && alive()) {}
 			const stillRunning = alive()
 			const after = stateOf()
 			const bootWroteAfter = after.at && Date.parse(after.at) >= Date.parse(midAt)

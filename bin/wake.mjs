@@ -1231,13 +1231,17 @@ export function windowHasFocus(tree, id) {
  * never runs for it, because nothing a test does lands in the owner's view (STATUS.md, his rule); an arm names its own command.
  */
 export function notifyOwner(root, cfg, agent, what) {
-	const line = `${basename(root)} / ${agent} : ${what}`
+	// NO NUL in an argument: spawnSync THROWS on one, and a refusal that quotes a guard's stderr can carry one (the review of
+	// #relay-death, F3: the throw turned the relay's true refusal into "its watcher crashed"). Telling the owner never throws.
+	const line = `${basename(root)} / ${agent} : ${what}`.replace(/\0/g, "")
 	const custom = cfg && Array.isArray(cfg.notify) && cfg.notify.length
 	const argv = custom ? [...cfg.notify, line] : ["notify-send", "-u", "critical", "-a", "claude-comm", "claude-comm", line]
 	let answered = "not run: a test's project"
 	if (custom || ![tmpdir(), "/tmp"].some((d) => String(root).startsWith(`${d}/`))) {
-		const r = spawnSync(String(argv[0]), argv.slice(1).map(String), { stdio: "ignore", timeout: 5000 })
-		answered = r.error ? r.error.code : r.status
+		try {
+			const r = spawnSync(String(argv[0]).replace(/\0/g, ""), argv.slice(1).map((a) => String(a).replace(/\0/g, "")), { stdio: "ignore", timeout: 5000 })
+			answered = r.error ? r.error.code : r.status
+		} catch (e) { answered = `threw: ${e.code || e.message}` }
 	}
 	try {
 		mkdirSync(join(root, ".comm", "wake"), { recursive: true })

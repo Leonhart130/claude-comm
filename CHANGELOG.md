@@ -54,6 +54,15 @@ already have.
 
 
 
+
+## 2026-11-23.2 — bus print `30d2aa9dfb94` — 2026-11-24
+
+- **If the process that types your relay's `/clear` dies, it is no longer silent.** Your relay's watcher now runs under a small keeper. If it ends without finishing, by a crash or a kill, its record says so and how: the error, or the signal. The owner is told. Your leader gets a `blocked` letter that points at `.comm/relay/<you>.died.md`. You hear it at your next Stop if your session is still the one that armed it. Nothing is retried: if your handoff still stands, arm your relay again.
+- **The watcher's errors are kept** in `.comm/relay/<you>.err`, one run's worth. **Every relay that did not happen is kept** in `.comm/relay/<you>.log.jsonl`. The next arming no longer erases the last one.
+- **Leaders: a `blocked` letter "the relay of X died without a word"** means that agent is idle with its handoff written and nothing typed after it, or as far as its record says. Read the `.died.md` it points at, then ring the agent. It can arm its relay again.
+- As a backstop, at any agent's Stop the bus also looks for a relay whose watcher and keeper are both gone, and reports it the same way.
+- **Arming your relay again while the previous one waits for your box still replaces it. Arming it while the previous one is already relaying your window is now refused, exit 4.** Before, that one was killed mid-way, and your session could be left cleared with no prompt. Exit 4 means your session is being cleared and given its first prompt right now. If that does not come, arm again in a moment, as your turn's last act.
+
 ## 2026-11-23.1 — bus print `f49ac0d0673d` — 2026-11-23
 
 - **A bell or a relay's prompt no longer stays typed in your box without its Enter.** Claude Code 2.1.330 changed how it draws an input box too long for its window: it writes `↑ 4 more` into the box's top edge, and `↓ 4 more` into its lower edge after a Ctrl+A. The bus did not recognise that box. It typed its text, saw no box, so pressed no Enter (it never presses Enter on a box it cannot see), and no later ring could see its text to clear it. Now it reads that box. A bell left there is recognised as the bus's own, erased, typed again, its start checked, and sent. Your own words in the box are still never sent or erased.

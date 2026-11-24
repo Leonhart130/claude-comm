@@ -15,7 +15,7 @@
  * directives? Measuring the wrong thing produced a confident, plausible, wrong
  * result, which is this project's signature failure mode.
  */
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync, statSync, lstatSync, symlinkSync, cpSync, utimesSync, chmodSync, renameSync, appendFileSync } from "node:fs"
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync, statSync, lstatSync, symlinkSync, cpSync, utimesSync, chmodSync, renameSync, appendFileSync, openSync, closeSync } from "node:fs"
 import { join, delimiter, resolve, dirname, basename, relative } from "node:path"
 import { execFileSync, spawnSync, spawn } from "node:child_process"
 import { createHash, randomUUID } from "node:crypto"
@@ -5083,7 +5083,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 // FINDINGS.md#relay
 {
 	const r95 = mkdtempSync(join(tmpdir(), "comm-attack-relay-"))
-	const opened95 = [], ARMS = ["nominal", "typed", "dialog", "guard", "noclear", "untaken", "grace", "titled", "titledTyped", "pasted", "lostEnter", "lostEnterTyped", "declared", "twoBells", "cutBell", "overBell", "waitBox", "turnInWait", "keyboardHeld", "guardInWait", "movedInWait", "exitInWait", "rearmInWait", "clearStuck", "sayStuck", "capNominal", "capWordsInFront", "capLetterAfter", "capDialogShort", "capDialogForever", "capDialogUnseen", "capDialogBlank", "capLostDialog", "capUnseen", "capLostOnce", "capErase", "capDialogWords", "capDialogEats", "capWordsAtEnd", "capDialogFirst", "capDialogFirstLong", "capSlowRedraw", "capExactFill", "capExactFillClean", "capSay800", "capUnseenNoCursor", "capMainScreen"], REFUSED = ["nosay", "noguard", "nested", "mail", "selfcancel", "unregistered", "unregisteredOld", "flagguard", "declaredStale", "longsay", "backslashsay"], SC = [...ARMS, ...REFUSED]
+	const opened95 = [], ARMS = ["nominal", "typed", "dialog", "guard", "noclear", "untaken", "grace", "titled", "titledTyped", "pasted", "lostEnter", "lostEnterTyped", "declared", "twoBells", "cutBell", "overBell", "waitBox", "turnInWait", "keyboardHeld", "guardInWait", "movedInWait", "exitInWait", "rearmInWait", "rearmRefused", "killedWatcher", "clearStuck", "sayStuck", "capNominal", "capWordsInFront", "capLetterAfter", "capDialogShort", "capDialogForever", "capDialogUnseen", "capDialogBlank", "capLostDialog", "capUnseen", "capLostOnce", "capErase", "capDialogWords", "capDialogEats", "capWordsAtEnd", "capDialogFirst", "capDialogFirstLong", "capSlowRedraw", "capExactFill", "capExactFillClean", "capSay800", "capUnseenNoCursor", "capMainScreen"], REFUSED = ["nosay", "noguard", "nested", "mail", "selfcancel", "unregistered", "unregisteredOld", "flagguard", "declaredStale", "longsay", "backslashsay"], SC = [...ARMS, ...REFUSED]
 	atExit(() => {
 		for (const [sock, id] of opened95)
 			try { spawnSync("kitten", ["@", "--to", `unix:${sock}`, "close-window", "--match", `id:${id}`], { timeout: 5000 }) } catch {}
@@ -5156,6 +5156,8 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 		if (process.stdin.setRawMode) process.stdin.setRawMode(true)
 		process.stdin.on("data", (d) => {
 			fs.appendFileSync(c.keys, d)
+			// what the record said the moment these bytes ARRIVED: a key noted before it goes is in it already (#relay-death, F4)
+			if (c.rec) { let ks = null; try { ks = JSON.parse(fs.readFileSync(c.rec, "utf8")).keys_sent || null } catch {} fs.appendFileSync(c.rec + ".seen", JSON.stringify({ d: d.toString(), ks }) + "\n") }
 			const s = d.toString()
 			// `paste` (A101): a long text is a PASTE, drawn 1200 ms later, and an Enter read before it is drawn joins it - lost.
 			// A loaded machine's reading of two writes as one, measured on a real session 11-02 (#enter-in-the-paste)
@@ -5250,13 +5252,13 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 			const c = { keys: join(r95, `${k}.keys`), pidFile: join(r95, `${k}.pid`), go: join(r95, `${k}.go`), out: join(r95, `${k}.out`), cwd: join(r95, k),
 				tx: tx(k), tx2: tx2(k), next: join(r95, `${k}.next.json`), regDir: regDir95, clears: k !== "noclear", swallows: k === "untaken" || k === "capLetterAfter",
 				paste: k === "pasted", loseEnter: /^lostEnter/.test(k) || k === "capLostOnce", appendOnLost: k === "lostEnterTyped",
-				loseClearEnter: k === "clearStuck", loseAllEnters: k === "sayStuck" || k === "capLostDialog" || k === "capErase", go2: join(r95, `${k}.go2`), out2: join(r95, `${k}.out2`),
+				loseClearEnter: k === "clearStuck", loseAllEnters: k === "sayStuck" || k === "capLostDialog" || k === "capErase", go2: join(r95, `${k}.go2`), out2: join(r95, `${k}.out2`), rec: k === "nominal" || k === "capNominal" ? join(r95, ".comm", "relay", `${k}.json`) : null,
 				cap: /^cap/.test(k) ? 3 : 0, width: 40, wordsBefore: k === "capWordsInFront" || k === "capDialogWords", letterAfter: k === "capLetterAfter", dialogAfterEnters: k === "capLostDialog" ? 1 : 0,
 				ctrlAIgnored: k === "capUnseen" || k === "capUnseenNoCursor" || k === "capMainScreen", lineBefore: k === "capExactFill", hideCursor: k === "capUnseenNoCursor", mainScreen: k === "capMainScreen", wordsAfter: k === "capWordsAtEnd", dialogOnPrompt: { capDialogFirst: 7000, capDialogFirstLong: 30000 }[k] || 0,
 				slowCtrlE: k === "capErase" ? 150 : 0, slowCtrlA: k === "capSlowRedraw" ? 2500 : 0,
 				// 6 s and 3 s: long enough that two readings 1.5 s apart, on a loaded machine, cannot step over them (the ninth review)
 				dialogOnCtrlA: { capDialogShort: { ms: 9000 }, capDialogForever: { ms: 1e9 }, capDialogUnseen: { ms: 9000, eats: true, ignoreAfter: true }, capDialogBlank: { ms: 2000, blankMs: 4000 }, capDialogWords: { ms: 9000 }, capDialogEats: { ms: 3000, eats: true } }[k] || null,
-				typed: k === "typed" || k === "titledTyped" || /^(waitBox|turnInWait|guardInWait|movedInWait|exitInWait|rearmInWait)$/.test(k) ? "hello"
+				typed: k === "typed" || k === "titledTyped" || /^(waitBox|turnInWait|guardInWait|movedInWait|exitInWait|rearmInWait|rearmRefused)$/.test(k) ? "hello"
 					: k === "twoBells" ? wk95.NUDGE + wk95.NUDGE : k === "cutBell" ? wk95.NUDGE.slice(0, 150) : k === "overBell" ? `${wk95.NUDGE} hello` : "", dialog: k === "dialog", title: /^titled/.test(k) ? "leader expert" : "", boot: reg.bootId(), relay: R95, txNested: join(r95, "nested-inner.jsonl"),
 				// "nested": relay.mjs run by ANOTHER `claude` under this one - node under that name, so it is a session of its own
 				argv: k === "nested" ? [fake95, join(r95, "nested.cjs"), join(r95, `${k}.json`)]
@@ -5270,7 +5272,7 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 			// `declared` IS read, in a tab of its own: one more split narrowed every pane and `nominal`'s prompt was not
 			// seen whole in its box before the Enter (A101 nominalSawIt red, 11-05, the first run with it as a split)
 			// (`longsay`, `backslashsay`: refused at the arming, a tab each - two more splits shrank `nominal`'s pane under its box, 11-14)
-			const where = /^(mail|selfcancel|unregistered|flagguard|declared|twoBells|cutBell|overBell|waitBox|turnInWait|keyboardHeld|guardInWait|movedInWait|exitInWait|rearmInWait|clearStuck|sayStuck|cap|longsay|backslashsay)/.test(k) ? ["--type=tab", "--match", `window_id:${b95.id}`] : ["--type=window", ...besideMe(b95)]
+			const where = /^(mail|selfcancel|unregistered|flagguard|declared|twoBells|cutBell|overBell|waitBox|turnInWait|keyboardHeld|guardInWait|movedInWait|exitInWait|rearmInWait|rearmRefused|killedWatcher|clearStuck|sayStuck|cap|longsay|backslashsay)/.test(k) ? ["--type=tab", "--match", `window_id:${b95.id}`] : ["--type=window", ...besideMe(b95)]
 			const id = Number(spawnSync("kitten", ["@", "--to", `unix:${b95.sock}`, "launch", "--keep-focus", ...where,
 				`--cwd=${join(r95, k)}`, `--env=CLAUDE_COMM_RUNTIME=${rt95}`, fake95, join(r95, "fake.cjs"), join(r95, `${k}.json`)], { encoding: "utf8", timeout: 10000 }).stdout)
 			if (Number.isInteger(id) && id > 0) opened95.push([b95.sock, id])
@@ -5300,7 +5302,19 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 			const st95 = readFileSync("/proc/self/stat", "utf8")
 			writeFileSync(join(rt95, "claude-comm", "typing", `${basename(b95.sock)}-${S95.keyboardHeld.id}.json`), JSON.stringify({ pid: process.pid, tick: st95.slice(st95.lastIndexOf(") ") + 2).split(" ")[19], at: Date.now(), what: "the arm's typist" }))
 		}
-		for (const k of ARMS) if (k !== "grace") { endTurn(k); if (k === "nominal") S95.nominal.ended = Date.now() }
+		// `killedWatcher` (#relay-death, the review's F2): its turn never ends; its node watcher - not its keeper - is SIGKILLed
+		{
+			const recPath = join(r95, ".comm", "relay", "killedWatcher.json")
+			for (const until = Date.now() + 5000; Date.now() < until && !S95.killedWatcher.watcherPid; nap(50))
+				for (const d of readdirSync("/proc")) {
+					if (!/^\d+$/.test(d)) continue
+					let c = []
+					try { c = readFileSync(`/proc/${d}/cmdline`, "utf8").split("\0") } catch { continue }
+					if (c[0] === process.execPath && c.includes("--after-turn") && c.includes(recPath)) { S95.killedWatcher.watcherPid = Number(d); break }
+				}
+			if (S95.killedWatcher.watcherPid) try { process.kill(S95.killedWatcher.watcherPid, "SIGKILL") } catch {}
+		}
+		for (const k of ARMS) if (k !== "grace" && k !== "killedWatcher") { endTurn(k); if (k === "nominal") S95.nominal.ended = Date.now() }
 		endTurn("grace"); nap(700); U("grace", "attends, ne vide pas"); A("grace", "end_turn", "ok")
 		const settled = (k) => { const r = recOf(k); return r && r.relayed !== null && !r.relay_pid }
 		// A114a's legs act at the moment the relay SAYS it is waiting for its box, never after a guessed delay
@@ -5316,20 +5330,68 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 			once("exitInWait", "waiting_for_the_box", () => { try { process.kill(S95.exitInWait.pid) } catch {} })
 			// the second arming, then its turn's end, then the same box emptied for the watcher it armed
 			once("rearmInWait", "box_wait_since", () => writeFileSync(S95.rearmInWait.c.go2, ""))
+			// `rearmRefused` (the review's F1): the agent arms again while it waits, and a guard refuses that arming - the first watcher
+			// must live on, and cancel at its next look because a turn was taken, never be left an orphan for the reaper to call dead
+			once("rearmRefused", "box_wait_since", () => { rmSync(join(r95, "rearmRefused", "HANDOFF.md"), { force: true }); writeFileSync(S95.rearmRefused.c.go2, "") })
+			if (acted95.rearmRefused && !acted95.refusedEnd && existsSync(S95.rearmRefused.c.out2)) { acted95.refusedEnd = true; U("rearmRefused", [{ type: "tool_result", tool_use_id: "t1", content: "relay: a guard failed" }]); endTurn("rearmRefused") }
 			if (acted95.rearmInWait && !acted95.rearmEnd && existsSync(S95.rearmInWait.c.out2)) { acted95.rearmEnd = true; U("rearmInWait", [{ type: "tool_result", tool_use_id: "t1", content: "relay: armed" }]); endTurn("rearmInWait") }
 			if (acted95.rearmEnd && !acted95.rearmFree && (recOf("rearmInWait") || {}).waiting_for_the_box) { acted95.rearmFree = true; ctrlU("rearmInWait") }
 		}
 		for (const k of ["clearStuck", "sayStuck", "capErase"]) if (S95[k].id) S95[k].boxAfter = wk95.screenAtRest({ sock: b95.sock, id: S95[k].id })
 		for (const k of SC) { S95[k].rec = recOf(k); S95[k].keys = keysOf(k) }
+		// what the arming now leaves beside the record (#relay-death): its watcher's stderr, and a log of every relay that did not happen
+		for (const k of SC) {
+			try { S95[k].err = readFileSync(join(r95, ".comm", "relay", `${k}.err`), "utf8") } catch { S95[k].err = null }
+			try { S95[k].log = readFileSync(join(r95, ".comm", "relay", `${k}.log.jsonl`), "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)) } catch { S95[k].log = [] }
+		}
 	}
 	const rec = (k) => (S95[k] && S95[k].rec) || {}, keys = (k) => S95[k] && S95[k].keys, out = (k) => (S95[k] && S95[k].o) || {}
 	const why = (k) => `${rec(k).refused || ""}${rec(k).cancelled || ""}`
 	const untouched = (k, re) => rec(k).relayed === false && keys(k) === "" && re.test(why(k))
 	let after = ""
 	try { after = readFileSync(tx2("nominal"), "utf8") } catch {}
+	// what reached the owner, read here for the legs below (A114a reads it again further on)
+	let toldA95 = ""
+	try { toldA95 = readFileSync(told95, "utf8") } catch {}
+	const toldIn = (k, re) => toldA95.split("\n").filter((l) => l.includes(`/ ${k} :`) && re.test(l)).length
 	const ok = {
 		armed: ARMS.every((k) => out(k).s === 0 && /relay: armed/.test(out(k).o || "")),
 		relayed: rec("nominal").relayed === true && keys("nominal") === `/clear\r${say("nominal")}\r` && after.includes(JSON.stringify(say("nominal"))),
+		// the ARMING opens the watcher's stderr (its header line proves the fd reached the watcher); a relay done logs nothing; a
+		// refusal, a --cancel and a watcher replaced by a new arming each leave one row (#relay-death)
+		stderrKept: /^relay watcher \d+ for 'nominal', armed /.test(S95.nominal.err || "") && S95.nominal.log.length === 0,
+		// every kind of key noted before it went, and where it was (the review's F4): the relay done, a refusal before any key, the Ctrl+A path
+		keysNoted: JSON.stringify(rec("nominal").keys_sent) === JSON.stringify({ kinds: ["/clear", "Enter", "prompt"], enter_after_prompt: true }) && rec("nominal").phase === "proving its prompt was taken"
+			&& rec("typed").keys_sent === undefined && ((rec("capNominal").keys_sent || {}).kinds || []).includes("Ctrl+A"),
+		// and noted BEFORE it went: each chunk the session received was already in the record when it arrived (an Enter after the prompt
+		// with the flag set) - the review's "the final record only" (F3 of the second round)
+		keysNotedBefore: ["nominal", "capNominal"].every((k) => {
+			let seen = []
+			try { seen = readFileSync(join(r95, ".comm", "relay", `${k}.json.seen`), "utf8").trim().split("\n").map((l) => JSON.parse(l)) } catch { return false }
+			// a chunk may hold two writes read as one (`/clear` and its Enter): judged token by token
+			const kinds = (d) => (d.match(/\/clear|\r|\x01|\x05|\x15|[^\r\x01\x05\x15]+/g) || []).map((t) => t === "\r" ? "Enter" : t === "\x01" ? "Ctrl+A"
+				: t === "\x05" ? "Ctrl+E" : t === "\x15" ? "Ctrl+U" : t === "/clear" ? "/clear" : t === say(k) ? "prompt" : null).filter(Boolean)
+			let promptIn = false, n = 0
+			const all = seen.every(({ d, ks }) => kinds(d).every((kk) => {
+				n++
+				const ok = !!ks && ks.kinds.includes(kk) && (!(kk === "Enter" && promptIn) || ks.enter_after_prompt === true)
+				if (kk === "prompt") promptIn = true
+				return ok
+			}))
+			// the prompt seen as one token, or the Enter after it was never judged for its flag (the third review, F7a): a prompt read
+			// in pieces is red here, not a pass on the Enters alone
+			return all && n >= 3 && promptIn
+		}),
+		// --cancel stops the keeper with its watcher: no death reported for what the agent asked
+		cancelNoDeath: !rec("selfcancel").died && /--cancel - nothing was typed/.test(rec("selfcancel").cancelled || "") && toldIn("selfcancel", /mort/) === 0,
+		rearmRefusedKeepsOld: (() => { let o = {}; try { o = JSON.parse(readFileSync(S95.rearmRefused.c.out2, "utf8")) } catch {} return o.s === 3 && /a guard failed/.test(o.e || "") })() &&
+			rec("rearmRefused").relayed === false && /took a turn while the relay waited/.test(rec("rearmRefused").cancelled || "") && !rec("rearmRefused").died && toldIn("rearmRefused", /mort/) === 0,
+		// the keeper (the review's F2): the watcher SIGKILLed mid-wait, its death recorded at once with its signal, the owner told
+		keeperReports: !!S95.killedWatcher.watcherPid && rec("killedWatcher").relayed === false && /was killed by signal 9 \(SIGKILL\)/.test((rec("killedWatcher").died || {}).how || "")
+			&& /keeper/.test((rec("killedWatcher").died || {}).by || "") && toldIn("killedWatcher", /son relais est mort sans un mot, tué par le signal 9 \(SIGKILL\)/) === 1,
+		refusalLogged: S95.typed.log.length === 1 && /text is on the input line/.test(S95.typed.log[0].refused || ""),
+		cancelLogged: S95.selfcancel.log.length === 1 && /--cancel/.test(S95.selfcancel.log[0].cancelled || ""),
+		replacedLogged: S95.rearmInWait.log.length === 1 && /replaced by a new arming/.test(S95.rearmInWait.log[0].cancelled || "") && S95.rearmInWait.log[0].relayed === false,
 		// never inside the turn: the first keystroke comes after its end AND the grace
 		afterTheTurn: !!S95.nominal && !!rec("nominal").clear && Date.parse(rec("nominal").clear.at) - S95.nominal.ended >= 1800,
 		typedRefused: untouched("typed", /text is on the input line/),
@@ -6871,6 +6933,504 @@ const DRAW_IDLE_BOX = `process.stdout.write("\\r\\n"+"─".repeat(60)+"\\r\\n❯
 	check("A128 an edge that says how many lines it hides (2.1.330) is read as the box's: a bell left there is the bus's own, erased, rung on its start; words above it kept; no arrow outside a rule, nor on the wrong edge, makes a box",
 		!threw128 && n128 >= 47 && Object.values(legs128).every(Boolean),
 		`${threw128 ? `ITS LEGS THREW: ${String(threw128.message).slice(0, 80)}; ` : ""}${n128} legs; ` + Object.entries(legs128).filter(([, v]) => !v).map(([k]) => `${k}=false`).join("; "))
+}
+
+// A129 — A RELAY'S WATCHER THAT DIES SAYS SO, AND ONE THAT DIES WITHOUT A WORD IS SEEN FROM OUTSIDE. Work's letter 93, 11-23: an expert
+// armed its relay at 04:57:50Z, its turn ended 12 s later, and nothing came; at 05:4x its record said `relayed: null`, no `ended_at`,
+// the watcher's pid gone - it slept 46 min until its chief rang it. Why is lost: the watcher's stderr went to "ignore", and the next
+// relay wrote over the record. Here a watcher that THROWS (its guards not a list: any throw, the source is incidental) must end its
+// record as a refusal, its stack kept, the owner told; a guard whose stderr holds a NUL must stay a refusal, not become a crash (the
+// review's F3); and a record whose watcher is GONE must be turned into one by `relay.mjs --reap`, the owner told and the leader sent a
+// `blocked` letter at a file of its own, once, under one lock - through the installed stub's Stop too, which starts no reaper for a
+// record off the roster and sees a pid recycled into another record's watcher (F5). A session gone with its watcher is closed
+// quietly. Controls one variable away: armed 5 s ago, a LIVE watcher of that record, a finished record - all untouched. The keeper
+// is armed here too (`keeperOtherArming`, `keeperOwnArming`, `keeperUnderLock`); the arming's replace is A130's, headless; the keys
+// noted before they go are A95's (they need a window). Proved red: the release before
+// reddens every leg but the controls (FINDINGS.md#relay-death).
+{
+	const r129 = mkdtempSync(join(tmpdir(), "comm-attack-death-"))
+	const kids129 = []
+	atExit(() => { for (const k of kids129) try { k.kill("SIGKILL") } catch {} try { rmSync(r129, { recursive: true, force: true }) } catch {} })
+	const told129 = join(r129, "told.txt"), AG = ["app", "young", "live", "other", "done", "twice", "crash", "nul", "typed", "stub", "stublive", "stubother", "lockheld", "lockstale", "gone", "kept", "merge", "noted", "underlock", "droplock", "torn", "tornlong", "foreign"]
+	for (const a of AG) mkdirSync(join(r129, a), { recursive: true })
+	mkdirSync(join(r129, ".comm"), { recursive: true })
+	writeFileSync(join(r129, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", ...Object.fromEntries(AG.map((a) => [a, a])) },
+		notify: ["sh", "-c", 'printf "%s\n" "$1" >> "$0"', told129] }))
+	execFileSync("node", [join(PKG, "install.mjs"), r129], { stdio: "pipe" })
+	const rel129 = join(r129, ".comm", "relay"); mkdirSync(rel129, { recursive: true })
+	const rec129 = (a) => join(rel129, `${a}.json`), read129 = (a) => { try { return JSON.parse(readFileSync(rec129(a), "utf8")) } catch { return {} } }
+	// HERMETIC (the third review, F7b): the reaper rings the leader through wake.mjs, whose windows() sent `kitten @ ls` to the
+	// owner's live sockets, 20 a run. A kitten that logs and fails stands in; its log says it was the one asked.
+	const bin129 = join(r129, "fakebin"), kittenLog129 = join(r129, "kitten.log")
+	mkdirSync(bin129, { recursive: true })
+	writeFileSync(join(bin129, "kitten"), `#!/bin/sh\nprintf '%s\\n' "$*" >> '${kittenLog129}'\nexit 1\n`, { mode: 0o755 })
+	const R129 = join(r129, ".comm", "bin", "relay.mjs"), env129 = { ...process.env, PATH: `${bin129}:${process.env.PATH}`, CLAUDE_COMM_RUNTIME: join(r129, "runtime") }
+	// and for EVERY child of this block, given env129 or not (the fourth review, F5: a spawn that forgot it reached the real kitten
+	// while `hermetic` stayed green) - restored at its end
+	const path0_129 = process.env.PATH
+	process.env.PATH = env129.PATH
+	atExit(() => { process.env.PATH = path0_129 })
+	const told = () => { try { return readFileSync(told129, "utf8").trim().split("\n").filter(Boolean) } catch { return [] } }
+	const ibx = join(r129, ".comm", "inbox", "leader")
+	const letters = () => { try { return readdirSync(ibx).filter((f) => f.endsWith(".json")).map((f) => JSON.parse(readFileSync(join(ibx, f), "utf8"))) } catch { return [] } }
+	const reapRuns = () => { try { return readFileSync(join(rel129, "reap.log"), "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)).filter((l) => l.by === "reaper").length } catch { return 0 } }
+	const ago = (ms) => new Date(Date.now() - ms).toISOString()
+	const deadPid = Number(spawnSync(process.execPath, ["-e", "console.log(process.pid)"], { encoding: "utf8" }).stdout.trim())
+	// A SESSION THAT LIVES: a process named `claude`, as a real session is - the reaper tells only while somebody waits on the relay
+	const fakeClaude = join(r129, "claude")
+	symlinkSync(process.execPath, fakeClaude)
+	const sess = spawn(fakeClaude, ["-e", "setTimeout(()=>{},120000)"], { stdio: "ignore" }); kids129.push(sess)
+	const watcherOf = (path) => { const k = spawn(process.execPath, ["-e", "setTimeout(()=>{},120000)", "--", "--after-turn", path], { stdio: "ignore" }); kids129.push(k); return k }
+	const armedLive = (k) => { try { return readFileSync(`/proc/${k.pid}/cmdline`, "utf8").includes("--after-turn") } catch { return false } }
+	const reap = () => spawnSync(process.execPath, [R129, "--reap", r129], { encoding: "utf8", env: env129, timeout: 30000 })
+	const orphanRec = (a, more = {}) => writeFileSync(rec129(a), JSON.stringify({ agent: a, session: sess.pid, window: 20, armed_at: ago(60_000), relay_pid: deadPid, relayed: null, ...more }))
+	const legs = {}
+
+	// THE CRASH: a session alive, a turn ended, guards that are not a list - the watcher throws at its step 3. Its stderr is the file
+	// the arming opens, opened here the same way. And THE NUL: a guard that fails printing one - a refusal it must stay.
+	const tx = join(r129, "crash.jsonl")
+	writeFileSync(tx, JSON.stringify({ type: "system", subtype: "turn_duration", timestamp: new Date().toISOString() }) + "\n")
+	const runWatcher = (a, guards) => {
+		const at = new Date().toISOString()
+		writeFileSync(rec129(a), JSON.stringify({ agent: a, session: sess.pid, cwd: join(r129, a), window: 9, sock: "/nonexistent", transcript: tx,
+			armed_offset: 0, say: "resume", guards, armed_at: at, relay_pid: null, relayed: null }))
+		const efd = openSync(join(rel129, `${a}.err`), "w")
+		const w = spawnSync(process.execPath, [R129, "--after-turn", rec129(a)], { stdio: ["ignore", "ignore", efd], env: env129, timeout: 20000 })
+		closeSync(efd)
+		w.armedAt = at
+		return w
+	}
+	const w = runWatcher("crash", 5)
+	const c = read129("crash")
+	const err = (() => { try { return readFileSync(join(rel129, "crash.err"), "utf8") } catch { return "" } })()
+	const log = (() => { try { return readFileSync(join(rel129, "crash.log.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l)) } catch { return [] } })()
+	legs.crash = c.relayed === false && !!c.ended_at && /its watcher crashed while checking its guards and its window/.test(c.refused || "") && /not iterable/.test((c.crashed || {}).error || "")
+	legs.crashStderr = /^relay watcher \d+ for 'crash'/.test(err) && /CRASHED/.test(err) && /not iterable/.test(err)
+	legs.crashLogged = log.length === 1 && log[0].relayed === false && /crashed/.test(log[0].refused || "")
+	legs.crashTold = told().some((l) => / crash : son relais n'a pas eu lieu : son veilleur a planté \(rien n'a été tapé\)/.test(l))
+	const wn = runWatcher("nul", ["printf 'a\\000b' >&2; exit 1"])
+	const n = read129("nul")
+	// ITS OWN NOTES LAND ON ITS OWN ARMING'S RECORD ONLY: a guard that, as it fails, leaves a NEW arming's record in place (as the agent
+	// arming again a moment after this watcher's end would) - the refusal and the owner's note must not be written over it (F1, round 2)
+	const newer = JSON.stringify({ agent: "noted", armed_at: "2099-01-01T00:00:00.000Z", relay_pid: null, relayed: null })
+	const wNoted = runWatcher("noted", [`printf '%s' '${newer}' > '${rec129("noted")}'; exit 1`])
+	legs.notesOwnOnly = read129("noted").armed_at === "2099-01-01T00:00:00.000Z" && read129("noted").relayed === null && !read129("noted").refused && !read129("noted").owner_told
+	// ...and its refusal LOGGED all the same, said as not written (the third review, F4: it was in no record and no log)
+	const log129 = (a) => { try { return readFileSync(join(rel129, `${a}.log.jsonl`), "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)) } catch { return [] } }
+	// its arming named in it (the fourth review, F6: a row without `st` was one nobody could tie to its arming)
+	legs.notesOwnLogged = (() => { const l = log129("noted"); return l.length === 1 && l[0].relayed === false && /a guard failed/.test(l[0].refused || "") && l[0].unwritten === "its record is another arming's now" && l[0].armed_at === wNoted.armedAt && l[0].agent === "noted" })()
+	// A RECORD THAT CANNOT BE SHOWN TO BE ITS OWN - no armed_at at all - is not written on either (the fourth review, F3: the loose test
+	// wrote its refusal there); logged, `unwritten`
+	const wForeign = runWatcher("foreign", [`printf '%s' '{"agent":"foreign","relayed":null}' > '${rec129("foreign")}'; exit 1`])
+	legs.foreignNotWritten = (() => { try { return readFileSync(rec129("foreign"), "utf8") === '{"agent":"foreign","relayed":null}' } catch { return false } })()
+		&& (() => { const l = log129("foreign"); return l.length === 1 && l[0].unwritten === "its record is another arming's now" && l[0].armed_at === wForeign.armedAt })()
+	writeFileSync(rec129("foreign"), JSON.stringify({ agent: "foreign", relayed: true }))
+	// A RECORD READ TORN IS NEVER WRITTEN OVER (the third review, F2): a guard that leaves it torn as it fails. `torn`: whole again 20 ms
+	// later (a writer in place, finishing) - the refusal lands on the whole record, its armed_at and transcript kept; the stderr line is
+	// the positive control that the read WAS torn. `tornlong`: torn for good - nothing written, the refusal in the log
+	const tornAt = {}
+	for (const [a, back] of [["torn", true], ["tornlong", false]]) {
+		const keep = join(r129, `${a}.whole`)
+		const g = back ? `cp '${rec129(a)}' '${keep}'; printf '{"torn":' > '${rec129(a)}'; ( sleep 0.02; cp '${keep}' '${rec129(a)}' ) >/dev/null 2>&1 </dev/null & exit 1`
+			: `printf '{"torn":' > '${rec129(a)}'; exit 1`
+		tornAt[a] = runWatcher(a, [g]).armedAt
+	}
+	const tornErr = (() => { try { return readFileSync(join(rel129, "torn.err"), "utf8") } catch { return "" } })()
+	legs.tornKept = read129("torn").relayed === false && /a guard failed/.test(read129("torn").refused || "") && !!read129("torn").armed_at && read129("torn").transcript === tx
+		&& !read129("torn").intent_unreadable && /its record cannot be read .* again in 20 ms/.test(tornErr)
+	legs.tornLongUntouched = (() => { try { return readFileSync(rec129("tornlong"), "utf8") === '{"torn":' } catch { return false } })()
+		&& (() => { const l = log129("tornlong"); return l.length === 1 && l[0].unwritten === "its record could not be read" && /a guard failed/.test(l[0].refused || "") && l[0].armed_at === tornAt.tornlong })()
+	for (const a of ["torn", "tornlong"]) writeFileSync(rec129(a), JSON.stringify({ agent: a, relayed: true }))
+	writeFileSync(rec129("noted"), JSON.stringify({ agent: "noted", relayed: true }))
+	legs.nulStaysARefusal = wn.status === 1 && n.relayed === false && /a guard failed at the moment of the relay/.test(n.refused || "") && !n.crashed
+		&& told().some((l) => / nul : son relais n'a pas eu lieu : .*a guard failed/.test(l))
+
+	// THE REAP: gone (a pid that exited), armed a minute ago; and its controls
+	orphanRec("app", { turn_ended_at: ago(58_000) })
+	writeFileSync(join(rel129, "app.log.jsonl"), '{"torn":')   // a log whose last append was cut short
+	writeFileSync(rec129("young"), JSON.stringify({ agent: "young", session: sess.pid, armed_at: new Date().toISOString(), relay_pid: deadPid, relayed: null }))
+	const liveK = watcherOf(rec129("live"))
+	writeFileSync(rec129("live"), JSON.stringify({ agent: "live", session: sess.pid, armed_at: ago(60_000), relay_pid: liveK.pid, relayed: null }))
+	const otherK = watcherOf(rec129("live"))   // alive, and a watcher - of ANOTHER record
+	orphanRec("other", { relay_pid: otherK.pid })
+	writeFileSync(rec129("done"), JSON.stringify({ agent: "done", session: sess.pid, armed_at: ago(60_000), relay_pid: null, relayed: true }))
+	orphanRec("typed", { turn_ended_at: ago(58_000), clear: { at: ago(57_000), typed: true, cleared: true }, keys_sent: { kinds: ["/clear", "Enter"], enter_after_prompt: false } })
+	orphanRec("gone", { session: deadPid })   // its session gone with it: nobody waits on it
+	nap(150)
+	legs.controlsArmed = armedLive(liveK) && armedLive(otherK) && (() => { try { return readFileSync(`/proc/${sess.pid}/cmdline`, "utf8").split("\0")[0].endsWith("/claude") } catch { return false } })()
+	const toldBefore = told().length
+	reap()
+	const a = read129("app"), L = letters()
+	legs.reap = a.relayed === false && !!a.ended_at && /is gone and wrote nothing about why, after the turn that armed it ended/.test(a.refused || "") && (a.died || {}).by === "a Stop hook"
+	legs.letter = L.length === 3 && L.every((m) => m.kind === "blocked") && ["app", "other", "typed"].every((x) => L.some((m) => m.from === x))
+		&& L.some((m) => m.from === "app" && m.refPath === ".comm/relay/app.died.md") && /The relay of app died without a word/.test((() => { try { return readFileSync(join(rel129, "app.died.md"), "utf8") } catch { return "" } })())
+	legs.told = told().length - toldBefore === 3 && told().some((l) => / app : son relais est mort sans un mot \(rien n'a été tapé\) - fenêtre 20/.test(l))
+	legs.young = read129("young").relayed === null && !read129("young").ended_at
+	legs.live = read129("live").relayed === null && !read129("live").ended_at
+	legs.recycled = read129("other").relayed === false
+	legs.done = read129("done").relayed === true && !read129("done").ended_at
+	legs.typedSaid = /\/clear was typed and taken: a fresh session waits/.test(read129("typed").refused || "")
+	legs.sessionGoneQuiet = read129("gone").relayed === false && (read129("gone").died || {}).session_gone === true && !letters().some((m) => m.from === "gone") && !told().some((l) => / gone : /.test(l))
+	legs.tornLogClosed = (() => { try { const ls = readFileSync(join(rel129, "app.log.jsonl"), "utf8").trim().split("\n"); return ls.length === 2 && ls[0] === '{"torn":' && JSON.parse(ls[1]).relayed === false } catch { return false } })()
+	// AGAIN: nothing left to tell
+	const nL = letters().length, nT = told().length
+	reap()
+	legs.onceOnly = nL > 0 && letters().length === nL && told().length === nT
+	// TWO REAPERS AT ONCE, one record: one letter, one line to the owner
+	orphanRec("twice", { window: 21 })
+	const both = [0, 1].map(() => spawn(process.execPath, [R129, "--reap", r129], { stdio: "ignore", env: env129 }))
+	const running = (k) => { try { return !/^Z/.test(readFileSync(`/proc/${k.pid}/stat`, "utf8").split(") ").pop()) } catch { return false } }
+	for (const u = Date.now() + 20000; Date.now() < u && both.some(running); nap(50)) {}
+	legs.twice = read129("twice").relayed === false && letters().filter((m) => m.from === "twice").length === 1 && told().filter((l) => / twice : /.test(l)).length === 1
+	// THE LEADER'S OWN: the owner told, no letter to itself
+	orphanRec("leader", { window: 1 })
+	reap()
+	const own = read129("leader")
+	legs.leaderOwn = own.relayed === false && !("leader" in ((own.died || {}).told || {})) && !letters().some((m) => m.from === "leader") && told().some((l) => / leader : son relais est mort/.test(l))
+	// THE LOCK, both ways (two reapers rarely meet inside a millisecond, so their race alone cannot redden it): one held a moment
+	// ago keeps this reaper off the record; one left two minutes ago by a reaper killed mid-way is nobody's
+	for (const [k, age] of [["held", 0], ["stale", 120_000]]) {
+		orphanRec(`lock${k}`, { window: 23 })
+		writeFileSync(`${rec129(`lock${k}`)}.reap`, "1"); if (age) { const t = new Date(Date.now() - age); utimesSync(`${rec129(`lock${k}`)}.reap`, t, t) }
+	}
+	reap()
+	legs.lockHeld = read129("lockheld").relayed === null && existsSync(`${rec129("lockheld")}.reap`)
+	legs.lockStale = read129("lockstale").relayed === false && !existsSync(`${rec129("lockstale")}.reap`)
+	rmSync(`${rec129("lockheld")}.reap`, { force: true }); writeFileSync(rec129("lockheld"), JSON.stringify({ agent: "lockheld", relayed: true }))
+
+	// THE KEEPER ENDS ITS OWN ARMING'S RECORD, never the next one's (the second review, F1): `--kept` as the keeper runs it, with
+	// the arming's `armed_at` - an older arming's keeper leaves the new, live record alone; its own reports the signal
+	const t2 = new Date().toISOString()
+	orphanRec("kept", { armed_at: t2, window: 24 })
+	const kept = (rc, at) => spawnSync(process.execPath, [R129, "--kept", rec129("kept"), String(rc), at], { encoding: "utf8", env: env129, timeout: 30000 })
+	const keeperLines = (a) => { try { return readFileSync(join(rel129, "reap.log"), "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)).filter((l) => l.by === "keeper" && l.agent === a) } catch { return [] } }
+	kept(1, ago(90_000))
+	// and at its FIRST read, before any lock: no keeper line (it exits there), as the round-3 mutant without that read would not
+	legs.keeperOtherArming = read129("kept").relayed === null && !read129("kept").ended_at && keeperLines("kept").length === 0
+	kept(143, t2)
+	legs.keeperOwnArming = read129("kept").relayed === false && /was killed by signal 15 \(SIGTERM\)/.test((read129("kept").died || {}).how || "")
+		&& letters().some((m) => m.from === "kept") && told().some((l) => / kept : son relais est mort sans un mot, tué par le signal 15 \(SIGTERM\)/.test(l))
+	// ...AND UNDER THE LOCK (the third review, F1): its first read sees its own record, then a new arming holds the lock and writes its
+	// own - the read under the lock must leave that one alone. The lock held here as that arming holds it; the keeper's `reap.log` line
+	// is the positive control (written only past the first read: a keeper that started late and read the new record is red, not a pass)
+	let underLock = null
+	// each wait well under the keeper's 5 s for the lock: past it, it would give up unlocked and pass without the read under test
+	for (const wait of [700, 1500, 3000]) {
+		const tA = new Date().toISOString(), lk = `${rec129("underlock")}.reap`
+		writeFileSync(rec129("underlock"), JSON.stringify({ agent: "underlock", session: sess.pid, window: 25, armed_at: tA, relay_pid: deadPid, relayed: null }))
+		writeFileSync(lk, "1")
+		const k0 = keeperLines("underlock").length, nL0 = letters().filter((m) => m.from === "underlock").length
+		const kp = spawn(process.execPath, [R129, "--kept", rec129("underlock"), "137", tA], { stdio: "ignore", env: env129 })
+		nap(wait)
+		const liveU = watcherOf(rec129("underlock"))
+		writeFileSync(rec129("underlock"), JSON.stringify({ agent: "underlock", session: sess.pid, window: 25, armed_at: "2099-02-02T00:00:00.000Z", relay_pid: liveU.pid, relayed: null }))
+		// still WAITING for the lock as it goes: a keeper that gave up its own wait before proves nothing (the fifth review, F2)
+		const aliveAtRm = running(kp)
+		rmSync(lk, { force: true })
+		const tRm = Date.now()
+		for (const u = Date.now() + 15000; Date.now() < u && running(kp); nap(20)) {}
+		// it read the record UNDER the lock: on within a moment of the lock's going, not at its own 5 s wait's end, which logs the
+		// same "nothing" (the fourth review, F8)
+		const quick = Date.now() - tRm < 1500
+		const ks = keeperLines("underlock").slice(k0)
+		// it read the new record first, or gave up before the lock went: inconclusive, again, later
+		if (!ks.length || !aliveAtRm) { try { liveU.kill("SIGKILL") } catch {} continue }
+		const u = read129("underlock")
+		underLock = quick && ks.length === 1 && ks[0].did === "nothing" && u.armed_at === "2099-02-02T00:00:00.000Z" && u.relayed === null && !u.ended_at && !u.died
+			&& letters().filter((m) => m.from === "underlock").length === nL0 && !told().some((l) => / underlock : /.test(l))
+		try { liveU.kill("SIGKILL") } catch {}
+		break
+	}
+	legs.keeperUnderLock = underLock === true
+	writeFileSync(rec129("underlock"), JSON.stringify({ agent: "underlock", relayed: true }))
+	// THE LATE MERGE (round 1's F7a, unarmed in round 2): a new arming written while the reaper tells - here by a `comm.mjs` that
+	// writes one when it is asked to send - keeps its record clean of the old death
+	const comm129 = join(r129, ".comm", "bin", "comm.mjs"), realComm = readFileSync(comm129)
+	writeFileSync(comm129, `import { writeFileSync } from "node:fs"\nif (process.argv[2] === "send") writeFileSync(${JSON.stringify(rec129("merge"))}, JSON.stringify({ agent: "merge", armed_at: "2099-01-01T00:00:00.000Z", relay_pid: null, relayed: null }))\n`)
+	orphanRec("merge")
+	reap()
+	writeFileSync(comm129, realComm)
+	legs.lateMergeKept = read129("merge").armed_at === "2099-01-01T00:00:00.000Z" && !read129("merge").died && read129("merge").relayed === null
+	writeFileSync(rec129("merge"), JSON.stringify({ agent: "merge", relayed: true }))
+	// A LOCK BROKEN AND RETAKEN WHILE ITS HOLDER WORKED IS THE NEW HOLDER'S (the third review, F5): a reaper slowed in its telling (a
+	// `comm.mjs` that takes 2 s), its lock overwritten meanwhile as a successor that broke it would - the reaper must not remove it.
+	// The positive control: the lock held the reaper's own pid when it was taken over
+	writeFileSync(comm129, `Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 2000)\n`)
+	orphanRec("droplock", { window: 26 })
+	const lkD = `${rec129("droplock")}.reap`
+	const rp = spawn(process.execPath, [R129, "--reap", r129], { stdio: "ignore", env: env129 })
+	let heldByReaper = false
+	for (const u = Date.now() + 15000; Date.now() < u && !heldByReaper && running(rp); nap(20)) { try { heldByReaper = readFileSync(lkD, "utf8") === String(rp.pid) } catch {} }
+	if (heldByReaper) writeFileSync(lkD, "1")
+	for (const u = Date.now() + 20000; Date.now() < u && running(rp); nap(50)) {}
+	writeFileSync(comm129, realComm)
+	legs.dropLockOwnOnly = heldByReaper && (() => { try { return readFileSync(lkD, "utf8") === "1" } catch { return false } })()
+	rmSync(lkD, { force: true }); writeFileSync(rec129("droplock"), JSON.stringify({ agent: "droplock", relayed: true }))
+
+	// THROUGH THE STUB. First nothing to reap but a record OFF THE ROSTER: no reaper is started. Then an orphan: reaped from one Stop,
+	// the live one beside it left alone. Then a pid recycled into another record's watcher, alone: only the stub's own test starts it.
+	const stop = () => spawnSync(process.execPath, [join(r129, "done", ".claude", "comm-hook.mjs"), "stop"], { cwd: join(r129, "done"), env: env129, encoding: "utf8", timeout: 15000,
+		input: JSON.stringify({ cwd: join(r129, "done"), hook_event_name: "Stop", stop_hook_active: false, transcript_path: join(r129, "none.jsonl") }) })
+	orphanRec("ghost")
+	const runs0 = reapRuns()
+	stop(); nap(1500)
+	legs.stubOffRosterIdle = reapRuns() === runs0 && read129("ghost").relayed === null
+	rmSync(rec129("ghost"), { force: true })
+	orphanRec("stub", { window: 22 })
+	const stubLiveK = watcherOf(rec129("stublive")), stubOtherK = watcherOf(rec129("stublive"))
+	writeFileSync(rec129("stublive"), JSON.stringify({ agent: "stublive", session: sess.pid, armed_at: ago(60_000), relay_pid: stubLiveK.pid, relayed: null }))
+	nap(150)
+	stop()
+	// the reaper writes its run's line last, after the letter and the leader's ring: wait for it, then a moment for any second run
+	for (const u = Date.now() + 15000; Date.now() < u && reapRuns() < runs0 + 1; nap(50)) {}
+	nap(500)
+	legs.stub = read129("stub").relayed === false && letters().some((m) => m.from === "stub") && reapRuns() === runs0 + 1
+	orphanRec("stubother", { relay_pid: stubOtherK.pid })
+	stop()
+	for (const u = Date.now() + 15000; Date.now() < u && read129("stubother").relayed !== false; nap(50)) {}
+	legs.stubRecycled = read129("stubother").relayed === false
+	legs.stubLive = read129("stublive").relayed === null && armedLive(stubLiveK)
+	// the stand-in was the kitten asked, whenever a socket was there to ask about (none on a machine with no kitty)
+	legs.hermetic = (() => { let socks = []; try { socks = readdirSync("/tmp").filter((f) => /^kitty-\d+$/.test(f)) } catch {} try { return !socks.length || readFileSync(kittenLog129, "utf8").includes(" ls") } catch { return false } })()
+	check("A129 a relay's watcher that dies says so - a throw ends its record as a refusal, its stack kept, the owner told - and one gone without a word is reaped from any Stop: the record, the owner, the leader's letter, once",
+		Object.values(legs).every(Boolean),
+		Object.entries(legs).map(([k, v]) => `${k}=${v}`).join("; ") + `; watcher exit ${w.status}`)
+	// its fake watchers carry `--after-turn` in /proc: gone before any later arm looks
+	for (const k of kids129) try { k.kill("SIGKILL") } catch {}
+	process.env.PATH = path0_129
+}
+
+// A130 — THE ARMING'S REPLACE AND ITS LOCK, WITHOUT A WINDOW (the fourth review of #relay-death, F2: round 3's F3 and F6 were called
+// "A95's ground", and are not). The REAL arming runs inside a fake session - an orphan named `claude`, its registry entry written -
+// and a fake kitten answers `ls` with that session's window and refuses everything else: nothing is typed, no window opened. strace
+// holds the arming's kill 400 ms, and the old watcher writes the moment strace's log shows that kill: its write lands between the
+// arming's read under the lock and its kill, by construction (the fifth review, F4: a 100 ms timer let a stalled arming pass
+// NOREREAD). Legs: `note` (a key noted then is in the "replaced" row: the read after the kill), `end` (an end written then stands,
+// and is logged once on the killed watcher's behalf), `endlog` (the watcher had logged it itself: still ONE row - F3), `relayed` (a
+// relay done then: no row of a relay that did not happen), `f6` (a live watcher seen only under the lock: "already armed", its record,
+// its watcher, no lock left), `f6held` (the lock never had: the holder's lock spared), `f6box` (one waiting for its box: replaced),
+// `locktyping` (typing, seen only under the lock: refused, its lock dropped); and by PHASE at the unlocked read (the fifth and sixth
+// reviews): refused, never killed - `typing`, `heldtyping`, `aftclear`, `prompting`, `proving`, `unknown`; replaced - `heldkb`,
+// `heldother`, `oldrelease`; already armed - `guardphase`, `oldarmed` (see their table); under the lock, `lefttyping` and
+// `f6checking`; `deadprev`; and a REAL watcher's record read as each of its keys arrives (`realclear`, `realerase`, `realerase2`:
+// the ninth review's F1 - the phase an arming would read then). Positive controls: strace's log of the DELAYED kill, the old watcher's own mark that it wrote, the
+// kitten's log of the arming's `ls` before a swap. strace missing: red, said so. For the block, PATH and CLAUDE_COMM_RUNTIME are its
+// own (F5: a spawn that forgot env130 would arm a REAL relay on the session running the suite); its sweep kills only what it knows (F7).
+{
+	const r130 = mkdtempSync(join(tmpdir(), "comm-attack-arming-"))
+	const P130 = join(r130, "p"), A130dir = join(P130, "app")
+	mkdirSync(A130dir, { recursive: true }); mkdirSync(join(P130, ".comm"), { recursive: true })
+	writeFileSync(join(P130, ".comm", "config.json"), JSON.stringify({ leader: "leader", agents: { leader: ".", app: "app" },
+		notify: ["sh", "-c", 'printf "%s\n" "$1" >> "$0"', join(r130, "told.txt")], box: { retryMs: 600000, notifyAfterMs: 600000, maxMs: 43200000 } }))
+	execFileSync("node", [join(PKG, "install.mjs"), P130], { stdio: "pipe" })
+	const reg130 = await import(pathToFileURL(join(PKG, "bin", "session-registry.mjs")).href)
+	const R130 = join(P130, ".comm", "bin", "relay.mjs"), rec130 = join(P130, ".comm", "relay", "app.json"), lock130 = `${rec130}.reap`
+	const log130 = rec130.replace(/\.json$/, ".log.jsonl"), rt130 = join(r130, "runtime")
+	mkdirSync(dirname(rec130), { recursive: true })
+	let ksock = null
+	try { ksock = readdirSync("/tmp").filter((f) => /^kitty-\d+$/.test(f)).map((f) => `/tmp/${f}`)[0] || null } catch {}
+	const bin130 = join(r130, "fakebin"), klog130 = join(r130, "kitten.log"), kls130 = join(r130, "ls.json")
+	mkdirSync(bin130, { recursive: true })
+	writeFileSync(join(bin130, "kitten"), `#!/bin/sh\nprintf '%s\\n' "$*" >> '${klog130}'\nif [ "$*" = "@ --to unix:${ksock} ls" ]; then cat '${kls130}'; exit 0; fi\nexit 1\n`, { mode: 0o755 })
+	const env130 = { ...process.env, PATH: `${bin130}:${process.env.PATH}`, CLAUDE_COMM_RUNTIME: rt130, CLAUDE_COMM_AGENT: "" }
+	// THE BLOCK'S OWN WORLD, for every child, given env130 or not (F5); restored at its end and at any exit
+	const env0_130 = { PATH: process.env.PATH, CLAUDE_COMM_RUNTIME: process.env.CLAUDE_COMM_RUNTIME }
+	const restore130 = () => { process.env.PATH = env0_130.PATH; if (env0_130.CLAUDE_COMM_RUNTIME === undefined) delete process.env.CLAUDE_COMM_RUNTIME; else process.env.CLAUDE_COMM_RUNTIME = env0_130.CLAUDE_COMM_RUNTIME }
+	process.env.PATH = env130.PATH; process.env.CLAUDE_COMM_RUNTIME = rt130
+	// WHAT IT KNOWS, and only that, is killed (F7): the session, its fake watchers, the watcher an arming left and that one's keeper
+	const known130 = new Set()
+	const pgOf = (p) => { try { const s = readFileSync(`/proc/${p}/stat`, "utf8"); return Number(s.slice(s.lastIndexOf(")") + 2).split(" ")[2]) } catch { return 0 } }
+	const ours = (p) => { try { return readFileSync(`/proc/${p}/cmdline`, "utf8").includes(r130) } catch { return false } }
+	const kill130 = (p) => { if (!(p > 1) || !ours(p)) return; if (pgOf(p) === p) try { process.kill(-p, "SIGKILL") } catch {} try { process.kill(p, "SIGKILL") } catch {} }
+	let spid130 = 0
+	const sweep130 = (all) => { for (const p of known130) if (all || p !== spid130) { kill130(p); if (p !== spid130) known130.delete(p) } }
+	const leftBy = () => { try { const p = Number(JSON.parse(readFileSync(rec130, "utf8")).relay_pid); if (p > 1) { known130.add(p); const g = pgOf(p); if (g > 1 && ours(g)) known130.add(g) } } catch {} }
+	atExit(() => { restore130(); sweep130(true); try { rmSync(r130, { recursive: true, force: true }) } catch {} })
+	const hasStrace = spawnSync("sh", ["-c", "command -v strace"], { encoding: "utf8" }).status === 0
+	// THE SESSION: an orphan named claude in the agent's folder, running the bench's job loop; nothing above it is a session
+	const fake130 = join(r130, "claude"), sd130 = join(r130, "s")
+	symlinkSync(process.execPath, fake130); mkdirSync(sd130)
+	writeFileSync(join(sd130, "runner.cjs"), BENCH_RUNNER)
+	spawnSync("sh", ["-c", '"$0" "$@" >/dev/null 2>&1 &', fake130, join(sd130, "runner.cjs"), sd130, String(process.pid)], { cwd: A130dir, env: env130, stdio: "ignore" })
+	for (const u = Date.now() + 8000; Date.now() < u && !spid130; nap(20)) try { spid130 = Number(readFileSync(join(sd130, "ready"), "utf8")) } catch {}
+	if (spid130) known130.add(spid130)
+	const tx130 = join(r130, "session.jsonl")
+	writeFileSync(tx130, JSON.stringify({ type: "system", subtype: "turn_duration", timestamp: new Date().toISOString() }) + "\n")
+	mkdirSync(join(rt130, "claude-comm", "sessions"), { recursive: true })
+	writeFileSync(join(rt130, "claude-comm", "sessions", `${spid130}.json`), JSON.stringify({ v: 1, pid: spid130, start: reg130.startTimeOf(spid130),
+		boot: reg130.bootId(), transcript: tx130, agent: "app", source: "startup", at: new Date().toISOString() }))
+	writeFileSync(kls130, JSON.stringify([{ id: 1, tabs: [{ id: 1, windows: [{ id: 77, pid: 1, in_alternate_screen: true, foreground_processes: [{ pid: spid130 }], user_vars: {} }] }] }]))
+	// THE OLD WATCHER, fake: `--after-turn <record>` in its command line (what isWatcher reads), its own process group, gone with the
+	// suite (F6) - a suite gone OR a zombie: a killed suite not yet reaped still answers kill(pid, 0), measured. It writes - atomically - the moment strace's log shows the arming's group kill: a key noted, its end (and its own log
+	// row, `endlog`), or a relay done; then marks that it did
+	const fw130 = join(r130, "fw.cjs")
+	writeFileSync(fw130, `const fs=require("fs"),[mode,rec,suite,slog]=process.argv.slice(2),log=rec.replace(/\\.json$/,".log.jsonl")
+setInterval(()=>{let z=true;try{z=/^Z/.test(fs.readFileSync("/proc/"+suite+"/stat","utf8").split(") ").pop())}catch{}if(z)process.exit(0)},300);setTimeout(()=>process.exit(0),120000)
+const wr=(o)=>{const t=rec+".fw.tmp";fs.writeFileSync(t,JSON.stringify(o));fs.renameSync(t,rec);if(mode==="endlog")fs.appendFileSync(log,JSON.stringify({...o,logged_at:new Date().toISOString()})+"\\n");fs.appendFileSync(rec+".fw.done",mode+"\\n")}
+if(mode!=="idle"){const iv=setInterval(()=>{let t="";try{t=fs.readFileSync(slog,"utf8")}catch{}if(!/kill\\(-/.test(t))return;clearInterval(iv);const r=JSON.parse(fs.readFileSync(rec,"utf8")),at=new Date().toISOString()
+if(mode==="note")wr({...r,keys_sent:{kinds:["Ctrl+U"],enter_after_prompt:false}})
+else if(mode==="relayed")wr({...r,relayed:true,relay_pid:null,ended_at:at,clear:{at,typed:true,cleared:true}})
+else wr({...r,relayed:false,relay_pid:null,ended_at:at,cancelled:"the old watcher's own end"})},2)}
+setInterval(()=>{},1000)\n`)
+	const fake = (mode, slog = "") => {
+		const k = spawn(process.execPath, [fw130, mode, rec130, String(process.pid), slog, "--after-turn"], { detached: true, stdio: "ignore" })
+		known130.add(k.pid)
+		for (const u = Date.now() + 5000; Date.now() < u; nap(10)) try { if (readFileSync(`/proc/${k.pid}/cmdline`, "utf8").includes("--after-turn")) break } catch {}
+		return k
+	}
+	const alive130 = (pid) => { try { return !/^Z/.test(readFileSync(`/proc/${pid}/stat`, "utf8").split(") ").pop()) } catch { return false } }
+	const read130 = () => { try { return JSON.parse(readFileSync(rec130, "utf8")) } catch { return {} } }
+	const rows130 = (at) => { try { return readFileSync(log130, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)).filter((o) => o.armed_at === at) } catch { return [] } }
+	const lsSeen = () => { try { return readFileSync(klog130, "utf8").split("\n").filter((l) => l === `@ --to unix:${ksock} ls`).length } catch { return 0 } }
+	const BOX = "waiting for its box", TURN = "waiting for the turn that armed it to end"
+	const old130 = (pid, at, more = {}) => JSON.stringify({ agent: "app", session: spid130, cwd: A130dir, window: 77, sock: ksock, transcript: tx130, armed_offset: 0,
+		say: "resume", guards: ["true"], armed_at: at, relay_pid: pid, relayed: null, phase: TURN, ...more })
+	const boxed = () => ({ phase: BOX, box_wait_since: new Date(Date.now() - 30_000).toISOString() })
+	// a hold of the window's keyboard, as wake.holdKeyboard writes it, for `pid`
+	const holdFor = (pid, what) => {
+		const f = join(rt130, "claude-comm", "typing", `${basename(String(ksock))}-77.json`), st = readFileSync(`/proc/${pid}/stat`, "utf8")
+		mkdirSync(dirname(f), { recursive: true })
+		writeFileSync(f, JSON.stringify({ pid, tick: st.slice(st.lastIndexOf(") ") + 2).split(" ")[19], at: Date.now(), what }))
+		return f
+	}
+	let jobs130 = 9000
+	const submit130 = (tag, traced) => {
+		const n = ++jobs130, argv = [...(traced ? ["strace", "-o", join(r130, `strace-${tag}.log`), "-e", "trace=kill", "-e", "inject=kill:delay_enter=400000"] : []),
+			process.execPath, R130, "--say", "resume", "--guard", "true"]
+		writeFileSync(join(sd130, `${n}.job.tmp`), JSON.stringify({ argv, cwd: A130dir, env: env130 })); renameSync(join(sd130, `${n}.job.tmp`), join(sd130, `${n}.job`))
+		return () => {
+			for (const u = Date.now() + 30000; Date.now() < u; nap(20)) if (existsSync(join(sd130, `${n}.out`))) try { const o = JSON.parse(readFileSync(join(sd130, `${n}.out`), "utf8")); leftBy(); return o } catch {}
+			leftBy(); return { status: null, stdout: "", stderr: "no answer in 30 s" }
+		}
+	}
+	const delayed = (tag) => { try { return /kill\(-.*DELAYED/.test(readFileSync(join(r130, `strace-${tag}.log`), "utf8")) } catch { return false } }
+	const reset130 = () => { sweep130(false); for (const f of [rec130, lock130, log130, `${rec130}.fw.done`, join(rt130, "claude-comm", "typing", `${basename(String(ksock))}-77.json`)]) rmSync(f, { force: true }) }
+	const said = (o) => `${o.status} ${((o.stdout || "") + (o.stderr || "")).trim().split("\n")[0].slice(0, 90)}`
+	const legs130 = {}, said130 = {}
+	const ready130 = !!spid130 && !!ksock && hasStrace
+	if (ready130) {
+		// NOTE, END, ENDLOG, RELAYED: an old watcher waiting for its box, replaced; its write lands inside the held kill
+		for (const mode of ["note", "end", "endlog", "relayed"]) {
+			reset130()
+			const k = fake(mode, join(r130, `strace-${mode}.log`)), at = new Date(Date.now() - 60_000).toISOString()
+			writeFileSync(rec130, old130(k.pid, at, boxed()))
+			const o = submit130(mode, true)()
+			said130[mode] = said(o)
+			const rows = rows130(at), wrote = (() => { try { return readFileSync(`${rec130}.fw.done`, "utf8").includes(mode) } catch { return false } })()
+			const armed = o.status === 0 && /^relay: armed/.test(o.stdout || "") && read130().armed_at !== at && delayed(mode) && wrote && !alive130(k.pid)
+			legs130[mode] = armed && (mode === "note" ? rows.length === 1 && /replaced by a new arming/.test(rows[0].cancelled || "") && /Ctrl\+U/.test(rows[0].cancelled || "")
+				: mode === "end" ? rows.length === 1 && rows[0].cancelled === "the old watcher's own end" && /killed as it ended/.test(rows[0].logged_by || "")
+				: mode === "endlog" ? rows.length === 1 && rows[0].cancelled === "the old watcher's own end" && !rows[0].logged_by
+				: rows.length === 0)
+		}
+		// A LIVE OLD WATCHER SEEN AT THE ARMING'S UNLOCKED READ, BY ITS PHASE ALONE (the fifth, sixth and seventh reviews): past its box -
+		// typing its /clear (`typing`; `heldtyping`, with no box wait and the keyboard its own), waiting after the /clear (`aftclear`) -
+		// refused (4), alive, its record untouched. Replaced (armed, the old one killed, one "replaced" row): waiting for its box whoever
+		// holds the keyboard - itself, for a look (`heldkb`), or another typist (`heldother`) - a watcher of the release before that waited
+		// (`oldrelease`: no phase, a box wait). "Already armed", as the release before said: its guards being checked (`guardphase`, the
+		// eighth review's F1: its first look may be erasing under its hold), one of the release before that never waited (`oldarmed`)
+		const ended130 = { turn_ended_at: new Date(Date.now() - 20_000).toISOString() }
+		const CASES130 = {
+			typing: [{ ...boxed(), phase: "typing the /clear", keys_sent: { kinds: ["/clear"], enter_after_prompt: false } }, null, "refused"],
+			heldtyping: [{ ...ended130, phase: "typing the /clear" }, "self", "refused"],
+			aftclear: [{ ...boxed(), phase: "waiting for its box after the /clear" }, null, "refused"],
+			heldkb: [boxed(), "self", "replaced"],
+			heldother: [boxed(), "other", "replaced"],
+			guardphase: [{ ...ended130, phase: "checking its guards and its window" }, null, "armed"],
+			// every phase past its box is "typing", an unknown one too (the eighth review, F3)
+			prompting: [{ ...boxed(), phase: "typing the first prompt" }, null, "refused"],
+			proving: [{ ...boxed(), phase: "proving its prompt was taken" }, null, "refused"],
+			unknown: [{ ...boxed(), phase: "a phase this release does not know" }, null, "refused"],
+			oldrelease: [{ ...boxed(), phase: undefined }, null, "replaced"],
+			oldarmed: [{ phase: undefined }, null, "armed"],
+		}
+		for (const [kt, [more, hold, want]] of Object.entries(CASES130)) {
+			reset130()
+			const k = fake("idle"), at = new Date(Date.now() - 60_000).toISOString()
+			writeFileSync(rec130, old130(k.pid, at, more))
+			if (hold === "self") holdFor(k.pid, "the relay of app")
+			if (hold === "other") holdFor(spid130, "a bell")
+			const o = submit130(kt, false)()
+			said130[kt] = said(o)
+			if (want === "replaced") for (const u = Date.now() + 3000; Date.now() < u && alive130(k.pid); nap(20)) {}
+			const r = read130(), rows = rows130(at)
+			legs130[kt] = want === "refused"
+				? o.status === 4 && /relaying this window right now/.test(o.stderr || "") && alive130(k.pid) && r.armed_at === at && r.relay_pid === k.pid && rows.length === 0 && !existsSync(lock130)
+				: want === "armed" ? o.status === 0 && /already armed/.test(o.stdout || "") && alive130(k.pid) && r.armed_at === at && rows.length === 0 && !existsSync(lock130)
+				: o.status === 0 && /^relay: armed/.test(o.stdout || "") && !alive130(k.pid) && r.armed_at !== at && rows.length === 1 && /replaced by a new arming/.test(rows[0].cancelled || "") && !existsSync(lock130)
+		}
+		// F6, F6HELD, F6BOX, LOCKTYPING: the record ENDED at the arming's unlocked read; under the lock - held here, as a new arming holds
+		// it - a live watcher's record is in its place. The swap waits for the arming's `ls`: past its unlocked read, before its lock
+		// LEFTTYPING (the eighth review, F2): the same watcher waiting for its box at the unlocked read, past it - typing its /clear - under the lock
+		// F6CHECKING (the ninth review, F2): the one found only under the lock is checking its guards - "already armed" there too
+		for (const k6 of ["f6", "f6held", "f6box", "locktyping", "lefttyping", "f6checking"]) {
+			reset130()
+			const k = fake("idle"), at0 = new Date(Date.now() - 120_000).toISOString(), at = new Date(Date.now() - 60_000).toISOString()
+			writeFileSync(rec130, k6 === "lefttyping" ? old130(k.pid, at, boxed()) : old130(null, at0, { relayed: false, ended_at: new Date(Date.now() - 90_000).toISOString(), cancelled: "an older one, ended" }))
+			writeFileSync(lock130, "1")
+			const ls0 = lsSeen(), wait = submit130(k6, false)
+			let sawLs = false
+			for (const u = Date.now() + 15000; Date.now() < u && !sawLs; nap(5)) sawLs = lsSeen() > ls0
+			writeFileSync(rec130, old130(k.pid, at, k6 === "f6box" ? boxed() : k6 === "locktyping" || k6 === "lefttyping" ? { ...boxed(), phase: "typing the /clear" }
+				: k6 === "f6checking" ? { ...ended130, phase: "checking its guards and its window" } : {}))
+			if (k6 !== "f6held") rmSync(lock130, { force: true })
+			const o = wait()
+			said130[k6] = said(o)
+			if (k6 === "f6box") for (const u = Date.now() + 3000; Date.now() < u && alive130(k.pid); nap(20)) {}
+			const r = read130(), lk = (() => { try { return readFileSync(lock130, "utf8") } catch { return null } })()
+			legs130[k6] = sawLs && (k6 === "f6box"
+				? o.status === 0 && /^relay: armed/.test(o.stdout || "") && !alive130(k.pid) && r.armed_at !== at && rows130(at).length === 1 && /replaced by a new arming/.test(rows130(at)[0].cancelled || "") && lk === null
+				: k6 === "locktyping" || k6 === "lefttyping" ? o.status === 4 && /relaying this window right now/.test(o.stderr || "") && alive130(k.pid) && r.armed_at === at && r.phase === "typing the /clear" && lk === null
+				: o.status === 0 && /already armed/.test(o.stdout || "") && r.armed_at === at && r.relay_pid === k.pid && alive130(k.pid) && (k6 === "f6held" ? lk === "1" : lk === null))
+		}
+		// DEADPREV (the eighth review, F6): the record open, its watcher's pid dead - the next arming logs that death and says it
+		{
+			reset130()
+			const gone = Number(spawnSync(process.execPath, ["-e", "console.log(process.pid)"], { encoding: "utf8" }).stdout.trim())
+			const at = new Date(Date.now() - 60_000).toISOString()
+			writeFileSync(rec130, old130(gone, at, boxed()))
+			const o = submit130("deadprev", false)()
+			said130.deadprev = said(o)
+			const rows = rows130(at)
+			legs130.deadprev = o.status === 0 && /^relay: armed/.test(o.stdout || "") && /Your previous relay \(armed .*\) died without a word/.test(o.stdout || "")
+				&& rows.length === 1 && (rows[0].died || {}).by === "its own next arming" && read130().armed_at !== at
+		}
+		// REAL WATCHER (review 9, F1): the record as each of its keys ARRIVES - the phase an arming would read then
+		{
+			const es = readFileSync(join(PKG, "test", "edge-screens.mjs"), "utf8"), SCR = {}
+			for (const l of es.split("\n")) { const m = /^\t"(\w+)": (".*"),?$/.exec(l); if (m) SCR[m[1]] = JSON.parse(m[2]) }
+			const kit0 = readFileSync(join(bin130, "kitten"), "utf8")
+			for (const [tag, screen] of [["realclear", "empty"], ["realerase", "tail"]]) {
+				reset130()
+				const scr = join(r130, `screen-${tag}.txt`), snap = join(r130, `snap-${tag}.txt`)
+				writeFileSync(scr, SCR[screen])
+				writeFileSync(join(bin130, "kitten"), `#!/bin/sh\nprintf '%s\\n' "$*" >> '${klog130}'\ncase "$*" in\n"@ --to unix:${ksock} ls") cat '${kls130}'; exit 0;;\n*" get-text "*) cat '${scr}'; exit 0;;\n*" send-text "*) { printf 'ARG %s\\n' "$*"; cat '${rec130}'; printf '\\n@@END@@\\n'; } >> '${snap}'; exit 0;;\nesac\nexit 1\n`, { mode: 0o755 })
+				const o = submit130(tag, false)()
+				appendFileSync(tx130, JSON.stringify({ type: "system", subtype: "turn_duration", timestamp: new Date().toISOString() }) + "\n")
+				let snaps = []
+				const parse = () => { try { return readFileSync(snap, "utf8").split("@@END@@\n").slice(0, -1).filter((c) => c.startsWith("ARG ")).map((c) => { const i = c.indexOf("\n"); let rec = {}; try { rec = JSON.parse(c.slice(i + 1)) } catch {} return { arg: c.slice(4, i), rec } }) } catch { return [] } }
+				for (const u = Date.now() + 25000; Date.now() < u; nap(50)) { snaps = parse(); if (tag === "realclear" ? snaps.some((s) => s.arg.endsWith(" /clear")) : snaps.length) break }
+				const key = tag === "realclear" ? snaps.find((s) => s.arg.endsWith(" /clear")) : snaps[0]
+				legs130[tag] = o.status === 0 && !!key && (tag === "realclear" ? key.rec.phase === "typing the /clear" : ["waiting for the turn that armed it to end", "checking its guards and its window"].includes(key.rec.phase))
+				if (tag === "realerase") {
+					const w = Number(read130().relay_pid), aw = read130().armed_at
+					const o2 = submit130("realerase2", false)()
+					legs130.realerase2 = o2.status === 0 && /already armed/.test(o2.stdout || "") && alive130(w) && read130().armed_at === aw
+					said130.realerase2 = said(o2)
+				}
+				said130[tag] = `${said(o)} | keys: ${snaps.map((s) => `${JSON.stringify(s.arg.split(" ").pop())}@${s.rec.phase}`).join(", ")}`
+				leftBy(); sweep130(false)
+				writeFileSync(join(bin130, "kitten"), kit0, { mode: 0o755 })
+			}
+		}
+	}
+	reset130()
+	check("A130 the arming's replace and its lock, headless: what the old watcher wrote between the arming's read under the lock and its kill is said, or stands, logged once; a watcher past its box is refused, never killed, one waiting for it replaced, any other 'already armed' - on both reads; a predecessor dead without a word logged",
+		ready130 && Object.keys(legs130).length === 25 && Object.values(legs130).every(Boolean),
+		!ready130 ? `not run: ${!hasStrace ? "strace is missing (apt install strace) - " : ""}${!ksock ? "no /tmp/kitty-N socket name to borrow - " : ""}${!spid130 ? "the fake session never started" : ""}`
+			: Object.entries(legs130).map(([k, v]) => `${k}=${v} (${said130[k]})`).join("; "))
+	sweep130(true)
+	restore130()
 }
 
 // A119 - A123: WHO MAY OPEN AND CLOSE, UNDER WHAT ROOM, AND A CLOSED AGENT REOPENED BY ITS MAIL. Work's leader, 11-08 (letters 38, 44, 48): nothing checked who launches,
