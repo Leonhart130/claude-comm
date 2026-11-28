@@ -62,7 +62,7 @@ micro coupé, rien n'arrive au PC.
 | « Chef, parle plus lentement » / « plus vite » | le débit de sa voix d'un cran (0,05), retenu pour cet agent, entre 0,75 et 1,2 |
 | « Chef, vitesse normale » | le débit choisi au départ |
 | « Chef, voix de Pierre » / « voix de Jessica » | sa voix change aussitôt (un même modèle : rien à recharger), retenue |
-| « Chef, débit zéro quatre-vingt-cinq » | ce débit-là, retenu |
+| « Chef, passe en 0,85 » (ou « débit », « vitesse ») | ce débit-là, retenu - en chiffres ou en mots, quoi que Whisper écrive : « 0,85 », « 0.85 », « zéro quatre-vingt-cinq » |
 | « Chef, plus fort » / « moins fort » | le volume de sa voix, retenu pour cet agent |
 | « Qui écoute ? » | la liste des agents inscrits et de leurs noms, lue |
 
@@ -116,6 +116,7 @@ bibliothèques CUDA), plus environ 60 Mo par voix Piper.
 4. **La RAM et la VRAM** de Whisper résident, pour l'arranger avec work.
 5. **La voix** : trois voix Piper françaises, à te faire écouter (une par agent, peut-être).
 6. **Les noms** : Whisper reconnaît-il « Chef », « Work », « Toolbox » en début de phrase, et sans les confondre ?
+7. **Les nombres** : comment Whisper écrit « passe en 0,85 » et « minuteur dix minutes » dits par le propriétaire.
 
 ## À décider
 
@@ -123,5 +124,5 @@ bibliothèques CUDA), plus environ 60 Mo par voix Piper.
 - **La fenêtre de suite** : 20 s, plus, moins, ou pas du tout.
 - **L'agent** : un agent de cuisine dans son propre dossier (recommandé, pour les permissions), ou n'importe quel agent ?
 - ~~La voix~~ : **les deux, Jessica et Pierre** (un même modèle), **Jessica au départ**, changeables à la voix (le propriétaire,
-  2026-11-28). **Reste à trancher : le débit de départ** (0,85, 0,90 ou 1).
+  2026-11-28). ~~Le débit de départ~~ : **0,85** (`--length-scale` 1,176 dans Piper).
 - **Le temps sans parole** avant l'arrêt automatique.
