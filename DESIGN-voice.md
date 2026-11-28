@@ -10,7 +10,8 @@ et le micro par défaut de la machine). Le premier usage : cuisiner avec un agen
 réponse, réagir, et continuer la conversation.
 
 **Déjà choisi :** un **mot d'appel** (seule une phrase qui commence par lui est envoyée), et **tout en local** (rien ne quitte le
-PC). **Ajouté par le propriétaire le 2026-11-28 :** l'outil sert **à n'importe quel agent**, pas seulement à la cuisine (le leader
+PC pour la voix : la reconnaissance et la synthèse sont locales. **Mais ce que l'agent reçoit part chez Anthropic, comme tout
+message tapé à un agent Claude** (la revue du plan, F2 : « rien ne quitte le PC » était faux). **Ajouté par le propriétaire le 2026-11-28 :** l'outil sert **à n'importe quel agent**, pas seulement à la cuisine (le leader
 de work, celui de ce dépôt…), avec **un nom vocal par agent**, qu'il règle lui-même. Et le casque porte jusqu'à la cuisine.
 
 ## Ce qui existe déjà, mesuré le 2026-11-28
@@ -132,12 +133,61 @@ bibliothèques CUDA), plus environ 60 Mo par voix Piper.
 
 ## À décider
 
-- **Les noms vocaux** de tes agents. « Chef » pour la cuisine. Pour les autres, court de préférence (voir plus haut).
-- ~~La fenêtre de suite~~ : **20 s** (le propriétaire, 2026-11-28).
+- ~~Les noms vocaux~~ : **« Chef », « Work », « Toolbox »** au départ, changeables (le propriétaire, 2026-11-28).
+- ~~La fenêtre de suite~~ : **20 s** (le propriétaire, 2026-11-28). **À revoir après la revue du plan (F2)** : partout, ou
+  seulement pour le chef (work et ce dépôt peuvent agir) ?
+- **Les permissions du chef** : le limiter à parler, chercher sur le web et lire son dossier (rien d'autre à portée d'une phrase
+  mal comprise), ou le laisser tel quel ?
 - ~~La RAM~~ : **1,65 Gio acceptés** par le propriétaire tant que l'outil tourne ; work prévenu au premier vrai lancement.
 - ~~L'agent de cuisine~~ : il existe, dans son propre dossier, **sans le bus**. Il faut y installer le bus (un seul agent) et
   que le propriétaire redémarre sa session dans la même fenêtre (`/exit` puis `claude --continue`) pour qu'elle charge les hooks.
-  **Reste à décider : son accord pour l'installation.**
+  **Accordé et fait le 2026-11-28** (le bus, un seul agent ; une règle de confidentialité pour son chemin). **Reste : le
+  redémarrage de sa session**, par le propriétaire, quand elle n'est pas occupée.
 - ~~La voix~~ : **les deux, Jessica et Pierre** (un même modèle), **Jessica au départ**, changeables à la voix (le propriétaire,
   2026-11-28). ~~Le débit de départ~~ : **0,85** (`--length-scale` 1,176 dans Piper).
 - **Le temps sans parole** avant l'arrêt automatique.
+
+## Ce que la revue du plan a changé (`exchange/REVIEW-voice-design-1.md`, 2026-11-28)
+
+Verdict : **construire après ces changements**. L'architecture tient (la reconnaissance locale, le nom en tête, la frappe par la
+bibliothèque de `wake.mjs`, la réponse prise au `Stop`). Ces corrections priment sur le texte plus haut.
+
+1. **La réponse lue (F1).** On ne lit qu'**un seul `Stop` par phrase vocale** : le premier, quand `stop_hook_active` est faux, et
+   seulement si la dernière vraie ligne d'utilisateur du tour est exactement le texte que l'outil a tapé. Ça écarte les sonnettes,
+   les suites de courrier, les relais et ce que tu tapes au PC. Le texte de la réponse s'assemble comme le fait déjà l'outil de work
+   `derniere-reponse.mjs` (repris, pas réécrit) : `last_assistant_message` est absent quand la réponse précède un outil. Si ce `Stop`
+   a bloqué pour du courrier, une seule phrase fixe suit (« Chef a aussi reçu du courrier »).
+2. **La fenêtre de suite (F2)** : une télé, une autre personne ou l'écho de l'agent auraient la même autorité que toi. **À
+   décider par le propriétaire** (plus bas). Quel que soit son choix : 2 phrases sans nom au plus, jamais pendant la lecture ni
+   juste après, un seuil de niveau (la voix près du micro, pas la pièce), et, pour un agent qui peut agir (work, ce dépôt), une
+   confirmation par le nom avant tout acte irréversible.
+3. **Chaque panne s'entend (F3).** Un son et une phrase pour : l'écoute qui meurt, Whisper en erreur, une erreur d'API ou une limite
+   d'usage (le hook `StopFailure`), un dialogue de permission ou une question de l'agent (`Notification`), une frappe refusée. Et si
+   le casque décroche : PipeWire bascule sur les haut-parleurs et le micro du PC. L'outil le voit et se met en pause, au lieu de
+   parler à la pièce.
+4. **Les minuteurs survivent à l'écoute (F4)** : chacun est un minuteur `systemd-run --user --on-active`, et redit à voix haute à
+   sa pose (« minuteur de dix minutes posé »).
+5. **La frappe (F5)** suit **toutes** les règles de `wake.mjs` (9 et 10 comprises) et les limites du relais : une ligne, sans
+   antislash, 800 caractères au plus, sinon refusé et dit. Le préfixe `[vocal] ` reste. Un texte vocal resté dans une case est
+   effacé par l'outil lui-même, jamais laissé aux autres.
+6. **Une phrase qui attend a une borne (F6)** : 60 s. Passé ce délai, elle n'est pas envoyée et l'outil le dit. Ce que fait Claude
+   Code d'un message tapé pendant un tour est à mesurer : s'il le garde en file proprement, on tape tout de suite.
+7. **L'écoute a son propre service (F7)**, avec son plafond de mémoire et `Restart=on-failure`, hors de `agents.slice` (l'enveloppe
+   des tests, où elle prendrait un tiers et serait la première tuée).
+8. **L'écho (F8)** : l'écoute reprend une fois la lecture vidée, plus une marge. Une phrase entendue qui reprend la dernière
+   réponse lue est jetée. Et le skill ne fait plus finir chaque réponse par « dis-moi… ».
+9. **Une phrase mal comprise (F9)** : l'agent commence sa réponse par ce qu'il a compris, en quelques mots (« Pour les pâtes : … »).
+   Loin du PC, c'est la seule vérification possible.
+10. **Le lien à la fenêtre (F10)** est revérifié avant chaque phrase (le registre : pid, démarrage, transcription). La règle
+    `[vocal]` est réinjectée à chaque démarrage de session d'un agent inscrit, pour survivre à un `/clear`.
+11. **Le coût pour les autres agents (F11)** : un seul `stat` dans le `Stop` du stub pour un agent qui n'est pas en voix. Le passage
+    de la réponse se fait par un fichier déposé, jamais par un tube ou une socket, qui bloquerait la fin de tour d'un agent si
+    l'écoute était morte.
+12. **Les pièges de lecture (F12)** : renommer exige une phrase explicite (« Chef, ton nom vocal est Cuistot ») et une confirmation.
+    Un nom seul répond « oui ? ». Un « euh » avant le nom est toléré. Une commande ne vaut que si elle est la phrase entière.
+13. **Rien sur le disque (F13)** : pas de journal de ce qui est entendu, pas de vidage mémoire du processus, le texte passé par
+    fichier ou par l'entrée standard, jamais en argument (lisible dans `/proc`). L'enregistrement d'essai du propriétaire a été
+    effacé le 2026-11-28.
+
+**À mesurer en construisant** : la liste en fin de `REVIEW-voice-design-1.md` (l'écho, la perte du casque, Whisper sur le bruit, le
+bouton de coupure du micro, ce que Claude Code fait d'un message tapé pendant un tour…).
