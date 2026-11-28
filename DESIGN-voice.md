@@ -111,7 +111,11 @@ bibliothèques CUDA), plus environ 60 Mo par voix Piper.
 
 1. ~~La portée du casque jusqu'à la cuisine~~ : elle y va, dit le propriétaire.
 2. **Whisper sur la RTX 2080** : la latence pour une phrase de 5 s (modèles `large-v3-turbo` et `medium`), et la justesse en
-   français avec du bruit de cuisine (hotte, eau qui coule).
+   français avec du bruit de cuisine (hotte, eau qui coule). **Mesuré le 2026-11-28, premier essai** (`large-v3-turbo`, int8,
+   10 s de la voix du propriétaire, sans bruit) : « Chef, combien de temps pour cuire les pâtes ? » et « Work ? Où en es-tu ? »,
+   justes, les deux noms reconnus en tête. **1,45 s** pour transcrire 10 s, 4 s de chargement une fois. **1,65 Gio de RAM**
+   résidente (le pic de son scope) : c'est lourd sur cette machine. Un modèle plus petit, ou un autre moteur, est à comparer.
+   Le niveau du micro est bas (-20 dB en crête, gain du PC à 100 %), et Whisper s'en accommode.
 3. **L'écho** : la voix lue dans le casque revient-elle dans le micro ? Ça décide si « Chef, stop » peut couper une lecture.
 4. **La RAM et la VRAM** de Whisper résident, pour l'arranger avec work.
 5. **La voix** : trois voix Piper françaises, à te faire écouter (une par agent, peut-être).
