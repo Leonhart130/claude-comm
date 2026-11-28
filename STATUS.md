@@ -15,6 +15,8 @@ fold the settled parts into the README, the carried ones into `FINDINGS.md#carri
 00000. **RAM, work's 97:** the bench's windows through `systemd-run --slice=agents.slice` so the whole gate fits `borne` (then its
    floor back to 2 500 MB), then the sessions of `launch`/`reopen`/the relay there too (§1, measure first); a memory alert mid-turn
    (§2: `PostToolUse` reads `MemAvailable`). And §13's control: a full `boot.mjs` refuses outside `agents.slice` or under 5 000 MB.
+0000v. **The voice tool (owner, 11-28): scope only, NOT built** - `DESIGN-voice.md`: its loop, its measurements first, its open
+   decisions. Built on his go, once those are settled; then a review, as for any delivery.
 0000b. **Then §12's control** (a boot row when the installed Claude Code is newer than the last real-box run; `test/box-real.mjs`
    taking s9, `exchange/WIP-more-edge-probe-box-real-s9.mjs` - its s1, s2, s8 red on the release before too: triage first), **then
    work's 90 in its order:** 88 (`who` counts a `claude -p --bare`: `liveAgents`, `who.mjs`, keep it in `tree`; A22 has 279 B),
