@@ -61,6 +61,8 @@ micro coupé, rien n'arrive au PC.
 | « Chef, pause » / « Chef, reprends » | plus rien n'est envoyé à cet agent / de nouveau |
 | « Chef, parle plus lentement » / « plus vite » | le débit de sa voix d'un cran (0,05), retenu pour cet agent, entre 0,75 et 1,2 |
 | « Chef, vitesse normale » | le débit choisi au départ |
+| « Chef, voix de Pierre » / « voix de Jessica » | sa voix change aussitôt (un même modèle : rien à recharger), retenue |
+| « Chef, débit zéro quatre-vingt-cinq » | ce débit-là, retenu |
 | « Chef, plus fort » / « moins fort » | le volume de sa voix, retenu pour cet agent |
 | « Qui écoute ? » | la liste des agents inscrits et de leurs noms, lue |
 
@@ -68,6 +70,10 @@ Le minuteur est local exprès : un agent Claude n'a pas d'horloge qui sonne pend
 « Chef, explique plus lentement la cuisson » part chez l'agent, comme n'importe quelle question.
 
 ## Ce que l'agent fait de son côté
+
+**Ses réglages, demandés avec tes mots.** « Je préfère quand c'est Pierre, et un peu moins vite » : l'agent comprend et règle sa
+propre voix avec une commande de l'outil (`voice.mjs set --voice pierre --rate 0.85`), puis répond avec elle. Les phrases
+courtes du tableau ci-dessus font la même chose sans passer par lui. Les réglages sont retenus par agent.
 
 Une règle dans son skill : un message qui commence par `[vocal]` vient d'une personne qui écoute sans regarder. Il répond en
 phrases courtes, une étape à la fois, sans tableau ni code ni liste longue. Il écrit les quantités en toutes lettres (« deux
@@ -116,6 +122,6 @@ bibliothèques CUDA), plus environ 60 Mo par voix Piper.
 - **Les noms vocaux** de tes agents. « Chef » pour la cuisine. Pour les autres, court de préférence (voir plus haut).
 - **La fenêtre de suite** : 20 s, plus, moins, ou pas du tout.
 - **L'agent** : un agent de cuisine dans son propre dossier (recommandé, pour les permissions), ou n'importe quel agent ?
-- **La voix** : Jessica ou Pierre (un même modèle, donc les deux pour deux agents ne coûtent pas plus), et le débit de départ,
-  après l'écoute de 0,85, 0,90 et 1 (demandé par le propriétaire, le 2026-11-28).
+- ~~La voix~~ : **les deux, Jessica et Pierre** (un même modèle), **Jessica au départ**, changeables à la voix (le propriétaire,
+  2026-11-28). **Reste à trancher : le débit de départ** (0,85, 0,90 ou 1).
 - **Le temps sans parole** avant l'arrêt automatique.
