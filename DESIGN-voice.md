@@ -10,7 +10,8 @@ et le micro par défaut de la machine). Le premier usage : cuisiner avec un agen
 réponse, réagir, et continuer la conversation.
 
 **Déjà choisi :** un **mot d'appel** (seule une phrase qui commence par lui est envoyée), et **tout en local** (rien ne quitte le
-PC).
+PC). **Ajouté par le propriétaire le 2026-11-28 :** l'outil sert **à n'importe quel agent**, pas seulement à la cuisine (le leader
+de work, celui de ce dépôt…), avec **un nom vocal par agent**, qu'il règle lui-même. Et le casque porte jusqu'à la cuisine.
 
 ## Ce qui existe déjà, mesuré le 2026-11-28
 
@@ -28,17 +29,27 @@ PC).
 
 1. **Le micro écoute** en continu. Un détecteur de parole découpe les phrases.
 2. **Chaque phrase est transcrite localement** (Whisper, sur la carte graphique, en français).
-3. **Si elle commence par le mot d'appel**, un petit son confirme qu'elle est entendue, et le reste de la phrase est tapé dans la
-   fenêtre de l'agent, précédé de `[vocal]`. Sinon, elle est jetée sur-le-champ : ni enregistrée, ni écrite nulle part.
+3. **Si elle commence par le nom vocal d'un agent inscrit**, un petit son confirme qu'elle est entendue, et le reste de la phrase
+   est tapé dans la fenêtre de CET agent, précédé de `[vocal]`. Sinon, elle est jetée sur-le-champ : ni enregistrée, ni écrite
+   nulle part.
+   **La fenêtre de suite :** pendant 20 s après la fin d'une réponse lue, une phrase sans nom part au même agent, comme dans une
+   conversation. Passé ce délai, il faut redire le nom. Réglable, et désactivable.
 4. **L'agent répond.** Au `Stop`, sa réponse est nettoyée pour l'oreille (sans markdown, sans liens, sans blocs de code) et lue
-   dans le casque par une voix française locale (Piper).
+   dans le casque par une voix française locale (Piper). **Chaque agent peut avoir sa voix**, pour savoir qui parle.
 5. **Pendant la lecture, le micro n'envoie rien** : l'agent ne s'entend pas lui-même.
 
-**Le démarrage :** depuis la fenêtre de l'agent. Tu lui dis (ou tu tapes) « lance le micro », et il démarre l'outil sur sa
-propre fenêtre, comme il arme son relais. L'outil ne parle qu'à cette fenêtre-là, jamais à une autre.
+**Un seul micro, plusieurs agents.** Tu dis (ou tu tapes) « lance le micro » dans la fenêtre d'un agent. L'écoute démarre si
+elle ne tourne pas déjà, et cet agent s'y inscrit, sous son nom vocal et sur SA fenêtre, comme il arme son relais. Un deuxième
+agent s'inscrit de la même façon, depuis sa fenêtre. Seule une fenêtre inscrite peut recevoir une phrase : jamais une autre.
 
-**L'arrêt :** à la voix (« Chef, coupe le micro »), en tapant, ou tout seul après un temps sans parole (deux heures, réglable),
-pour rendre la mémoire.
+**Le nom vocal** se règle par agent, dans le `.comm/config.json` de son projet (ou au lancement). Il est court de préférence
+(« Chef », « Work », « Toolbox ») : on le dit à chaque phrase hors de la fenêtre de suite. Un nom plus long marche aussi. Deux
+agents inscrits ne peuvent pas avoir le même nom, et un nom trop proche d'un autre est refusé à l'inscription.
+
+**La pause et l'arrêt.** « Chef, pause » : plus rien n'est envoyé à cet agent, l'écoute attend seulement « Chef, reprends ».
+On ne se coupe donc jamais soi-même loin du PC. **L'arrêt complet** se fait au clavier, ou tout seul après un temps sans
+parole (deux heures, réglable), pour rendre la mémoire. **Le bouton de coupure du micro du casque** reste l'interrupteur sûr :
+micro coupé, rien n'arrive au PC.
 
 ## Les commandes à la voix (traitées sur place, jamais envoyées à l'agent)
 
@@ -47,7 +58,8 @@ pour rendre la mémoire.
 | « Chef, répète » | la dernière réponse est relue |
 | « Chef, stop » | la lecture en cours s'arrête (à condition que l'écho le permette, voir les mesures) |
 | « Chef, minuteur dix minutes » | un minuteur local, qui sonne et le dit à la fin (« le minuteur de dix minutes est fini ») |
-| « Chef, coupe le micro » | l'outil s'arrête, avec un son de fin |
+| « Chef, pause » / « Chef, reprends » | plus rien n'est envoyé à cet agent / de nouveau |
+| « Qui écoute ? » | la liste des agents inscrits et de leurs noms, lue |
 
 Le minuteur est local exprès : un agent Claude n'a pas d'horloge qui sonne pendant que tu cuisines.
 
@@ -59,7 +71,8 @@ cents grammes ») et finit par ce qu'il attend (« dis-moi quand c'est fait »).
 
 ## Hors du périmètre v1
 
-- Parler à plusieurs agents à la voix (« Chef, demande à X »).
+- Qu'un agent passe la parole à un autre à la voix (« Chef, demande à Work… ») : chacun reçoit seulement ce qui commence par
+  son nom.
 - Le téléphone, ou le PC à distance.
 - Un moteur de mot d'appel dédié : le mot est reconnu dans le texte de Whisper. C'est plus simple, mais toute parole passe par
   la carte graphique.
@@ -86,16 +99,18 @@ bibliothèques CUDA), plus environ 60 Mo par voix Piper.
 
 ## À mesurer avant d'écrire le code
 
-1. **La portée du casque** jusqu'à la cuisine : un enregistrement pendant que tu marches avec.
+1. ~~La portée du casque jusqu'à la cuisine~~ : elle y va, dit le propriétaire.
 2. **Whisper sur la RTX 2080** : la latence pour une phrase de 5 s (modèles `large-v3-turbo` et `medium`), et la justesse en
    français avec du bruit de cuisine (hotte, eau qui coule).
 3. **L'écho** : la voix lue dans le casque revient-elle dans le micro ? Ça décide si « Chef, stop » peut couper une lecture.
 4. **La RAM et la VRAM** de Whisper résident, pour l'arranger avec work.
-5. **La voix** : trois voix Piper françaises, à te faire écouter.
+5. **La voix** : trois voix Piper françaises, à te faire écouter (une par agent, peut-être).
+6. **Les noms** : Whisper reconnaît-il « Chef », « Work », « Toolbox » en début de phrase, et sans les confondre ?
 
 ## À décider
 
-- **Le mot d'appel** : « Chef » ? Il doit être court, rare dans une phrase ordinaire, et bien reconnu par Whisper.
+- **Les noms vocaux** de tes agents. « Chef » pour la cuisine. Pour les autres, court de préférence (voir plus haut).
+- **La fenêtre de suite** : 20 s, plus, moins, ou pas du tout.
 - **L'agent** : un agent de cuisine dans son propre dossier (recommandé, pour les permissions), ou n'importe quel agent ?
 - **La voix**, après l'écoute des trois.
 - **Le temps sans parole** avant l'arrêt automatique.
