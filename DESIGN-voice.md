@@ -16,7 +16,9 @@ de work, celui de ce dépôt…), avec **un nom vocal par agent**, qu'il règle 
 ## Ce qui existe déjà, mesuré le 2026-11-28
 
 - **Claude Code a une dictée intégrée** (`/voice`), mais il faut tenir ou taper la barre d'espace. Elle ne marche pas loin du
-  clavier. Et l'audio part chez Anthropic pour être transcrit. **Non retenue.**
+  clavier. Et l'audio part chez Anthropic pour être transcrit, par un modèle que la doc ne nomme pas, qu'aucun autre outil ne
+  peut appeler. **Non retenue** ; elle reste disponible devant le PC. Whisper a rendu les deux phrases du propriétaire mot pour
+  mot (plus bas).
 - **Claude Code ne lit pas ses réponses à voix haute.** Mais son hook `Stop` reçoit le texte de la réponse
   (`last_assistant_message`, dans la doc officielle des hooks), et le stub du bus traite déjà le `Stop`. C'est la prise pour la
   lecture.
@@ -33,18 +35,24 @@ de work, celui de ce dépôt…), avec **un nom vocal par agent**, qu'il règle 
    est tapé dans la fenêtre de CET agent, précédé de `[vocal]`. Sinon, elle est jetée sur-le-champ : ni enregistrée, ni écrite
    nulle part.
    **La fenêtre de suite :** pendant 20 s après la fin d'une réponse lue, une phrase sans nom part au même agent, comme dans une
-   conversation. Passé ce délai, il faut redire le nom. Réglable, et désactivable.
+   conversation. Passé ce délai, il faut redire le nom. Réglable, et désactivable. **Un nom en tête gagne toujours** : « Work, … »
+   dit dans la fenêtre de suite du chef part à work, et la fenêtre de suite passe à work.
 4. **L'agent répond.** Au `Stop`, sa réponse est nettoyée pour l'oreille (sans markdown, sans liens, sans blocs de code) et lue
-   dans le casque par une voix française locale (Piper). **Chaque agent peut avoir sa voix**, pour savoir qui parle.
+   dans le casque par une voix française locale (Piper). **Chaque agent peut avoir sa voix**, pour savoir qui parle. **Une
+   réponse longue est lue par morceaux** : les premières phrases, puis « je continue ? » ; « oui » ou « la suite » (sans le nom,
+   dans la fenêtre de suite) lit la suite, « non » s'arrête là.
 5. **Pendant la lecture, le micro n'envoie rien** : l'agent ne s'entend pas lui-même.
 
 **Un seul micro, plusieurs agents.** Tu dis (ou tu tapes) « lance le micro » dans la fenêtre d'un agent. L'écoute démarre si
 elle ne tourne pas déjà, et cet agent s'y inscrit, sous son nom vocal et sur SA fenêtre, comme il arme son relais. Un deuxième
 agent s'inscrit de la même façon, depuis sa fenêtre. Seule une fenêtre inscrite peut recevoir une phrase : jamais une autre.
 
-**Le nom vocal** se règle par agent, dans le `.comm/config.json` de son projet (ou au lancement). Il est court de préférence
-(« Chef », « Work », « Toolbox ») : on le dit à chaque phrase hors de la fenêtre de suite. Un nom plus long marche aussi. Deux
-agents inscrits ne peuvent pas avoir le même nom, et un nom trop proche d'un autre est refusé à l'inscription.
+**Le nom vocal est celui du propriétaire, pas celui de l'agent** (le propriétaire, le 2026-11-28 : un agent peut se renommer,
+« alimentation » par exemple, et il veut continuer à l'appeler « Chef »). Il est choisi à l'inscription, retenu **par dossier**
+(le dossier d'un agent ne change pas quand il se renomme), et un agent peut en avoir plusieurs (« Chef », « Cuistot »). Il se
+change à la voix (« Chef, je t'appelle Cuistot ») ou en le demandant à l'agent. Court de préférence (« Chef », « Work »,
+« Toolbox ») : on le dit à chaque phrase hors de la fenêtre de suite. Deux agents inscrits ne peuvent pas porter le même nom, et
+un nom trop proche d'un autre est refusé à l'inscription.
 
 **La pause et l'arrêt.** « Chef, pause » : plus rien n'est envoyé à cet agent, l'écoute attend seulement « Chef, reprends ».
 On ne se coupe donc jamais soi-même loin du PC. **L'arrêt complet** se fait au clavier, ou tout seul après un temps sans
@@ -125,8 +133,11 @@ bibliothèques CUDA), plus environ 60 Mo par voix Piper.
 ## À décider
 
 - **Les noms vocaux** de tes agents. « Chef » pour la cuisine. Pour les autres, court de préférence (voir plus haut).
-- **La fenêtre de suite** : 20 s, plus, moins, ou pas du tout.
-- **L'agent** : un agent de cuisine dans son propre dossier (recommandé, pour les permissions), ou n'importe quel agent ?
+- ~~La fenêtre de suite~~ : **20 s** (le propriétaire, 2026-11-28).
+- ~~La RAM~~ : **1,65 Gio acceptés** par le propriétaire tant que l'outil tourne ; work prévenu au premier vrai lancement.
+- ~~L'agent de cuisine~~ : il existe, dans son propre dossier, **sans le bus**. Il faut y installer le bus (un seul agent) et
+  que le propriétaire redémarre sa session dans la même fenêtre (`/exit` puis `claude --continue`) pour qu'elle charge les hooks.
+  **Reste à décider : son accord pour l'installation.**
 - ~~La voix~~ : **les deux, Jessica et Pierre** (un même modèle), **Jessica au départ**, changeables à la voix (le propriétaire,
   2026-11-28). ~~Le débit de départ~~ : **0,85** (`--length-scale` 1,176 dans Piper).
 - **Le temps sans parole** avant l'arrêt automatique.
